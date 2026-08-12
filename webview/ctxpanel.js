@@ -175,7 +175,7 @@ window.CtxPanel = (() => {
       paintBar(p.fill, s.pct);
     }
 
-    root.append(head);
+    root.append(head, host);
 
     btnRefresh.onclick = () => post({ cmd: 'refresh' });
     btnDiag.onclick = () => post({ cmd: 'diagnose' });
@@ -190,6 +190,32 @@ window.CtxPanel = (() => {
         paintCell(cells[0], d.usage.session, d.sessionReset);
         paintCell(cells[1], d.usage.week, d.weekReset);
         if (acct.firstChild !== cells[0]) acct.replaceChildren(cells[0], cells[1]);
+      }
+
+      // Le card delle sessioni attive col consumo di token
+      host.hidden = false;
+      if (!d.cards.length) {
+        host.replaceChildren(el('div', 'empty', 'Nessuna conversazione aperta in questo progetto.'));
+        cards.clear();
+      } else {
+        if (host.querySelector('.empty')) host.replaceChildren();
+        const seen = new Set();
+        d.cards.forEach((s, i) => {
+          seen.add(s.id);
+          let c = cards.get(s.id);
+          if (!c) {
+            c = buildCard(s.id);
+            cards.set(s.id, c);
+          }
+          paintCard(c, s, d.limit, d.focusHow);
+          if (host.children[i] !== c) host.insertBefore(c, host.children[i] || null);
+        });
+        for (const [id, c] of [...cards]) {
+          if (!seen.has(id)) {
+            c.remove();
+            cards.delete(id);
+          }
+        }
       }
     }
 
