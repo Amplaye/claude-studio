@@ -3,6 +3,7 @@
 // e sopravvive al ricaricamento della finestra grazie al serializer.
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
+import type { ContextMonitor } from '../context/monitor';
 import { bindWebview } from './bind';
 import type { ChatController } from './controller';
 
@@ -11,7 +12,12 @@ const TYPE = 'claudeStudio.panel';
 export class ChatPanel {
   private static current?: ChatPanel;
 
-  static open(ctx: vscode.ExtensionContext, chat: ChatController, column?: vscode.ViewColumn) {
+  static open(
+    ctx: vscode.ExtensionContext,
+    chat: ChatController,
+    column?: vscode.ViewColumn,
+    monitor?: ContextMonitor
+  ) {
     if (ChatPanel.current) {
       ChatPanel.current.panel.reveal(column, false);
       return ChatPanel.current;
@@ -22,18 +28,22 @@ export class ChatPanel {
       column ?? vscode.ViewColumn.Active,
       { enableScripts: true, retainContextWhenHidden: true }
     );
-    return new ChatPanel(panel, ctx, chat);
+    return new ChatPanel(panel, ctx, chat, monitor);
   }
 
   /** Ricarichi la finestra e la scheda e' ancora li'. */
-  static register(ctx: vscode.ExtensionContext, chat: ChatController): vscode.Disposable {
+  static register(
+    ctx: vscode.ExtensionContext,
+    chat: ChatController,
+    monitor?: ContextMonitor
+  ): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(TYPE, {
       async deserializeWebviewPanel(panel) {
         if (ChatPanel.current) {
           panel.dispose();
           return;
         }
-        new ChatPanel(panel, ctx, chat);
+        new ChatPanel(panel, ctx, chat, monitor);
       },
     });
   }
@@ -41,12 +51,13 @@ export class ChatPanel {
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     ctx: vscode.ExtensionContext,
-    chat: ChatController
+    chat: ChatController,
+    monitor?: ContextMonitor
   ) {
     ChatPanel.current = this;
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'activity.svg');
 
-    const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel');
+    const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel', monitor);
     // Scheda in primo piano = so per certo che conversazione stai guardando: e' il
     // caso in cui la barra di contesto non ha proprio niente da indovinare.
     owned.setPanelActive(panel.active);

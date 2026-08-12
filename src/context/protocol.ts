@@ -41,6 +41,13 @@ export interface CtxData {
 /** Estensione -> pannello. */
 export type CtxWire = { k: 'data'; d: CtxData };
 
+/**
+ * Estensione -> chat. Gli stessi dati, ma diretti alla colonna del contesto che la
+ * scheda a tutto schermo si tiene di fianco: li' il pannello della barra laterale
+ * non c'e', e senza questo la scheda sarebbe l'unica faccia a non vedere niente.
+ */
+export type CtxToChat = { k: 'ctx'; d: CtxData };
+
 /** Pannello -> estensione. */
 export type CtxCmd =
   | { cmd: 'ready' }

@@ -179,6 +179,11 @@
           "type": "boolean",
           "default": true,
           "description": "Mostra la sessione, il contesto e l'uso dell'account nella barra di stato."
+        },
+        "claudeStudio.openAsTab": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cliccando l'icona nella barra delle attività si apre la scheda a tutto schermo (una sola: se c'è già, torna davanti) e il pannello laterale si chiude. Spegnilo per restare nel pannello laterale."
         }
       }
     }

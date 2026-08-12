@@ -453,6 +453,21 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   const after = (arr) => arr.filter((m) => m.k === 'tool_start').length;
   t(after(pg) >= 1, 'la scheda non riceve i nuovi eventi');
 
+  // ---- il contesto dentro la scheda ----
+  // Nella barra laterale il contesto ha un pannello suo; in una scheda no, quindi i
+  // dati devono arrivare qui, altrimenti la faccia larga e' l'unica a non vederlo.
+  const railFrames = pg.filter((m) => m.k === 'ctx');
+  t(railFrames.length > 0, 'la scheda non riceve i dati del contesto');
+  t(
+    railFrames.some((m) => (m.d?.cards || []).some((c) => c.own)),
+    'nella colonna della scheda non arriva la conversazione della chat'
+  );
+  // Una scheda sola: chiederla di nuovo la riporta davanti, non ne apre una seconda.
+  t(
+    registered.panels.length === 1,
+    'e’ stata aperta piu’ di una scheda: ' + registered.panels.length
+  );
+
   for (const d of ctx.subscriptions) d.dispose?.();
 
   if (fails.length) {

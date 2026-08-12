@@ -27,6 +27,7 @@ export class ContextView implements vscode.WebviewViewProvider {
       tokensCss: 'tokens.css',
       motionCss: 'motion.css',
       contextCss: 'context.css',
+      ctxpanelJs: 'ctxpanel.js',
       contextJs: 'context.js',
     });
 

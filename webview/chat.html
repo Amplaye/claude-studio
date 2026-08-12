@@ -5,63 +5,76 @@
     <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
     <link rel="stylesheet" href="{{tokensCss}}" />
     <link rel="stylesheet" href="{{motionCss}}" />
+    <link rel="stylesheet" href="{{contextCss}}" />
     <link rel="stylesheet" href="{{chatCss}}" />
     <title>Claude Studio</title>
   </head>
   <body>
     {{sprite}}
 
-    <header class="top">
-      <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
-      <span class="grow"></span>
-      <label class="chip modechip" id="mode" title="Come si comporta coi permessi">
-        <svg class="ico"><use href="#ion-shield-checkmark" /></svg>
-        <select id="modeSel">
-          <option value="default">Chiede</option>
-          <option value="acceptEdits">Modifiche ok</option>
-          <option value="plan">Solo piano</option>
-          <option value="bypassPermissions">Non chiede</option>
-        </select>
-      </label>
-      <span class="chip" id="spend" title="Contesto dell’ultimo turno e costo della conversazione" hidden>
-        <svg class="ico"><use href="#ion-speedometer" /></svg><span id="spendTokens">0</span>
-        <span class="sep">·</span><span id="spendCost">$0</span>
-      </span>
-      <span class="chip" id="model" title="Modello della sessione">
-        <svg class="ico"><use href="#ion-hardware-chip" /></svg><span id="modelName">—</span>
-      </span>
-      <button class="iconbtn" id="btnHistory" title="Conversazioni di questo progetto">
-        <svg class="ico"><use href="#ion-time" /></svg>
-      </button>
-      <button class="iconbtn" id="btnTab" title="Apri come scheda">
-        <svg class="ico"><use href="#ion-open" /></svg>
-      </button>
-      <button class="iconbtn" id="btnNew" title="Nuova sessione">
-        <svg class="ico"><use href="#ion-add" /></svg>
-      </button>
-    </header>
+    <div class="shell">
+      <div class="chatcol">
+        <header class="top">
+          <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
+          <span class="grow"></span>
+          <label class="chip modechip" id="mode" title="Come si comporta coi permessi">
+            <svg class="ico"><use href="#ion-shield-checkmark" /></svg>
+            <select id="modeSel">
+              <option value="default">Chiede</option>
+              <option value="acceptEdits">Modifiche ok</option>
+              <option value="plan">Solo piano</option>
+              <option value="bypassPermissions">Non chiede</option>
+            </select>
+          </label>
+          <span class="chip" id="spend" title="Contesto dell’ultimo turno e costo della conversazione" hidden>
+            <svg class="ico"><use href="#ion-speedometer" /></svg><span id="spendTokens">0</span>
+            <span class="sep">·</span><span id="spendCost">$0</span>
+          </span>
+          <span class="chip" id="model" title="Modello della sessione">
+            <svg class="ico"><use href="#ion-hardware-chip" /></svg><span id="modelName">—</span>
+          </span>
+          <button class="iconbtn" id="btnHistory" title="Conversazioni di questo progetto">
+            <svg class="ico"><use href="#ion-time" /></svg>
+          </button>
+          <button class="iconbtn" id="btnCtx" title="Mostra o nascondi il contesto" hidden>
+            <svg class="ico"><use href="#ion-speedometer" /></svg>
+          </button>
+          <button class="iconbtn" id="btnTab" title="Apri come scheda">
+            <svg class="ico"><use href="#ion-open" /></svg>
+          </button>
+          <button class="iconbtn" id="btnNew" title="Nuova sessione">
+            <svg class="ico"><use href="#ion-add" /></svg>
+          </button>
+        </header>
 
-    <div class="drawer" id="drawer" hidden>
-      <div class="drawer-head">
-        <span>Conversazioni</span>
-        <button class="iconbtn" id="drawerClose" title="Chiudi">
-          <svg class="ico"><use href="#ion-close" /></svg>
-        </button>
+        <div class="drawer" id="drawer" hidden>
+          <div class="drawer-head">
+            <span>Conversazioni</span>
+            <button class="iconbtn" id="drawerClose" title="Chiudi">
+              <svg class="ico"><use href="#ion-close" /></svg>
+            </button>
+          </div>
+          <div class="drawer-list" id="drawerList"></div>
+        </div>
+
+        <main class="log" id="log"></main>
+
+        <form class="composer" id="composer">
+          <div class="menu" id="menu" hidden></div>
+          <div class="attach" id="attach" hidden></div>
+          <textarea id="input" rows="1" placeholder="Scrivi a Claude…  (@ per un file, / per un comando, Invio manda)"></textarea>
+          <button class="send" id="send" type="submit" title="Manda">
+            <svg class="ico"><use href="#ion-send" /></svg>
+          </button>
+        </form>
       </div>
-      <div class="drawer-list" id="drawerList"></div>
+
+      <!-- Da scheda a tutto schermo il contesto sta qui di fianco: nella barra
+           laterale ha un pannello suo, ma in una scheda quello non c'e'. -->
+      <aside class="rail" id="rail"></aside>
     </div>
 
-    <main class="log" id="log"></main>
-
-    <form class="composer" id="composer">
-      <div class="menu" id="menu" hidden></div>
-      <div class="attach" id="attach" hidden></div>
-      <textarea id="input" rows="1" placeholder="Scrivi a Claude…  (@ per un file, / per un comando, Invio manda)"></textarea>
-      <button class="send" id="send" type="submit" title="Manda">
-        <svg class="ico"><use href="#ion-send" /></svg>
-      </button>
-    </form>
-
+    <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>
   </body>
 </html>

@@ -77,7 +77,7 @@ for (const width of [320, 620]) {
     return {
       cells: [...document.querySelectorAll('.acell .av')].map((n) => n.textContent),
       resets: [...document.querySelectorAll('.acell .ar')].map((n) => n.textContent),
-      count: document.getElementById('count').textContent,
+      count: document.querySelector('.count').textContent,
       name: document.querySelector('.cname')?.textContent,
       pct: document.querySelector('.cpct')?.textContent,
       tok: document.querySelector('.ctok')?.textContent,
@@ -90,9 +90,9 @@ for (const width of [320, 620]) {
       busyDot: !!document.querySelector('.dot.busy'),
       kind: document.querySelector('.cico use')?.getAttribute('href'),
       fillW: document.querySelector('.ctxcard .fill')?.style.width,
-      project: document.getElementById('fprojectName').textContent,
-      branch: document.getElementById('fbranchName').textContent,
-      total: document.getElementById('fcostVal').textContent,
+      project: document.querySelector('.fproject .v').textContent,
+      branch: document.querySelector('.fbranch .v').textContent,
+      total: document.querySelector('.fcost .v').textContent,
     };
   });
 
@@ -171,7 +171,7 @@ for (const width of [320, 620]) {
       firstKind: cs[0].querySelector('.cico use')?.getAttribute('href'),
       firstFill: cs[0].querySelector('.fill')?.style.background,
       badges: cs.filter((c) => !c.querySelector('.badge').hidden).length,
-      count: document.getElementById('count').textContent,
+      count: document.querySelector('.count').textContent,
       hOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       squashed: cs.filter((c) => c.scrollHeight > c.clientHeight + 2).map((c) => c.className),
     };
@@ -197,9 +197,9 @@ for (const width of [320, 620]) {
   const go = await lastSent();
   t(go?.cmd === 'focus' && go.id === 'bbbb', 'il clic sulla card non porta alla sessione: ' + JSON.stringify(go));
 
-  await page.click('#btnRefresh');
+  await page.click('.btnRefresh');
   t((await lastSent())?.cmd === 'refresh', 'il tasto aggiorna non fa niente');
-  await page.click('#btnDiag');
+  await page.click('.btnDiag');
   t((await lastSent())?.cmd === 'diagnose', 'il tasto della diagnostica non fa niente');
 
   // ---- stati di magra: nessuna sessione, numeri dell'account non ancora arrivati ----
@@ -208,8 +208,8 @@ for (const width of [320, 620]) {
   const empty = await page.evaluate(() => ({
     empty: document.querySelector('.empty')?.textContent,
     wait: document.querySelector('.await')?.textContent,
-    branchHidden: document.getElementById('fbranch').hidden,
-    count: document.getElementById('count').textContent,
+    branchHidden: document.querySelector('.fbranch').hidden,
+    count: document.querySelector('.count').textContent,
   }));
   t(/Nessuna conversazione/.test(empty.empty || ''), 'manca lo stato vuoto: ' + empty.empty);
   t(/limite API/.test(empty.wait || ''), 'non si distingue l’attesa dal limite API: ' + empty.wait);

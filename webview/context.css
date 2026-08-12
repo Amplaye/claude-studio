@@ -1,20 +1,30 @@
 /* Il pannello del contesto. Impianto e proporzioni vengono dalla context-bar 0.0.6:
    il colore lo portano barre, pallini e gradienti, il testo resta bianco pieno e la
-   gerarchia la fanno dimensione e peso. */
+   gerarchia la fanno dimensione e peso.
 
+   Tutto sta sotto `.ctx` perche' questo foglio viene caricato anche dalla chat, che
+   ha classi con gli stessi nomi (`.iconbtn`, `.empty`): senza il prefisso il pannello
+   ridisegnerebbe la testata della chat. */
+
+html,
 body {
+  height: 100%;
+}
+
+.ctx {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   padding: 0 13px;
   overflow: hidden;
 }
 
-.grow {
+.ctx .grow {
   flex: 1 1 auto;
 }
 
-.lab {
+.ctx .lab {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -24,7 +34,7 @@ body {
   text-transform: uppercase;
 }
 
-.iconbtn {
+.ctx .iconbtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -40,17 +50,17 @@ body {
   cursor: pointer;
   transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
-.iconbtn:hover {
+.ctx .iconbtn:hover {
   opacity: 1;
   border-color: var(--line);
 }
-.iconbtn:active {
+.ctx .iconbtn:active {
   transform: scale(0.94);
 }
 
 /* ---------- testata: l'account ---------- */
 
-.hdr {
+.ctx .hdr {
   flex: 0 0 auto;
   margin: 0 -13px 4px;
   padding: 11px 13px 12px;
@@ -59,7 +69,7 @@ body {
   box-shadow: 0 6px 14px -12px rgba(0, 0, 0, 0.9);
 }
 
-.hdr-top {
+.ctx .hdr-top {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -67,16 +77,16 @@ body {
 }
 
 /* Due colonne se il pannello e' largo, in colonna se lo stringi. */
-.acct {
+.ctx .acct {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 10px 16px;
 }
 
-.acell {
+.ctx .acell {
   min-width: 0;
 }
-.an {
+.ctx .an {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -85,28 +95,28 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.av {
+.ctx .av {
   margin-top: 2px;
   font-size: 27px;
   font-weight: 750;
   line-height: 1.05;
   letter-spacing: -0.02em;
 }
-.ar {
+.ctx .ar {
   margin-top: 4px;
   font-size: 11.5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.await {
+.ctx .await {
   grid-column: 1 / -1;
   font-size: 13px;
 }
 
 /* ---------- la riga della sezione ---------- */
 
-.secline {
+.ctx .secline {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -114,7 +124,7 @@ body {
   margin: 14px 0 8px;
 }
 
-.count {
+.ctx .count {
   padding: 1px 7px;
   border-radius: var(--pill);
   background: var(--line);
@@ -124,17 +134,18 @@ body {
 
 /* ---------- le card ---------- */
 
-.cards {
+.ctx .cards {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
   padding-bottom: 10px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.ctxcard {
+.ctx .ctxcard {
   /* Senza `flex: 0 0 auto` la colonna schiaccia le card appena superano
      l'altezza del pannello, invece di far scorrere. */
   flex: 0 0 auto;
@@ -146,12 +157,12 @@ body {
   cursor: pointer;
   overflow: hidden;
 }
-.ctxcard:active {
+.ctx .ctxcard:active {
   transform: scale(0.995);
 }
 
 /* La sessione in cui sei: gradiente argilla->pesca, niente barrette laterali. */
-.ctxcard.focused {
+.ctx .ctxcard.focused {
   border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
   background:
     linear-gradient(
@@ -166,13 +177,13 @@ body {
     0 8px 22px -14px var(--claude-1);
 }
 
-.chead {
+.ctx .chead {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.dot {
+.ctx .dot {
   flex: 0 0 auto;
   width: 8px;
   height: 8px;
@@ -180,20 +191,20 @@ body {
   background: rgba(255, 255, 255, 0.32);
   transition: background 0.2s ease;
 }
-.dot.recent {
+.ctx .dot.recent {
   background: color-mix(in srgb, var(--ok) 60%, rgba(255, 255, 255, 0.35));
 }
-.dot.busy {
+.ctx .dot.busy {
   background: var(--ok);
 }
 
-.cico {
+.ctx .cico {
   flex: 0 0 auto;
   font-size: 14px;
   opacity: 0.85;
 }
 
-.cname {
+.ctx .cname {
   flex: 1;
   min-width: 0;
   font-size: 14px;
@@ -206,7 +217,7 @@ body {
   overflow: hidden;
 }
 
-.badge {
+.ctx .badge {
   flex: 0 0 auto;
   padding: 2px 6px;
   border-radius: 5px;
@@ -218,15 +229,15 @@ body {
   text-transform: uppercase;
 }
 
-.ren {
+.ctx .ren {
   flex: 0 0 auto;
   opacity: 0;
 }
-.ctxcard:hover .ren {
+.ctx .ctxcard:hover .ren {
   opacity: 0.85;
 }
 
-.cmeta {
+.ctx .cmeta {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -234,7 +245,7 @@ body {
   font-size: 11.5px;
 }
 
-.tabpill {
+.ctx .tabpill {
   flex: 0 0 auto;
   padding: 0 5px;
   border: 1px solid var(--line);
@@ -244,43 +255,43 @@ body {
 }
 /* La nostra conversazione: la pillola porta l'accento, perche' qui il legame e'
    certo e non una somiglianza di nomi. */
-.ctxcard.own .tabpill {
+.ctx .ctxcard.own .tabpill {
   border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
   color: var(--claude-2);
 }
 
-.csub {
+.ctx .csub {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.crow {
+.ctx .crow {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
   margin-top: 8px;
 }
-.cpct {
+.ctx .cpct {
   font-size: 23px;
   font-weight: 750;
   line-height: 1;
   letter-spacing: -0.02em;
 }
-.cnums {
+.ctx .cnums {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 11.5px;
   min-width: 0;
+  font-size: 11.5px;
 }
-.ccost {
+.ctx .ccost {
   opacity: 0.9;
 }
 
-.bar {
+.ctx .bar {
   position: relative;
   height: 6px;
   margin-top: 7px;
@@ -288,13 +299,13 @@ body {
   background: rgba(255, 255, 255, 0.14);
   overflow: hidden;
 }
-.fill {
+.ctx .fill {
   height: 100%;
   width: 0;
   border-radius: 4px;
 }
 
-.empty {
+.ctx .empty {
   padding: 12px 0;
   font-size: 13px;
   opacity: 0.9;
@@ -302,7 +313,7 @@ body {
 
 /* ---------- il piede ---------- */
 
-.foot {
+.ctx .foot {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -312,7 +323,7 @@ body {
   border-top: 1px solid var(--line);
   font-size: 11.5px;
 }
-.fitem {
+.ctx .fitem {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -321,6 +332,16 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.foot .ico {
+.ctx .foot .ico {
   opacity: 0.75;
+}
+
+/* ---------- la colonna dentro la scheda a tutto schermo ---------- */
+
+.rail {
+  flex: 0 0 var(--rail-w, 300px);
+  width: var(--rail-w, 300px);
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  overflow: hidden;
 }

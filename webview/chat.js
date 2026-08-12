@@ -603,6 +603,9 @@
         // non si leggono. Il "apri come scheda" sparisce quando gia' ci sei.
         document.body.classList.toggle('wide', m.surface === 'panel');
         $('btnTab').hidden = m.surface === 'panel';
+        // Il contesto di fianco ha senso solo dove c'e' spazio: nella scheda.
+        $('btnCtx').hidden = m.surface !== 'panel';
+        if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
         spent = { usd: 0, tokens: 0 };
         paintSpent();
@@ -623,6 +626,9 @@
         break;
       case 'history':
         showHistory(m.items || []);
+        break;
+      case 'ctx':
+        rail.render(m.d);
         break;
       case 'commands':
         commands = m.items || [];
@@ -909,6 +915,22 @@
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
+
+  // ---------- la colonna del contesto (solo nella scheda) ----------
+  // Nella barra laterale il contesto ha un pannello suo, sotto la chat; in una
+  // scheda quel pannello non esiste, quindi lo stesso disegno si monta qui di
+  // fianco. Il codice e' lo stesso, ctxpanel.js: due posti, un pannello solo.
+  const rail = window.CtxPanel($('rail'), (m) => vscode.postMessage(m));
+
+  function showRail(on) {
+    document.body.classList.toggle('rail-on', on);
+    $('btnCtx').classList.toggle('on', on);
+    vscode.setState({ ...(vscode.getState() || {}), rail: on });
+  }
+
+  $('btnCtx').addEventListener('click', () =>
+    showRail(!document.body.classList.contains('rail-on'))
+  );
 
   showEmpty();
   setBusy(false);

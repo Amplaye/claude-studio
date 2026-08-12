@@ -4,9 +4,35 @@ body {
 }
 
 body {
+  overflow: hidden;
+}
+
+/* La chat e la colonna del contesto stanno affiancate; dentro, la chat resta la
+   pila di sempre (testata, discorso, campo di scrittura). */
+.shell {
+  display: flex;
+  height: 100%;
+}
+.chatcol {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  min-width: 0;
+}
+
+/* La colonna del contesto esiste solo nella scheda a tutto schermo: nella barra
+   laterale il contesto ha gia' un pannello suo, sotto la chat. E se la finestra e'
+   stretta si toglie di mezzo da sola, invece di strozzare il discorso. */
+.rail {
+  display: none;
+}
+body.wide.rail-on .rail {
+  display: block;
+}
+@media (max-width: 899px) {
+  body.wide.rail-on .rail {
+    display: none;
+  }
 }
 
 /* Da scheda a tutto schermo lo spazio in piu' diventa margine, non righe lunghe

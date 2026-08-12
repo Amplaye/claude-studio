@@ -1,7 +1,12 @@
 # Claude Studio
 
 Chat di Claude Code e barra di contesto, in una sola estensione di VSCode.
-Nella barra laterale ci sono tutte e due: **Chat** sopra, **Contesto** sotto.
+
+Cliccando l'icona nella barra delle attivita' si apre la **scheda a tutto schermo**
+— una sola: se c'e' gia', torna davanti — con il contesto in una colonna di fianco.
+Chi preferisce il pannello laterale lo tiene: li' Chat e Contesto sono due pannelli
+impilati, e si arriva con "Claude Studio: Apri nel pannello laterale" o spegnendo
+`claudeStudio.openAsTab`.
 
 La chat non ha un motore proprio: parla con la CLI `claude` gia' installata sul PC
 attraverso l'Agent SDK ufficiale. Da li' arrivano gratis autenticazione, modelli,
@@ -35,7 +40,11 @@ che vive nel motore, non nell'interfaccia.
 - **Fase 3 — fatta**: la context bar assorbita.
   - **Pannello "Contesto"**: uso dell'account (5h e 7 giorni, con quanto manca al
     reset), una card per conversazione aperta con contesto, token, **costo** e barra
-    che scivola, e in fondo progetto, ramo git e totale speso.
+    che scivola, e in fondo progetto, ramo git e totale speso. Lo stesso pannello
+    (stesso codice, `webview/ctxpanel.js`) sta anche **di fianco alla scheda** a
+    tutto schermo, dove il pannello laterale non c'e': si mostra e si nasconde dalla
+    testata, e sotto i 900 px si toglie di mezzo da sola per non strozzare il
+    discorso.
   - **Barra di stato**: dove sei, il contesto, quante conversazioni, l'uso
     dell'account, il ramo — con **Ionicons cotte in un font su misura**, perche' li'
     VSCode disegna solo icone che arrivano da un font.
@@ -161,6 +170,7 @@ Impostazioni → Claude Studio → Cli Path.
 | `claudeStudio.contextLimit` | La finestra di contesto su cui si calcola la %. |
 | `claudeStudio.refreshSeconds` | Ogni quanto la barra di contesto rifa' i conti (1,5s). |
 | `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |
+| `claudeStudio.openAsTab` | Cliccando l'icona si apre la scheda e il pannello laterale si chiude. Spegnilo per restare nel pannello. |
 
 ## Convivenza con la context-bar 0.0.6
 

@@ -308,6 +308,70 @@ for (const surface of ['view', 'panel']) {
     'il percorso nel tool non apre il file: ' + JSON.stringify(so)
   );
 
+  // ---- il contesto di fianco: c'e' solo nella scheda ----
+  // Nella barra laterale il contesto ha un pannello suo; in una scheda quello non
+  // esiste, e senza questa colonna la faccia larga sarebbe l'unica a non vederlo.
+  await post({
+    k: 'ctx',
+    d: {
+      project: 'CRM',
+      limit: '1M',
+      focusHow: 'studio',
+      usage: { session: 34, week: 71 },
+      usageWait: 'caricamento…',
+      sessionReset: 'tra 2h',
+      weekReset: 'tra 3g',
+      branch: 'master',
+      dirty: false,
+      totalCost: '$1.20',
+      cards: [
+        {
+          id: 'aaaa', shortId: 'aaaaaaaa', name: 'Questa conversazione', own: true,
+          tabName: 'Studio', preview: '', pct: 22, tokens: '220.0k', cost: '$0.42',
+          lastClock: '09:41', lastAgo: 'adesso', busy: false, recent: true, focused: true,
+        },
+      ],
+    },
+  });
+  await page.waitForTimeout(150);
+
+  const railed = await page.evaluate(() => {
+    const rail = document.getElementById('rail');
+    const box = rail.getBoundingClientRect();
+    const log = document.getElementById('log').getBoundingClientRect();
+    return {
+      shown: getComputedStyle(rail).display !== 'none',
+      btn: getComputedStyle(document.getElementById('btnCtx')).display !== 'none',
+      cards: rail.querySelectorAll('.ctxcard').length,
+      name: rail.querySelector('.cname')?.textContent,
+      cost: rail.querySelector('.fcost .v')?.textContent,
+      // niente sovrapposizioni: la colonna sta a destra del discorso
+      apart: box.width === 0 || box.left >= log.right - 1,
+      // le classi della chat non devono essere ridipinte dal foglio del contesto
+      headerBtn: Math.round(document.getElementById('btnNew').getBoundingClientRect().width),
+    };
+  });
+
+  t(railed.shown === wide, 'la colonna del contesto e’ nel posto sbagliato: shown=' + railed.shown);
+  t(railed.btn === wide, 'il tasto del contesto e’ nel posto sbagliato: btn=' + railed.btn);
+  if (wide) {
+    t(railed.cards === 1, 'la colonna del contesto non disegna le sessioni: ' + railed.cards);
+    t(railed.name === 'Questa conversazione', 'nome sbagliato nella colonna: ' + railed.name);
+    t(railed.cost === '$1.20', 'il totale speso non arriva nella colonna: ' + railed.cost);
+    t(railed.apart, 'la colonna del contesto si sovrappone al discorso');
+    // e si toglie di mezzo quando lo chiedi
+    await page.click('#btnCtx');
+    await page.waitForTimeout(80);
+    t(
+      await page.locator('#rail').isHidden(),
+      'il tasto non nasconde la colonna del contesto'
+    );
+    await page.click('#btnCtx');
+    await page.waitForTimeout(80);
+    t(await page.locator('#rail').isVisible(), 'la colonna del contesto non torna');
+  }
+  t(railed.headerBtn > 10 && railed.headerBtn < 60, 'il foglio del contesto ha ridipinto i tasti della chat: ' + railed.headerBtn);
+
   const finale = 'Il primo usa `esbuild`, il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n';
   await post({ k: 'block_start', id: 'b2_0', kind: 'text' });
   for (const t of ['Il primo ', 'usa `esbuild`, ', 'il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n'])
@@ -355,6 +419,8 @@ for (const surface of ['view', 'panel']) {
         .filter((n) => n.scrollHeight > n.clientHeight + 2 && !n.querySelector('.plan, .out, .detail'))
         .map((n) => n.className),
       logWidth: Math.round(box.width),
+      railWidth: Math.round(document.getElementById('rail').getBoundingClientRect().width),
+      winWidth: document.documentElement.clientWidth,
     };
   });
 
@@ -381,7 +447,13 @@ for (const surface of ['view', 'panel']) {
   t(r.isWide === wide, 'la faccia non ha riconosciuto se stessa');
   t(r.tabBtnHidden === wide, 'il tasto "apri come scheda" è nel posto sbagliato');
   if (wide) {
-    t(r.logWidth > 1000, 'la scheda non usa la larghezza della finestra: ' + r.logWidth);
+    // La scheda usa tutta la finestra: quello che non e' discorso e' la colonna
+    // del contesto, non spazio buttato.
+    t(
+      r.logWidth + r.railWidth >= r.winWidth - 2,
+      'la scheda non usa la larghezza della finestra: ' + r.logWidth + '+' + r.railWidth + ' su ' + r.winWidth
+    );
+    t(r.railWidth > 200, 'la colonna del contesto e’ sparita dalla scheda: ' + r.railWidth);
     t(r.colWidth <= 880, 'da scheda le righe sono troppo lunghe: ' + r.colWidth + 'px');
     t(
       Math.abs(r.composerLeft - r.msgLeft) <= 1,
