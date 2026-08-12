@@ -70,11 +70,16 @@ for (const surface of ['view', 'panel']) {
     const ico = document.querySelector('.empty .ico');
     return {
       keys: [...document.querySelectorAll('.empty .key kbd')].map((n) => n.textContent),
+      // The modifier is named after the machine running the check: "Alt+" here,
+      // "⌥" on a Mac. Asking for the literal "Alt+N" would pass on Windows and
+      // fail on macOS for a label that is perfectly correct there — which is
+      // exactly what it did.
+      alt: (window.I18N && window.I18N.alt) || 'Alt+',
       dash: ico ? getComputedStyle(ico).strokeDasharray : '',
     };
   });
   t(
-    empty.keys.includes('@') && empty.keys.includes('Alt+N') && empty.keys.includes('Esc'),
+    empty.keys.includes('@') && empty.keys.includes(empty.alt + 'N') && empty.keys.includes('Esc'),
     'the empty state does not mention the shortcuts: ' + empty.keys.join(',')
   );
   t(
