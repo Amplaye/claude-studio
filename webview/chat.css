@@ -1347,19 +1347,24 @@ body.wide .msg.user {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 50%;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 15px;
   color: #fff;
   background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
   transition: transform 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
 }
+.send-arrow {
+  width: 18px;
+  height: 18px;
+}
 .send:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
+  transform: translateX(1px);
 }
 .send:active {
   transform: scale(0.92);

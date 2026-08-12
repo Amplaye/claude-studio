@@ -224,6 +224,18 @@ export class ChatController {
     this.mode = value;
     void this.session?.setPermissionMode(value);
     this.broadcast({ k: 'mode', value });
+    // Passando a yolo si approvano automaticamente i permessi in attesa:
+    // l'utente ha appena detto "fa' tutto da solo".
+    if (value === 'bypassPermissions') this.allowAllPending();
+  }
+
+  /** Approva tutti i permessi in attesa (usato dal passaggio a yolo). */
+  private allowAllPending() {
+    for (const [id, p] of [...this.pending]) {
+      if (p.kind === 'question') continue; // le domande vanno risposte dall'utente
+      this.emit({ k: 'ask_done', id, ok: true, label: 'Consentito (Yolo)' });
+      p.settle(allow(p.req.input, {}, 'user_temporary'));
+    }
   }
 
   dispose() {

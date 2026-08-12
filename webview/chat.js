@@ -722,13 +722,30 @@
     $('spendCost').textContent = '$' + spent.usd.toFixed(spent.usd < 1 ? 3 : 2);
   }
 
+  /** Freccia futuristica verso destra — disegnata a mano, non da un icon font. */
+  function sendArrow() {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', 'ico send-arrow');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    // Punta di freccia aggressiva + linea centrale
+    const p = document.createElementNS(SVG, 'path');
+    p.setAttribute('d', 'M5 12h12m0 0l-5-5.5m5 5.5l-5 5.5');
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '2.4');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+    return svg;
+  }
+
   // ---------- busy ----------
   let busy = false;
   function setBusy(v) {
     busy = v;
     sendBtn.classList.toggle('stop', v);
     sendBtn.title = v ? 'Ferma' : 'Manda';
-    sendBtn.replaceChildren(icon(v ? 'stop-circle' : 'arrow-up'));
+    sendBtn.replaceChildren(v ? icon('stop-circle') : sendArrow());
     if (v) showWaiting();
     else hideWaiting();
   }

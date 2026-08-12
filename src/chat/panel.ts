@@ -89,10 +89,7 @@ export class ChatPanel {
     this.isPrimary = isPrimary;
     if (isPrimary) ChatPanel.primary = this;
     ChatPanel.all.add(this);
-    panel.iconPath = {
-      light: vscode.Uri.joinPath(ctx.extensionUri, 'media', 'activity.svg'),
-      dark: vscode.Uri.joinPath(ctx.extensionUri, 'media', 'activity.svg'),
-    };
+    panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
     const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel', monitor);
     // Solo la principale governa il bollino della barra: le secondarie sono
