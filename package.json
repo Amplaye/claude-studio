@@ -71,7 +71,9 @@
     "typecheck": "tsc --noEmit",
     "preview": "node build.mjs && node scripts/preview.mjs",
     "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs",
-    "smoke": "node scripts/smoke-engine.mjs"
+    "smoke": "node scripts/smoke-engine.mjs",
+    "host-check": "node build.mjs && node scripts/host-check.cjs",
+    "verify": "npm run typecheck && npm run ui-check && node scripts/host-check.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
