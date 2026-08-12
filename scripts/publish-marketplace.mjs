@@ -3,11 +3,13 @@
 //
 // Uso: node scripts/publish-marketplace.mjs [percorso.vsix]
 import { ensureBrowser } from './lib/browser.mjs';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const VSIX = path.resolve(process.argv[2] || 'claude-studio.vsix').replace(/\\/g, '/');
 const PUBLISHER = 'MrWilson';
+/** Versione attesa: l'esito si conferma trovando questa nella riga del portale. */
+const VERSION = JSON.parse(readFileSync('package.json', 'utf8')).version;
 const MANAGE_URL = `https://marketplace.visualstudio.com/manage/publishers/${PUBLISHER}`;
 
 if (!existsSync(VSIX)) {
@@ -19,6 +21,9 @@ const browser = await ensureBrowser({ startUrl: MANAGE_URL });
 const ctx = browser.contexts()[0];
 let page = ctx.pages().find((p) => p.url().includes('marketplace.visualstudio.com'));
 if (!page) page = await ctx.newPage();
+// Un dialog nativo lasciato aperto blocca il browser e CDP smette di rispondere:
+// si chiudono da soli invece di restare in attesa di un click umano.
+page.on('dialog', (d) => d.dismiss().catch(() => {}));
 await page.bringToFront();
 
 if (!page.url().includes('/manage/publishers')) {
@@ -104,23 +109,33 @@ await page
   });
 console.log('  upload avviato, attendo esito...');
 
-let stato = '?';
-for (let i = 0; i < 10; i++) {
-  await page.waitForTimeout(6000);
-  const t = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ');
-  const m = t.match(/Verifying|Verification failed|Approved|Published|already exists|error/i);
-  if (m) {
-    stato = m[0];
-    if (/failed|already exists|error/i.test(stato)) break;
-    if (/Verifying|Approved|Published/i.test(stato)) break;
+// L'esito NON si deduce dal modal: si va a rileggere la riga del publisher e si
+// pretende di trovarci la versione appena caricata. Prima si accettava qualunque
+// stato non-errore, cosi' un upload mai avvenuto passava per riuscito.
+let confermato = false;
+let stato = 'sconosciuto';
+for (let tentativo = 0; tentativo < 8 && !confermato; tentativo++) {
+  await page.waitForTimeout(7000);
+  await page.goto(MANAGE_URL, { waitUntil: 'load', timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(3500);
+  const t = (await page.locator('body').innerText().catch(() => '')).replace(/[ \t]+/g, ' ');
+  if (/Verification failed|already exists/i.test(t)) {
+    stato = (t.match(/Verification failed|already exists/i) || [])[0] ?? 'errore';
+    break;
+  }
+  if (t.includes(VERSION)) {
+    confermato = true;
+    stato = (t.match(/Verifying|Approved|Published/i) || ['presente'])[0];
   }
 }
-console.log(`  stato riportato dal portale: ${stato}`);
+
+console.log(`  versione ${VERSION} sul portale: ${confermato ? 'sì' : 'NON trovata'} — stato: ${stato}`);
 await page.screenshot({ path: '.publish-last.png' }).catch(() => {});
 await browser.close();
 
-if (/failed|already exists|error/i.test(stato)) {
-  console.error('✗ Marketplace: pubblicazione non riuscita.');
+if (!confermato) {
+  console.error(`✗ Marketplace: impossibile confermare la pubblicazione di ${VERSION}.`);
+  console.error('  Guarda .publish-last.png e il portale prima di considerarla fatta.');
   process.exit(4);
 }
-console.log('✓ Marketplace: pacchetto accettato.');
+console.log(`✓ Marketplace: ${VERSION} accettata (${stato}).`);
