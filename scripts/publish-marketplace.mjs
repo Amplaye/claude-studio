@@ -120,6 +120,21 @@ await page
   });
 console.log('  upload avviato, attendo esito...');
 
+// Il file viaggia mentre questa pagina e' aperta: ricaricarla ADESSO annulla
+// l'upload a meta'. E' cosi' che si perdeva un rilascio su due — "upload avviato"
+// e poi la riga del portale ferma alla versione di prima, senza un errore da
+// nessuna parte. Prima di andare a controllare si aspetta che il dialogo si
+// chiuda da solo, che e' il portale che dice "ho finito di ricevere".
+const dialogo = page.locator('input[type=file]');
+for (let i = 0; i < 40 && (await dialogo.count()) > 0; i++) {
+  await page.waitForTimeout(1500);
+}
+console.log(
+  (await dialogo.count()) > 0
+    ? '  il dialogo e’ ancora aperto dopo un minuto: proseguo a controllare comunque'
+    : '  dialogo chiuso: il file e’ arrivato'
+);
+
 // L'esito NON si deduce dal modal: si va a rileggere la riga del publisher e si
 // pretende di trovarci la versione appena caricata. Prima si accettava qualunque
 // stato non-errore, cosi' un upload mai avvenuto passava per riuscito.
