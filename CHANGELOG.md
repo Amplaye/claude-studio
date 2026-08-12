@@ -1,18 +1,18 @@
-# Cos'è cambiato
+# Changelog
 
 ## 0.5.0
 
-Prima versione pubblica.
+First public release.
 
-- **Chat di Claude Code** dentro VS Code: pannello laterale o scheda a tutto
-  schermo, stessa conversazione da tutte e due le parti.
-- **Permessi da approvare con un clic**: comandi da lanciare, modifiche ai file
-  come diff colorati, piani da approvare, domande a scelta multipla.
-- **Tre modi**: Piano (ragiona e basta), Chiede (domanda prima di agire), Yolo
-  (fa tutto da solo). Si cambia anche a metà conversazione.
-- **Barra del contesto**: quanto ne hai consumato, quanto ne resta e quanto
-  manca al reset dell'account.
-- **Scelta del modello**, ognuno col suo colore, e il livello di impegno che
-  quel modello accetta davvero.
-- **`@` per i file, `/` per i comandi**, immagini da incollare, avviso sonoro a
-  lavoro finito, cronologia delle conversazioni di prima.
+- **Claude Code chat** inside VS Code: sidebar panel or full-screen tab, same
+  conversation on both sides.
+- **One-click permissions**: commands before they run, file edits as colored
+  diffs, plans to approve, multiple-choice questions.
+- **Three modes**: Plan (thinks only), Ask (checks before acting), Yolo (gets on
+  with it). Switch any time, even mid-conversation.
+- **Context bar**: what you've spent, what's left, and how long until your
+  account resets.
+- **Model picker**, each model with its own color, and the effort levels that
+  model actually accepts.
+- **`@` for files, `/` for commands**, paste images, a chime when the work is
+  done, and history of earlier conversations.

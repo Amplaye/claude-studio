@@ -1,10 +1,10 @@
-/* Il pannello del contesto. Impianto e proporzioni vengono dalla context-bar 0.0.6:
-   il colore lo portano barre, pallini e gradienti, il testo resta bianco pieno e la
-   gerarchia la fanno dimensione e peso.
+/* The context panel. Layout and proportions come from context-bar 0.0.6:
+   colour is carried by bars, dots and gradients, text stays full white and
+   hierarchy comes from size and weight.
 
-   Tutto sta sotto `.ctx` perche' questo foglio viene caricato anche dalla chat, che
-   ha classi con gli stessi nomi (`.iconbtn`, `.empty`): senza il prefisso il pannello
-   ridisegnerebbe la testata della chat. */
+   Everything sits under `.ctx` because this sheet is also loaded by the chat, which
+   has classes with the same names (`.iconbtn`, `.empty`): without the prefix the
+   panel would redraw the chat's header. */
 
 html,
 body {
@@ -58,7 +58,7 @@ body {
   transform: scale(0.94);
 }
 
-/* ---------- testata: l'account ---------- */
+/* ---------- header: the account ---------- */
 
 .ctx .hdr {
   flex: 0 0 auto;
@@ -76,7 +76,7 @@ body {
   margin-bottom: 10px;
 }
 
-/* Due colonne se il pannello e' largo, in colonna se lo stringi. */
+/* Two columns if the panel is wide, stacked if you squeeze it. */
 .ctx .acct {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
@@ -114,7 +114,7 @@ body {
   font-size: 13px;
 }
 
-/* ---------- la riga della sezione ---------- */
+/* ---------- the section row ---------- */
 
 .ctx .secline {
   flex: 0 0 auto;
@@ -132,7 +132,7 @@ body {
   font-weight: 700;
 }
 
-/* ---------- le card ---------- */
+/* ---------- the cards ---------- */
 
 .ctx .cards {
   flex: 1 1 auto;
@@ -146,8 +146,8 @@ body {
 }
 
 .ctx .ctxcard {
-  /* Senza `flex: 0 0 auto` la colonna schiaccia le card appena superano
-     l'altezza del pannello, invece di far scorrere. */
+  /* Without `flex: 0 0 auto` the column squashes the cards as soon as they go
+     past the panel's height, instead of scrolling. */
   flex: 0 0 auto;
   position: relative;
   padding: 11px 13px 12px;
@@ -161,7 +161,7 @@ body {
   transform: scale(0.995);
 }
 
-/* La sessione in cui sei: gradiente argilla->pesca, niente barrette laterali. */
+/* The session you're in: clay->peach gradient, no side stripes. */
 .ctx .ctxcard.focused {
   border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
   background:
@@ -253,8 +253,8 @@ body {
   font-family: var(--mono);
   font-size: 11px;
 }
-/* La nostra conversazione: la pillola porta l'accento, perche' qui il legame e'
-   certo e non una somiglianza di nomi. */
+/* Our own conversation: the pill carries the accent, because here the link is
+   certain and not just a similarity of names. */
 .ctx .ctxcard.own .tabpill {
   border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
   color: var(--claude-2);
@@ -311,7 +311,7 @@ body {
   opacity: 0.9;
 }
 
-/* ---------- il piede ---------- */
+/* ---------- the footer ---------- */
 
 .ctx .foot {
   flex: 0 0 auto;
@@ -336,7 +336,7 @@ body {
   opacity: 0.75;
 }
 
-/* ---------- la colonna dentro la scheda a tutto schermo ---------- */
+/* ---------- the column inside the full-screen tab ---------- */
 
 .rail {
   flex: 0 0 var(--rail-w, 300px);

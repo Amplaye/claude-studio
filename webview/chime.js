@@ -1,27 +1,27 @@
-/* Claude Studio — il suono di fine lavoro.
-   Niente file audio da spedire: il suono si costruisce qui con Web Audio, cosi'
-   l'estensione resta leggera e il timbro si ritocca cambiando dei numeri.
+/* Claude Studio — the sound for when the work is done.
+   No audio files to ship: the sound is built here with Web Audio, so the
+   extension stays light and the tone gets tweaked by changing a few numbers.
 
-   Regola del timbro: caldo, mai squillante. Onde morbide (triangolo e seno), un
-   passa-basso che si chiude mentre la nota muore, un filo di stanza intorno.
-   Deve farsi sentire dall'altra parte della scrivania senza far sobbalzare. */
+   Rule for the tone: warm, never shrill. Soft waves (triangle and sine), a
+   low-pass that closes as the note dies, a thread of room around it.
+   It has to carry across the desk without making you jump. */
 (() => {
   let ctx;
-  let master; // il volume dell'avviso, riscritto a ogni suonata
-  let wet; // quanto ne va nella stanza (il riverbero)
+  let master; // the chime's volume, rewritten on every play
+  let wet; // how much of it goes into the room (the reverb)
   let last = 0;
 
-  /* Quanto si spinge il cursore al massimo. Le note nascono piano (0.25 scarso)
-     per non impastarsi fra loro: senza questa spinta il cursore a fondo corsa
-     resta comunque un sussurro. A valle c'e' un limitatore, quindi si puo'
-     alzare senza che gli accordi gracchino. */
+  /* How far the slider pushes at maximum. The notes are born quiet (barely 0.25)
+     so they don't smear into each other: without this push the slider at the end
+     of its travel is still a whisper. There's a limiter downstream, so you can
+     turn it up without the chords crackling. */
   const BOOST = 4.2;
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   /**
-   * La stanza: rumore che si spegne, filtrato scuro. E' un riverbero finto e
-   * cortissimo, ma e' quello che toglie al suono l'aria da sveglia del telefono.
+   * The room: noise that fades out, filtered dark. It's a fake and very short
+   * reverb, but it's what takes the phone-alarm feel out of the sound.
    */
   function room(seconds) {
     const n = Math.floor(ctx.sampleRate * seconds);
@@ -31,7 +31,7 @@
       let prev = 0;
       for (let i = 0; i < n; i++) {
         const white = Math.random() * 2 - 1;
-        // un polo solo: basta a scurire il rumore e a togliergli il sibilo
+        // a single pole: enough to darken the noise and take the hiss off it
         prev = prev * 0.72 + white * 0.28;
         d[i] = prev * Math.pow(1 - i / n, 2.6);
       }
@@ -51,8 +51,8 @@
     master = ctx.createGain();
     master.gain.value = 0.6 * BOOST;
 
-    /* Il limitatore: tiene i picchi sotto lo zero quando piu' note si sommano.
-       E' quello che permette di alzare il volume senza sentire il "crack". */
+    /* The limiter: keeps the peaks under zero when several notes stack up.
+       It's what lets you turn the volume up without hearing the "crack". */
     const lim = ctx.createDynamicsCompressor();
     lim.threshold.value = -3;
     lim.knee.value = 0;
@@ -71,7 +71,7 @@
     return ctx;
   }
 
-  /** Una nota: corpo morbido, ottava sotto per il calore, coda che si chiude. */
+  /** One note: soft body, an octave below for warmth, a tail that closes. */
   function note(t0, freq, o) {
     const dur = o.dur || 0.9;
     const g = ctx.createGain();
@@ -100,8 +100,8 @@
       sub.stop(t0 + dur + 0.1);
     }
 
-    // Attacco breve ma non secco, e discesa esponenziale: e' la differenza fra
-    // una campana e un bip.
+    // Short attack but not abrupt, and an exponential decay: that's the difference
+    // between a bell and a beep.
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(o.gain || 0.25, t0 + 0.014);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
@@ -110,7 +110,7 @@
     f.connect(wet);
   }
 
-  /** Il tocco del battente: un soffio cortissimo, sotto la prima nota. */
+  /** The touch of the striker: a very short breath, under the first note. */
   function breath(t0) {
     const n = Math.floor(ctx.sampleRate * 0.06);
     const buf = ctx.createBuffer(1, n, ctx.sampleRate);
@@ -129,10 +129,10 @@
     src.start(t0);
   }
 
-  /* I suoni. `ask` e' sempre la versione corta e piu' bassa: serve a dire
-     "sono fermo qui", non "ho finito". */
+  /* The sounds. `ask` is always the short, lower version: it's there to say
+     "I'm stuck here", not "I'm done". */
   const SOUNDS = {
-    /* Coccola — l'originale, tre note calde che salgono */
+    /* Cozy — the original, three warm notes going up */
     cozy(t, ev) {
       const notes = ev === 'ask' ? [523.25, 392.0] : [392.0, 523.25, 659.25];
       notes.forEach((f, i) =>
@@ -140,8 +140,8 @@
       );
       breath(t);
     },
-    /* Raccolto — ispirato al suono di raccolta di Stardew Valley:
-       due note dolci che salgono veloci, come quando raccogli un frutto */
+    /* Harvest — inspired by the harvesting sound in Stardew Valley:
+       two sweet notes rising fast, like when you pick a fruit */
     harvest(t, ev) {
       if (ev === 'ask') {
         note(t, 587.33, { dur: 0.3, gain: 0.22, type: 'sine', cut: 2200, sub: false });
@@ -153,8 +153,8 @@
       }
       breath(t);
     },
-    /* Level up — ispirato alla fanfara di livello su:
-       accordo maggiore arpeggiato con eco */
+    /* Level up — inspired by the level-up fanfare:
+       a major chord arpeggiated with an echo */
     levelup(t, ev) {
       if (ev === 'ask') {
         note(t, 440.0, { dur: 0.5, gain: 0.2, type: 'triangle', cut: 1600 });
@@ -167,8 +167,8 @@
         breath(t);
       }
     },
-    /* Stellina — ispirato alla stellina della notte di Stardew:
-       tintinnio breve e cristallino */
+    /* Starlit — inspired by the night star in Stardew:
+       a short, crystalline chime */
     starlit(t, ev) {
       if (ev === 'ask') {
         note(t, 1046.5, { dur: 0.35, gain: 0.14, type: 'sine', cut: 3200, sub: false });
@@ -178,8 +178,8 @@
         );
       }
     },
-    /* Forziere — ispirato all'apertura di un forziere:
-       nota bassa che sale a una maggiore alta, trionfale */
+    /* Chest — inspired by opening a treasure chest:
+       a low note climbing to a high major, triumphant */
     chest(t, ev) {
       if (ev === 'ask') {
         note(t, 329.63, { dur: 0.6, gain: 0.22, type: 'triangle', cut: 1500 });
@@ -195,9 +195,9 @@
   };
 
   /**
-   * Il contesto audio nasce muto finche' non hai toccato la pagina: e' una regola
-   * del browser, non un capriccio. Si sveglia al primo clic o al primo tasto, che
-   * tanto arrivano prima di qualunque risposta da aspettare.
+   * The audio context is born muted until you've touched the page: that's a
+   * browser rule, not a whim. It wakes up on the first click or the first
+   * keystroke, which come before any answer worth waiting for anyway.
    */
   function unlock() {
     const c = boot();
@@ -207,7 +207,7 @@
   function play(name, ev, volume) {
     if (!name || name === 'off') return;
     const now = Date.now();
-    if (now - last < 400) return; // due avvisi appiccicati suonano come un guasto
+    if (now - last < 400) return; // two chimes stuck together sound like a fault
     last = now;
 
     const c = boot();

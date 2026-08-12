@@ -1,9 +1,9 @@
-// Il ponte con l'editor.
+// The bridge to the editor.
 //
-// L'estensione ufficiale apre un server MCP su socket e lascia un lockfile in
-// ~/.claude/ide/. Qui non serve: l'Agent SDK sa ospitare un server MCP dentro il
-// nostro stesso processo, quindi il ponte e' una funzione, non una porta di rete —
-// e soprattutto non litiga con quello dell'ufficiale, che resta installata.
+// The official extension opens an MCP server on a socket and leaves a lockfile in
+// ~/.claude/ide/. That isn't needed here: the Agent SDK can host an MCP server
+// inside our own process, so the bridge is a function, not a network port — and
+// above all it doesn't quarrel with the official one, which stays installed.
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { diagnostics, openEditors, openFile, showDiff } from '../chat/editor';
@@ -15,45 +15,45 @@ export function ideServer() {
     name: 'editor',
     version: '1.0.0',
     instructions:
-      "Ponte con l'editor VSCode di chi sta chattando. Usalo per mostrare un diff prima/dopo, " +
-      'per leggere gli errori che l’editor gia’ conosce senza rieseguire niente, e per sapere ' +
-      'quali file sono aperti e cosa e’ selezionato.',
+      'Bridge to the VSCode editor of whoever is chatting. Use it to show a before/after diff, ' +
+      'to read the errors the editor already knows about without re-running anything, and to know ' +
+      'which files are open and what is selected.',
     tools: [
       tool(
         'mostra_diff',
-        "Apre nell'editor il confronto nativo fra il prima e il dopo di un file.",
+        'Opens the native before/after comparison of a file in the editor.',
         {
-          file: z.string().describe('percorso del file, relativo alla cartella di lavoro'),
-          prima: z.string().describe('contenuto precedente'),
-          dopo: z.string().describe('contenuto nuovo'),
+          file: z.string().describe('path of the file, relative to the working folder'),
+          prima: z.string().describe('previous content'),
+          dopo: z.string().describe('new content'),
         },
         async (a) => {
           await showDiff(a.file, a.prima, a.dopo);
-          return text(`Diff di ${a.file} aperto nell'editor.`);
+          return text(`Diff of ${a.file} opened in the editor.`);
         }
       ),
       tool(
         'errori_editor',
-        "Errori e avvisi che l'editor conosce gia' (linter, TypeScript, ecc.). Non riesegue niente.",
-        { file: z.string().optional().describe('limita a un file; vuoto = tutti') },
+        'Errors and warnings the editor already knows about (linter, TypeScript, etc.). Re-runs nothing.',
+        { file: z.string().optional().describe('limit to one file; empty = all of them') },
         async (a) => text(diagnostics(a.file))
       ),
       tool(
         'file_aperti',
-        "I file aperti adesso nell'editor, con quello attivo e cosa e' selezionato.",
+        'The files open in the editor right now, with the active one and what is selected.',
         {},
         async () => text(openEditors())
       ),
       tool(
         'apri_file',
-        "Apre un file nell'editor, eventualmente su una riga precisa.",
+        'Opens a file in the editor, optionally at a precise line.',
         {
-          file: z.string().describe('percorso del file'),
-          riga: z.number().optional().describe('riga su cui portarsi'),
+          file: z.string().describe('path of the file'),
+          riga: z.number().optional().describe('line to jump to'),
         },
         async (a) => {
           await openFile(a.file, a.riga);
-          return text(`Aperto ${a.file}${a.riga ? ':' + a.riga : ''}.`);
+          return text(`Opened ${a.file}${a.riga ? ':' + a.riga : ''}.`);
         }
       ),
     ],

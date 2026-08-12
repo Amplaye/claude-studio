@@ -1,6 +1,6 @@
-// La seconda faccia: il pannello del contesto, sotto la chat nella barra laterale.
-// Stessa regola della chat — file veri, CSP stretta con nonce, e sul filo passano
-// dati, mai HTML.
+// The second face: the context panel, below the chat in the sidebar. Same rule as
+// the chat — real files, tight CSP with a nonce, and what travels the wire is data,
+// never HTML.
 import * as vscode from 'vscode';
 import { renderPage } from '../shared/html';
 import type { ContextMonitor } from './monitor';
@@ -37,8 +37,8 @@ export class ContextView implements vscode.WebviewViewProvider {
     const listener = webview.onDidReceiveMessage((m: CtxCmd) => {
       switch (m?.cmd) {
         case 'ready':
-          // Ci si iscrive solo quando la pagina e' pronta a ricevere: altrimenti la
-          // prima fotografia arriverebbe nel vuoto e resterebbe tutto grigio.
+          // We only subscribe once the page is ready to receive: otherwise the first
+          // snapshot would land in the void and everything would stay grey.
           sub?.dispose();
           sub = this.monitor.subscribe((d) => post({ k: 'data', d }));
           return;
@@ -57,7 +57,7 @@ export class ContextView implements vscode.WebviewViewProvider {
       }
     });
 
-    // Tornata visibile dopo essere stata nascosta: i numeri erano fermi da un po'.
+    // Visible again after being hidden: the numbers had been frozen for a while.
     const vis = view.onDidChangeVisibility(() => view.visible && this.monitor.tickSoon());
 
     view.onDidDispose(() => {

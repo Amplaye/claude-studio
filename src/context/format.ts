@@ -1,43 +1,43 @@
-// I formattatori della context-bar 0.0.6, portati com'erano: sono gia' tarati su
-// quello che si legge bene in una colonna stretta. Stanno da soli perche' li usano
-// sia la barra di stato sia il pannello, e le prove li chiamano direttamente.
+// The formatters from context-bar 0.0.6, carried over as they were: they're already
+// tuned for what reads well in a narrow column. They stand on their own because both
+// the status bar and the panel use them, and the tests call them directly.
 
-/** "tra 2h 15m" — quanto manca a un reset. */
+/** "in 2h 15m" — how long until a reset. */
 export function fmtReset(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return '';
   const d = Date.parse(iso);
   if (Number.isNaN(d)) return '';
   const totalMin = Math.max(0, Math.round((d - now) / 60000));
-  if (totalMin === 0) return 'tra <1 min';
+  if (totalMin === 0) return 'in <1 min';
   const days = Math.floor(totalMin / 1440);
   const hours = Math.floor((totalMin % 1440) / 60);
   const mins = totalMin % 60;
   const parts: string[] = [];
-  if (days) parts.push(days + 'g');
+  if (days) parts.push(days + 'd');
   if (hours) parts.push(hours + 'h');
   if (mins || !parts.length) parts.push(mins + 'm');
-  return 'tra ' + parts.join(' ');
+  return 'in ' + parts.join(' ');
 }
 
-/** "adesso", "12 min fa", "3h fa", "2g fa". */
+/** "now", "12 min ago", "3h ago", "2d ago". */
 export function fmtAgo(ms: number, now = Date.now()): string {
   const diff = Math.max(0, now - ms);
-  if (diff < 45000) return 'adesso';
+  if (diff < 45000) return 'now';
   const min = Math.round(diff / 60000);
-  if (min < 60) return `${min} min fa`;
+  if (min < 60) return `${min} min ago`;
   const h = Math.floor(min / 60);
-  if (h < 24) return `${h}h fa`;
-  return `${Math.floor(h / 24)}g fa`;
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
-/** "14:32" — l'ora dell'ultimo movimento. */
+/** "14:32" — the time of the last activity. */
 export function fmtClock(ms: number): string {
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return '';
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-/** "18.2k", "1.4M": i token per esteso non li legge nessuno. */
+/** "18.2k", "1.4M": nobody reads token counts written out in full. */
 export function fmtTokens(n: number): string {
   if (!n) return '0';
   if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
@@ -46,9 +46,9 @@ export function fmtTokens(n: number): string {
 }
 
 /**
- * Il costo la 0.0.6 lo raccoglieva e lo buttava via: non era mostrato da nessuna
- * parte. Qui si mostra, quindi serve scriverlo. Sotto il centesimo si va a tre
- * decimali, altrimenti tutte le conversazioni corte sembrerebbero costare "$0.00".
+ * 0.0.6 collected the cost and threw it away: it wasn't shown anywhere. Here it is
+ * shown, so it needs writing. Below a cent we go to three decimals, otherwise every
+ * short conversation would look like it costs "$0.00".
  */
 export function fmtCost(usd: number): string {
   if (!usd) return '$0';
@@ -57,7 +57,7 @@ export function fmtCost(usd: number): string {
   return '$' + Math.round(usd);
 }
 
-/** "1M", "200k": la finestra di contesto, scritta corta. */
+/** "1M", "200k": the context window, written short. */
 export function fmtLimit(n: number): string {
   return n >= 1e6 ? n / 1e6 + 'M' : Math.round(n / 1000) + 'k';
 }

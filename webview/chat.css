@@ -9,8 +9,8 @@ body {
   overflow: hidden;
 }
 
-/* La chat e la colonna del contesto stanno affiancate; dentro, la chat resta la
-   pila di sempre (testata, discorso, campo di scrittura). */
+/* The chat and the context column sit side by side; inside, the chat stays the
+   same old stack (header, thread, writing field). */
 .shell {
   display: flex;
   height: 100%;
@@ -21,22 +21,22 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* il fantasma del cambio conversazione si appoggia qui, non dentro il log:
-     dentro un contenitore che scorre si porterebbe dietro lo scorrimento */
+  /* the conversation-switch ghost rests here, not inside the log: inside a
+     scrolling container it would drag the scrolling along with it */
   position: relative;
 }
 
-/* Il fantasma riusa il foglio del log per restare identico a com'era, ma non e'
-   piu' una colonna che scorre: e' un'immagine ferma, tagliata dal suo riquadro. */
+/* The ghost reuses the log's sheet to stay identical to how it was, but it's no
+   longer a scrolling column: it's a still image, cropped by its own box. */
 .log-ghost-in {
   height: auto;
   overflow: visible;
   will-change: transform;
 }
 
-/* La colonna del contesto esiste solo nella scheda a tutto schermo: nella barra
-   laterale il contesto ha gia' un pannello suo, sotto la chat. E se la finestra e'
-   stretta si toglie di mezzo da sola, invece di strozzare il discorso. */
+/* The context column only exists in the full-screen tab: in the sidebar the
+   context already has a panel of its own, under the chat. And if the window is
+   narrow it gets out of the way by itself, instead of choking the thread. */
 .rail {
   display: none;
 }
@@ -49,10 +49,10 @@ body.wide.rail-on .rail {
   }
 }
 
-/* Da scheda a tutto schermo lo spazio in piu' diventa margine, non righe lunghe
-   due metri: la colonna di lettura resta della stessa larghezza del pannello.
-   E' un margine, non un contenitore centrato, cosi' i messaggi tuoi restano
-   allineati a destra come nella faccia stretta. */
+/* In the full-screen tab the extra space becomes margin, not lines two metres
+   long: the reading column stays the same width as the panel's.
+   It's a margin, not a centred container, so your messages stay aligned to the
+   right just like in the narrow face. */
 body.wide {
   --gutter: max(16px, calc((100% - 860px) / 2));
 }
@@ -64,7 +64,7 @@ body.wide .log {
   padding-top: 22px;
   gap: 14px;
 }
-/* stesso margine del log: il campo di scrittura resta incolonnato coi messaggi */
+/* same margin as the log: the writing field stays lined up with the messages */
 body.wide .composer {
   margin-left: var(--gutter);
   margin-right: var(--gutter);
@@ -73,7 +73,7 @@ body.wide .msg.user {
   max-width: 640px;
 }
 
-/* ---------- testata ---------- */
+/* ---------- header ---------- */
 .top {
   flex: 0 0 auto;
   display: flex;
@@ -83,12 +83,12 @@ body.wide .msg.user {
   border-bottom: 1px solid var(--line);
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, var(--claude-1)) 0%, var(--surface) 100%);
   position: relative;
-  /* La testata tocca i bordi anche nella scheda larga */
+  /* The header touches the edges in the wide tab too */
   margin: 0;
   width: 100%;
   box-sizing: border-box;
 }
-/* linea luminosa sotto la testata */
+/* glowing line under the header */
 .top::after {
   content: '';
   position: absolute;
@@ -166,16 +166,17 @@ body.wide .msg.user {
 .iconbtn:active {
   transform: scale(0.94);
 }
-/* un tasto che tiene aperto qualcosa lo dice restando acceso */
+/* a button holding something open says so by staying lit */
 .iconbtn.on {
   border-color: var(--claude-1);
   background: color-mix(in srgb, var(--claude-1) 14%, transparent);
   color: var(--claude-2);
 }
 
-/* ---------- pannello delle impostazioni ----------
-   Non e' un cassetto come la cronologia: quello sposta il discorso in giu', e per
-   tre menu a tendina sarebbe troppo. Sta sopra, agganciato al tasto che lo apre. */
+/* ---------- settings panel ----------
+   It isn't a drawer like the history: that one pushes the thread down, and for
+   three dropdowns it would be too much. It sits on top, hooked to the button
+   that opens it. */
 .pop {
   position: absolute;
   top: 48px;
@@ -203,8 +204,8 @@ body.wide .msg.user {
   color: #fff;
   margin-bottom: 4px;
 }
-/* Il colore lo portano bordi, aloni e gradienti: il testo resta bianco pieno,
-   la gerarchia la fanno dimensione e peso. */
+/* Colour is carried by borders, halos and gradients: text stays full white,
+   hierarchy comes from size and weight. */
 .pop-sec {
   margin: 10px 0 6px;
   padding-top: 8px;
@@ -222,8 +223,8 @@ body.wide .msg.user {
 }
 
 /* ---------- model cards ----------
-   Quanti sono lo dice la CLI, non noi: la griglia si adatta da sola, cosi' un
-   modello in piu' domani non spacca la fila. */
+   How many there are is up to the CLI, not us: the grid adapts by itself, so one
+   more model tomorrow doesn't break the row. */
 .model-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -257,17 +258,17 @@ body.wide .msg.user {
   background: color-mix(in srgb, var(--fam) 12%, transparent);
 }
 
-/* ---------- ogni famiglia il suo colore e il suo effetto ----------
-   Non e' una scala da poco a tanto: sono quattro effetti diversi, cosi' il
-   modello si riconosce dal colore prima ancora di leggere il nome.
+/* ---------- each family its own colour and its own effect ----------
+   It isn't a scale from little to lots: they're four different effects, so the
+   model is recognised by its colour before you even read the name.
 
-     haiku   ciano    la scia veloce che attraversa
-     sonnet  viola    il respiro morbido
-     opus    argilla  il bordo a gradiente che gira
-     fable   oro      il giro svelto, l'alone che respira, la carta che galleggia
+     haiku   cyan    the fast sweep that crosses over
+     sonnet  purple  the soft breathing
+     opus    clay    the spinning gradient border
+     fable   gold    the quick spin, the breathing halo, the floating card
 
-   Il bordo animato e' un ::before che sbuca da sotto la carta e un ::after che
-   gli ritaglia il centro: un bordo vero non si puo' far girare. */
+   The animated border is a ::before poking out from under the card and an
+   ::after that cuts out its centre: a real border can't be made to spin. */
 
 .model-card.fam-haiku {
   --fam: #22d3ee;
@@ -286,7 +287,7 @@ body.wide .msg.user {
   --fam-2: #ffe9c9;
 }
 
-/* -- haiku: una scia che attraversa di corsa, come un lampo -- */
+/* -- haiku: a sweep that races across, like a flash -- */
 .model-card.fam-haiku {
   overflow: hidden;
 }
@@ -309,14 +310,14 @@ body.wide .msg.user {
 .model-card.fam-haiku:hover::after,
 .model-card.fam-haiku.on::after {
   opacity: 0.55;
-  /* svelta: e' il modello veloce */
+  /* quick: it's the fast model */
   animation: cs-sheen 1.3s ease-in-out infinite;
 }
 .model-card.fam-haiku.on {
   box-shadow: 0 0 18px -8px color-mix(in srgb, var(--fam) 75%, transparent);
 }
 
-/* -- sonnet: nessuna corsa, un alone che respira piano -- */
+/* -- sonnet: no racing, a halo that breathes slowly -- */
 .model-card.fam-sonnet:hover {
   box-shadow: 0 0 20px -8px color-mix(in srgb, var(--fam) 70%, transparent);
 }
@@ -324,7 +325,7 @@ body.wide .msg.user {
   animation: cs-fam-breathe 3.2s ease-in-out infinite;
 }
 
-/* -- opus: il bordo a gradiente che gira -- */
+/* -- opus: the spinning gradient border -- */
 .model-card.fam-opus,
 .model-card.fam-fable {
   overflow: hidden;
@@ -360,7 +361,7 @@ body.wide .msg.user {
   box-shadow: 0 0 22px -6px color-mix(in srgb, var(--fam) 60%, transparent);
 }
 
-/* -- fable: il giro e' piu' svelto, l'alone respira, la carta galleggia -- */
+/* -- fable: the spin is quicker, the halo breathes, the card floats -- */
 .model-card.fam-fable::before {
   inset: -2px;
   animation-duration: 2.2s;
@@ -386,8 +387,8 @@ body.wide .msg.user {
   line-height: 1.3;
   color: #fff;
 }
-/* La finestra di contesto ("1M context") va a capo sotto al nome: e' un dettaglio
-   del modello, non parte di come si chiama. */
+/* The context window ("1M context") wraps onto its own line under the name: it's
+   a detail of the model, not part of what it's called. */
 .mc-note {
   display: block;
   font-size: 9px;
@@ -399,8 +400,8 @@ body.wide .msg.user {
   color: #fff;
   opacity: 0.95;
 }
-/* Due righe, poi i puntini: le descrizioni le scrive la CLI e sono di lunghezza
-   imprevedibile — su una riga sola resterebbe solo l'inizio. */
+/* Two lines, then the ellipsis: the descriptions are written by the CLI and are
+   of unpredictable length — on a single line only the start would be left. */
 .mc-desc {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -415,9 +416,9 @@ body.wide .msg.user {
 }
 
 /* ---------- segmented control ---------- */
-/* Quanti livelli d'impegno ci siano lo decide il modello, non noi: da tre a
-   cinque, piu' l'automatico. Su una riga sola gli ultimi finivano fuori dal
-   pannello, quindi si va a capo. */
+/* How many effort levels there are is decided by the model, not us: from three
+   to five, plus automatic. On a single line the last ones ended up outside the
+   panel, so they wrap. */
 .seg {
   display: flex;
   flex-wrap: wrap;
@@ -447,12 +448,12 @@ body.wide .msg.user {
   text-align: center;
   position: relative;
   z-index: 1;
-  /* Il fondo del bottone non deve coprire lo slider quando e' acceso */
+  /* The button's background mustn't cover the slider when it's lit */
   background-clip: padding-box;
 }
-/* Il passaggio del mouse si deve vedere subito, non solo dopo il clic: oltre al
-   fondo appena schiarito c'e' un bordo, che resta leggibile anche sopra allo
-   slider del livello scelto. */
+/* The mouse passing over has to show right away, not only after the click: as
+   well as the slightly lightened background there's a border, which stays
+   readable even on top of the chosen level's slider. */
 .seg-btn:hover:not(:disabled),
 .seg-btn:focus-visible:not(:disabled) {
   opacity: 1;
@@ -473,8 +474,8 @@ body.wide .msg.user {
   opacity: 0.25;
   cursor: default;
 }
-/* Lo slider interno scorre da un bottone all'altro. Posizione e misura le mette
-   il JS: con i bottoni che vanno a capo non basta piu' incollarlo in alto. */
+/* The inner slider runs from one button to the next. Position and size are set
+   by the JS: with the buttons wrapping, pinning it to the top isn't enough. */
 .seg-slider {
   position: absolute;
   top: 3px;
@@ -489,7 +490,7 @@ body.wide .msg.user {
   pointer-events: none;
 }
 
-/* La descrizione della scelta: una riga, sparisce se e' vuota. */
+/* The description of the choice: one line, disappears if it's empty. */
 .phint {
   margin: 4px 0 4px;
   font-size: 11px;
@@ -501,7 +502,7 @@ body.wide .msg.user {
   display: none;
 }
 
-/* ---------- sezione suono (label + select / range / check) ---------- */
+/* ---------- sound section (label + select / range / check) ---------- */
 .prow {
   display: flex;
   align-items: center;
@@ -577,7 +578,7 @@ body.wide .msg.user {
   transform: scale(0.97);
 }
 
-/* ---------- cassetto della cronologia ---------- */
+/* ---------- history drawer ---------- */
 .drawer {
   flex: 0 0 auto;
   max-height: 45%;
@@ -656,7 +657,7 @@ body.wide .msg.user {
   opacity: 0.7;
 }
 
-/* ---------- conversazione ---------- */
+/* ---------- conversation ---------- */
 .log {
   flex: 1 1 auto;
   min-height: 0;
@@ -671,8 +672,8 @@ body.wide .msg.user {
 .msg {
   position: relative;
   min-width: 0;
-  /* Il log e' una colonna flex: senza questo, appena la conversazione supera
-     l'altezza della finestra i messaggi si schiacciano invece di scorrere. */
+  /* The log is a flex column: without this, as soon as the conversation goes
+     past the window's height the messages squash instead of scrolling. */
   flex: 0 0 auto;
 }
 
@@ -694,8 +695,8 @@ body.wide .msg.user {
   word-break: break-word;
 }
 
-/* Le immagini mandate restano nel messaggio: si vede a colpo d'occhio che sono
-   partite, e si riaprono grandi con un clic. */
+/* Sent images stay in the message: you can see at a glance that they went out,
+   and they reopen big with a click. */
 .uimgs {
   display: flex;
   flex-wrap: wrap;
@@ -750,7 +751,7 @@ body.wide .msg.user {
   padding: 0;
   background: none;
 }
-/* pensiero ripiegabile */
+/* collapsible thinking */
 .think {
   border: 1px dashed var(--line);
   border-radius: var(--r);
@@ -831,7 +832,7 @@ body.wide .msg.user {
   margin-top: 9px;
 }
 
-/* diff: il colore lo portano il segno e la barra, il testo resta bianco pieno */
+/* diff: colour is carried by the sign and the bar, the text stays full white */
 .diff {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -876,7 +877,7 @@ body.wide .msg.user {
   opacity: 0.7;
 }
 
-/* lista dei todo */
+/* todo list */
 .todos {
   display: flex;
   flex-direction: column;
@@ -910,7 +911,7 @@ body.wide .msg.user {
   font-weight: 650;
 }
 
-/* sub-agent: il suo discorso vive dentro la card del Task che lo ha lanciato */
+/* sub-agent: its thread lives inside the card of the Task that launched it */
 .tool .prompt {
   font-size: 12px;
   line-height: 1.5;
@@ -990,7 +991,7 @@ body.wide .msg.user {
   overflow: auto;
 }
 
-/* ---------- permessi ---------- */
+/* ---------- permissions ---------- */
 .perm {
   border: 1px solid color-mix(in srgb, var(--claude-1) 55%, var(--line));
   border-radius: var(--r);
@@ -1057,7 +1058,7 @@ body.wide .msg.user {
   font-size: 11.5px;
 }
 
-/* domande a scelta multipla */
+/* multiple-choice questions */
 .perm .q + .q {
   margin-top: 13px;
 }
@@ -1123,7 +1124,7 @@ body.wide .msg.user {
   opacity: 0.8;
 }
 
-/* i tasti */
+/* the buttons */
 .perm .acts {
   display: flex;
   flex-wrap: wrap;
@@ -1172,7 +1173,7 @@ body.wide .msg.user {
   background: color-mix(in srgb, var(--bad) 12%, transparent);
 }
 
-/* risposto: la scheda si spegne e resta a verbale */
+/* answered: the card dims down and stays on the record */
 .perm.resolved {
   box-shadow: none;
 }
@@ -1202,7 +1203,7 @@ body.wide .msg.user {
   color: var(--bad);
 }
 
-/* selettore di modalita' nella testata — segmented control */
+/* mode selector in the header — segmented control */
 .modeseg {
   display: flex;
   gap: 2px;
@@ -1225,8 +1226,8 @@ body.wide .msg.user {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  /* Testo sempre bianco pieno: la scelta la dice lo slider colorato dietro,
-     non il grigio. Spento e acceso si leggono uguale. */
+  /* Text always full white: the choice is told by the coloured slider behind,
+     not by grey. Off and on read the same. */
   opacity: 1;
   transition: color 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
               text-shadow 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
@@ -1245,7 +1246,7 @@ body.wide .msg.user {
 .modeseg-btn.on {
   font-weight: 700;
 }
-/* Lo slider e' un figlio aggiunto dal JS: scorre da un bottone all'altro. */
+/* The slider is a child added by the JS: it runs from one button to the next. */
 .modeseg-slider {
   position: absolute;
   top: 3px;
@@ -1260,7 +1261,7 @@ body.wide .msg.user {
   z-index: 0;
   pointer-events: none;
 }
-/* Colori dello slider per ciascun modo */
+/* Slider colours for each mode */
 .modeseg-slider.mode-default {
   background: color-mix(in srgb, var(--claude-1) 18%, var(--surface));
   border-color: color-mix(in srgb, var(--claude-1) 50%, transparent);
@@ -1276,15 +1277,15 @@ body.wide .msg.user {
   border-color: color-mix(in srgb, #e74c3c 55%, transparent);
   box-shadow: 0 2px 8px -3px color-mix(in srgb, #e74c3c 40%, transparent);
 }
-/* Il modo lo dice lo slider colorato dietro: il testo resta bianco, cosi' si
-   legge uguale acceso e spento. */
+/* The mode is told by the coloured slider behind: the text stays white, so it
+   reads the same on and off. */
 .modeseg-btn[data-mode='default'].on,
 .modeseg-btn[data-mode='plan'].on,
 .modeseg-btn.yolo.on {
   color: #fff;
 }
 
-/* stato "sta pensando" */
+/* "thinking" state */
 .pulse {
   display: flex;
   align-items: center;
@@ -1308,8 +1309,8 @@ body.wide .msg.user {
   background: var(--claude-1);
   flex: 0 0 auto;
 }
-/* L'anello e' un gradiente conico bucato in mezzo: una ciambella che gira intorno
-   al pallino, senza un solo pixel di immagine. */
+/* The ring is a conic gradient with a hole in the middle: a doughnut spinning
+   around the dot, without a single pixel of image. */
 .pulse .thinking-ring {
   position: absolute;
   inset: 0;
@@ -1318,8 +1319,8 @@ body.wide .msg.user {
   mask: radial-gradient(closest-side, transparent 78%, #000 82%);
 }
 
-/* errori: leggibili, non urlati. Prima cos'e' successo, poi cosa si puo' fare, e
-   solo per chi lo cerca il testo grezzo del motore. */
+/* errors: readable, not shouted. First what happened, then what can be done, and
+   only for whoever goes looking for it, the engine's raw text. */
 .err {
   border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line));
   border-radius: var(--r);
@@ -1334,7 +1335,7 @@ body.wide .msg.user {
   color: var(--bad);
   margin-top: 2px;
 }
-/* un turno fermato non e' un guasto: stesso riquadro, tono diverso */
+/* a stopped turn isn't a fault: same box, different tone */
 .err.calm {
   border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
 }
@@ -1386,7 +1387,7 @@ body.wide .msg.user {
   word-break: break-word;
 }
 
-/* stato vuoto */
+/* empty state */
 .empty {
   margin: auto;
   text-align: center;
@@ -1408,7 +1409,7 @@ body.wide .msg.user {
   font-size: 12.5px;
   opacity: 0.85;
 }
-/* le scorciatoie stanno dove guardi mentre non c'e' ancora niente da leggere */
+/* the shortcuts sit where you look while there's nothing to read yet */
 .empty .keys {
   margin-top: 14px;
   display: flex;
@@ -1434,7 +1435,7 @@ body.wide .msg.user {
   color: var(--claude-2);
 }
 
-/* percorso cliccabile nella testa di un tool */
+/* clickable path in a tool's head */
 .arg.link {
   border: 0;
   background: transparent;
@@ -1461,7 +1462,7 @@ body.wide .msg.user {
   background: var(--card);
   padding: 8px 8px 8px 12px;
   display: flex;
-  flex-wrap: wrap; /* gli allegati stanno su una riga loro, sopra il testo */
+  flex-wrap: wrap; /* the attachments sit on a row of their own, above the text */
   align-items: flex-end;
   gap: 8px;
   transition: border-color 0.2s ease, box-shadow 0.25s ease;
@@ -1506,8 +1507,8 @@ body.wide .msg.user {
   background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
   transition: transform 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
 }
-/* "navigate" punta in alto a destra: la ruoto perche' punti a destra, come un
-   jet che parte. Il filtro le da' la scia luminosa. */
+/* "navigate" points to the top right: I rotate it so it points right, like a jet
+   taking off. The filter gives it the glowing trail. */
 .send-arrow {
   width: 18px;
   height: 18px;
@@ -1537,7 +1538,7 @@ body.wide .msg.user {
   background: linear-gradient(135deg, var(--bad), #ff8a7a);
 }
 
-/* menu di "@" e "/": sale dal campo di scrittura, non lo copre */
+/* the "@" and "/" menu: it rises from the writing field, it doesn't cover it */
 .menu {
   position: absolute;
   left: 0;
@@ -1552,7 +1553,7 @@ body.wide .msg.user {
   padding: 5px;
   z-index: 5;
 }
-/* barra di ricerca dentro il popup dei comandi */
+/* search bar inside the commands popup */
 .menu-search {
   display: flex;
   align-items: center;
@@ -1581,7 +1582,7 @@ body.wide .msg.user {
   color: var(--fg);
   opacity: 0.5;
 }
-/* griglia di comandi nel popup / */
+/* grid of commands in the / popup */
 .menu-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1629,7 +1630,7 @@ body.wide .msg.user {
   width: 12px;
   height: 12px;
 }
-/* riga file: una riga sola, nome e percorso affiancati */
+/* file row: a single line, name and path side by side */
 .mitem {
   display: flex;
   align-items: baseline;
@@ -1657,7 +1658,7 @@ body.wide .msg.user {
   white-space: nowrap;
   text-align: right;
 }
-/* riga comando: nome e descrizione su due righe, con simbolo a sinistra */
+/* command row: name and description on two lines, with a symbol on the left */
 .mitem-cmd {
   flex-direction: row;
   align-items: flex-start;
@@ -1696,7 +1697,7 @@ body.wide .msg.user {
   white-space: nowrap;
 }
 
-/* allegati: selezione dall'editor e immagini incollate */
+/* attachments: selection from the editor and pasted images */
 .attach {
   display: flex;
   flex-wrap: wrap;
@@ -1748,12 +1749,12 @@ body.wide .msg.user {
   font-size: 12px;
   color: inherit;
 }
-/* miniatura cliccabile: il cursore invita */
+/* clickable thumbnail: the cursor invites you */
 .att .thumb {
   cursor: pointer;
 }
 
-/* ---------- lightbox per immagini allegate ---------- */
+/* ---------- lightbox for attached images ---------- */
 .lightbox {
   position: fixed;
   inset: 0;
@@ -1773,7 +1774,7 @@ body.wide .msg.user {
   box-shadow: 0 20px 60px -20px #000;
   cursor: default;
 }
-/* La X: sempre visibile in alto a destra, cosi' si sa come si esce. */
+/* The X: always visible at the top right, so you know how to get out. */
 .lbx {
   position: absolute;
   top: 14px;

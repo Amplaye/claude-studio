@@ -1,13 +1,13 @@
-// Il bollino sull'icona nella barra delle attivita': l'unico posto dove VSCode
-// lascia dire "e' successo qualcosa" senza rubare il fuoco a quello che stai
-// facendo. Vive solo finche' la vista laterale e' montata: se non c'e', qui non
-// succede niente e l'avviso resta il suono.
+// The badge on the activity bar icon: the only place VSCode lets you say
+// "something happened" without stealing focus from what you're doing. It only
+// lives while the sidebar view is mounted: if it isn't, nothing happens here and
+// the sound is the only notice you get.
 import * as vscode from 'vscode';
 
 let host: vscode.WebviewView | undefined;
 let value = 0;
 
-/** La vista laterale si presenta quando nasce e si toglie quando muore. */
+/** The sidebar view introduces itself when it's born and bows out when it dies. */
 export function useBadgeHost(v: vscode.WebviewView | undefined) {
   host = v;
   paint();
@@ -22,8 +22,8 @@ export function setChatBadge(n: number) {
 function paint() {
   if (!host) return;
   try {
-    host.badge = value > 0 ? { value, tooltip: 'Claude ha finito' } : undefined;
+    host.badge = value > 0 ? { value, tooltip: 'Claude is done' } : undefined;
   } catch {
-    /* una VSCode piu' vecchia puo' non avere il bollino: non e' un guasto */
+    /* an older VSCode may not have badges: that's not a failure */
   }
 }

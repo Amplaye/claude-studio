@@ -1,6 +1,6 @@
-// Le webview caricano file veri con asWebviewUri e girano sotto una CSP stretta con
-// nonce: niente risorse esterne, niente 'unsafe-inline', niente interfaccia dentro
-// stringhe JavaScript (con animazioni da ritoccare quella strada e' impraticabile).
+// The webviews load real files through asWebviewUri and run under a tight CSP with
+// a nonce: no external resources, no 'unsafe-inline', no interface buried inside
+// JavaScript strings (with animations to tweak, that road is a dead end).
 import * as fs from 'node:fs';
 import * as vscode from 'vscode';
 
@@ -12,10 +12,10 @@ export function makeNonce(): string {
 }
 
 /**
- * Costruisce la pagina di una webview a partire dal suo .html.
- * I segnaposto {{...}} sono percorsi di risorse, il nonce, la CSP e lo sprite delle
- * Ionicons — che va incollato nel documento: Chromium non segue i riferimenti
- * <use href="file.svg#id"> verso un file esterno, quindi lo sprite si inserisce qui.
+ * Builds a webview page starting from its .html.
+ * The {{...}} placeholders are asset paths, the nonce, the CSP and the Ionicons
+ * sprite — which has to be pasted into the document: Chromium doesn't follow
+ * <use href="file.svg#id"> references to an external file, so the sprite goes in here.
  */
 export function renderPage(
   webview: vscode.Webview,
@@ -42,7 +42,7 @@ export function renderPage(
       'utf8'
     );
   } catch {
-    /* senza sprite le icone non si vedono, ma la pagina funziona lo stesso */
+    /* without the sprite the icons don't show, but the page still works */
   }
 
   const vars: Record<string, string> = { csp, nonce, sprite };

@@ -1,37 +1,37 @@
-// Lettura dei transcript. Il tick puo' scattare ogni secondo e mezzo, quindi qui
-// dentro non si rilegge mai due volte lo stesso byte.
+// Reading the transcripts. The tick can fire every second and a half, so in here the
+// same byte is never read twice.
 //
-// Differenza con la 0.0.6, ed e' la correzione piu' importante: li' il costo veniva
-// sommato solo sugli ultimi 256 KB del file. Su una conversazione lunga usciva un
-// costo sottostimato — e per giunta non era mostrato da nessuna parte. Qui il file
-// si legge tutto **una volta sola**, e da li' in poi solo la parte nuova: il costo e'
-// quello vero dall'inizio, e il lavoro per tick resta quello di prima o meno.
+// The difference from 0.0.6, and it's the most important fix: over there the cost was
+// summed over only the last 256 KB of the file. On a long conversation that produced
+// an understated cost — and on top of that it wasn't shown anywhere. Here the file is
+// read in full **once**, and from then on only the new part: the cost is the real one
+// from the beginning, and the work per tick stays what it was before, or less.
 import * as fs from 'node:fs';
 
 export interface Scan {
-  /** Contesto occupato: usage dell'ultimo messaggio del discorso principale. */
+  /** Context used: usage of the last message of the main thread. */
   usedTokens: number;
-  /** Costo dell'intera conversazione, dal primo messaggio. */
+  /** Cost of the whole conversation, from the first message. */
   costUsd: number;
-  /** Primo prompt umano: serve a dare un nome alla card. */
+  /** First human prompt: it's what gives the card a name. */
   prompt: string;
-  /** Quante righe sono state digerite: utile alle prove. */
+  /** How many lines were digested: useful to the tests. */
   lines: number;
 }
 
 interface Entry extends Scan {
-  /** Byte gia' letti. */
+  /** Bytes already read. */
   offset: number;
-  /** Coda di riga rimasta a meta' fra due letture (in byte, non in caratteri). */
+  /** Line tail left half-written between two reads (in bytes, not characters). */
   carry: Buffer;
-  /** Se il file dichiara un totale suo, quello batte la somma riga per riga. */
+  /** If the file declares a total of its own, that beats the line-by-line sum. */
   declaredTotal: number | null;
   sum: number;
 }
 
 const cache = new Map<string, Entry>();
 
-/** Le prove partono da zero: senza questo la seconda prova vedrebbe la prima. */
+/** The tests start from scratch: without this the second test would see the first. */
 export function forgetTranscripts() {
   cache.clear();
 }
@@ -50,8 +50,8 @@ function fresh(): Entry {
 }
 
 /**
- * Lo stato di una conversazione dal suo transcript.
- * Se il file non e' cresciuto dall'ultima volta non si tocca il disco.
+ * A conversation's state, from its transcript.
+ * If the file hasn't grown since last time, the disk isn't touched.
  */
 export function scanTranscript(file: string): Scan {
   let size: number;
@@ -62,8 +62,8 @@ export function scanTranscript(file: string): Scan {
   }
 
   let e = cache.get(file);
-  // File piu' corto di quanto avevamo letto: e' stato riscritto da capo. Ripartire
-  // dal vecchio offset darebbe numeri inventati.
+  // File shorter than what we had read: it was rewritten from scratch. Starting again
+  // from the old offset would give made-up numbers.
   if (!e || size < e.offset) {
     e = fresh();
     cache.set(file, e);
@@ -87,8 +87,8 @@ export function scanTranscript(file: string): Scan {
   const buf = e.carry.length ? Buffer.concat([e.carry, chunk]) : chunk;
   const text = buf.toString('utf8');
   const rows = text.split('\n');
-  // L'ultimo pezzo puo' essere una riga scritta a meta': si tiene da parte in byte,
-  // cosi' non si spezza un carattere multibyte a cavallo di due letture.
+  // The last piece can be a half-written line: it's set aside in bytes, so a
+  // multibyte character straddling two reads doesn't get broken.
   const tail = rows.pop() ?? '';
   e.carry = tail ? buf.subarray(buf.length - Buffer.byteLength(tail, 'utf8')) : Buffer.alloc(0);
 
@@ -107,18 +107,18 @@ function digest(e: Entry, row: string) {
   try {
     o = JSON.parse(line);
   } catch {
-    return; // riga a meta' o rumore: non e' un errore da raccontare
+    return; // half a line or noise: not an error worth reporting
   }
   if (!o || typeof o !== 'object') return;
   e.lines++;
 
-  // Il costo lo pagano anche i sub-agent, quindi si somma tutto.
+  // Sub-agents cost money too, so everything gets summed.
   if (typeof o.costUSD === 'number') e.sum += o.costUSD;
   if (typeof o.totalCostUsd === 'number') e.declaredTotal = o.totalCostUsd;
   e.costUsd = e.declaredTotal ?? e.sum;
 
-  // Il contesto no: quello del sub-agent e' una finestra sua, e prenderlo per buono
-  // farebbe crollare la percentuale del discorso principale appena parte un Task.
+  // Not the context: a sub-agent's is a window of its own, and taking it at face
+  // value would collapse the main thread's percentage the moment a Task starts.
   const usage = o.message?.usage;
   if (usage && !o.isSidechain) {
     e.usedTokens =
@@ -131,7 +131,7 @@ function digest(e: Entry, row: string) {
   if (!e.prompt && o.type === 'user' && o.message) e.prompt = humanPrompt(o.message.content);
 }
 
-/** Il primo prompt scritto da una persona: gli inserimenti automatici non contano. */
+/** The first prompt written by a person: automatic insertions don't count. */
 function humanPrompt(content: unknown): string {
   let txt = '';
   if (typeof content === 'string') txt = content;

@@ -1,18 +1,18 @@
-// Il pezzo che guarda l'editor: cosa hai selezionato, che file ci sono, e come si
-// apre un file o un diff nativo. Sta tutto qui cosi' il resto della chat non deve
-// sapere niente di VSCode.
+// The piece that watches the editor: what you selected, which files are around, and
+// how to open a file or a native diff. It all sits here so the rest of the chat
+// doesn't have to know anything about VSCode.
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 
-/** Un percorso puo' arrivare relativo o gia' assoluto: qui diventa sempre assoluto. */
+/** A path can arrive relative or already absolute: here it always becomes absolute. */
 function toUri(p: string): vscode.Uri {
   return vscode.Uri.file(/^([a-zA-Z]:[\\/]|\/)/.test(p) ? p : path.join(workspaceRoot(), p));
 }
 
 export interface Selected {
-  /** percorso relativo alla cartella di lavoro */
+  /** path relative to the working folder */
   rel: string;
-  /** "12-38" oppure "12" */
+  /** "12-38" or "12" */
   lines: string;
   text: string;
 }
@@ -22,7 +22,7 @@ export function workspaceRoot(): string {
   return f && f.length ? f[0].uri.fsPath : process.cwd();
 }
 
-/** Cosa e' selezionato adesso nell'editor attivo. Niente selezione = niente. */
+/** What is selected right now in the active editor. No selection = nothing. */
 export function currentSelection(): Selected | undefined {
   const ed = vscode.window.activeTextEditor;
   if (!ed || ed.selection.isEmpty) return undefined;
@@ -37,8 +37,8 @@ export function currentSelection(): Selected | undefined {
   };
 }
 
-// L'elenco dei file si rilegge di rado: cercarli a ogni tasto premuto mentre si
-// scrive "@..." vuol dire far grattare il disco per niente.
+// The file list is re-read rarely: searching on every keystroke while you type
+// "@..." means making the disk grind for nothing.
 let cache: { at: number; files: string[] } = { at: 0, files: [] };
 const CACHE_MS = 30000;
 
@@ -54,8 +54,8 @@ export async function findFiles(q: string, limit = 40): Promise<string[]> {
   }
   const needle = q.trim().toLowerCase();
   if (!needle) return cache.files.slice(0, limit);
-  // Chi ha il pezzo cercato nel nome del file viene prima: e' quasi sempre
-  // quello che si sta cercando.
+  // Whatever has the searched-for bit in the file name comes first: that's almost
+  // always the one you're looking for.
   const hits = cache.files.filter((f) => f.toLowerCase().includes(needle));
   hits.sort((a, b) => {
     const an = a.split('/').pop()!.toLowerCase().includes(needle) ? 0 : 1;
@@ -76,13 +76,13 @@ export async function openFile(rel: string, line?: number) {
       ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
     }
   } catch (e) {
-    void vscode.window.showErrorMessage(`Non riesco ad aprire ${rel}: ${e instanceof Error ? e.message : e}`);
+    void vscode.window.showErrorMessage(`I can't open ${rel}: ${e instanceof Error ? e.message : e}`);
   }
 }
 
-// ---- diff nativo -----------------------------------------------------------
-// Il "prima" non sta su disco (sul disco c'e' gia' il "dopo"), quindi si serve da
-// un documento finto in memoria, di sola lettura.
+// ---- native diff -----------------------------------------------------------
+// The "before" isn't on disk (the disk already holds the "after"), so it's served
+// from a fake read-only in-memory document.
 const BEFORE = 'claude-studio-prima';
 const stash = new Map<string, string>();
 let seq = 0;
@@ -98,8 +98,9 @@ export async function showDiff(rel: string, before: string, after: string, title
   stash.set(key, before);
   const left = vscode.Uri.from({ scheme: BEFORE, path: key });
 
-  // Il "dopo" e' quasi sempre il file vero: cosi' il diff resta modificabile e
-  // vivo. Se non esiste (file mai scritto) si ripiega su un secondo documento finto.
+  // The "after" is almost always the real file: that way the diff stays editable and
+  // alive. If it doesn't exist (a file never written) we fall back to a second fake
+  // document.
   const abs = toUri(rel);
   let right = abs;
   try {
@@ -109,10 +110,10 @@ export async function showDiff(rel: string, before: string, after: string, title
     stash.set(k2, after);
     right = vscode.Uri.from({ scheme: BEFORE, path: k2 });
   }
-  await vscode.commands.executeCommand('vscode.diff', left, right, title || `${rel} — prima ↔ dopo`);
+  await vscode.commands.executeCommand('vscode.diff', left, right, title || `${rel} — before ↔ after`);
 }
 
-/** Errori e avvisi che l'editor conosce gia': non serve rieseguire niente. */
+/** Errors and warnings the editor already knows about: nothing needs re-running. */
 export function diagnostics(rel?: string): string {
   const rows: string[] = [];
   const all = vscode.languages.getDiagnostics();
@@ -121,14 +122,14 @@ export function diagnostics(rel?: string): string {
     if (rel && !name.toLowerCase().includes(rel.toLowerCase())) continue;
     for (const d of list) {
       if (d.severity > vscode.DiagnosticSeverity.Warning) continue;
-      const sev = d.severity === vscode.DiagnosticSeverity.Error ? 'errore' : 'avviso';
+      const sev = d.severity === vscode.DiagnosticSeverity.Error ? 'error' : 'warning';
       rows.push(`${name}:${d.range.start.line + 1}:${d.range.start.character + 1} ${sev}: ${d.message}`);
     }
   }
-  return rows.length ? rows.slice(0, 200).join('\n') : 'Nessun errore o avviso aperto nell’editor.';
+  return rows.length ? rows.slice(0, 200).join('\n') : 'No open errors or warnings in the editor.';
 }
 
-/** I file aperti adesso, con l'indicazione di quello attivo. */
+/** The files open right now, marking which one is active. */
 export function openEditors(): string {
   const rows: string[] = [];
   for (const g of vscode.window.tabGroups.all) {
@@ -140,6 +141,6 @@ export function openEditors(): string {
     }
   }
   const sel = currentSelection();
-  if (sel) rows.push(`selezione: ${sel.rel} righe ${sel.lines}`);
-  return rows.length ? rows.join('\n') : 'Nessun file aperto nell’editor.';
+  if (sel) rows.push(`selection: ${sel.rel} lines ${sel.lines}`);
+  return rows.length ? rows.join('\n') : 'No files open in the editor.';
 }

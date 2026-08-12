@@ -9,18 +9,18 @@ import { checkForUpdates, startAutoUpdate } from './update/updater';
 
 export function activate(ctx: vscode.ExtensionContext) {
   const chat = new ChatController(ctx);
-  // La barra di contesto vive nello stesso processo della chat: e' cosi' che vede
-  // le conversazioni aperte da qui senza doverle indovinare dal disco.
+  // The context bar lives in the same process as the chat: that's how it sees the
+  // conversations opened from here without having to guess them off the disk.
   const monitor = new ContextMonitor();
   monitor.start(ctx);
 
   ctx.subscriptions.push(
     registerDiffProvider(),
-    // La chat deve sapere cosa hai selezionato senza chiedertelo.
+    // The chat has to know what you selected without asking you.
     vscode.window.onDidChangeTextEditorSelection(() => chat.pushSelection()),
     vscode.window.onDidChangeActiveTextEditor(() => chat.pushSelection()),
-    // Torni sulla finestra: il bollino di "ha finito" ha gia' detto quel che
-    // doveva e si spegne da solo.
+    // You come back to the window: the "it's done" badge has already said what it
+    // had to say and turns itself off.
     vscode.window.onDidChangeWindowState((s) => s.focused && chat.onWindowFocus()),
     vscode.window.registerWebviewViewProvider(ChatView.id, new ChatView(ctx, chat, monitor), {
       webviewOptions: { retainContextWhenHidden: true },
@@ -29,15 +29,15 @@ export function activate(ctx: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     ChatPanel.register(ctx, chat, monitor),
-    // "Apri" apre la scheda: e' la faccia principale. Il pannello laterale resta
-    // a portata di mano, ma da comando suo.
+    // "Open" opens the tab: that's the main face. The sidebar panel stays within
+    // reach, but behind its own command.
     vscode.commands.registerCommand('claudeStudio.show', () => ChatPanel.open(ctx, chat, undefined, monitor)),
     vscode.commands.registerCommand('claudeStudio.openTab', () =>
       ChatPanel.open(ctx, chat, undefined, monitor)
     ),
     vscode.commands.registerCommand('claudeStudio.openSidebar', () => {
-      // Chiesto apposta: qui il pannello laterale deve restare, non rimbalzare
-      // subito sulla scheda.
+      // Asked for on purpose: here the sidebar panel has to stay put, not bounce
+      // straight over to the tab.
       stayInSidebar();
       return vscode.commands.executeCommand('workbench.view.extension.claudeStudio');
     }),
@@ -54,8 +54,8 @@ export function activate(ctx: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand('claudeStudio.context.refresh', () => monitor.tick()),
     vscode.commands.registerCommand('claudeStudio.context.diagnose', () => monitor.diagnose()),
-    // Gli aggiornamenti arrivano da soli; questo comando serve solo a non dover
-    // aspettare il giro delle sei ore.
+    // Updates arrive on their own; this command only exists so you don't have to
+    // wait for the six-hour round.
     vscode.commands.registerCommand('claudeStudio.update', () => checkForUpdates(ctx, { manual: true })),
     startAutoUpdate(ctx),
     { dispose: () => chat.dispose() },

@@ -1,18 +1,18 @@
-// Il filo fra estensione e pannello del contesto. Come per la chat: un solo posto
-// per i tipi, e sul filo passano dati gia' formattati — la webview disegna, non fa
-// i conti.
+// The wire between the extension and the context panel. Same as the chat: one
+// single place for the types, and what travels the wire is already formatted — the
+// webview draws, it doesn't do the math.
 import type { FocusHow } from './focus';
 
 export interface CtxCard {
   id: string;
   shortId: string;
-  /** Nome della card: quello che hai dato tu > nome tab > primo prompt > id corto. */
+  /** The card's name: the one you gave it > tab name > first prompt > short id. */
   name: string;
-  /** Da dove viene: la nostra chat, oppure una tab dell'estensione ufficiale. */
+  /** Where it comes from: our chat, or a tab of the official extension. */
   own: boolean;
   tabName: string;
   preview: string;
-  /** Percentuale di contesto occupato, oppure null se non si sa ancora. */
+  /** Percentage of context used, or null if we don't know yet. */
   pct: number | null;
   tokens: string;
   cost: string;
@@ -34,21 +34,21 @@ export interface CtxData {
   cards: CtxCard[];
   branch: string;
   dirty: boolean;
-  /** Somma dei costi delle conversazioni vive: e' il dato che la 0.0.6 buttava via. */
+  /** Sum of the costs of the live conversations: the number 0.0.6 threw away. */
   totalCost: string;
 }
 
-/** Estensione -> pannello. */
+/** Extension -> panel. */
 export type CtxWire = { k: 'data'; d: CtxData };
 
 /**
- * Estensione -> chat. Gli stessi dati, ma diretti alla colonna del contesto che la
- * scheda a tutto schermo si tiene di fianco: li' il pannello della barra laterale
- * non c'e', e senza questo la scheda sarebbe l'unica faccia a non vedere niente.
+ * Extension -> chat. The same data, but aimed at the context column the fullscreen
+ * tab keeps beside itself: over there the sidebar panel doesn't exist, and without
+ * this the tab would be the only face that sees nothing.
  */
 export type CtxToChat = { k: 'ctx'; d: CtxData };
 
-/** Pannello -> estensione. */
+/** Panel -> extension. */
 export type CtxCmd =
   | { cmd: 'ready' }
   | { cmd: 'refresh' }

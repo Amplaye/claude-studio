@@ -1,8 +1,7 @@
-// La faccia larga: una scheda vera nell'area editor, come quella dell'ufficiale.
-// La prima scheda e' la "principale" e si comporta come prima (riaprirla la
-// riporta in primo piano). Il "+" ne apre di nuove, ciascuna con il proprio
-// controller e la propria sessione: cosi' si lavora su piu' conversazioni
-// in contemporanea.
+// The wide face: a real tab in the editor area, like the official one's. The first
+// tab is the "primary" and behaves as before (reopening it brings it to the front).
+// The "+" opens new ones, each with its own controller and its own session: that's
+// how you work on several conversations at the same time.
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
 import type { ContextMonitor } from '../context/monitor';
@@ -12,14 +11,14 @@ import { ChatController } from './controller';
 const TYPE = 'claudeStudio.panel';
 
 export class ChatPanel {
-  /** La scheda principale: una sola, riaprirla la riporta davanti. */
+  /** The primary tab: one only, reopening it brings it to the front. */
   private static primary?: ChatPanel;
-  /** Tutte le schede aperte, principale compresa: servono per la pulizia. */
+  /** Every open tab, primary included: they're needed for cleanup. */
   private static all = new Set<ChatPanel>();
 
   /**
-   * Apre la scheda principale: se c'e' gia', la riporta davanti. E' il
-   * comportamento di "Apri Claude Studio" e del clic sull'icona.
+   * Opens the primary tab: if it's already there, it brings it to the front. This is
+   * the behaviour of "Open Claude Studio" and of the click on the icon.
    */
   static open(
     ctx: vscode.ExtensionContext,
@@ -41,8 +40,8 @@ export class ChatPanel {
   }
 
   /**
-   * Apre una nuova scheda indipendente, con il proprio controller e la propria
-   * sessione. E' il "+" nella testata.
+   * Opens a new independent tab, with its own controller and its own session. This
+   * is the "+" in the header.
    */
   static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
     const chat = new ChatController(ctx, { primary: false });
@@ -56,7 +55,7 @@ export class ChatPanel {
     return new ChatPanel(panel, ctx, chat, monitor, false);
   }
 
-  /** Ricarichi la finestra e la scheda e' ancora li'. */
+  /** You reload the window and the tab is still there. */
   static register(
     ctx: vscode.ExtensionContext,
     chat: ChatController,
@@ -73,9 +72,9 @@ export class ChatPanel {
     });
   }
 
-  /** Il controller di questa scheda: le schede secondarie ne hanno uno proprio. */
+  /** This tab's controller: secondary tabs have one of their own. */
   readonly chat: ChatController;
-  /** true = scheda principale, false = scheda secondaria (ne ha uno suo). */
+  /** true = primary tab, false = secondary tab (which has its own). */
   private readonly isPrimary: boolean;
 
   private constructor(
@@ -92,15 +91,15 @@ export class ChatPanel {
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
     const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel', monitor);
-    // Solo la principale governa il bollino della barra: le secondarie sono
-    // conversazioni a se', la barra di contesto le ignora.
+    // Only the primary governs the bar's badge: the secondary ones are conversations
+    // of their own, and the context bar ignores them.
     if (isPrimary) {
       owned.setPanelActive(panel.active);
     }
     const state = panel.onDidChangeViewState(() => {
       if (isPrimary) owned.setPanelActive(panel.active);
-      // Tornata davanti dopo essere stata dietro: i numeri erano fermi da un po',
-      // e il tasto "aggiorna" non c'e' piu' perche' questo lo fa da solo.
+      // Back in front after being behind: the numbers had been frozen for a while,
+      // and the "refresh" button is gone because this does it by itself.
       if (panel.visible) monitor?.tickSoon();
     });
     panel.onDidDispose(() => {
@@ -108,8 +107,7 @@ export class ChatPanel {
       listener.dispose();
       if (isPrimary) owned.setPanelActive(false);
       chat.detach(surface);
-      // Le schede secondarie portano con se' il controller: quando muoiono, muore
-      // anche quello.
+      // Secondary tabs carry their controller with them: when they die, it dies too.
       if (!isPrimary) chat.dispose();
       ChatPanel.all.delete(this);
       if (ChatPanel.primary === this) ChatPanel.primary = undefined;

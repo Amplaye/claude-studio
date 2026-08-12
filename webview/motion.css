@@ -1,6 +1,6 @@
-/* Tutte le animazioni stanno qui: i tempi si ritoccano in un posto solo.
-   Si muovono soltanto transform e opacity — le due proprieta' che la scheda
-   video gestisce da sola — cosi' si puo' essere vistosi e restare fluidi. */
+/* All the animations live here: the timings get tweaked in one place only.
+   Only transform and opacity move — the two properties the graphics card
+   handles on its own — so you can be showy and still stay smooth. */
 
 @keyframes cs-enter {
   from {
@@ -59,9 +59,9 @@
   }
 }
 
-/* ---- le carte dei modelli ----
-   Tre pezzi che si sommano man mano che il modello sale di fascia: il lampo che
-   attraversa, il galleggiamento, l'alone che respira. */
+/* ---- the model cards ----
+   Three pieces that stack up as the model moves up a tier: the flash that
+   sweeps across, the floating, the halo that breathes. */
 
 @keyframes cs-sheen {
   0% {
@@ -93,8 +93,8 @@
   }
 }
 
-/* Come cs-glow e cs-breathe, ma sul colore della famiglia (--fam) invece che
-   sul colore del marchio: cosi' ogni modello alita del suo. */
+/* Like cs-glow and cs-breathe, but on the family colour (--fam) instead of
+   the brand colour: that way each model breathes in its own. */
 @keyframes cs-fam-glow {
   0%,
   100% {
@@ -149,7 +149,7 @@
   }
 }
 
-/* Le outline Ionicons sono tracciati: possono disegnarsi da sole. */
+/* The Ionicons outlines are paths: they can draw themselves. */
 @keyframes cs-draw {
   from {
     stroke-dashoffset: var(--len, 300);
@@ -190,8 +190,8 @@
   }
 }
 
-/* Cambio conversazione: quella vecchia scorre via, la nuova entra dall'altra
-   parte. Sono due meta' dello stesso gesto, e devono durare uguale. */
+/* Switching conversation: the old one slides away, the new one comes in from the
+   other side. They're two halves of the same gesture, and must last the same. */
 @keyframes cs-swap-out {
   from {
     opacity: 1;
@@ -214,7 +214,7 @@
   }
 }
 
-/* Il pallino di una sessione che sta scrivendo proprio ora. */
+/* The dot for a session that's writing right now. */
 @keyframes cs-ping {
   0%,
   100% {
@@ -250,7 +250,7 @@
   }
 }
 
-/* ---- applicazione ---- */
+/* ---- application ---- */
 
 .msg {
   animation: cs-enter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
@@ -272,9 +272,8 @@
   animation: cs-caret 1s ease-in-out infinite;
 }
 
-/* Un alone, non un secondo pallino: senza la sfocatura resta un disco pieno che
-   copre tutto quello che ha intorno. La sfocatura e' ferma, si muovono solo
-   scala e opacita'. */
+/* A halo, not a second dot: without the blur it stays a solid disc that covers
+   everything around it. The blur is fixed, only scale and opacity move. */
 .thinking-halo::before {
   content: '';
   position: absolute;
@@ -310,7 +309,7 @@
   animation: cs-breathe 1.5s ease-in-out infinite;
 }
 
-/* apertura di un blocco tool: elastica, ma solo su transform e opacity */
+/* opening a tool block: springy, but only on transform and opacity */
 .tool[open] > .body,
 .think[open] > .body {
   transform-origin: top center;
@@ -335,22 +334,22 @@
   animation: cs-rise 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
-/* la spunta del verdetto si disegna, come quella dei tool */
+/* the verdict's tick draws itself, like the tools' one */
 .perm.resolved .verdict .perm-ico path {
   stroke-dasharray: var(--len, 300);
   animation: cs-draw 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 
-/* finche' nessuno risponde, la scheda respira: non e' un messaggio come gli altri */
+/* until someone answers, the card breathes: it isn't a message like the others */
 .perm:not(.resolved) .perm-ico {
   animation: cs-breathe 2s ease-in-out infinite;
 }
 
-/* ---- apertura e chiusura di una scheda ----
-   Le linguette di VSCode non si possono animare: quelle le disegna l'editor. Ma
-   quello che c'e' dentro si', ed e' quello che guardi — una scheda nuova entra
-   invece di comparire di colpo, e chiudendola dal tasto in testata se ne va
-   prima di sparire davvero. */
+/* ---- opening and closing a tab ----
+   VS Code's tab strips can't be animated: the editor draws those. But what's
+   inside can be, and that's what you look at — a new tab comes in instead of
+   appearing all at once, and closing it from the header button lets it leave
+   before it really disappears. */
 .shell.tab-in {
   animation: cs-tab-in 0.44s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
@@ -385,7 +384,7 @@
   }
 }
 
-/* il pannello delle impostazioni scende dal tasto che lo ha aperto */
+/* the settings panel drops down from the button that opened it */
 .pop {
   animation: cs-pop-in 0.28s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
@@ -418,10 +417,10 @@
   animation: cs-squeeze 0.2s ease-out;
 }
 
-/* Cambio conversazione. Il discorso vecchio non viene copiato: sono gli stessi
-   nodi, spostati dentro un fantasma sovrapposto al log e tagliati alla stessa
-   finestra che stavi guardando. Cosi' esce quello che vedevi davvero, e intanto
-   il nuovo entra al suo posto. */
+/* Switching conversation. The old thread isn't copied: they're the same nodes,
+   moved into a ghost laid over the log and cropped to the same window you were
+   looking at. That way what leaves is what you actually saw, and meanwhile the
+   new one comes in to take its place. */
 .log-ghost {
   position: absolute;
   overflow: hidden;
@@ -429,7 +428,7 @@
   z-index: 2;
   animation: cs-swap-out 0.35s cubic-bezier(0.4, 0, 1, 1) both;
 }
-/* Dentro il fantasma non si muove piu' niente: e' un'immagine che se ne va. */
+/* Inside the ghost nothing moves any more: it's an image on its way out. */
 .log-ghost *,
 .log-ghost *::before,
 .log-ghost *::after {
@@ -458,9 +457,9 @@
   }
 }
 
-/* Lo stato vuoto e' l'unico posto dove un'icona ha spazio per disegnarsi da sola:
-   le Ionicons outline sono tracciati, e stroke-dasharray si eredita fin dentro
-   la forma richiamata con <use>. */
+/* The empty state is the only place an icon has room to draw itself:
+   the Ionicons outlines are paths, and stroke-dasharray is inherited right into
+   the shape pulled in with <use>. */
 .empty .ico {
   stroke-dasharray: var(--len, 900);
   animation: cs-draw 1.1s cubic-bezier(0.65, 0, 0.35, 1) both, cs-chunk 0.5s ease-out both;
@@ -474,7 +473,7 @@
   box-shadow: 0 14px 30px -20px var(--claude-1), 0 0 0 1px color-mix(in srgb, var(--claude-1) 30%, transparent);
 }
 
-/* ---- il pannello del contesto ---- */
+/* ---- the context panel ---- */
 
 .ctxcard {
   animation: cs-enter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
@@ -484,13 +483,13 @@
   animation: cs-ping 1.5s ease-in-out infinite;
 }
 
-/* La barra scivola fino al valore nuovo invece di saltarci. */
+/* The bar glides to the new value instead of jumping to it. */
 .fill {
   transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
 }
 
-/* E mentre scivola si porta dietro una scia: e' l'unico momento in cui una barra
-   ferma da minuti si fa notare. */
+/* And as it glides it drags a sweep along: it's the only moment when a bar
+   that's been still for minutes gets noticed. */
 .fill.glide::after {
   content: '';
   position: absolute;
@@ -501,7 +500,7 @@
   animation: cs-sweep 0.8s ease-out both;
 }
 
-/* Se il sistema chiede meno movimento restano solo le dissolvenze. */
+/* If the system asks for less motion, only the fades are left. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -519,8 +518,8 @@
   .fill.glide::after {
     animation: none !important;
   }
-  /* Il fantasma del cambio conversazione non serve piu': senza movimento sarebbe
-     solo un doppione fermo sopra il discorso nuovo. */
+  /* The conversation-switch ghost isn't needed any more: without motion it would
+     just be a still duplicate sitting on top of the new thread. */
   .log-ghost {
     display: none !important;
   }
@@ -533,8 +532,8 @@
   }
 }
 
-/* I loop infiniti si fermano appena l'elemento esce dallo schermo: venti aloni
-   che pulsano fuori vista scaldano il portatile per niente. */
+/* The infinite loops stop as soon as the element leaves the screen: twenty halos
+   pulsing out of sight heat up the laptop for nothing. */
 .offscreen .thinking-halo::before,
 .offscreen .thinking-ring,
 .offscreen .tool-bar::after,

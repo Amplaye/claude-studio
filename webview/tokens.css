@@ -1,13 +1,13 @@
-/* La palette e le regole tipografiche portate dalla context-bar 0.0.6.
-   Il colore lo portano barre, pallini e gradienti: il testo e' bianco pieno,
-   la gerarchia la fanno dimensione e peso — mai il grigio. */
+/* The palette and the type rules carried over from context-bar 0.0.6.
+   Colour is carried by bars, dots and gradients: text is full white,
+   hierarchy comes from size and weight — never grey. */
 :root {
   --ok: #3fb950;
   --warn: #e3b341;
   --bad: #f85149;
 
-  --claude-1: #d97757; /* argilla */
-  --claude-2: #e9a97f; /* pesca   */
+  --claude-1: #d97757; /* clay  */
+  --claude-2: #e9a97f; /* peach */
 
   --fg: var(--vscode-foreground, #e6edf3);
   --surface: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
@@ -25,17 +25,17 @@
   box-sizing: border-box;
 }
 
-/* Un display: dichiarato in una classe batte la regola [hidden] del browser:
-   senza questa riga un elemento con `hidden = true` resta bello visibile. */
+/* A display: declared in a class beats the browser's [hidden] rule:
+   without this line an element with `hidden = true` stays plainly visible. */
 [hidden] {
   display: none !important;
 }
 
-/* Lo sprite delle Ionicons vive incollato in cima al <body>: e' un magazzino di
-   <symbol>, non un disegno. Va nascosto da qui e non con un attributo style,
-   perche' la CSP della webview (senza 'unsafe-inline') gli attributi style del
-   markup li ignora — e un <svg> senza display diventa un blocco alto 150px che
-   spinge giu' tutta la pagina. */
+/* The Ionicons sprite lives pasted at the top of the <body>: it's a warehouse of
+   <symbol>, not a drawing. It has to be hidden from here and not with a style
+   attribute, because the webview's CSP (without 'unsafe-inline') ignores style
+   attributes in the markup — and an <svg> with no display becomes a 150px-tall
+   block that pushes the whole page down. */
 svg.sprite {
   display: none !important;
 }
@@ -50,7 +50,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Etichette piccole: maiuscole, peso alto, tracking largo. */
+/* Small labels: uppercase, heavy weight, wide tracking. */
 .lab {
   font-size: 11px;
   font-weight: 700;
@@ -58,7 +58,7 @@ body {
   text-transform: uppercase;
 }
 
-/* Numeri grandi. */
+/* Big numbers. */
 .big {
   font-size: 27px;
   font-weight: 750;

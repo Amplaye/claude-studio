@@ -1,11 +1,10 @@
-// Le conversazioni nate dalla chat di Claude Studio.
+// The conversations born from the Claude Studio chat.
 //
-// E' qui il vero guadagno dell'aver messo chat e barra di contesto nella stessa
-// estensione. Per le tab dell'estensione ufficiale l'aggancio fra "cosa stai
-// guardando" e "quale sessione e'" resta una cascata di tentativi, e quando fallisce
-// la card lo dice ("stimata"). Per le nostre no: la sessione l'abbiamo aperta noi,
-// quindi id, titolo, se sta lavorando e dove la stai guardando sono fatti, non
-// indovinelli.
+// This is where putting the chat and the context bar in the same extension really
+// pays off. For the official extension's tabs, the hook between "what you're looking
+// at" and "which session it is" stays a cascade of attempts, and when it fails the
+// card says so ("estimated"). Not for ours: we opened the session, so the id, the
+// title, whether it's working and where you're looking at it are facts, not riddles.
 import type { Wire } from '../engine/protocol';
 
 export interface OwnSession {
@@ -14,18 +13,18 @@ export interface OwnSession {
   model: string;
   startedAt: number;
   updatedAt: number;
-  /** Il primo messaggio scritto: e' il nome che si legge sulla card. */
+  /** The first message written: it's the name you read on the card. */
   title: string;
-  /** Contesto dell'ultimo turno, cosi' com'e' arrivato dal motore. */
+  /** Context of the last turn, exactly as it came from the engine. */
   tokens: number;
-  /** Costo dichiarato dal motore per la conversazione. */
+  /** Cost the engine declares for the conversation. */
   costUsd: number;
   busy: boolean;
 }
 
 class OwnedSessions {
   private cur?: OwnSession;
-  /** Dove stai guardando la chat: scheda in primo piano, pannello laterale aperto. */
+  /** Where you're looking at the chat: tab in front, sidebar panel open. */
   private panelActive = false;
   private viewVisible = false;
   private listeners = new Set<() => void>();
@@ -39,7 +38,7 @@ class OwnedSessions {
     return this.cur;
   }
 
-  /** La chat e' sotto gli occhi adesso? Serve a decidere qual e' la sessione in focus. */
+  /** Is the chat in front of your eyes right now? It decides which session is focused. */
   looking(): 'panel' | 'view' | null {
     if (this.panelActive) return 'panel';
     if (this.viewVisible) return 'view';
@@ -59,14 +58,14 @@ class OwnedSessions {
   }
 
   /**
-   * La chat le passa tutto quello che manda alla webview: qui si tiene solo cio' che
-   * serve alla card. Cosi' il controller non deve ricordarsi di avvisare due volte.
+   * The chat hands over everything it sends to the webview: here we keep only what
+   * the card needs. That way the controller doesn't have to remember to notify twice.
    */
   observe(e: Wire, cwd: string) {
     switch (e.k) {
       case 'session': {
         const now = Date.now();
-        // Stessa sessione ripresa: si tiene quello che gia' si sapeva.
+        // Same session picked up again: we keep what we already knew.
         if (this.cur?.id === e.id) {
           this.cur.model = e.model;
           this.cur.updatedAt = now;
@@ -86,8 +85,8 @@ class OwnedSessions {
         break;
       }
       case 'user':
-        // Il nome della card e' la prima cosa che hai scritto, non l'ultima: cambiarlo
-        // a ogni messaggio farebbe ballare la lista sotto gli occhi.
+        // The card's name is the first thing you wrote, not the last: changing it on
+        // every message would make the list dance in front of your eyes.
         if (!this.cur) {
           this.cur = blank(cwd);
         }
@@ -108,14 +107,14 @@ class OwnedSessions {
       case 'tool_start':
       case 'block_final':
         if (this.cur) this.cur.updatedAt = Date.now();
-        return; // roba continua: non vale un ridisegno per ogni pezzo
+        return; // continuous stuff: not worth a redraw for every piece
       default:
         return;
     }
     this.changed();
   }
 
-  /** Conversazione azzerata o estensione chiusa: la card non ha piu' motivo di esserci. */
+  /** Conversation cleared or extension closed: the card has no reason to exist. */
   end() {
     if (!this.cur) return;
     this.cur = undefined;
@@ -127,7 +126,7 @@ class OwnedSessions {
       try {
         fn();
       } catch {
-        /* chi ascolta non deve poter far cadere la chat */
+        /* a listener must never be able to bring the chat down */
       }
     }
   }

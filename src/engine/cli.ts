@@ -1,12 +1,12 @@
-// Dove sta la CLI `claude` gia' installata su questo PC.
-// Non impacchettiamo una copia del binario: l'ufficiale ne porta centinaia di MB,
-// noi zero.
+// Where the `claude` CLI already installed on this PC lives.
+// We don't bundle a copy of the binary: the official one carries hundreds of MB, we
+// carry zero.
 //
-// Dalla 2.1.x il pacchetto npm non porta piu' `cli.js`: porta un binario nativo in
-// `bin/claude(.exe)`, tirato giu' dal pacchetto per la piattaforma. Cercare ancora
-// solo `cli.js` vuol dire non trovare niente — e senza percorso l'SDK va a cercare
-// il proprio binario, che noi apposta non spediamo. Si cercano quindi entrambe le
-// forme, dalla piu' nuova alla piu' vecchia, piu' l'installer nativo.
+// Since 2.1.x the npm package no longer ships `cli.js`: it ships a native binary in
+// `bin/claude(.exe)`, pulled down from the platform-specific package. Still looking
+// only for `cli.js` means finding nothing — and without a path the SDK goes looking
+// for its own binary, which we deliberately don't ship. So we look for both forms,
+// newest to oldest, plus the native installer.
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -15,20 +15,20 @@ import { execFileSync } from 'node:child_process';
 const PKG = path.join('@anthropic-ai', 'claude-code');
 const EXE = process.platform === 'win32' ? 'claude.exe' : 'claude';
 
-/** Come si e' arrivati a questa CLI: serve all'aggiornamento automatico. */
+/** How we got to this CLI: the automatic update needs to know. */
 export type CliKind = 'npm' | 'native' | 'manual';
 
 export interface ClaudeCli {
-  /** Il file da passare all'SDK: binario nativo o cli.js. */
+  /** The file to hand the SDK: native binary or cli.js. */
   path: string;
-  /** Quello che dichiara di essere, '' se non si riesce a saperlo. */
+  /** What it claims to be, '' if we can't find out. */
   version: string;
   kind: CliKind;
-  /** Radice dei moduli globali npm, quando l'installazione e' quella. */
+  /** Root of the npm global modules, when that's the installation. */
   npmRoot?: string;
 }
 
-/** Le radici dove npm mette i moduli globali su questo sistema. */
+/** The roots where npm puts global modules on this system. */
 function npmRoots(): string[] {
   const home = os.homedir();
   const out: string[] = [];
@@ -44,12 +44,12 @@ function npmRoots(): string[] {
   return out;
 }
 
-/** Chiede a npm dove sta il prefix globale. Costa uno spawn: lo si fa una volta. */
+/** Asks npm where the global prefix is. It costs a spawn: we do it once. */
 function npmRootGlobal(): string | undefined {
   try {
     const root = execFileSync('npm', ['root', '-g'], {
       timeout: 8000,
-      shell: true, // npm su Windows e' npm.cmd
+      shell: true, // npm on Windows is npm.cmd
       stdio: ['ignore', 'pipe', 'ignore'],
     })
       .toString()
@@ -60,7 +60,7 @@ function npmRootGlobal(): string | undefined {
   }
 }
 
-/** I due file che, dentro il pacchetto, sanno fare da CLI: prima il nuovo. */
+/** The two files inside the package that can act as the CLI: the new one first. */
 function insidePackage(pkgDir: string): string | undefined {
   const bin = path.join(pkgDir, 'bin', EXE);
   if (fs.existsSync(bin)) return bin;
@@ -69,7 +69,7 @@ function insidePackage(pkgDir: string): string | undefined {
   return undefined;
 }
 
-/** L'installer nativo non passa da npm: lascia un binario e basta. */
+/** The native installer doesn't go through npm: it just leaves a binary. */
 function nativeCandidates(): string[] {
   const home = os.homedir();
   return [
@@ -82,8 +82,8 @@ function nativeCandidates(): string[] {
 let found: ClaudeCli | null | undefined;
 
 /**
- * La CLI da usare, o undefined se su questo PC non ce n'e' una.
- * @param override valore dell'impostazione claudeStudio.cliPath
+ * The CLI to use, or undefined if there isn't one on this PC.
+ * @param override value of the claudeStudio.cliPath setting
  */
 export function claudeCli(override?: string): ClaudeCli | undefined {
   if (override && fs.existsSync(override)) {
@@ -98,7 +98,7 @@ export function claudeCli(override?: string): ClaudeCli | undefined {
   for (const p of nativeCandidates()) {
     if (fs.existsSync(p)) return (found = { path: p, version: versionOf(p), kind: 'native' });
   }
-  // Ultima carta, e la piu' cara: si chiede a npm dove tiene i globali.
+  // Last card, and the most expensive: ask npm where it keeps the globals.
   const root = npmRootGlobal();
   if (root) {
     const p = insidePackage(path.join(root, PKG));
@@ -108,14 +108,14 @@ export function claudeCli(override?: string): ClaudeCli | undefined {
   return undefined;
 }
 
-/** Solo il percorso, che e' quello che serve all'SDK. */
+/** Just the path, which is what the SDK needs. */
 export function findClaudeCli(override?: string): string | undefined {
   return claudeCli(override)?.path;
 }
 
 /**
- * Dopo un aggiornamento il percorso resta quello, ma la versione no: e se prima
- * non c'era niente, adesso potrebbe esserci. Si butta via quel che si sapeva.
+ * After an update the path stays the same, but the version doesn't: and if before
+ * there was nothing, now there might be something. We throw away what we knew.
  */
 export function resetCliCache() {
   found = undefined;
@@ -125,9 +125,9 @@ export function resetCliCache() {
 const versions = new Map<string, string>();
 
 /**
- * Versione dichiarata dalla CLI trovata (per la testata). Prima si guarda il
- * package.json del pacchetto — costa zero; se non c'e' (installer nativo) si
- * chiede al binario, una volta sola.
+ * The version the CLI we found declares (for the header). First we look at the
+ * package's package.json — that costs nothing; if it isn't there (native installer)
+ * we ask the binary, once.
  */
 export function versionOf(cli: string): string {
   const cached = versions.get(cli);
@@ -142,7 +142,7 @@ export function versionOf(cli: string): string {
         break;
       }
     } catch {
-      /* si prova la cartella sopra */
+      /* try the folder above */
     }
   }
   if (!v && !cli.endsWith('.js')) {
@@ -154,12 +154,12 @@ export function versionOf(cli: string): string {
       }).toString();
       v = (out.match(/\d+\.\d+\.\d+/) || [''])[0];
     } catch {
-      /* pazienza: la testata resta senza numero */
+      /* never mind: the header stays without a number */
     }
   }
   versions.set(cli, v);
   return v;
 }
 
-/** Nome storico, tenuto perche' lo chiama la testata della chat. */
+/** Historical name, kept because the chat header calls it. */
 export const claudeCliVersion = versionOf;

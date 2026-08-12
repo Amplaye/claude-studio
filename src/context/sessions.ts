@@ -1,6 +1,6 @@
-// Le sessioni aperte dall'estensione ufficiale: la CLI lascia un file per processo
-// in ~/.claude/sessions/<pid>.json. Se il processo e' morto la tab e' chiusa, e la
-// card sparisce.
+// The sessions opened by the official extension: the CLI leaves one file per process
+// in ~/.claude/sessions/<pid>.json. If the process is dead the tab is closed, and the
+// card disappears.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { projectsDirFor, sessionNamesPath, sessionsDir, writeOurFile } from './paths';
@@ -11,28 +11,28 @@ export interface LiveSession {
   file: string;
   mtimeMs: number;
   startedAt: number;
-  /** Il nome della tab mostrato da Claude: e' l'unico aggancio serio con la tab vera. */
+  /** The tab name Claude shows: it's the only serious hook onto the real tab. */
   tabName: string;
 }
 
-/** Un processo e' vivo? Nessun segnale mandato: si controlla solo che esista. */
+/** Is a process alive? No signal is sent: we only check that it exists. */
 export function pidAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
   } catch (e: any) {
-    return e?.code === 'EPERM'; // esiste ma non e' nostro
+    return e?.code === 'EPERM'; // it exists but it isn't ours
   }
 }
 
-/** Le sessioni vive di questo progetto, la piu' fresca per prima. */
+/** The live sessions of this project, freshest first. */
 export function liveSessions(cwd: string): LiveSession[] {
   const out: LiveSession[] = [];
   let files: string[];
   try {
     files = fs.readdirSync(sessionsDir());
   } catch {
-    return out; // nessuna tab dell'ufficiale mai aperta: caso normale
+    return out; // no official tab ever opened: a normal case
   }
   for (const f of files) {
     if (!f.endsWith('.json')) continue;
@@ -45,13 +45,13 @@ export function liveSessions(cwd: string): LiveSession[] {
       continue;
     }
     if (!meta?.sessionId) continue;
-    if (meta.cwd && cwd && meta.cwd !== cwd) continue; // solo il progetto corrente
+    if (meta.cwd && cwd && meta.cwd !== cwd) continue; // the current project only
     const file = path.join(projectsDirFor(meta.cwd || cwd), meta.sessionId + '.jsonl');
     let mtimeMs = meta.startedAt || 0;
     try {
       mtimeMs = fs.statSync(file).mtimeMs;
     } catch {
-      /* transcript non ancora scritto: resta l'ora di avvio */
+      /* transcript not written yet: the start time stands */
     }
     out.push({
       id: meta.sessionId,
@@ -66,7 +66,7 @@ export function liveSessions(cwd: string): LiveSession[] {
   return out;
 }
 
-// ---- i nomi che dai tu alle sessioni -------------------------------------
+// ---- the names you give the sessions --------------------------------------
 
 export function readSessionNames(): Record<string, string> {
   try {

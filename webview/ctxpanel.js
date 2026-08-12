@@ -1,13 +1,12 @@
-/* Claude Studio — il pannello del contesto, come pezzo montabile.
-   Vive in due posti: da solo nella barra laterale, e come colonna dentro la scheda
-   a tutto schermo. Il disegno e' lo stesso, quindi il codice e' uno solo.
+/* Claude Studio — the context panel, as a mountable piece.
+   It lives in two places: on its own in the sidebar, and as a column inside the
+   full-screen tab. The design is the same, so there's only one lot of code.
 
-   Due regole di casa, le stesse della chat:
-     - niente innerHTML con dati: tutto passa da textContent;
-     - si costruisce una volta e poi si ridipinge. Ricreare i nodi a ogni
-       aggiornamento ammazzerebbe le transizioni e farebbe saltare lo scorrimento
-       sotto il dito — e con una barra animata rilancerebbe la scia ogni secondo e
-       mezzo, per sempre. */
+   Two house rules, the same as the chat's:
+     - no innerHTML with data: everything goes through textContent;
+     - build once, then repaint. Recreating the nodes on every update would kill
+       the transitions and make the scroll jump under your finger — and with an
+       animated bar it would relaunch the sweep every second and a half, forever. */
 window.CtxPanel = (() => {
   const SVG = 'http://www.w3.org/2000/svg';
 
@@ -35,26 +34,26 @@ window.CtxPanel = (() => {
     return b;
   }
 
-  /** Il colore vive nelle barre, non nel testo. */
+  /** Colour lives in the bars, not in the text. */
   const barColor = (p) =>
     p == null ? 'rgba(255,255,255,.3)' : p >= 80 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
 
   function makeBar() {
     const b = el('div', 'bar');
     const f = el('div', 'fill');
-    // Finita la scia la classe se ne va: cosi' "sta scivolando" resta una cosa vera
-    // e non una traccia appiccicata addosso per sempre.
+    // Once the sweep is over the class goes away: that way "it's gliding" stays a
+    // real thing and not a mark stuck on it forever.
     f.addEventListener('animationend', () => f.classList.remove('glide'));
     b.appendChild(f);
     return b;
   }
 
-  /** La scia parte solo quando la barra si muove davvero: altrimenti e' rumore. */
+  /** The sweep only starts when the bar really moves: otherwise it's noise. */
   function paintBar(fill, pct) {
     const w = (pct == null ? 0 : Math.max(0, Math.min(100, pct))) + '%';
     if (fill.style.width !== w) {
       fill.classList.remove('glide');
-      void fill.offsetWidth; // riavvia l'animazione anche se la classe c'era gia'
+      void fill.offsetWidth; // restarts the animation even if the class was already there
       fill.classList.add('glide');
       fill.style.width = w;
     }
@@ -62,25 +61,25 @@ window.CtxPanel = (() => {
   }
 
   /**
-   * Costruisce il pannello dentro `root` e restituisce chi lo sa ridipingere.
-   * `post` e' come si parla con l'estensione: la stessa forma nelle due facce.
+   * Builds the panel inside `root` and returns whatever knows how to repaint it.
+   * `post` is how you talk to the extension: the same shape on both faces.
    */
   return function mount(root, post) {
     root.classList.add('ctx');
 
-    // ---------- testata: l'account ----------
+    // ---------- header: the account ----------
     const acct = el('div', 'acct');
     const head = el('header', 'hdr');
     const headTop = el('div', 'hdr-top');
     const lab = el('span', 'lab');
     lab.append(icon('speedometer'), document.createTextNode('Account'));
-    // Qui c'erano due tasti che non servivano a chi guarda:
-    //  - "aggiorna adesso": i numeri si aggiornano da soli, col timer e stando a
-    //    sentire la cartella delle sessioni. Un tasto per rifare una cosa che gia'
-    //    si fa da se' e' solo un dubbio in piu' ("allora non e' aggiornato?").
-    //  - l'occhio, "cosa vede l'estensione": apriva un foglio di testo con percorsi
-    //    e id delle sessioni. E' roba da quando qualcosa non torna, non da tutti i
-    //    giorni: resta nella palette dei comandi, dove va cercata apposta.
+    // There used to be two buttons here that did nothing for the person looking:
+    //  - "refresh now": the numbers refresh on their own, on a timer and by
+    //    listening to the sessions folder. A button to redo something that already
+    //    happens by itself is just one more doubt ("so it isn't up to date?").
+    //  - the eye, "what the extension sees": it opened a text sheet with session
+    //    paths and ids. That's for when something doesn't add up, not for every
+    //    day: it stays in the command palette, where you go look for it on purpose.
     headTop.append(lab, el('span', 'grow'));
     head.append(headTop, acct);
 
@@ -94,16 +93,16 @@ window.CtxPanel = (() => {
       return c;
     }
 
-    const cells = [buildCell('Sessione · 5h'), buildCell('Settimana · 7g')];
+    const cells = [buildCell('Session · 5h'), buildCell('Week · 7d')];
     const waiting = el('div', 'await');
 
     function paintCell(c, pct, reset) {
       c._p.val.textContent = pct == null ? '—' : Math.round(pct) + '%';
-      c._p.reset.textContent = reset ? 'reset ' + reset : ' ';
+      c._p.reset.textContent = reset ? 'resets in ' + reset : ' ';
       paintBar(c._p.fill, pct);
     }
 
-    // ---------- le card (nascosto, ma servono i dati) ----------
+    // ---------- the cards (hidden, but the data is needed) ----------
     const host = el('main', 'cards');
     host.hidden = true;
     const cards = new Map();
@@ -114,8 +113,8 @@ window.CtxPanel = (() => {
       const dot = el('span', 'dot');
       const kind = icon('sparkles', 'cico');
       const name = el('span', 'cname');
-      const badge = el('span', 'badge', 'qui');
-      const ren = iconButton('pencil', 'Rinomina', 'ren');
+      const badge = el('span', 'badge', 'here');
+      const ren = iconButton('pencil', 'Rename', 'ren');
       chead.append(dot, kind, name, badge, ren);
 
       const meta = el('div', 'cmeta');
@@ -151,28 +150,28 @@ window.CtxPanel = (() => {
 
       p.dot.classList.toggle('busy', !!s.busy);
       p.dot.classList.toggle('recent', !s.busy && !!s.recent);
-      p.dot.title = s.busy ? 'attiva ora' : s.recent ? 'attiva di recente' : 'ferma';
+      p.dot.title = s.busy ? 'active now' : s.recent ? 'recently active' : 'idle';
 
       p.kind.firstChild.setAttribute('href', s.own ? '#ion-sparkles' : '#ion-chatbubble-ellipses');
-      p.kind.setAttribute('title', s.own ? 'Conversazione di Claude Studio' : 'Tab dell’estensione ufficiale');
+      p.kind.setAttribute('title', s.own ? 'Claude Studio conversation' : 'Tab from the official extension');
 
       p.name.textContent = s.name;
       p.name.title = s.preview || s.name;
       p.badge.hidden = !s.focused;
       p.pill.textContent = s.own ? 'Studio' : s.tabName || s.shortId;
       p.pill.title = s.own
-        ? 'aperta da Claude Studio · id ' + s.shortId
+        ? 'opened by Claude Studio · id ' + s.shortId
         : 'tab "' + (s.tabName || '?') + '" · id ' + s.shortId;
 
-      // Se l'aggancio non e' certo va detto, e va detto sulla card in focus: meglio
-      // un dubbio scritto che una certezza sbagliata su dove ti trovi.
+      // If the match isn't certain it has to be said, and said on the focused card:
+      // better a doubt in writing than a wrong certainty about where you are.
       const via =
         !s.focused || how === 'studio' || how === 'tab'
           ? ''
           : how === 'posizione'
-            ? ' · stimata'
-            : ' · ultima attiva';
-      p.sub.textContent = s.lastClock + ' · ' + s.lastAgo + (s.busy ? ' · attiva ora' : '') + via;
+            ? ' · estimated'
+            : ' · last active';
+      p.sub.textContent = s.lastClock + ' · ' + s.lastAgo + (s.busy ? ' · active now' : '') + via;
 
       p.pct.textContent = s.pct == null ? '—' : s.pct + '%';
       p.tok.textContent = s.tokens + ' / ' + limit;
@@ -182,7 +181,7 @@ window.CtxPanel = (() => {
 
     root.append(head, host);
 
-    // ---------- disegno ----------
+    // ---------- drawing ----------
     function render(d) {
       if (!d) return;
       if (!d.usage) {
@@ -194,10 +193,10 @@ window.CtxPanel = (() => {
         if (acct.firstChild !== cells[0]) acct.replaceChildren(cells[0], cells[1]);
       }
 
-      // Le card delle sessioni attive col consumo di token
+      // The cards for the active sessions with their token usage
       host.hidden = false;
       if (!d.cards.length) {
-        host.replaceChildren(el('div', 'empty', 'Nessuna conversazione aperta in questo progetto.'));
+        host.replaceChildren(el('div', 'empty', 'No conversations open in this project.'));
         cards.clear();
       } else {
         if (host.querySelector('.empty')) host.replaceChildren();

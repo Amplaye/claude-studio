@@ -1,7 +1,7 @@
-// Le conversazioni gia' avvenute. Non serve inventarsi niente: la CLI le tiene in
-// ~/.claude/projects e l'SDK le sa leggere. Da qui escono due cose — l'elenco per la
-// tendina, e il ridisegno di una conversazione intera negli stessi eventi che la
-// webview riceverebbe dal vivo.
+// Conversations that already happened. Nothing needs inventing: the CLI keeps them
+// in ~/.claude/projects and the SDK knows how to read them. Two things come out of
+// here — the list for the dropdown, and the redraw of an entire conversation as the
+// same events the webview would receive live.
 import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk';
 import type { HistoryItem, Wire } from '../engine/protocol';
 
@@ -10,19 +10,19 @@ export async function recentSessions(cwd: string, limit = 40): Promise<HistoryIt
     const list = await listSessions({ dir: cwd, limit });
     return list.map((s) => ({
       id: s.sessionId,
-      summary: (s.customTitle || s.summary || 'Senza titolo').slice(0, 160),
+      summary: (s.customTitle || s.summary || 'Untitled').slice(0, 160),
       when: s.lastModified,
     }));
   } catch {
-    // Nessuna cronologia e' un caso normale (progetto nuovo), non un errore da urlare.
+    // No history is a normal case (new project), not an error worth shouting about.
     return [];
   }
 }
 
 /**
- * Rimette in fila una conversazione passata come se stesse arrivando adesso.
- * Del testo si prende solo la versione definitiva: i frammenti dello streaming
- * non esistono piu' e non servono.
+ * Lines a past conversation back up as if it were arriving right now.
+ * Only the final version of the text is taken: the streaming fragments no longer
+ * exist and aren't needed.
  */
 export async function replaySession(id: string, cwd: string): Promise<Wire[]> {
   const out: Wire[] = [];

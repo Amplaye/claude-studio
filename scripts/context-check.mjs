@@ -1,11 +1,11 @@
-// Fa recitare al pannello del contesto qualche giro di aggiornamento e controlla le
-// cose che a occhio non si notano finche' non danno fastidio:
-//  - le card si RIDIPINGONO, non si ricreano (altrimenti addio transizioni, e lo
-//    scorrimento salta sotto il dito a ogni tick);
-//  - la card in focus dice quanto e' sicuro l'aggancio ("stimata", "ultima attiva")
-//    invece di far finta di saperlo;
-//  - il costo si vede — nella 0.0.6 veniva raccolto e buttato via;
-//  - clic e rinomina partono davvero verso l'estensione.
+// Makes the context panel act out a few refresh rounds and checks the things you
+// don't notice by eye until they start to bother you:
+//  - the cards get REPAINTED, not recreated (otherwise goodbye transitions, and the
+//    scroll jumps under your finger on every tick);
+//  - the focused card says how sure the match is ("estimated", "last active")
+//    instead of pretending to know;
+//  - the cost shows up — in 0.0.6 it was collected and thrown away;
+//  - clicks and renames really do travel to the extension.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -16,15 +16,15 @@ const url = pathToFileURL(path.join(root, 'dist', 'preview-context.html')).href;
 const card = (over = {}) => ({
   id: 'aaaaaaaa-1111-2222-3333-444444444444',
   shortId: 'aaaaaaaa',
-  name: 'Fase 3 — la barra di contesto',
+  name: 'Phase 3 — the context bar',
   own: true,
   tabName: 'Studio',
-  preview: 'Continua con la fase 3',
+  preview: 'Carry on with phase 3',
   pct: 18,
   tokens: '182.0k',
   cost: '$0.42',
   lastClock: '09:41',
-  lastAgo: 'adesso',
+  lastAgo: 'just now',
   busy: true,
   recent: true,
   focused: true,
@@ -36,9 +36,9 @@ const data = (over = {}) => ({
   limit: '1M',
   focusHow: 'studio',
   usage: { session: 34, week: 71 },
-  usageWait: 'caricamento…',
-  sessionReset: 'tra 2h 15m',
-  weekReset: 'tra 3g 4h',
+  usageWait: 'loading…',
+  sessionReset: 'in 2h 15m',
+  weekReset: 'in 3d 4h',
   cards: [card()],
   branch: 'master',
   dirty: true,
@@ -60,20 +60,20 @@ for (const width of [320, 620]) {
   const t = (cond, msg) => !cond && fails.push(`[${width}px] ` + msg);
   const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 
-  // La pagina si annuncia da sola: senza questo l'estensione non saprebbe quando
-  // mandare la prima fotografia.
-  t((await lastSent())?.cmd === 'ready', 'la pagina non si annuncia all’estensione');
+  // The page announces itself: without this the extension wouldn't know when to
+  // send the first snapshot.
+  t((await lastSent())?.cmd === 'ready', 'the page does not announce itself to the extension');
 
-  // ---- un primo giro ----
+  // ---- a first round ----
   await post(data());
-  // Si aspetta che la scia di entrata finisca: altrimenti al giro dopo non si
-  // distingue una scia rilanciata da una ancora in volo.
+  // Wait for the entry trail to finish: otherwise on the next round you can't tell
+  // a re-launched trail from one still in flight.
   await page.waitForTimeout(900);
 
   const first = await page.evaluate(() => {
     const c = document.querySelector('.ctxcard');
-    if (c) c.dataset.stamp = 'primo'; // se sopravvive, la card non e' stata ricreata
-    document.querySelector('.acell').dataset.stamp = 'primo';
+    if (c) c.dataset.stamp = 'first'; // if it survives, the card was not recreated
+    document.querySelector('.acell').dataset.stamp = 'first';
     return {
       cells: [...document.querySelectorAll('.acell .av')].map((n) => n.textContent),
       resets: [...document.querySelectorAll('.acell .ar')].map((n) => n.textContent),
@@ -92,25 +92,25 @@ for (const width of [320, 620]) {
     };
   });
 
-  t(first.cells.join('|') === '34%|71%', 'i numeri dell’account non ci sono: ' + first.cells.join('|'));
-  t(first.resets[0] === 'reset tra 2h 15m', 'il reset non e’ scritto: ' + first.resets[0]);
-  t(/Fase 3/.test(first.name || ''), 'il nome della card manca: ' + first.name);
-  t(first.pct === '18%', 'la percentuale non c’e’: ' + first.pct);
-  t(first.tok === '182.0k / 1M', 'i token non sono scritti sul limite: ' + first.tok);
-  t(first.cost === '$0.42', 'il costo della conversazione non si vede: ' + first.cost);
-  t(first.pill === 'Studio', 'la pillola non dice da dove viene la sessione: ' + first.pill);
-  t(first.badge && first.focused, 'la sessione in focus non e’ marcata');
-  t(first.own, 'la card della nostra chat non e’ riconosciuta come nostra');
-  t(first.busyDot, 'il pallino di chi sta lavorando non pulsa');
-  t(first.kind === '#ion-sparkles', 'icona sbagliata per la nostra conversazione: ' + first.kind);
-  t(first.fillW === '18%', 'la barra non segue la percentuale: ' + first.fillW);
-  // con l'aggancio certo non si deve leggere nessun dubbio
-  t(!/stimata|ultima attiva/.test(first.sub || ''), 'la card dubita di un aggancio certo: ' + first.sub);
+  t(first.cells.join('|') === '34%|71%', 'the account numbers are missing: ' + first.cells.join('|'));
+  t(first.resets[0] === 'resets in 2h 15m', 'the reset is not written out: ' + first.resets[0]);
+  t(/Phase 3/.test(first.name || ''), 'the card name is missing: ' + first.name);
+  t(first.pct === '18%', 'the percentage is missing: ' + first.pct);
+  t(first.tok === '182.0k / 1M', 'the tokens are not written against the limit: ' + first.tok);
+  t(first.cost === '$0.42', 'the cost of the conversation does not show: ' + first.cost);
+  t(first.pill === 'Studio', 'the pill does not say where the session comes from: ' + first.pill);
+  t(first.badge && first.focused, 'the focused session is not marked');
+  t(first.own, 'the card for our own chat is not recognised as ours');
+  t(first.busyDot, 'the dot for whoever is working does not pulse');
+  t(first.kind === '#ion-sparkles', 'wrong icon for our own conversation: ' + first.kind);
+  t(first.fillW === '18%', 'the bar does not follow the percentage: ' + first.fillW);
+  // when the match is certain there must be no hint of doubt
+  t(!/estimated|last active/.test(first.sub || ''), 'the card doubts a certain match: ' + first.sub);
 
-  // ---- secondo giro: stessa sessione, numeri nuovi ----
+  // ---- second round: same session, new numbers ----
   await post(
     data({
-      cards: [card({ pct: 64, tokens: '640.0k', cost: '$0.90', busy: false, lastAgo: '2 min fa' })],
+      cards: [card({ pct: 64, tokens: '640.0k', cost: '$0.90', busy: false, lastAgo: '2 min ago' })],
       focusHow: 'posizione',
     })
   );
@@ -129,19 +129,19 @@ for (const width of [320, 620]) {
     sub: document.querySelector('.csub')?.textContent,
   }));
 
-  t(second.stamp === 'primo', 'la card e’ stata ricreata invece che ridipinta');
-  t(second.acctStamp === 'primo', 'le celle dell’account vengono ricostruite a ogni giro');
-  // Numeri dell'account fermi: la scia non deve ripartire da sola mentre leggi.
-  t(second.acctGlide === 0, 'la barra dell’account rilancia la scia senza motivo');
-  t(second.cards === 1, 'card duplicate: ' + second.cards);
-  t(second.pct === '64%', 'la percentuale non si e’ aggiornata: ' + second.pct);
-  t(second.fillW === '64%', 'la barra non si e’ mossa: ' + second.fillW);
-  t(/warn/.test(second.fillBg || ''), 'oltre il 60% la barra non passa all’ambra: ' + second.fillBg);
-  t(second.glide, 'la barra si muove senza la scia');
-  t(!second.busyDot, 'il pallino resta "attiva ora" su una sessione ferma');
-  t(/stimata/.test(second.sub || ''), 'un aggancio incerto non viene dichiarato: ' + second.sub);
+  t(second.stamp === 'first', 'the card was recreated instead of repainted');
+  t(second.acctStamp === 'first', 'the account cells are rebuilt on every round');
+  // Account numbers hold still: the trail must not restart on its own while you read.
+  t(second.acctGlide === 0, 'the account bar replays the trail for no reason');
+  t(second.cards === 1, 'duplicated cards: ' + second.cards);
+  t(second.pct === '64%', 'the percentage did not update: ' + second.pct);
+  t(second.fillW === '64%', 'the bar did not move: ' + second.fillW);
+  t(/warn/.test(second.fillBg || ''), 'past 60% the bar does not turn amber: ' + second.fillBg);
+  t(second.glide, 'the bar moves without the trail');
+  t(!second.busyDot, 'the dot stays on "active now" for an idle session');
+  t(/estimated/.test(second.sub || ''), 'an uncertain match is not declared: ' + second.sub);
 
-  // ---- una seconda sessione, dell'estensione ufficiale, e il sorpasso ----
+  // ---- a second session, from the official extension, and the overtake ----
   await post(
     data({
       focusHow: 'tab',
@@ -158,7 +158,7 @@ for (const width of [320, 620]) {
     return {
       n: cs.length,
       order: cs.map((c) => c.querySelector('.cname').textContent),
-      stampStillThere: cs.some((c) => c.dataset.stamp === 'primo'),
+      stampStillThere: cs.some((c) => c.dataset.stamp === 'first'),
       firstOwn: cs[0].classList.contains('own'),
       firstKind: cs[0].querySelector('.cico use')?.getAttribute('href'),
       firstFill: cs[0].querySelector('.fill')?.style.background,
@@ -168,49 +168,49 @@ for (const width of [320, 620]) {
     };
   });
 
-  t(third.n === 2, 'le due sessioni non ci sono entrambe: ' + third.n);
-  t(third.order[0] === 'CRM — reminder', 'la sessione in focus non e’ salita in cima: ' + third.order.join(' | '));
-  t(third.stampStillThere, 'riordinando la lista le card sono state ricostruite');
-  t(!third.firstOwn, 'una tab dell’ufficiale e’ marcata come nostra');
-  t(third.firstKind === '#ion-chatbubble-ellipses', 'icona sbagliata per una tab dell’ufficiale: ' + third.firstKind);
-  t(/bad/.test(third.firstFill || ''), 'oltre l’80% la barra non passa al rosso: ' + third.firstFill);
-  t(third.badges === 1, 'il badge "qui" e’ su piu’ di una card: ' + third.badges);
-  t(!third.hOverflow, 'il pannello sfonda in orizzontale');
-  t(!third.squashed.length, 'card schiacciate dal flex: ' + third.squashed.join(' | '));
+  t(third.n === 2, 'the two sessions are not both there: ' + third.n);
+  t(third.order[0] === 'CRM — reminder', 'the focused session did not move to the top: ' + third.order.join(' | '));
+  t(third.stampStillThere, 'reordering the list rebuilt the cards');
+  t(!third.firstOwn, 'a tab from the official extension is marked as ours');
+  t(third.firstKind === '#ion-chatbubble-ellipses', 'wrong icon for a tab from the official extension: ' + third.firstKind);
+  t(/bad/.test(third.firstFill || ''), 'past 80% the bar does not turn red: ' + third.firstFill);
+  t(third.badges === 1, 'the "you are here" badge is on more than one card: ' + third.badges);
+  t(!third.hOverflow, 'the panel overflows sideways');
+  t(!third.squashed.length, 'cards squashed by the flex: ' + third.squashed.join(' | '));
 
-  // ---- clic, rinomina, tasti della testata ----
+  // ---- clicks, rename, header buttons ----
   await page.locator('.ctxcard').nth(1).locator('.ren').click();
   const ren = await lastSent();
-  t(ren?.cmd === 'rename' && ren.id.startsWith('aaaaaaaa'), 'la rinomina non parte: ' + JSON.stringify(ren));
+  t(ren?.cmd === 'rename' && ren.id.startsWith('aaaaaaaa'), 'the rename does not fire: ' + JSON.stringify(ren));
 
   await page.locator('.ctxcard').first().click();
   const go = await lastSent();
-  t(go?.cmd === 'focus' && go.id === 'bbbb', 'il clic sulla card non porta alla sessione: ' + JSON.stringify(go));
+  t(go?.cmd === 'focus' && go.id === 'bbbb', 'clicking the card does not take you to the session: ' + JSON.stringify(go));
 
-  // In testata non ci sono piu' tasti: l'aggiornamento e' continuo per conto suo,
-  // e la diagnostica vive nella palette dei comandi. Se ricompaiono qui, e' un
-  // ritorno indietro e va visto subito.
+  // There are no buttons in the header any more: the refresh runs continuously on
+  // its own, and the diagnostics live in the command palette. If they show up here
+  // again, that's a step backwards and it needs to be seen right away.
   t(
     (await page.locator('.hdr-top .iconbtn').count()) === 0,
-    'in testata al contesto sono tornati dei tasti'
+    'buttons are back in the context header'
   );
 
-  // ---- stati di magra: nessuna sessione, numeri dell'account non ancora arrivati ----
-  await post(data({ cards: [], usage: null, usageWait: 'limite API — riprovo tra 8m', branch: '' }));
+  // ---- lean states: no sessions, account numbers not in yet ----
+  await post(data({ cards: [], usage: null, usageWait: 'API limit — retrying in 8m', branch: '' }));
   await page.waitForTimeout(120);
   const empty = await page.evaluate(() => ({
     empty: document.querySelector('.empty')?.textContent,
     wait: document.querySelector('.await')?.textContent,
   }));
-  t(/Nessuna conversazione/.test(empty.empty || ''), 'manca lo stato vuoto: ' + empty.empty);
-  t(/limite API/.test(empty.wait || ''), 'non si distingue l’attesa dal limite API: ' + empty.wait);
+  t(/No conversations/.test(empty.empty || ''), 'the empty state is missing: ' + empty.empty);
+  t(/API limit/.test(empty.wait || ''), 'you cannot tell waiting from the API limit: ' + empty.wait);
 
-  // e tornando indietro le card si ricostruiscono senza lasciare buchi
+  // and going back the cards rebuild without leaving holes
   await post(data());
   await page.waitForTimeout(120);
-  t((await page.locator('.ctxcard').count()) === 1, 'dopo lo stato vuoto la card non torna');
+  t((await page.locator('.ctxcard').count()) === 1, 'after the empty state the card does not come back');
 
-  t(errors.length === 0, 'errori JS in pagina: ' + errors.join(' | '));
+  t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
 
   await page.screenshot({ path: path.join(root, 'dist', `preview-context-${width}.png`), fullPage: true });
   await page.close();
@@ -219,7 +219,7 @@ for (const width of [320, 620]) {
 await browser.close();
 
 if (fails.length) {
-  console.error('FALLITO:\n- ' + fails.join('\n- '));
+  console.error('FAILED:\n- ' + fails.join('\n- '));
   process.exit(1);
 }
-console.log('context-check ok — screenshot in dist/preview-context-*.png');
+console.log('context-check ok — screenshots in dist/preview-context-*.png');

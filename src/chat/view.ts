@@ -7,15 +7,15 @@ import type { ChatController } from './controller';
 import { ChatPanel } from './panel';
 
 /**
- * Quando apri il pannello laterale apposta ("Apri nel pannello laterale") non deve
- * scapparti la scheda in faccia: per qualche istante il rimbalzo si spegne.
+ * When you open the sidebar panel on purpose ("Open in Sidebar") the tab must not
+ * jump in your face: for a moment the bounce is switched off.
  */
 let stayInSidebarUntil = 0;
 export function stayInSidebar() {
   stayInSidebarUntil = Date.now() + 4000;
 }
 
-/** La faccia stretta: vive nel contenitore della barra delle attivita'. */
+/** The narrow face: it lives in the activity bar container. */
 export class ChatView implements vscode.WebviewViewProvider {
   static readonly id = 'claudeStudio.chat';
 
@@ -27,13 +27,13 @@ export class ChatView implements vscode.WebviewViewProvider {
 
   resolveWebviewView(view: vscode.WebviewView) {
     const { surface, listener } = bindWebview(view.webview, this.ctx, this.chat, 'view');
-    // Il bollino di "ha finito" si appende qui: e' l'icona nella barra delle
-    // attivita', l'unico posto che si vede anche da un'altra scheda.
+    // The "it's done" badge hangs here: it's the activity bar icon, the only place
+    // you can see even from another tab.
     useBadgeHost(view);
 
     const seen = () => {
-      // La barra di contesto vuole sapere se la chat e' sotto gli occhi: e' quello
-      // che le permette di dire "sei qui" senza tirare a indovinare.
+      // The context bar wants to know whether the chat is in front of your eyes:
+      // that's what lets it say "you are here" without guessing.
       owned.setViewVisible(view.visible);
       if (view.visible) this.maybeJumpToTab();
     };
@@ -50,17 +50,17 @@ export class ChatView implements vscode.WebviewViewProvider {
   }
 
   /**
-   * Cliccare l'icona nella barra delle attivita' apre il contenitore laterale: non
-   * c'e' un evento per quel clic, ma c'e' questo — la vista che diventa visibile.
-   * Da li' si apre la scheda (o si riporta davanti quella che c'e' gia': una sola,
-   * mai una seconda) e il pannello laterale si chiude, avendo gia' dato quel che
-   * doveva. Chi preferisce il pannello lo spegne da Impostazioni.
+   * Clicking the activity bar icon opens the sidebar container: there's no event for
+   * that click, but there is this one — the view becoming visible. From there the
+   * tab is opened (or the one already there is brought forward: one only, never a
+   * second) and the sidebar panel closes, having already given what it had to give.
+   * Anyone who prefers the panel turns this off in Settings.
    */
   private maybeJumpToTab() {
     const on = vscode.workspace.getConfiguration('claudeStudio').get<boolean>('openAsTab', true);
     if (!on || Date.now() < stayInSidebarUntil) return;
-    // Non si apre una scheda mentre VSCode sta ancora montando questa vista: si
-    // lascia finire il giro e poi si salta.
+    // We don't open a tab while VSCode is still mounting this view: let the round
+    // finish, then jump.
     setTimeout(() => {
       ChatPanel.open(this.ctx, this.chat, undefined, this.monitor);
       void vscode.commands.executeCommand('workbench.action.closeSidebar');

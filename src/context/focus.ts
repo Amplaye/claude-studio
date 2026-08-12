@@ -1,12 +1,12 @@
-// Quale sessione stai guardando adesso.
+// Which session you're looking at right now.
 //
-// Per le nostre e' una certezza: la chat dice se e' in primo piano, e la sessione
-// aperta e' una sola. Per le tab dell'ufficiale si tira a indovinare, e la card lo
-// dichiara — meglio un dubbio scritto che una certezza sbagliata su dove ti trovi.
+// For ours it's a certainty: the chat says whether it's in front, and there's only
+// one open session. For the official extension's tabs we're guessing, and the card
+// says so — better a doubt written down than a wrong certainty about where you are.
 import * as vscode from 'vscode';
 import type { LiveSession } from './sessions';
 
-/** Come si e' arrivati alla sessione in focus, dalla piu' sicura alla piu' incerta. */
+/** How we arrived at the focused session, from the surest to the shakiest. */
 export type FocusHow = 'studio' | 'tab' | 'posizione' | 'recenza';
 
 export interface ClaudeTab {
@@ -25,7 +25,7 @@ export function normLabel(s: string): string {
     .toLowerCase();
 }
 
-/** Le tab di una certa webview aperte in questa finestra, con il flag di attiva. */
+/** The tabs of a given webview open in this window, with the active flag. */
 function tabsOfType(marker: string): ClaudeTab[] {
   const out: ClaudeTab[] = [];
   try {
@@ -43,31 +43,31 @@ function tabsOfType(marker: string): ClaudeTab[] {
       }
     }
   } catch {
-    /* API delle tab non disponibile: si resta senza aggancio */
+    /* tabs API not available: we're left without a hook */
   }
   return out;
 }
 
-/** Le tab dell'estensione ufficiale, in ordine stabile (colonna, poi posizione). */
+/** The official extension's tabs, in stable order (column, then position). */
 export function claudeTabs(): ClaudeTab[] {
   return tabsOfType('claudeVSCodePanel').sort(
     (a, b) => (a.viewColumn || 0) - (b.viewColumn || 0) || a.index - b.index
   );
 }
 
-/** La nostra scheda e' quella davanti? Allora non c'e' niente da indovinare. */
+/** Is our tab the one in front? Then there's nothing to guess. */
 export function studioTabActive(): boolean {
   return tabsOfType('claudeStudio.panel').some((t) => t.isActive && t.groupActive);
 }
 
-/** La tab Claude attiva: prima quella nel gruppo col fuoco, poi una qualsiasi attiva. */
+/** The active Claude tab: first the one in the focused group, then any active one. */
 export function activeClaudeTab(tabs = claudeTabs()): ClaudeTab | null {
   return tabs.find((t) => t.isActive && t.groupActive) || tabs.find((t) => t.isActive) || null;
 }
 
 /**
- * Aggancia la tab attiva a una sessione dell'ufficiale.
- * `how` dice quanto e' affidabile l'aggancio, e finisce scritto sulla card.
+ * Hooks the active tab onto one of the official extension's sessions.
+ * `how` says how reliable that hook is, and ends up written on the card.
  */
 export function matchTabToSession(
   tab: ClaudeTab | null,
@@ -78,24 +78,24 @@ export function matchTabToSession(
   if (!tab) return null;
   const lab = normLabel(tab.label);
 
-  // 1) il nome tab scritto dalla CLI in sessions/<pid>.json
+  // 1) the tab name the CLI writes in sessions/<pid>.json
   let hit = lab ? sessions.find((s) => s.tabName && normLabel(s.tabName) === lab) : undefined;
   if (hit) return { id: hit.id, how: 'tab' };
-  // 2) il nome che hai dato tu dal pannello
+  // 2) the name you gave it from the panel
   hit = lab ? sessions.find((s) => names[s.id] && normLabel(names[s.id]) === lab) : undefined;
   if (hit) return { id: hit.id, how: 'tab' };
-  // 3) la label contiene il nome tab o l'inizio dell'id (Claude a volte aggiunge suffissi)
+  // 3) the label contains the tab name or the start of the id (Claude sometimes adds suffixes)
   hit = lab ? sessions.find((s) => s.tabName && lab.includes(normLabel(s.tabName))) : undefined;
   if (hit) return { id: hit.id, how: 'tab' };
   hit = lab ? sessions.find((s) => lab.includes(s.id.slice(0, 8))) : undefined;
   if (hit) return { id: hit.id, how: 'tab' };
-  // 4) una sola tab e una sola sessione: e' per forza lei
+  // 4) one tab and one session: it can only be that one
   if (sessions.length === 1 && tabs.length === 1) return { id: sessions[0].id, how: 'tab' };
-  // 5) per posizione: se le tab si chiamano tutte uguale il nome non aiuta, ma
-  //    restano nell'ordine in cui sono nate, che e' l'ordine di startedAt. Vale
-  //    solo se i conti tornano, e la card dira' "stimata".
-  //    (Nella 0.0.6 qui c'era anche un confronto `t === tab` che non poteva mai
-  //    essere vero: le tab sono oggetti ricostruiti a ogni giro.)
+  // 5) by position: if the tabs are all named the same the name doesn't help, but
+  //    they stay in the order they were born in, which is the order of startedAt.
+  //    It only holds if the counts match, and the card will say "estimated".
+  //    (In 0.0.6 there was also a `t === tab` comparison here that could never be
+  //    true: the tabs are objects rebuilt on every round.)
   if (tabs.length === sessions.length && tabs.length > 0) {
     const pos = tabs.findIndex((t) => t.viewColumn === tab.viewColumn && t.index === tab.index);
     if (pos >= 0) {
@@ -107,12 +107,12 @@ export function matchTabToSession(
 }
 
 /**
- * Porta davvero il fuoco su una tab dell'ufficiale. Non esiste un'API per rivelare
- * la webview di un'altra estensione: si passa per l'indice dell'editor nel gruppo.
+ * Actually moves the focus onto one of the official extension's tabs. There's no API
+ * to reveal another extension's webview: we go through the editor's index in the group.
  *
- * La 0.0.6 conosceva solo i gruppi 1-4 e dal quinto in poi apriva nel posto
- * sbagliato — senza dirlo. Qui i comandi numerati arrivano all'ottavo, e oltre si
- * cammina di gruppo in gruppo: nessuna colonna resta fuori portata.
+ * 0.0.6 only knew groups 1-4 and from the fifth on it opened in the wrong place —
+ * without saying so. Here the numbered commands reach the eighth, and beyond that we
+ * walk from group to group: no column stays out of reach.
  */
 export async function revealTab(tab: ClaudeTab) {
   const ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth'];
@@ -128,6 +128,6 @@ export async function revealTab(tab: ClaudeTab) {
     }
     await vscode.commands.executeCommand('workbench.action.openEditorAtIndex', tab.index + 1);
   } catch {
-    /* la tab e' sparita mentre ci arrivavamo: il prossimo giro se ne accorge */
+    /* the tab vanished while we were getting there: the next round will notice */
   }
 }

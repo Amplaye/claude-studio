@@ -1,6 +1,6 @@
 /* Claude Studio — chat.
-   Regola di casa: niente innerHTML con dati. Tutto passa da textContent o da nodi
-   costruiti a mano, come nella context-bar. */
+   House rule: no innerHTML with data. Everything goes through textContent or nodes
+   built by hand, same as in the context-bar. */
 (() => {
   const vscode = acquireVsCodeApi();
   const $ = (id) => document.getElementById(id);
@@ -11,7 +11,7 @@
   const modeBox = $('mode');
   const SVG = 'http://www.w3.org/2000/svg';
 
-  // ---------- utilita' DOM ----------
+  // ---------- DOM helpers ----------
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -28,7 +28,7 @@
     return svg;
   }
 
-  /** La spunta e' un tracciato vero (non un <use>): cosi' puo' disegnarsi da sola. */
+  /** The checkmark is a real path (not a <use>): that way it can draw itself. */
   function drawnCheck(cls) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('class', cls ? 'ico ' + cls : 'ico');
@@ -71,13 +71,13 @@
     Workflow: 'git-branch',
   };
 
-  /** I tool che mostrano un diff: il "prima" viene dai dati del tool, non dal disco. */
+  /** Tools that show a diff: the "before" comes from the tool's data, not from disk. */
   const DIFF_TOOLS = { Write: 1, Edit: 1, NotebookEdit: 1 };
-  /** Tool che si raccontano gia' da soli: dell'esito riuscito non serve dire niente. */
+  /** Tools that already speak for themselves: on success there's nothing to add. */
   const QUIET = { Write: 1, Edit: 1, NotebookEdit: 1, TodoWrite: 1 };
 
   let cwd = '';
-  /** I percorsi assoluti riempiono la riga senza dire niente: si tiene la parte utile. */
+  /** Absolute paths fill the line without saying anything: keep the useful part. */
   function shortPath(p) {
     const s = String(p || '');
     if (cwd && s.toLowerCase().startsWith(cwd.toLowerCase())) {
@@ -86,13 +86,13 @@
     return s;
   }
 
-  /** Riga di riepilogo di un tool: il primo argomento che dice davvero qualcosa. */
+  /** A tool's summary line: the first argument that actually says something. */
   function toolArg(inp, name) {
     if (!inp || typeof inp !== 'object') return '';
-    // La lista dei todo la si vede tutta sotto: in testa il JSON sarebbe solo rumore.
+    // The whole todo list shows up below: up top the JSON would just be noise.
     if (name === 'TodoWrite') {
       const n = (inp.todos || []).length;
-      return n === 1 ? '1 voce' : n + ' voci';
+      return n === 1 ? '1 item' : n + ' items';
     }
     for (const k of ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'description', 'prompt']) {
       const v = inp[k];
@@ -117,8 +117,8 @@
     if (stick) log.scrollTop = log.scrollHeight;
   }
 
-  // I loop infiniti si fermano fuori schermo: venti aloni che pulsano dove non
-  // guardi scaldano il portatile per niente.
+  // Infinite loops stop when off screen: twenty halos pulsing where you aren't
+  // looking heat up the laptop for nothing.
   const seen = new IntersectionObserver(
     (entries) => {
       for (const e of entries) e.target.classList.toggle('offscreen', !e.isIntersecting);
@@ -126,8 +126,8 @@
     { root: log, rootMargin: '160px' }
   );
 
-  /** Se il pezzo arriva da un sub-agent finisce dentro la card del Task che lo ha
-      lanciato; altrimenti in fondo alla conversazione. */
+  /** If the piece comes from a sub-agent it goes inside the card of the Task that
+      launched it; otherwise at the bottom of the conversation. */
   function add(node, parent) {
     const nest = parent && tools.get(parent);
     if (nest && nest._kids) {
@@ -144,14 +144,14 @@
     return node;
   }
 
-  // ---------- stato vuoto ----------
-  /** Le scorciatoie si imparano solo se stanno scritte dove guardi mentre aspetti. */
+  // ---------- empty state ----------
+  /** Shortcuts only get learned if they're written where you look while waiting. */
   const KEYS = [
-    ['@', 'un file'],
-    ['/', 'un comando'],
-    ['Alt+N', 'nuova'],
-    ['Alt+H', 'cronologia'],
-    ['Esc', 'ferma'],
+    ['@', 'a file'],
+    ['/', 'a command'],
+    ['Alt+N', 'new'],
+    ['Alt+H', 'history'],
+    ['Esc', 'stop'],
   ];
 
   function showEmpty() {
@@ -159,8 +159,8 @@
     const box = el('div', 'empty');
     box.append(
       icon('chatbubble-ellipses'),
-      el('h2', null, 'Pronti.'),
-      el('p', null, 'Scrivi qui sotto: risponde la stessa Claude Code che usi da terminale, con i tuoi CLAUDE.md, skill, MCP e permessi.')
+      el('h2', null, 'Ready.'),
+      el('p', null, 'Write below: you get the same Claude Code you use from the terminal, with your CLAUDE.md, skills, MCP and permissions.')
     );
     const keys = el('div', 'keys');
     for (const [k, what] of KEYS) {
@@ -173,10 +173,10 @@
   }
 
   /**
-   * Cambio conversazione: quella vecchia scorre via mentre la nuova entra.
-   * I nodi non si copiano, si spostano dentro un fantasma sovrapposto al log e
-   * tagliato alla stessa finestra che stavi guardando — cosi' se ne va proprio
-   * quello che vedevi, non una ricostruzione.
+   * Switching conversation: the old one slides away while the new one comes in.
+   * The nodes aren't copied, they're moved into a ghost laid over the log and
+   * clipped to the same window you were looking at — so what leaves is exactly
+   * what you were seeing, not a reconstruction.
    */
   function swapLog(paint) {
     const kids = [...log.children];
@@ -192,7 +192,7 @@
     ghost.style.left = box.left - host.left + 'px';
     ghost.style.width = box.width + 'px';
     ghost.style.height = box.height + 'px';
-    // stesso foglio del log, cosi' i nodi spostati restano identici a com'erano
+    // same stylesheet as the log, so the moved nodes stay identical to how they were
     const inner = el('div', 'log log-ghost-in');
     inner.style.transform = `translateY(${-log.scrollTop}px)`;
     inner.append(...kids);
@@ -202,13 +202,13 @@
 
     log.replaceChildren();
     log.classList.remove('swap-in');
-    void log.offsetWidth; // riparte anche su due cambi ravvicinati
+    void log.offsetWidth; // restarts even on two changes back to back
     log.classList.add('swap-in');
     stick = true;
     paint();
   }
 
-  // ---------- blocchi ----------
+  // ---------- blocks ----------
   const blocks = new Map(); // id -> {node, body, caret, kind, raw}
   const tools = new Map(); // tool_use_id -> node
 
@@ -231,7 +231,7 @@
     node.className = 'msg think';
     node.open = false;
     const sum = el('summary');
-    sum.append(icon('bulb'), el('span', null, 'Ragionamento'));
+    sum.append(icon('bulb'), el('span', null, 'Reasoning'));
     const body = el('div', 'body');
     const caret = el('span', 'caret');
     body.appendChild(caret);
@@ -250,9 +250,9 @@
     toBottom();
   }
 
-  /* Il testo definitivo arriva col messaggio completo: si ridisegna il blocco una
-     volta sola, con il markdown reso. Cosi' lo streaming resta grezzo e veloce e il
-     risultato finale resta pulito. */
+  /* The final text arrives with the complete message: the block gets redrawn just
+     once, with the markdown rendered. That way streaming stays raw and fast and the
+     end result stays clean. */
   function finalize(id, kind, text, parent) {
     const b = kind === 'thinking' ? thinkBlock(id, parent) : textBlock(id, parent);
     b.raw = text;
@@ -265,7 +265,7 @@
     toBottom();
   }
 
-  /** Markdown minimo e sicuro: blocchi ``` e `codice`. Nessun innerHTML. */
+  /** Minimal, safe markdown: ``` blocks and `code`. No innerHTML. */
   function markdown(src) {
     const out = [];
     const parts = String(src).split(/```/);
@@ -289,8 +289,8 @@
 
   // ---------- tool ----------
 
-  /** Un diff a righe. Il "prima" arriva dai dati del tool, mai riletto dal disco:
-      rileggerlo significherebbe correre contro la scrittura che sta avvenendo. */
+  /** A line-by-line diff. The "before" comes from the tool's data, never re-read from
+      disk: re-reading it would mean racing against the write that's happening. */
   function diffBody(name, inp) {
     const box = el('div', 'diff');
     const rows = [];
@@ -306,7 +306,7 @@
       push('-', inp.old_string);
       push('+', inp.new_string);
     }
-    if (!rows.length) return null; // niente da mostrare: meglio nessun riquadro vuoto
+    if (!rows.length) return null; // nothing to show: better no box than an empty one
 
     const MAX = 60;
     for (const [sign, text] of rows.slice(0, MAX)) {
@@ -314,8 +314,8 @@
       row.append(el('span', 'sign', sign), el('span', 'code', text || ' '));
       box.append(row);
     }
-    if (rows.length > MAX) box.append(el('div', 'more', `… altre ${rows.length - MAX} righe`));
-    if (inp.replace_all) box.append(el('div', 'more', 'sostituite tutte le occorrenze'));
+    if (rows.length > MAX) box.append(el('div', 'more', `… ${rows.length - MAX} more lines`));
+    if (inp.replace_all) box.append(el('div', 'more', 'all occurrences replaced'));
     return box;
   }
 
@@ -341,14 +341,14 @@
     const sum = el('summary');
     const head = el('div', 'head');
     const ic = icon(TOOL_ICONS[name] || 'flash', 'tool-ico');
-    // Se il tool tocca un file, il percorso e' un collegamento: un clic lo apre
-    // nell'editor, dove serve guardarlo davvero.
+    // If the tool touches a file, the path is a link: one click opens it in the
+    // editor, where you actually need to look at it.
     const file = i.file_path || i.path;
     const arg = el(typeof file === 'string' ? 'button' : 'span', 'arg', toolArg(inp, name));
     if (typeof file === 'string') {
       arg.type = 'button';
       arg.classList.add('link');
-      arg.title = 'Apri nell’editor';
+      arg.title = 'Open in the editor';
       arg.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -376,7 +376,7 @@
     node.append(sum, body);
     node._ico = ic;
     node._body = body;
-    // Se sei tu ad aprire o chiudere la card, l'esito non ci mette piu' becco.
+    // If you're the one opening or closing the card, the result stops meddling with it.
     sum.addEventListener('click', () => {
       node._touched = true;
     });
@@ -399,14 +399,14 @@
       setTimeout(() => spark.remove(), 800);
     }
 
-    // "File updated successfully" sotto a un diff che si vede gia' e' rumore:
-    // di questi tool l'esito si mostra solo quando va storto.
+    // "File updated successfully" under a diff you can already see is noise:
+    // for these tools the result only shows up when something goes wrong.
     const t = ok && QUIET[node.dataset.tool] ? '' : String(text || '').trim();
     if (t) {
       const lines = t.split('\n');
       const out = el('div', 'out', lines.length > 400 ? lines.slice(0, 400).join('\n') + '\n…' : t);
-      // Nelle card che hanno gia' qualcosa da mostrare (diff, todo, sub-agent)
-      // l'esito e' una nota in fondo, non il contenuto principale.
+      // In cards that already have something to show (diff, todo, sub-agent)
+      // the result is a note at the bottom, not the main content.
       if (node._kids) node._body.append(el('div', 'sub-result', t.slice(0, 2000)));
       else node._body.append(out);
       if (!node._touched && !node.open) node.open = lines.length <= 12;
@@ -414,18 +414,18 @@
       if (n) n.remove();
       if (lines.length > 12) {
         node.querySelector('.head').insertBefore(
-          el('span', 'count', lines.length + ' righe'),
+          el('span', 'count', lines.length + ' lines'),
           node.querySelector('.chev')
         );
       }
     } else if (!node._touched && !node._kids && !node.open) {
-      node.classList.add('bare'); // niente da aprire: via la freccia
+      node.classList.add('bare'); // nothing to open: drop the arrow
     }
     toBottom();
   }
 
-  // ---------- permessi ----------
-  const asks = new Map(); // id -> nodo della scheda
+  // ---------- permissions ----------
+  const asks = new Map(); // id -> the card's node
 
   function button(cls, iconName, text) {
     const b = el('button', 'btn ' + cls);
@@ -434,11 +434,11 @@
     return b;
   }
 
-  /** Le domande a scelta multipla: una risposta per domanda, poi si manda. */
+  /** Multiple-choice questions: one answer per question, then you send. */
   function questionBody(node, m, send) {
     const answers = {};
     const box = el('div', 'qs');
-    const go = button('ok', 'send', 'Manda');
+    const go = button('ok', 'send', 'Send');
     go.disabled = true;
 
     const check = () => {
@@ -489,14 +489,14 @@
 
     const head = el('div', 'head');
     const ic = m.kind === 'plan' ? 'list' : m.kind === 'question' ? 'options' : 'shield-checkmark';
-    head.append(icon(ic, 'perm-ico'), el('span', 'title', m.title || 'Serve il tuo permesso'));
+    head.append(icon(ic, 'perm-ico'), el('span', 'title', m.title || 'Your permission is needed'));
     node.append(head);
 
     const acts = el('div', 'acts');
     const answered = (choice, answers) => {
       if (node.classList.contains('resolved')) return;
       vscode.postMessage({ cmd: 'answer', id: m.id, choice, answers });
-      // Niente attesa dell'estensione: chi ha cliccato vede subito il tasto spegnersi.
+      // No waiting on the extension: whoever clicked sees the button go dead right away.
       for (const b of node.querySelectorAll('button')) b.disabled = true;
     };
 
@@ -504,9 +504,9 @@
       const body = el('div', 'plan');
       body.replaceChildren(...markdown(m.plan || m.detail || ''));
       node.append(body);
-      const ok = button('ok', 'checkmark', 'Approva ed esegui');
-      const auto = button('always', 'flash', 'Approva, non chiedermi le modifiche');
-      const no = button('no', 'close', 'Continua a pianificare');
+      const ok = button('ok', 'checkmark', 'Approve and run');
+      const auto = button('always', 'flash', "Approve, don't ask about edits");
+      const no = button('no', 'close', 'Keep planning');
       ok.addEventListener('click', () => answered('allow'));
       auto.addEventListener('click', () => answered('always'));
       no.addEventListener('click', () => answered('deny'));
@@ -516,24 +516,24 @@
       acts.append(go);
     } else {
       if (m.detail) node.append(el('div', 'detail', m.detail));
-      const ok = button('ok', 'checkmark', 'Consenti');
+      const ok = button('ok', 'checkmark', 'Allow');
       ok.addEventListener('click', () => answered('allow'));
       acts.append(ok);
       if (m.canAlways) {
-        const always = button('always', 'checkmark-circle', 'Consenti sempre');
-        // Non e' una promessa "per stavolta": la regola resta scritta sul disco.
-        always.title = 'La regola resta scritta nei permessi del progetto (.claude/settings.local.json).';
+        const always = button('always', 'checkmark-circle', 'Always allow');
+        // This isn't a "just this once" promise: the rule stays written on disk.
+        always.title = "The rule stays written in the project's permissions (.claude/settings.local.json).";
         always.addEventListener('click', () => answered('always'));
         acts.append(always);
       }
-      const no = button('no', 'close', 'Rifiuta');
+      const no = button('no', 'close', 'Deny');
       no.addEventListener('click', () => answered('deny'));
       acts.append(no);
     }
 
     node.append(acts);
     asks.set(m.id, node);
-    stick = true; // un permesso non si perde fuori schermo
+    stick = true; // a permission request must not get lost off screen
     add(node);
   }
 
@@ -553,69 +553,69 @@
     toBottom();
   }
 
-  // ---------- errori ----------
+  // ---------- errors ----------
   //
-  // Dal motore arriva quello che arriva: a volte una frase, spesso un messaggio
-  // scritto per chi legge i log. Qui si dice cos'e' successo e cosa si puo' fare,
-  // e il testo originale resta sotto per chi lo vuole vedere.
+  // Whatever the engine sends is what you get: sometimes a sentence, often a message
+  // written for whoever reads the logs. Here we say what happened and what you can do
+  // about it, and the original text stays below for anyone who wants to see it.
   const ERRORS = [
     {
       re: /cli\.js|@anthropic-ai\/claude-code|non trovo la cli|command not found|ENOENT|spawn/i,
-      title: 'Non trovo la CLI di Claude Code su questo computer.',
-      hint: 'Installala con "npm i -g @anthropic-ai/claude-code", oppure indica il percorso di cli.js in Impostazioni → Claude Studio → Cli Path.',
+      title: "Can't find the Claude Code CLI on this computer.",
+      hint: 'Install it with "npm i -g @anthropic-ai/claude-code", or point to the path of cli.js in Settings → Claude Studio → Cli Path.',
       keep: false,
     },
     {
       re: /rate.?limit|\b429\b|too many requests|usage limit/i,
-      title: 'Hai raggiunto il limite d’uso dell’account.',
-      hint: 'Nel pannello del contesto c’è quanto manca al prossimo reset.',
+      title: "You've hit the account's usage limit.",
+      hint: 'The context panel shows how long until the next reset.',
     },
     {
       re: /\b401\b|\b403\b|unauthor|authentic|not logged in|invalid api key|oauth/i,
-      title: 'Claude Code non è autenticato.',
-      hint: 'Apri un terminale, lancia "claude" e rifai l’accesso: la chat usa la stessa autenticazione.',
+      title: 'Claude Code is not authenticated.',
+      hint: 'Open a terminal, run "claude" and sign in again: the chat uses the same authentication.',
     },
     {
       re: /credit|billing|insufficient|payment/i,
-      title: 'L’account non ha credito per rispondere.',
-      hint: 'Il pannello del contesto mostra quanto è stato speso finora.',
+      title: "The account doesn't have the credit to answer.",
+      hint: 'The context panel shows how much has been spent so far.',
     },
     {
       re: /prompt is too long|context (window|length|limit)|too many tokens|exceeds? .{0,20}tokens/i,
-      title: 'La conversazione ha riempito la finestra di contesto.',
-      hint: 'Aprine una nuova (Alt+N) e riparti da un riassunto: qui non ci sta più niente.',
+      title: 'The conversation has filled up the context window.',
+      hint: "Open a new one (Alt+N) and start again from a summary: nothing else fits in here.",
     },
     {
       re: /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|network|offline/i,
-      title: 'La connessione si è interrotta.',
-      hint: 'Controlla la rete e rimanda il messaggio: la conversazione non è andata persa.',
+      title: 'The connection dropped.',
+      hint: "Check the network and send the message again: the conversation wasn't lost.",
     },
     {
       re: /interrupt|interrott|abort|cancell?ed|annullat/i,
-      title: 'Turno interrotto.',
-      hint: 'Il prossimo messaggio riparte da qui.',
+      title: 'Turn interrupted.',
+      hint: 'The next message picks up from here.',
       calm: true,
     },
     {
       re: /exit(ed)? (with )?code|process (exited|terminated|died)|SIGTERM|SIGKILL|killed/i,
-      title: 'Il processo di Claude si è chiuso da solo.',
-      hint: 'Rimanda il messaggio: la sessione riparte in automatico.',
+      title: 'The Claude process shut itself down.',
+      hint: 'Send the message again: the session restarts automatically.',
     },
   ];
 
   function readableError(raw) {
-    const s = String(raw || '').trim() || 'Errore senza descrizione.';
+    const s = String(raw || '').trim() || 'Error with no description.';
     for (const e of ERRORS) {
       if (e.re.test(s)) return { title: e.title, hint: e.hint, calm: !!e.calm, raw: e.keep === false ? '' : s };
     }
-    // Un messaggio gia' scritto per una persona si mostra com'e': riscriverlo
-    // significherebbe nasconderlo.
+    // A message already written for a person gets shown as it is: rewriting it
+    // would mean hiding it.
     if (s.length <= 220 && !/\n|Error:|Exception|\bat .+:\d+|[{}]/.test(s)) {
       return { title: s, hint: '', calm: false, raw: '' };
     }
     return {
-      title: 'Qualcosa è andato storto.',
-      hint: 'Di solito basta rimandare il messaggio. Qui sotto c’è quello che ha detto il motore.',
+      title: 'Something went wrong.',
+      hint: 'Usually sending the message again is enough. Below is what the engine said.',
       calm: false,
       raw: s,
     };
@@ -630,23 +630,23 @@
     if (e.raw && e.raw !== e.title) {
       const det = document.createElement('details');
       det.className = 'err-raw';
-      det.append(el('summary', null, 'Dettagli tecnici'), el('pre', null, e.raw.slice(0, 4000)));
+      det.append(el('summary', null, 'Technical details'), el('pre', null, e.raw.slice(0, 4000)));
       body.append(det);
     }
     node.append(icon(e.calm ? 'stop-circle' : 'alert-circle'), body);
     add(node);
   }
 
-  // ---------- attesa ----------
+  // ---------- waiting ----------
   let waiting = null;
   function showWaiting() {
     if (waiting) return;
     waiting = el('div', 'msg pulse');
-    // Due movimenti, non uno: l'alone che pulsa dice "sta lavorando", il gradiente
-    // che gira dice "e' ancora vivo". Insieme sono l'attesa.
+    // Two movements, not one: the pulsing halo says "it's working", the spinning
+    // gradient says "it's still alive". Together they are the wait.
     const orb = el('span', 'orb');
     orb.append(el('span', 'thinking-ring'), el('span', 'dot thinking-halo'));
-    waiting.append(orb, el('span', null, 'Claude sta pensando…'));
+    waiting.append(orb, el('span', null, 'Claude is thinking…'));
     add(waiting);
   }
   function hideWaiting() {
@@ -655,25 +655,25 @@
     waiting = null;
   }
 
-  // ---------- cronologia ----------
+  // ---------- history ----------
   const drawer = $('drawer');
 
   function fmtAgo(ms) {
     const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-    if (s < 90) return 'adesso';
+    if (s < 90) return 'just now';
     const m = Math.round(s / 60);
-    if (m < 60) return m + ' min fa';
+    if (m < 60) return m + ' min ago';
     const h = Math.round(m / 60);
-    if (h < 24) return h === 1 ? "un'ora fa" : h + ' ore fa';
+    if (h < 24) return h === 1 ? 'an hour ago' : h + ' hours ago';
     const g = Math.round(h / 24);
-    return g === 1 ? 'ieri' : g + ' giorni fa';
+    return g === 1 ? 'yesterday' : g + ' days ago';
   }
 
   function showHistory(items) {
     const list = $('drawerList');
     list.replaceChildren();
     if (!items.length) {
-      list.append(el('div', 'drawer-empty', 'Nessuna conversazione salvata per questo progetto.'));
+      list.append(el('div', 'drawer-empty', 'No saved conversations for this project.'));
     }
     for (const it of items) {
       const row = el('div', 'hrow card-hover');
@@ -691,10 +691,10 @@
   }
 
   /**
-   * Nascondi dopo l'animazione di uscita — ma non solo dopo quella: se il sistema
-   * ha le animazioni spente, `animationend` non arriva mai e il pannello resterebbe
-   * li' aperto per sempre. La rete di sicurezza e' un timer poco piu' lungo
-   * dell'animazione.
+   * Hide after the exit animation — but not only after that: if the system has
+   * animations turned off, `animationend` never arrives and the panel would sit
+   * there open forever. The safety net is a timer a little longer than the
+   * animation.
    */
   function hideAfterClosing(node, ms) {
     let done = false;
@@ -718,18 +718,18 @@
   $('btnHistory').addEventListener('click', () => toggleHistory());
   $('drawerClose').addEventListener('click', closeDrawer);
 
-  // ---------- quanto e' costato ----------
-  // Il costo si somma turno per turno; i token sono quelli dell'ultimo turno, cioe'
-  // quanto contesto sta portando la conversazione adesso.
+  // ---------- what it cost ----------
+  // The cost adds up turn by turn; the tokens are the ones from the last turn, that
+  // is, how much context the conversation is carrying right now.
   let spent = { usd: 0, tokens: 0 };
   const fmtTokens = (n) =>
     n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n);
 
   function paintSpent() {
-    // Il chip del consumo e' stato tolto dalla testata: quello che si spende si
-    // legge nel pannello del contesto. Finche' non c'e' non si tocca niente —
-    // senza questo controllo la funzione esplodeva a ogni fine turno, e con lei
-    // tutto il resto del messaggio.
+    // The usage chip was taken out of the header: what you spend is read in the
+    // context panel. As long as it isn't there we touch nothing — without this
+    // check the function blew up at every end of turn, and took the rest of the
+    // message down with it.
     const chip = $('spend');
     if (!chip) return;
     if (!spent.tokens && !spent.usd) {
@@ -741,7 +741,7 @@
     $('spendCost').textContent = '$' + spent.usd.toFixed(spent.usd < 1 ? 3 : 2);
   }
 
-  /** Freccia futuristica: la punta di "navigate" delle Ionicons, tipo jet. */
+  /** Futuristic arrow: the tip of Ionicons' "navigate", jet-like. */
   function sendArrow() {
     return icon('navigate', 'send-arrow');
   }
@@ -751,33 +751,33 @@
   function setBusy(v) {
     busy = v;
     sendBtn.classList.toggle('stop', v);
-    sendBtn.title = v ? 'Ferma' : 'Manda';
+    sendBtn.title = v ? 'Stop' : 'Send';
     sendBtn.replaceChildren(v ? icon('stop-circle') : sendArrow());
     if (v) showWaiting();
     else hideWaiting();
   }
 
-  // ---------- messaggi dall'estensione ----------
+  // ---------- messages from the extension ----------
   window.addEventListener('message', (ev) => {
     const m = ev.data;
     if (!m || !m.k) return;
     switch (m.k) {
       case 'hello':
-        // Da scheda la colonna del testo si tiene stretta: righe lunghe due metri
-        // non si leggono. Il "apri come scheda" sparisce quando gia' ci sei.
+        // In a tab the text column stays narrow: lines two metres long don't get
+        // read. The "open as tab" button disappears when you're already there.
         document.body.classList.toggle('wide', m.surface === 'panel');
         $('btnTab').hidden = m.surface === 'panel';
-        // Il contesto di fianco ha senso solo dove c'e' spazio: nella scheda.
+        // The context alongside only makes sense where there's room: in the tab.
         $('btnCtx').hidden = m.surface !== 'panel';
-        // E una scheda si chiude; la barra laterale no.
+        // And a tab can be closed; the sidebar can't.
         $('btnClose').hidden = m.surface !== 'panel';
         if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         showEmpty();
-        // Animazione di apertura: la scheda entra tutta intera, il pannello
-        // laterale (che e' sempre li') si limita al suo discorso.
+        // Opening animation: the tab comes in whole, while the side panel
+        // (which is always there) sticks to its own conversation.
         if (m.surface === 'panel') playTabIn();
         log.classList.remove('fresh-open');
         void log.offsetWidth;
@@ -790,7 +790,7 @@
         waiting = null;
         spent = { usd: 0, tokens: 0 };
         paintSpent();
-        // il discorso di prima esce scorrendo mentre quello nuovo prende posto
+        // the previous conversation scrolls out while the new one takes its place
         swapLog(showEmpty);
         break;
       case 'mode':
@@ -804,8 +804,8 @@
         models = m.items || [];
         paintCfg();
         break;
-      // Chi decide se e' il momento di suonare e' l'estensione: e' l'unica a
-      // sapere se la finestra e' davanti a te. Qui si suona e basta.
+      // The extension decides whether it's time to play a sound: it's the only one
+      // that knows if the window is in front of you. Here we just play it.
       case 'chime':
         if (window.Chime) window.Chime.play(m.sound, m.event, m.volume);
         break;
@@ -823,7 +823,7 @@
         break;
       case 'selection':
         selection = m.file ? { file: m.file, lines: m.lines } : null;
-        // ogni selezione nuova riparte allegata: e' quello che ci si aspetta
+        // every new selection starts out attached: that's what you'd expect
         useSelection = true;
         paintAttach();
         break;
@@ -836,14 +836,14 @@
         if (busy) showWaiting();
         break;
       case 'session':
-        // L'icona del modello nella testata e' stata rimossa:
-        // il modello si sceglie nelle impostazioni.
+        // The model icon in the header was removed:
+        // the model gets picked in the settings.
         break;
       case 'user': {
         const n = el('div', 'msg user');
         if (m.text) n.append(el('div', 'utext', m.text));
-        // Le immagini allegate restano qui sotto: e' la prova che sono partite,
-        // e si riaprono grandi con un clic come prima dell'invio.
+        // The attached images stay down here: they're the proof that they went out,
+        // and one click opens them big again, just like before sending.
         if (m.images && m.images.length) {
           const box = el('div', 'uimgs');
           for (const im of m.images) {
@@ -851,7 +851,7 @@
             const t = document.createElement('img');
             t.className = 'uimg';
             t.src = src;
-            t.alt = 'Immagine allegata';
+            t.alt = 'Attached image';
             t.addEventListener('click', () => openLightbox(src));
             box.append(t);
           }
@@ -896,18 +896,18 @@
     }
   });
 
-  // ---------- il menu di "@" e "/" ----------
+  // ---------- the "@" and "/" menu ----------
   const menu = $('menu');
   let commands = [];
   let picking = null; // {kind:'@'|'/', start, end, items, sel}
 
-  /** Il pezzo di parola sotto al cursore, se comincia per @ o per /. */
+  /** The piece of word under the caret, if it starts with @ or with /. */
   function token() {
     const pos = input.selectionStart;
     const before = input.value.slice(0, pos);
     const m = before.match(/(^|\s)([@/])([^\s]*)$/);
     if (!m) return null;
-    // lo slash vale solo come primo carattere: "10/20" non e' un comando
+    // the slash only counts as the first character: "10/20" isn't a command
     if (m[2] === '/' && before.length !== m[3].length + 1) return null;
     return { kind: m[2], q: m[3], start: pos - m[3].length - 1, end: pos };
   }
@@ -918,12 +918,12 @@
     menu.replaceChildren();
   }
 
-  /** Raggruppa i comandi per categoria (la parte prima di ':' o 'Generale'). */
+  /** Groups the commands by category (the part before ':' or 'General'). */
   function categorize(items) {
     const cats = new Map();
     for (const it of items) {
       const m = it.label.match(/^\/([^:]+):/);
-      const cat = m ? m[1] : 'Generale';
+      const cat = m ? m[1] : 'General';
       if (!cats.has(cat)) cats.set(cat, []);
       cats.get(cat).push(it);
     }
@@ -943,19 +943,19 @@
     }
     const isCmd = picking.kind === '/';
     if (isCmd) {
-      // Intestazione con barra di ricerca
+      // Header with search bar
       const head = el('div', 'menu-head');
-      head.append(icon('terminal'), el('span', null, ' Comandi'));
+      head.append(icon('terminal'), el('span', null, ' Commands'));
       menu.append(head);
 
       const searchBox = el('div', 'menu-search');
       cmdSearchInput = document.createElement('input');
       cmdSearchInput.type = 'text';
-      cmdSearchInput.placeholder = 'Cerca un comando…';
+      cmdSearchInput.placeholder = 'Search for a command…';
       searchBox.append(icon('search'), cmdSearchInput);
       menu.append(searchBox);
 
-      // Griglia per categorie
+      // Grid by category
       const grid = el('div', 'menu-grid');
       const cats = categorize(items);
       let idx = 0;
@@ -980,7 +980,7 @@
       }
       menu.append(grid);
 
-      // Filtro in tempo reale nella barra di ricerca
+      // Live filtering from the search bar
       cmdSearchInput.addEventListener('input', () => {
         const q = cmdSearchInput.value.toLowerCase();
         let first = -1;
@@ -992,7 +992,7 @@
           row.classList.remove('on');
           if (show && first < 0) first = Number(row.dataset.idx);
         }
-        // Nascondi le categorie vuote
+        // Hide the empty categories
         for (const cat of grid.querySelectorAll('.menu-cat')) {
           let next = cat.nextElementSibling;
           let visible = false;
@@ -1008,7 +1008,7 @@
           if (r) r.classList.add('on');
         }
       });
-      // Non perdere il focus dalla textarea — preventDefault sul mousedown basta
+      // Don't lose focus from the textarea — preventDefault on mousedown is enough
       cmdSearchInput.addEventListener('mousedown', (e) => e.stopPropagation());
       cmdSearchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeMenu(); input.focus(); }
@@ -1067,10 +1067,10 @@
     picking = { kind: t.kind, start: t.start, end: t.end, items: [], sel: 0 };
     if (t.kind === '/') {
       if (!commands.length) {
-        // Senza sessione attiva non ci sono comandi: mostra un messaggio
+        // Without an active session there are no commands: show a message
         menu.replaceChildren();
         const hint = el('div', 'menu-head');
-        hint.append(icon('terminal'), el('span', null, ' Manda un messaggio per caricare i comandi'));
+        hint.append(icon('terminal'), el('span', null, ' Send a message to load the commands'));
         menu.append(hint);
         menu.hidden = false;
         return;
@@ -1090,7 +1090,7 @@
 
   function showFiles(items) {
     if (!picking || picking.kind !== '@') return;
-    // il cursore puo' essersi mosso mentre l'estensione cercava
+    // the caret may have moved while the extension was searching
     const t = token();
     if (!t) {
       closeMenu();
@@ -1108,12 +1108,12 @@
     img.src = src;
     overlay.appendChild(img);
 
-    // La X in alto a destra: il clic sul fondo chiude gia', ma senza un bottone
-    // visibile non si sa. Esc fa la stessa cosa.
+    // The X at the top right: clicking the backdrop already closes it, but without a
+    // visible button nobody knows that. Esc does the same thing.
     const x = el('button', 'lbx');
     x.type = 'button';
-    x.title = 'Chiudi (Esc)';
-    x.setAttribute('aria-label', 'Chiudi');
+    x.title = 'Close (Esc)';
+    x.setAttribute('aria-label', 'Close');
     x.append(icon('close'));
     overlay.appendChild(x);
 
@@ -1131,14 +1131,14 @@
       e.stopPropagation();
       close();
     });
-    // Il clic sull'immagine non chiude: capita di volerla solo guardare
+    // Clicking the image doesn't close it: sometimes you just want to look at it
     img.addEventListener('click', (e) => e.stopPropagation());
     overlay.addEventListener('click', close);
     document.addEventListener('keydown', onKey);
     document.body.appendChild(overlay);
   }
 
-  // ---------- allegati: selezione dall'editor e immagini incollate ----------
+  // ---------- attachments: editor selection and pasted images ----------
   const attach = $('attach');
   let selection = null; // {file, lines}
   let useSelection = true;
@@ -1151,7 +1151,7 @@
       chip.append(icon('code-slash'), el('span', null, `${selection.file}:${selection.lines}`));
       const x = el('button', 'attx');
       x.type = 'button';
-      x.title = 'Non allegare la selezione';
+      x.title = "Don't attach the selection";
       x.append(icon('close'));
       x.addEventListener('click', () => {
         useSelection = false;
@@ -1165,14 +1165,14 @@
       const thumb = document.createElement('img');
       thumb.className = 'thumb';
       thumb.src = `data:${im.mime};base64,${im.data}`;
-      // Clic sulla miniatura: apre l'immagine a tutto schermo
+      // Click on the thumbnail: opens the image full screen
       thumb.addEventListener('click', (e) => {
         e.stopPropagation();
         openLightbox(`data:${im.mime};base64,${im.data}`);
       });
       const x = el('button', 'attx');
       x.type = 'button';
-      x.title = 'Togli';
+      x.title = 'Remove';
       x.append(icon('close'));
       x.addEventListener('click', () => {
         images.splice(i, 1);
@@ -1200,8 +1200,8 @@
     }
   });
 
-  // ---------- invio ----------
-  /** L'ultimo messaggio mandato: la freccia in su lo ripesca. */
+  // ---------- sending ----------
+  /** The last message sent: the up arrow fishes it back out. */
   let lastText = '';
 
   function grow() {
@@ -1215,7 +1215,7 @@
   input.addEventListener('blur', closeMenu);
 
   input.addEventListener('keydown', (e) => {
-    // col menu aperto le frecce e l'invio servono al menu, non al messaggio
+    // with the menu open the arrows and Enter belong to the menu, not to the message
     if (picking && !menu.hidden) {
       if (e.key === 'ArrowDown') return e.preventDefault(), moveSel(1);
       if (e.key === 'ArrowUp') return e.preventDefault(), moveSel(-1);
@@ -1227,8 +1227,8 @@
       composer.requestSubmit();
       return;
     }
-    // Freccia in su sul campo vuoto: torna l'ultimo messaggio mandato, da
-    // ritoccare invece che da riscrivere.
+    // Up arrow on an empty field: the last message sent comes back, to touch up
+    // instead of rewriting from scratch.
     if (e.key === 'ArrowUp' && !input.value && lastText) {
       e.preventDefault();
       input.value = lastText;
@@ -1254,19 +1254,19 @@
     });
     input.value = '';
     images = [];
-    // La selezione si allega una volta sola: resta selezionata nell'editor, ma non
-    // deve infilarsi da sola anche nei messaggi dopo. Si riarma se la cambi.
+    // The selection gets attached only once: it stays selected in the editor, but it
+    // shouldn't sneak into the messages after it too. It re-arms if you change it.
     useSelection = false;
     paintAttach();
     closeMenu();
     grow();
     composer.classList.remove('sending');
-    void composer.offsetWidth; // riavvia l'animazione anche a invii ravvicinati
+    void composer.offsetWidth; // restarts the animation even on back-to-back sends
     composer.classList.add('sending');
   });
 
-  // ---------- mode segmented control con slider ----------
-  // Lo slider scorre da un bottone all'altro senza ricreare nulla.
+  // ---------- mode segmented control with slider ----------
+  // The slider glides from one button to the next without recreating anything.
   const modeSlider = el('div', 'modeseg-slider');
   modeBox.appendChild(modeSlider);
 
@@ -1275,7 +1275,7 @@
     for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
       btn.classList.toggle('on', btn.dataset.mode === value);
     }
-    // Muovi lo slider sul bottone attivo
+    // Move the slider onto the active button
     const active = modeBox.querySelector('.modeseg-btn.on');
     if (active) {
       const boxRect = modeBox.getBoundingClientRect();
@@ -1283,7 +1283,7 @@
       modeSlider.style.left = (btnRect.left - boxRect.left) + 'px';
       modeSlider.style.width = btnRect.width + 'px';
     }
-    // Colore dello slider
+    // Slider colour
     modeSlider.className = 'modeseg-slider mode-' + value;
   }
   for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
@@ -1296,12 +1296,12 @@
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
-  // ---------- apertura e chiusura della scheda ----------
+  // ---------- opening and closing the tab ----------
   //
-  // La linguetta in cima la disegna VSCode e non ce la lascia toccare; quello che
-  // c'e' dentro invece e' nostro. All'apertura la pagina entra, alla chiusura esce
-  // e solo dopo si chiude davvero — cosi' il gesto ha un principio e una fine
-  // invece di essere uno sfarfallio.
+  // The tab strip at the top is drawn by VS Code and it won't let us touch it; what's
+  // inside, though, is ours. On opening the page comes in, on closing it goes out and
+  // only then does it really close — so the gesture has a beginning and an end
+  // instead of being a flicker.
   const shell = document.querySelector('.shell');
 
   function playTabIn() {
@@ -1314,8 +1314,8 @@
     const bye = () => vscode.postMessage({ cmd: 'closeTab' });
     if (!shell) return bye();
     shell.classList.add('tab-out');
-    // Se l'animazione non parte (movimento ridotto, pagina nascosta) il tasto deve
-    // chiudere lo stesso: la rete di sicurezza e' il timer.
+    // If the animation doesn't start (reduced motion, page hidden) the button has to
+    // close it anyway: the safety net is the timer.
     let done = false;
     const fire = () => {
       if (done) return;
@@ -1328,12 +1328,12 @@
 
   $('btnClose').addEventListener('click', closeTab);
 
-  // ---------- impostazioni: modello, pensiero, avvisi ----------
+  // ---------- settings: model, thinking, alerts ----------
   //
-  // Le scelte le tiene l'estensione (restano fra una finestra e l'altra): qui si
-  // disegnano e si rimandano indietro un pezzo per volta. L'elenco dei modelli
-  // arriva dalla CLI a sessione accesa, quindi finche' non c'e' resta la voce
-  // "predefinito" — che e' anche la scelta giusta per la maggior parte dei casi.
+  // The extension holds the choices (they survive from one window to the next): here
+  // we just draw them and send them back one piece at a time. The list of models
+  // comes from the CLI once the session is up, so until it's there the "default"
+  // entry stays — which is also the right choice for most cases.
   const cfg = $('cfg');
   const btnCfg = $('btnCfg');
   let prefs = {
@@ -1348,29 +1348,29 @@
   };
   let models = [];
 
-  // Ogni livello di impegno ha un nome e una spiegazione semplice.
+  // Every effort level has a name and a plain explanation.
   const EFFORT_INFO = {
-    '':     { label: 'Auto',          desc: 'Claude decide quanto impegnarsi in base alla domanda' },
-    low:    { label: 'Veloce',        desc: 'Risponde subito — buono per domande semplici' },
-    medium: { label: 'Equilibrato',   desc: 'Il giusto mix tra velocita\u0300 e precisione' },
-    high:   { label: 'Approfondito',  desc: 'Si prende il tempo per fare le cose per bene' },
-    xhigh:  { label: 'Molto approfondito', desc: 'Analizza tutto a fondo prima di agire' },
-    max:    { label: 'Massimo',       desc: 'Non si risparmia niente, la massima qualita\u0300' },
+    '':     { label: 'Auto',          desc: 'Claude decides how hard to work based on the question' },
+    low:    { label: 'Fast',          desc: 'Answers right away — good for simple questions' },
+    medium: { label: 'Balanced',      desc: 'The right mix of speed and precision' },
+    high:   { label: 'Thorough',      desc: 'Takes the time to do things properly' },
+    xhigh:  { label: 'Very thorough', desc: 'Analyses everything in depth before acting' },
+    max:    { label: 'Maximum',       desc: 'Spares nothing, the highest quality' },
   };
   const THINK_INFO = {
-    auto: { label: 'Auto',   desc: 'Claude decide quando ragionare a fondo' },
-    on:   { label: 'Acceso', desc: 'Ragiona passo passo prima di ogni risposta' },
-    off:  { label: 'Spento', desc: 'Risponde direttamente, senza ragionamento intermedio' },
+    auto: { label: 'Auto', desc: 'Claude decides when to reason in depth' },
+    on:   { label: 'On',   desc: 'Reasons step by step before every answer' },
+    off:  { label: 'Off',  desc: 'Answers directly, with no intermediate reasoning' },
   };
 
   // -- model cards --
   //
-  // Le carte le detta la CLI installata, non una lista scritta qui: il giorno che
-  // esce un modello nuovo appare da solo, e uno che sparisce non resta a fare
-  // finta. Il nome e la descrizione sono quelli suoi, tradotti solo quel poco che
-  // serve a starci dentro.
+  // The cards are dictated by the installed CLI, not by a list written here: the day
+  // a new model comes out it shows up by itself, and one that disappears doesn't hang
+  // around pretending. The name and description are its own, trimmed only as much as
+  // it takes to fit.
 
-  /** Dalla descrizione della CLI si tiene l'ultimo pezzo: il "a cosa serve". */
+  /** From the CLI's description we keep the last piece: the "what it's for". */
   function modelPurpose(m) {
     const d = String(m.description || '');
     const parts = d.split('·');
@@ -1378,39 +1378,39 @@
     return PURPOSE_IT[tail] || tail || String(m.resolved || '');
   }
 
-  /** Le poche frasi che la CLI dice sempre uguali: qui in italiano. */
+  /** The handful of phrases the CLI always words the same way: shortened here. */
   const PURPOSE_IT = {
-    'Best for everyday, complex tasks': 'Per tutti i giorni, anche complessi',
-    'Most capable for your hardest and longest-running tasks': 'Il più capace, per i lavori tosti',
-    'Efficient for routine tasks': 'Efficiente per le cose di routine',
-    'Fastest for quick answers': 'Il più veloce, risposte al volo',
+    'Best for everyday, complex tasks': 'For every day, complex ones too',
+    'Most capable for your hardest and longest-running tasks': 'The most capable, for the tough jobs',
+    'Efficient for routine tasks': 'Efficient for routine things',
+    'Fastest for quick answers': 'The fastest, answers on the fly',
   };
 
   /**
-   * Il nome sulla carta, spezzato in due righe.
+   * The name on the card, broken across two lines.
    *
-   * La CLI attacca al nome la finestra di contesto — "Opus (1M context)" — e su
-   * una riga sola la carta diventa illeggibile. Il nome resta grosso sopra, la
-   * precisazione va a capo piu' piccola sotto.
+   * The CLI tacks the context window onto the name — "Opus (1M context)" — and on
+   * a single line the card becomes unreadable. The name stays big up top, the
+   * qualifier wraps smaller underneath.
    */
   function bareName(m) {
     const raw = String(m.label || m.value).trim();
-    // Coda fra parentesi tonde o quadre: "(1M context)", "[1m]", ...
+    // Tail in round or square brackets: "(1M context)", "[1m]", ...
     const cut = raw.match(/^(.*?)[\s]*[([]([^)\]]+)[)\]]\s*$/);
     if (cut) return { name: cut[1].trim(), note: cut[2].trim() };
     return { name: raw, note: '' };
   }
 
   /**
-   * "Opus" da solo non dice quale Opus. Il numero pero' c'e' gia' nel modello
-   * risolto — claude-opus-5 — quindi si prende da li' invece di tenere qui una
-   * lista che invecchia: il giorno che la CLI risolvera' su claude-opus-6, la
-   * carta dira' "Opus 6" da sola, senza toccare niente.
+   * "Opus" on its own doesn't say which Opus. But the number is already there in
+   * the resolved model — claude-opus-5 — so we take it from there instead of
+   * keeping a list here that goes stale: the day the CLI resolves to claude-opus-6,
+   * the card will say "Opus 6" all by itself, without touching a thing.
    */
   const FALLBACK_VER = { opus: '5' };
 
   function versioned(name, resolved) {
-    if (!name || /\d/.test(name)) return name; // la versione ce l'ha gia'
+    if (!name || /\d/.test(name)) return name; // it already has the version
     const key = name.trim().toLowerCase();
     const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const hit = String(resolved || '')
@@ -1426,14 +1426,14 @@
   }
 
   /**
-   * Ogni famiglia ha il suo colore e il suo effetto: non e' una scala da poco a
-   * tanto, sono quattro cose diverse. Cosi' il modello si riconosce a colpo
-   * d'occhio dal colore, prima ancora di leggere il nome.
+   * Every family has its own colour and its own effect: it isn't a scale from little
+   * to a lot, they're four different things. That way you recognise the model at a
+   * glance from the colour, before you even read the name.
    *
-   *   haiku   ciano    scia veloce che attraversa
-   *   sonnet  viola    respiro morbido
-   *   opus    argilla  bordo a gradiente che gira
-   *   fable   oro      giro svelto + alone + galleggia
+   *   haiku   cyan     fast streak crossing through
+   *   sonnet  purple   soft breathing
+   *   opus    clay     gradient border going round
+   *   fable   gold     quick spin + halo + floats
    */
   const FAMILY = [
     [/fable|mythos/i, 'fable'],
@@ -1454,16 +1454,16 @@
     list.replaceChildren();
 
     if (!models.length) {
-      list.append(el('p', 'phint', 'I modelli appariranno dopo il primo messaggio'));
+      list.append(el('p', 'phint', 'The models will appear after the first message'));
       return;
     }
 
     for (const m of models) {
-      // Niente "Automatico": il modello lo si sceglie sempre a mano.
+      // No "Automatic": the model is always picked by hand.
       if (m.recommended) continue;
       const value = m.value;
       const isOn = prefs.model === value;
-      // Ogni famiglia ha il suo colore e il suo effetto.
+      // Every family has its own colour and its own effect.
       const cls = 'model-card fam-' + modelFamily(m) + (isOn ? ' on' : '');
       const card = el('button', cls);
       card.type = 'button';
@@ -1479,20 +1479,20 @@
     }
   }
 
-  // -- segmented control generico con slider --
+  // -- generic segmented control with slider --
 
   /**
-   * Mette lo slider sopra al bottone acceso. Si usano gli offset (non i rect):
-   * sono gia' relativi al contenitore — che e' `position: relative` — quindi non
-   * sbagliano di mezzo pixel e, soprattutto, valgono anche mentre il pannello sta
-   * ancora scivolando dentro con la sua animazione.
+   * Puts the slider over the active button. We use the offsets (not the rects):
+   * they're already relative to the container — which is `position: relative` — so
+   * they don't miss by half a pixel and, above all, they hold up even while the
+   * panel is still sliding in with its animation.
    */
   function placeSeg(container) {
     const slider = container.querySelector('.seg-slider');
     if (!slider) return;
     const active = container.querySelector('.seg-btn.on');
-    // A pannello chiuso non c'e' niente da misurare: meglio non muoverlo affatto
-    // che incollarlo a zero e vederlo poi saltare al primo clic.
+    // With the panel closed there's nothing to measure: better not to move it at all
+    // than to pin it to zero and then watch it jump on the first click.
     if (!active || !container.offsetParent) return;
     slider.style.left = active.offsetLeft + 'px';
     slider.style.top = active.offsetTop + 'px';
@@ -1501,15 +1501,15 @@
     slider.style.display = '';
   }
 
-  /** Ogni volta che il contenitore cambia misura (i bottoni vanno a capo, il
-   *  pannello si apre) lo slider si rimette a posto da solo. */
+  /** Every time the container changes size (the buttons wrap, the panel opens)
+   *  the slider puts itself back in place on its own. */
   function watchSeg(container) {
     if (container.dataset.watched || typeof ResizeObserver === 'undefined') return;
     container.dataset.watched = '1';
     new ResizeObserver(() => placeSeg(container)).observe(container);
   }
 
-  /** Rimette a posto tutti gli slider: serve all'apertura del pannello. */
+  /** Puts all the sliders back in place: needed when the panel opens. */
   function placeAllSegs() {
     for (const c of document.querySelectorAll('.seg')) placeSeg(c);
   }

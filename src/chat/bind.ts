@@ -1,5 +1,5 @@
-// Le due facce della chat — pannello laterale e scheda — mostrano la stessa pagina
-// e parlano lo stesso protocollo. Qui c'e' l'aggancio comune, una volta sola.
+// The chat's two faces — sidebar panel and tab — show the same page and speak the
+// same protocol. Here is the common hook-up, written once.
 import * as vscode from 'vscode';
 import type { Cmd } from '../engine/protocol';
 import type { ContextMonitor } from '../context/monitor';
@@ -37,9 +37,9 @@ export function bindWebview(
     post: (e) => void webview.postMessage(e),
   };
 
-  // La scheda a tutto schermo si tiene il contesto in una colonna di fianco: nella
-  // barra laterale quel pannello c'e' gia' per conto suo, qui no. Ci si iscrive solo
-  // per la scheda, cosi' non si spedisce roba a chi non la disegna.
+  // The fullscreen tab keeps the context in a column beside it: in the sidebar that
+  // panel already exists on its own, here it doesn't. We subscribe only for the tab,
+  // so we don't ship things to someone who doesn't draw them.
   let ctxSub: vscode.Disposable | undefined;
 
   const msgs = webview.onDidReceiveMessage((m: Cmd | CtxCmd) => {
@@ -67,8 +67,8 @@ export function bindWebview(
         void vscode.commands.executeCommand('claudeStudio.openNewTab');
         return;
       case 'closeTab':
-        // Solo dalla scheda: nella barra laterale il tasto non c'e' proprio, e
-        // chiudere "l'editor attivo" da li' vorrebbe dire chiudere il file altrui.
+        // From the tab only: in the sidebar the button isn't there at all, and
+        // closing "the active editor" from there would mean closing someone else's file.
         if (kind === 'panel') void vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         return;
       case 'answer':
@@ -92,7 +92,7 @@ export function bindWebview(
       case 'openFile':
         void openFile(m.path, m.line);
         return;
-      // ---- quello che manda la colonna del contesto ----
+      // ---- what the context column sends ----
       case 'refresh':
         monitor?.tick();
         return;

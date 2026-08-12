@@ -1,8 +1,8 @@
-// Fa recitare alla webview un turno intero — testo in streaming, ragionamento,
-// due tool in parallelo che finiscono in ordine invertito — e controlla che ogni
-// esito sia finito sotto il tool giusto. E' il bug della terza parte: l'esito
-// abbinato per posizione invece che per tool_use_id.
-// Si prova due volte: faccia stretta (pannello) e faccia larga (scheda).
+// Makes the webview act out a whole turn — streaming text, reasoning, two tools in
+// parallel that finish in reverse order — and checks that every result ended up
+// under the right tool. That's the third-party bug: the result matched by position
+// instead of by tool_use_id.
+// It runs twice: narrow face (panel) and wide face (tab).
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -27,18 +27,17 @@ for (const surface of ['view', 'panel']) {
 
   const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
   const t = (cond, msg) => !cond && fails.push(`[${surface}] ` + msg);
-  /** L'ultimo messaggio che la pagina ha mandato all'estensione. */
+  /** The last message the page sent to the extension. */
   const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 
-  // ---- la pagina sotto la CSP vera ----
+  // ---- the page under the real CSP ----
   //
-  // Nella webview la CSP non ha 'unsafe-inline': gli attributi style scritti nel
-  // markup vengono buttati via. Qui si simula togliendoli, perche' un pezzo di
-  // interfaccia che sta in piedi solo grazie a uno style inline in anteprima
-  // sembra a posto e in VSCode e' rotto. E' successo davvero: lo sprite delle
-  // icone si nascondeva con style="display:none", la CSP lo ignorava, e quel
-  // <svg> tornava un blocco alto 150px in cima al documento che spingeva il
-  // campo di scrittura fuori dallo schermo.
+  // In the webview the CSP has no 'unsafe-inline': style attributes written into
+  // the markup get thrown away. Here we simulate that by removing them, because a
+  // piece of interface that only stands up thanks to an inline style looks fine in
+  // the preview and is broken in VS Code. It really happened: the icon sprite hid
+  // itself with style="display:none", the CSP ignored it, and that <svg> became a
+  // 150px-tall block at the top of the document that pushed the composer off screen.
   await page.evaluate(() => {
     for (const n of document.querySelectorAll('[style]')) n.removeAttribute('style');
   });
@@ -50,24 +49,24 @@ for (const surface of ['view', 'panel']) {
       compBottom: Math.round(comp.bottom),
       compH: Math.round(comp.height),
       winH: window.innerHeight,
-      sprite: sprite ? getComputedStyle(sprite).display : 'manca',
+      sprite: sprite ? getComputedStyle(sprite).display : 'missing',
     };
   });
-  t(layout.sprite === 'none', 'lo sprite delle icone si vede (e occupa spazio): display=' + layout.sprite);
-  t(layout.topY === 0, 'qualcosa spinge giu’ la testata: comincia a ' + layout.topY + 'px');
+  t(layout.sprite === 'none', 'the icon sprite is visible (and takes up space): display=' + layout.sprite);
+  t(layout.topY === 0, 'something is pushing the header down: it starts at ' + layout.topY + 'px');
   t(
     layout.compH > 20 && layout.compBottom <= layout.winH,
-    'il campo di scrittura non ci sta nella finestra: finisce a ' +
+    'the composer does not fit in the window: it ends at ' +
       layout.compBottom +
-      ' su ' +
+      ' out of ' +
       layout.winH
   );
 
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
 
-  // ---- lo stato vuoto: e' li' che si imparano le scorciatoie ----
+  // ---- the empty state: that's where you learn the shortcuts ----
   await page.waitForTimeout(120);
-  const vuoto = await page.evaluate(() => {
+  const empty = await page.evaluate(() => {
     const ico = document.querySelector('.empty .ico');
     return {
       keys: [...document.querySelectorAll('.empty .key kbd')].map((n) => n.textContent),
@@ -75,57 +74,57 @@ for (const surface of ['view', 'panel']) {
     };
   });
   t(
-    vuoto.keys.includes('@') && vuoto.keys.includes('Alt+N') && vuoto.keys.includes('Esc'),
-    'lo stato vuoto non dice le scorciatoie: ' + vuoto.keys.join(',')
+    empty.keys.includes('@') && empty.keys.includes('Alt+N') && empty.keys.includes('Esc'),
+    'the empty state does not mention the shortcuts: ' + empty.keys.join(',')
   );
   t(
-    /\d/.test(vuoto.dash),
-    'l’icona dello stato vuoto non si disegna da sola (niente stroke-dasharray): ' + vuoto.dash
+    /\d/.test(empty.dash),
+    'the empty-state icon does not draw itself (no stroke-dasharray): ' + empty.dash
   );
-  // lo scatto si aspetta che l'icona abbia finito di disegnarsi: a meta' strada
-  // sembrerebbe un'icona rotta
+  // the screenshot waits for the icon to finish drawing: halfway through it would
+  // look like a broken icon
   await page.waitForTimeout(1100);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-empty.png`), fullPage: true });
 
   await post({ k: 'session', id: 'abc', model: 'claude-opus-4-6[1m]', cwd: 'C:/Users/Steward/CRM' });
   await post({ k: 'busy', value: true });
-  await post({ k: 'user', text: 'Leggi i due file di configurazione e dimmi che differenza c’è.' });
+  await post({ k: 'user', text: 'Read the two config files and tell me what the difference is.' });
 
   await post({ k: 'turn_start' });
   await post({ k: 'block_start', id: 'b1_0', kind: 'thinking' });
-  for (const t of ['Devo aprire ', 'tutti e due i file ', 'prima di rispondere.'])
+  for (const t of ['I need to open ', 'both files ', 'before answering.'])
     await post({ k: 'delta', id: 'b1_0', kind: 'thinking', text: t });
   await post({
     k: 'block_final',
     id: 'b1_0',
     kind: 'thinking',
-    text: 'Devo aprire tutti e due i file prima di rispondere.',
+    text: 'I need to open both files before answering.',
   });
 
   await post({ k: 'block_start', id: 'b1_1', kind: 'text' });
-  for (const t of ['Apro ', 'i due file ', 'insieme.'])
+  for (const t of ['Opening ', 'the two files ', 'together.'])
     await post({ k: 'delta', id: 'b1_1', kind: 'text', text: t });
-  await post({ k: 'block_final', id: 'b1_1', kind: 'text', text: 'Apro i due file insieme.' });
+  await post({ k: 'block_final', id: 'b1_1', kind: 'text', text: 'Opening the two files together.' });
 
-  // due tool in parallelo, esiti in ordine invertito
+  // two tools in parallel, results in reverse order
   await post({ k: 'tool_start', id: 'tu_A', name: 'Read', input: { file_path: 'package.json' } });
   await post({ k: 'tool_start', id: 'tu_B', name: 'Bash', input: { command: 'git status --porcelain' } });
-  await post({ k: 'tool_end', id: 'tu_B', ok: true, text: 'RISULTATO-DI-B' });
-  await post({ k: 'tool_end', id: 'tu_A', ok: true, text: 'RISULTATO-DI-A' });
+  await post({ k: 'tool_end', id: 'tu_B', ok: true, text: 'RESULT-OF-B' });
+  await post({ k: 'tool_end', id: 'tu_A', ok: true, text: 'RESULT-OF-A' });
 
   await post({ k: 'tool_start', id: 'tu_C', name: 'Write', input: { file_path: 'out.txt' } });
-  await post({ k: 'tool_end', id: 'tu_C', ok: false, text: 'permesso negato' });
+  await post({ k: 'tool_end', id: 'tu_C', ok: false, text: 'permission denied' });
 
-  // ---- i tool che si disegnano da soli: todo, diff, sub-agent ----
+  // ---- the tools that draw themselves: todo, diff, sub-agent ----
   await post({
     k: 'tool_start',
     id: 'tu_T',
     name: 'TodoWrite',
     input: {
       todos: [
-        { content: 'Leggere i file', status: 'completed', activeForm: 'Leggendo i file' },
-        { content: 'Scrivere il diff', status: 'in_progress', activeForm: 'Scrivendo il diff' },
-        { content: 'Provare', status: 'pending', activeForm: 'Provando' },
+        { content: 'Read the files', status: 'completed', activeForm: 'Reading the files' },
+        { content: 'Write the diff', status: 'in_progress', activeForm: 'Writing the diff' },
+        { content: 'Test it', status: 'pending', activeForm: 'Testing it' },
       ],
     },
   });
@@ -143,22 +142,22 @@ for (const surface of ['view', 'panel']) {
   });
   await post({ k: 'tool_end', id: 'tu_E', ok: true, text: 'The file has been updated successfully.' });
 
-  // un sub-agent: il suo lavoro va DENTRO la card del Task, non in fondo al discorso
-  await post({ k: 'tool_start', id: 'tu_S', name: 'Task', input: { description: 'Conta i file', prompt: 'Conta i file .ts' } });
+  // a sub-agent: its work goes INSIDE the Task card, not at the end of the thread
+  await post({ k: 'tool_start', id: 'tu_S', name: 'Task', input: { description: 'Count the files', prompt: 'Count the .ts files' } });
   await post({ k: 'tool_start', id: 'tu_S1', name: 'Glob', input: { pattern: '**/*.ts' }, parent: 'tu_S' });
   await post({ k: 'tool_end', id: 'tu_S1', ok: true, text: 'src/a.ts\nsrc/b.ts' });
   await post({ k: 'block_start', id: 'sub_0', kind: 'text', parent: 'tu_S' });
-  await post({ k: 'delta', id: 'sub_0', kind: 'text', text: 'Ho contato ', parent: 'tu_S' });
-  await post({ k: 'block_final', id: 'sub_0', kind: 'text', text: 'Ho contato 2 file.', parent: 'tu_S' });
-  await post({ k: 'tool_end', id: 'tu_S', ok: true, text: 'Sono 2 file.' });
+  await post({ k: 'delta', id: 'sub_0', kind: 'text', text: 'I counted ', parent: 'tu_S' });
+  await post({ k: 'block_final', id: 'sub_0', kind: 'text', text: 'I counted 2 files.', parent: 'tu_S' });
+  await post({ k: 'tool_end', id: 'tu_S', ok: true, text: 'That is 2 files.' });
 
-  // un output lungo: la card resta chiusa e dichiara quante righe ha
+  // a long output: the card stays closed and says how many lines it has
   await post({ k: 'tool_start', id: 'tu_L', name: 'Bash', input: { command: 'git log' } });
   await post({
     k: 'tool_end',
     id: 'tu_L',
     ok: true,
-    text: Array.from({ length: 40 }, (_, i) => 'riga ' + i).join('\n'),
+    text: Array.from({ length: 40 }, (_, i) => 'line ' + i).join('\n'),
   });
   await page.waitForTimeout(200);
 
@@ -177,88 +176,88 @@ for (const surface of ['view', 'panel']) {
       counts: [...document.querySelectorAll('.count')].map((n) => n.textContent),
     };
   });
-  t(tr.todoDone === 1, 'i todo completati non sono segnati: ' + tr.todoDone);
-  t(tr.todoNow === 'Scrivendo il diff', 'il todo in corso non mostra la forma attiva: ' + tr.todoNow);
-  t(tr.dels.join('|') === 'const a = 1;|const b = 2;', 'il "prima" del diff è sbagliato: ' + tr.dels.join('|'));
-  t(tr.adds.join('|') === 'const a = 3;', 'il "dopo" del diff è sbagliato: ' + tr.adds.join('|'));
-  t(tr.editArg === 'src/app.ts', 'il percorso non è accorciato sulla cartella di lavoro: ' + tr.editArg);
-  t(tr.kidsTools === 1, 'il tool del sub-agent non è finito dentro il Task: ' + tr.kidsTools);
-  t(/Ho contato 2 file/.test(tr.kidsText || ''), 'il discorso del sub-agent non è annidato: ' + tr.kidsText);
-  t(!tr.strayGlob, 'il tool del sub-agent è finito anche in fondo alla conversazione');
-  t(tr.counts.includes('40 righe'), 'un output lungo non dichiara quante righe ha: ' + tr.counts.join(','));
+  t(tr.todoDone === 1, 'the completed todos are not marked: ' + tr.todoDone);
+  t(tr.todoNow === 'Writing the diff', 'the todo in progress does not show the active form: ' + tr.todoNow);
+  t(tr.dels.join('|') === 'const a = 1;|const b = 2;', 'the "before" of the diff is wrong: ' + tr.dels.join('|'));
+  t(tr.adds.join('|') === 'const a = 3;', 'the "after" of the diff is wrong: ' + tr.adds.join('|'));
+  t(tr.editArg === 'src/app.ts', 'the path is not shortened against the working folder: ' + tr.editArg);
+  t(tr.kidsTools === 1, 'the sub-agent tool did not end up inside the Task: ' + tr.kidsTools);
+  t(/I counted 2 files/.test(tr.kidsText || ''), 'the sub-agent thread is not nested: ' + tr.kidsText);
+  t(!tr.strayGlob, 'the sub-agent tool also ended up at the end of the conversation');
+  t(tr.counts.includes('40 lines'), 'a long output does not say how many lines it has: ' + tr.counts.join(','));
 
-  // ---- permessi: i tre tipi di domanda, cliccati davvero ----
+  // ---- permissions: the three kinds of question, really clicked ----
   await post({
     k: 'ask',
     id: 'ask_1',
     kind: 'tool',
     tool: 'Bash',
-    title: 'Claude vuole eseguire un comando',
+    title: 'Claude wants to run a command',
     detail: 'rm -rf dist',
     canAlways: true,
   });
   await page.waitForTimeout(120);
-  t(await page.isVisible('.perm[data-kind="tool"]'), 'la scheda del permesso non compare');
+  t(await page.isVisible('.perm[data-kind="tool"]'), 'the permission card does not appear');
   t(
     (await page.locator('.perm[data-kind="tool"] .btn.always').count()) === 1,
-    '"Consenti sempre" non c’è quando il motore lo permette'
+    '"Always allow" is missing when the engine allows it'
   );
   await page.click('.perm[data-kind="tool"] .btn.always');
   const s1 = await lastSent();
   t(
     s1?.cmd === 'answer' && s1.id === 'ask_1' && s1.choice === 'always',
-    'risposta sbagliata al permesso: ' + JSON.stringify(s1)
+    'wrong answer to the permission: ' + JSON.stringify(s1)
   );
   t(
     await page.locator('.perm[data-kind="tool"] .btn.ok').isDisabled(),
-    'dopo il clic i tasti restano cliccabili'
+    'after the click the buttons are still clickable'
   );
-  await post({ k: 'ask_done', id: 'ask_1', ok: true, label: 'Consentito sempre' });
+  await post({ k: 'ask_done', id: 'ask_1', ok: true, label: 'Always allowed' });
   await page.waitForTimeout(120);
-  t(await page.isVisible('.perm.resolved.ok .verdict'), 'la scheda non mostra l’esito');
-  t((await page.locator('.perm .acts').count()) === 0, 'i tasti restano dopo la risposta');
+  t(await page.isVisible('.perm.resolved.ok .verdict'), 'the card does not show the outcome');
+  t((await page.locator('.perm .acts').count()) === 0, 'the buttons stay after the answer');
 
-  // il piano
+  // the plan
   await post({
     k: 'ask',
     id: 'ask_2',
     kind: 'plan',
     tool: 'ExitPlanMode',
-    title: 'Claude ha finito di pianificare',
+    title: 'Claude is done planning',
     detail: '',
     canAlways: false,
-    plan: 'Passo uno: leggere.\nPasso due: scrivere.\n\n```js\nconst a = 1;\n```\n',
+    plan: 'Step one: read.\nStep two: write.\n\n```js\nconst a = 1;\n```\n',
   });
   await page.waitForTimeout(120);
   t(
     (await page.locator('.perm[data-kind="plan"] .plan pre code').count()) === 1,
-    'il piano non è reso col suo blocco di codice'
+    'the plan is not rendered with its code block'
   );
   t(
     (await page.locator('.perm[data-kind="plan"] .btn').count()) === 3,
-    'al piano mancano le tre scelte'
+    'the plan is missing its three choices'
   );
   await page.click('.perm[data-kind="plan"] .btn.no');
   const s2 = await lastSent();
-  t(s2?.cmd === 'answer' && s2.id === 'ask_2' && s2.choice === 'deny', 'il rifiuto del piano non parte: ' + JSON.stringify(s2));
-  await post({ k: 'ask_done', id: 'ask_2', ok: false, label: 'Continua a pianificare' });
+  t(s2?.cmd === 'answer' && s2.id === 'ask_2' && s2.choice === 'deny', 'denying the plan does not fire: ' + JSON.stringify(s2));
+  await post({ k: 'ask_done', id: 'ask_2', ok: false, label: 'Keep planning' });
 
-  // le domande a scelta multipla
+  // the multiple-choice questions
   await post({
     k: 'ask',
     id: 'ask_3',
     kind: 'question',
     tool: 'AskUserQuestion',
-    title: 'Claude ti chiede una cosa',
+    title: 'Claude is asking you something',
     detail: '',
     canAlways: false,
     questions: [
       {
-        question: 'Quale motore uso?',
-        header: 'Motore',
+        question: 'Which bundler should I use?',
+        header: 'Bundler',
         options: [
-          { label: 'esbuild', description: 'Veloce.' },
-          { label: 'tsc', description: 'Lento ma ufficiale.' },
+          { label: 'esbuild', description: 'Fast.' },
+          { label: 'tsc', description: 'Slow but official.' },
         ],
       },
     ],
@@ -266,33 +265,33 @@ for (const surface of ['view', 'panel']) {
   await page.waitForTimeout(120);
   t(
     await page.locator('.perm[data-kind="question"] .btn.ok').isDisabled(),
-    '"Manda" è attivo prima che ci sia una risposta'
+    '"Send" is active before there is an answer'
   );
   await page.click('.perm[data-kind="question"] .opt:nth-child(2)');
   await page.click('.perm[data-kind="question"] .btn.ok');
   const s3 = await lastSent();
   t(
-    s3?.cmd === 'answer' && s3.answers?.['Quale motore uso?'] === 'tsc',
-    'la risposta scelta non arriva all’estensione: ' + JSON.stringify(s3)
+    s3?.cmd === 'answer' && s3.answers?.['Which bundler should I use?'] === 'tsc',
+    'the chosen answer does not reach the extension: ' + JSON.stringify(s3)
   );
   await post({ k: 'ask_done', id: 'ask_3', ok: true, label: 'tsc' });
 
-  // ---- la modalita' permessi ----
-  // Non e' piu' un menu a tendina ma tre bottoni con lo slider sotto.
+  // ---- the permission mode ----
+  // It's no longer a dropdown but three buttons with the slider underneath.
   await post({ k: 'mode', value: 'plan' });
   await page.waitForTimeout(80);
   t(
     (await page.locator('#mode .modeseg-btn.on').getAttribute('data-mode')) === 'plan',
-    'la testata non segue la modalità decisa dall’estensione'
+    'the header does not follow the mode decided by the extension'
   );
   await page.locator('#mode .modeseg-btn[data-mode="bypassPermissions"]').click();
   const s4 = await lastSent();
   t(
     s4?.cmd === 'setMode' && s4.value === 'bypassPermissions',
-    'il cambio di modalità non arriva all’estensione: ' + JSON.stringify(s4)
+    'the mode change does not reach the extension: ' + JSON.stringify(s4)
   );
 
-  // ---- le impostazioni: modello, impegno, pensiero, avvisi ----
+  // ---- the settings: model, effort, thinking, alerts ----
   await post({
     k: 'prefs',
     value: {
@@ -300,9 +299,9 @@ for (const surface of ['view', 'panel']) {
       sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true,
     },
   });
-  // L'elenco e' esattamente quello che dice la CLI, nell'ordine in cui lo dice —
-  // meno il consigliato ('default'), che non si mostra piu': il modello lo si
-  // sceglie sempre a mano.
+  // The list is exactly what the CLI says, in the order it says it — minus the
+  // recommended one ('default'), which is no longer shown: you always pick the
+  // model by hand.
   await post({
     k: 'models',
     items: [
@@ -312,158 +311,158 @@ for (const surface of ['view', 'panel']) {
         resolved: 'claude-opus-5[1m]',
         efforts: ['low', 'medium', 'high', 'xhigh', 'max'], adaptive: true, recommended: true,
       },
-      { value: 'opus', label: 'Opus', description: 'Il più bravo.', resolved: 'claude-opus-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
-      { value: 'sonnet', label: 'Sonnet', description: 'Il bilanciato.', resolved: 'claude-sonnet-4-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
-      { value: 'haiku', label: 'Haiku', description: 'Il più svelto.', resolved: 'claude-haiku-4-5', efforts: [], adaptive: false, recommended: false },
+      { value: 'opus', label: 'Opus', description: 'The smartest.', resolved: 'claude-opus-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      { value: 'sonnet', label: 'Sonnet', description: 'The balanced one.', resolved: 'claude-sonnet-4-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      { value: 'haiku', label: 'Haiku', description: 'The fastest.', resolved: 'claude-haiku-4-5', efforts: [], adaptive: false, recommended: false },
     ],
   });
   await page.click('#btnCfg');
   await page.waitForTimeout(140);
-  t(await page.isVisible('#cfg'), 'il pannello delle impostazioni non si apre');
-  // Una card per modello vero. Il consigliato ('default') non si mostra: era
-  // l'"automatico", e adesso il modello lo scegli tu.
+  t(await page.isVisible('#cfg'), 'the settings panel does not open');
+  // One card per real model. The recommended one ('default') is not shown: it was
+  // the "automatic" choice, and now you pick the model yourself.
   const modelCards = await page.locator('#cfgModelList .model-card').count();
-  t(modelCards === 3, 'le card dei modelli non arrivano: ' + modelCards);
+  t(modelCards === 3, 'the model cards do not arrive: ' + modelCards);
   t(
-    !(await page.locator('#cfgModelList .model-card .mc-name').allTextContents()).includes('Automatico'),
-    'la card "Automatico" c’e’ ancora: il modello si sceglie a mano'
+    !(await page.locator('#cfgModelList .model-card .mc-name').allTextContents()).includes('Automatic'),
+    'the "Automatic" card is still there: the model is picked by hand'
   );
-  // Clic sulla card Opus (la prima, ora che il consigliato non c'e' piu')
+  // Click the Opus card (the first one, now that the recommended one is gone)
   await page.locator('#cfgModelList .model-card:nth-child(1)').click();
   const sm = await lastSent();
-  t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'il modello scelto non arriva: ' + JSON.stringify(sm));
+  t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'the chosen model does not arrive: ' + JSON.stringify(sm));
   await page.waitForTimeout(80);
-  // Impegno segue il modello: Auto + 3 livelli = 4 bottoni
+  // Effort follows the model: Auto + 3 levels = 4 buttons
   const effortBtns = await page.locator('#cfgEffort .seg-btn').count();
-  t(effortBtns === 4, 'i livelli di impegno non seguono il modello: ' + effortBtns);
-  // La card Opus deve mostrare la descrizione nella card stessa
+  t(effortBtns === 4, 'the effort levels do not follow the model: ' + effortBtns);
+  // The Opus card must show the description in the card itself
   const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-desc').textContent();
-  t(opusDesc === 'Il più bravo.', 'il modello scelto non si racconta: ' + opusDesc);
-  // "Opus" da solo non dice quale: il numero arriva dal modello risolto.
+  t(opusDesc === 'The smartest.', 'the chosen model does not describe itself: ' + opusDesc);
+  // "Opus" on its own does not say which one: the number comes from the resolved model.
   const opusName = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-name').textContent();
-  t(opusName === 'Opus 5', 'il nome del modello non porta la sua versione: ' + opusName);
+  t(opusName === 'Opus 5', 'the model name does not carry its version: ' + opusName);
   const haikuName = await page.locator('#cfgModelList .model-card:nth-child(3) .mc-name').textContent();
-  t(haikuName === 'Haiku 4.5', 'la versione di Haiku non arriva: ' + haikuName);
-  // Ogni famiglia il suo effetto: Opus, Sonnet e Haiku hanno classi diverse.
+  t(haikuName === 'Haiku 4.5', 'the Haiku version does not arrive: ' + haikuName);
+  // Each family gets its own effect: Opus, Sonnet and Haiku have different classes.
   t(
     (await page.locator('#cfgModelList .model-card.fam-opus.on').count()) === 1,
-    'Opus non prende l’effetto della sua famiglia'
+    'Opus does not get its family effect'
   );
   t(
     (await page.locator('#cfgModelList .model-card.fam-sonnet').count()) === 1,
-    'Sonnet non prende l’effetto della sua famiglia'
+    'Sonnet does not get its family effect'
   );
-  // Clic su Haiku: non accetta livelli, quindi resta il solo "Auto" — e Auto deve
-  // restare cliccabile, perche' vuol dire "non dirgli niente" e vale per tutti.
+  // Click Haiku: it takes no levels, so only "Auto" is left — and Auto must stay
+  // clickable, because it means "tell it nothing" and that works for every model.
   await page.locator('#cfgModelList .model-card:nth-child(3)').click();
   await page.waitForTimeout(80);
   t(
     (await page.locator('#cfgModelList .model-card.fam-haiku.on').count()) === 1,
-    'Haiku non prende l’effetto della sua famiglia'
+    'Haiku does not get its family effect'
   );
   const haikuBtns = await page.locator('#cfgEffort .seg-btn').count();
-  t(haikuBtns === 1, 'su un modello senza livelli deve restare il solo Auto: ' + haikuBtns);
+  t(haikuBtns === 1, 'on a model with no levels only Auto should be left: ' + haikuBtns);
   const autoOff = await page.locator('#cfgEffort .seg-btn:disabled').count();
-  t(autoOff === 0, 'Auto non deve mai essere spento: è sempre una scelta valida');
+  t(autoOff === 0, 'Auto must never be disabled: it is always a valid choice');
   t(
     await page.locator('#cfgEffort .seg-btn.on').isVisible(),
-    'senza livelli il pannello resta senza niente di acceso'
+    'with no levels the panel is left with nothing switched on'
   );
 
-  // Il pensiero: clic su Spento (il terzo bottone; il primo figlio e' lo slider)
+  // Thinking: click Off (the third button; the first child is the slider)
   await page.locator('#cfgThink .seg-btn').nth(2).click();
   const st = await lastSent();
-  t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'il pensiero non si spegne: ' + JSON.stringify(st));
+  t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'thinking does not turn off: ' + JSON.stringify(st));
   await page.selectOption('#cfgSound', 'harvest');
   const ssnd = await lastSent();
-  t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'harvest', 'il suono scelto non arriva: ' + JSON.stringify(ssnd));
+  t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'harvest', 'the chosen sound does not arrive: ' + JSON.stringify(ssnd));
   await page.click('#cfgTest');
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-cfg.png`) });
-  // avviso vero: arriva dall'estensione e la pagina lo suona senza lamentarsi
+  // a real alert: it comes from the extension and the page plays it without complaining
   await post({ k: 'chime', event: 'done', sound: 'cozy', volume: 0.4 });
   await page.waitForTimeout(120);
   await page.click('#cfgClose');
-  // il pannello esce con la sua animazione: si aspetta che finisca davvero
+  // the panel leaves with its animation: wait for it to actually finish
   await page.waitForTimeout(360);
-  t(await page.locator('#cfg').isHidden(), 'il pannello delle impostazioni non si chiude');
+  t(await page.locator('#cfg').isHidden(), 'the settings panel does not close');
 
-  // ---- gli ingressi: cronologia, "@", "/", selezione dall'editor ----
-  // Mentre Claude lavora il tasto e' "ferma", non "manda": per provare l'invio
-  // bisogna prima essere fermi davvero.
+  // ---- the inputs: history, "@", "/", selection from the editor ----
+  // While Claude works the button says "stop", not "send": to test sending you have
+  // to be idle first.
   await post({ k: 'busy', value: false });
   await post({
     k: 'history',
     items: [
-      { id: 's1', summary: 'Sistemare il diff', when: Date.now() - 3600000 },
-      { id: 's2', summary: 'Prima prova', when: Date.now() - 86400000 * 2 },
+      { id: 's1', summary: 'Fix the diff', when: Date.now() - 3600000 },
+      { id: 's2', summary: 'First test', when: Date.now() - 86400000 * 2 },
     ],
   });
   await page.waitForTimeout(120);
-  t((await page.locator('.hrow').count()) === 2, 'la cronologia non elenca le conversazioni');
+  t((await page.locator('.hrow').count()) === 2, 'the history does not list the conversations');
   t(
-    (await page.locator('.hwhen').first().textContent()) === "un'ora fa",
-    'la data della conversazione è scritta male: ' + (await page.locator('.hwhen').first().textContent())
+    (await page.locator('.hwhen').first().textContent()) === 'an hour ago',
+    'the conversation date is written wrong: ' + (await page.locator('.hwhen').first().textContent())
   );
   await page.locator('.hrow').nth(1).locator('.hopen').click();
   const sh = await lastSent();
-  t(sh?.cmd === 'open' && sh.id === 's2', 'la conversazione scelta non si riapre: ' + JSON.stringify(sh));
+  t(sh?.cmd === 'open' && sh.id === 's2', 'the chosen conversation does not reopen: ' + JSON.stringify(sh));
   await page.waitForTimeout(360);
-  t(await page.locator('#drawer').isHidden(), 'il cassetto resta aperto dopo aver scelto');
+  t(await page.locator('#drawer').isHidden(), 'the drawer stays open after choosing');
 
-  await post({ k: 'commands', items: [{ name: 'commit', description: 'Fa un commit' }, { name: 'test', description: 'Lancia i test' }] });
+  await post({ k: 'commands', items: [{ name: 'commit', description: 'Makes a commit' }, { name: 'test', description: 'Runs the tests' }] });
   await page.click('#input');
   await page.type('#input', '/com');
   await page.waitForTimeout(120);
-  t((await page.locator('.menu .mitem').count()) === 1, 'gli slash command non si filtrano');
+  t((await page.locator('.menu .mitem').count()) === 1, 'the slash commands do not filter');
   await page.keyboard.press('Enter');
-  t((await page.inputValue('#input')) === '/commit ', 'lo slash command non si completa: ' + (await page.inputValue('#input')));
+  t((await page.inputValue('#input')) === '/commit ', 'the slash command does not complete: ' + (await page.inputValue('#input')));
 
   await page.fill('#input', '');
-  await page.type('#input', 'guarda @ap');
+  await page.type('#input', 'look at @ap');
   await page.waitForTimeout(250);
   const sf = await lastSent();
-  t(sf?.cmd === 'files' && sf.q === 'ap', 'la ricerca dei file non parte: ' + JSON.stringify(sf));
+  t(sf?.cmd === 'files' && sf.q === 'ap', 'the file search does not fire: ' + JSON.stringify(sf));
   await post({ k: 'files', items: ['src/app.ts', 'docs/appunti.md'] });
   await page.waitForTimeout(120);
-  t((await page.locator('.menu .mitem').count()) === 2, 'i file non compaiono nel menu');
+  t((await page.locator('.menu .mitem').count()) === 2, 'the files do not show up in the menu');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   t(
-    (await page.inputValue('#input')) === 'guarda @docs/appunti.md ',
-    'il file scelto non finisce nel messaggio: ' + (await page.inputValue('#input'))
+    (await page.inputValue('#input')) === 'look at @docs/appunti.md ',
+    'the chosen file does not end up in the message: ' + (await page.inputValue('#input'))
   );
 
   await post({ k: 'selection', file: 'src/app.ts', lines: '12-38' });
   await page.waitForTimeout(120);
-  t(await page.isVisible('.attach .att'), 'la selezione dell’editor non compare fra gli allegati');
-  await page.fill('#input', 'spiegami questo');
+  t(await page.isVisible('.attach .att'), 'the editor selection does not show among the attachments');
+  await page.fill('#input', 'explain this to me');
   await page.locator('#send').click();
   const ss = await lastSent();
   t(
-    ss?.cmd === 'send' && ss.withSelection === true && ss.text === 'spiegami questo',
-    'la selezione non viene allegata al messaggio: ' + JSON.stringify(ss)
+    ss?.cmd === 'send' && ss.withSelection === true && ss.text === 'explain this to me',
+    'the selection is not attached to the message: ' + JSON.stringify(ss)
   );
-  t(await page.locator('.attach').isHidden(), 'gli allegati restano appesi dopo l’invio');
+  t(await page.locator('.attach').isHidden(), 'the attachments hang around after sending');
 
-  // e se la togli, non deve piu' partire
+  // and if you remove it, it must not travel any more
   await post({ k: 'selection', file: 'src/app.ts', lines: '12-38' });
   await page.click('.attx');
-  await page.fill('#input', 'senza');
+  await page.fill('#input', 'without');
   await page.locator('#send').click();
   const ss2 = await lastSent();
-  t(!ss2?.withSelection, 'la selezione parte anche dopo che l’hai tolta');
+  t(!ss2?.withSelection, 'the selection travels even after you removed it');
 
-  // clic sul percorso di un tool -> apri il file nell'editor
+  // click a tool path -> open the file in the editor
   await page.click('.tool[data-tool="Edit"] .arg.link');
   const so = await lastSent();
   t(
     so?.cmd === 'openFile' && /app\.ts$/.test(so.path || ''),
-    'il percorso nel tool non apre il file: ' + JSON.stringify(so)
+    'the path in the tool does not open the file: ' + JSON.stringify(so)
   );
 
-  // ---- il contesto di fianco: c'e' solo nella scheda ----
-  // Nella barra laterale il contesto ha un pannello suo; in una scheda quello non
-  // esiste, e senza questa colonna la faccia larga sarebbe l'unica a non vederlo.
+  // ---- the context alongside: only in the tab ----
+  // In the sidebar the context has its own panel; in a tab that doesn't exist, and
+  // without this column the wide face would be the only one that can't see it.
   await post({
     k: 'ctx',
     d: {
@@ -471,17 +470,17 @@ for (const surface of ['view', 'panel']) {
       limit: '1M',
       focusHow: 'studio',
       usage: { session: 34, week: 71 },
-      usageWait: 'caricamento…',
-      sessionReset: 'tra 2h',
-      weekReset: 'tra 3g',
+      usageWait: 'loading…',
+      sessionReset: 'in 2h',
+      weekReset: 'in 3d',
       branch: 'master',
       dirty: false,
       totalCost: '$1.20',
       cards: [
         {
-          id: 'aaaa', shortId: 'aaaaaaaa', name: 'Questa conversazione', own: true,
+          id: 'aaaa', shortId: 'aaaaaaaa', name: 'This conversation', own: true,
           tabName: 'Studio', preview: '', pct: 22, tokens: '220.0k', cost: '$0.42',
-          lastClock: '09:41', lastAgo: 'adesso', busy: false, recent: true, focused: true,
+          lastClock: '09:41', lastAgo: 'just now', busy: false, recent: true, focused: true,
         },
       ],
     },
@@ -498,38 +497,38 @@ for (const surface of ['view', 'panel']) {
       cards: rail.querySelectorAll('.ctxcard').length,
       name: rail.querySelector('.cname')?.textContent,
       cost: rail.querySelector('.ctxcard .ccost')?.textContent,
-      // niente sovrapposizioni: la colonna sta a destra del discorso
+      // no overlap: the column sits to the right of the thread
       apart: box.width === 0 || box.left >= log.right - 1,
-      // le classi della chat non devono essere ridipinte dal foglio del contesto
+      // the chat classes must not be repainted by the context stylesheet
       headerBtn: Math.round(document.getElementById('btnNew').getBoundingClientRect().width),
     };
   });
 
-  t(railed.shown === wide, 'la colonna del contesto e’ nel posto sbagliato: shown=' + railed.shown);
-  t(railed.btn === wide, 'il tasto del contesto e’ nel posto sbagliato: btn=' + railed.btn);
+  t(railed.shown === wide, 'the context column is in the wrong place: shown=' + railed.shown);
+  t(railed.btn === wide, 'the context button is in the wrong place: btn=' + railed.btn);
   if (wide) {
-    t(railed.cards === 1, 'la colonna del contesto non disegna le sessioni: ' + railed.cards);
-    t(railed.name === 'Questa conversazione', 'nome sbagliato nella colonna: ' + railed.name);
-    t(railed.cost === '$0.42', 'il costo della conversazione non arriva nella colonna: ' + railed.cost);
-    t(railed.apart, 'la colonna del contesto si sovrappone al discorso');
-    // e si toglie di mezzo quando lo chiedi
+    t(railed.cards === 1, 'the context column does not draw the sessions: ' + railed.cards);
+    t(railed.name === 'This conversation', 'wrong name in the column: ' + railed.name);
+    t(railed.cost === '$0.42', 'the cost of the conversation does not reach the column: ' + railed.cost);
+    t(railed.apart, 'the context column overlaps the thread');
+    // and it gets out of the way when you ask
     await page.click('#btnCtx');
     await page.waitForTimeout(80);
     t(
       await page.locator('#rail').isHidden(),
-      'il tasto non nasconde la colonna del contesto'
+      'the button does not hide the context column'
     );
     await page.click('#btnCtx');
     await page.waitForTimeout(80);
-    t(await page.locator('#rail').isVisible(), 'la colonna del contesto non torna');
+    t(await page.locator('#rail').isVisible(), 'the context column does not come back');
   }
-  t(railed.headerBtn > 10 && railed.headerBtn < 60, 'il foglio del contesto ha ridipinto i tasti della chat: ' + railed.headerBtn);
+  t(railed.headerBtn > 10 && railed.headerBtn < 60, 'the context stylesheet repainted the chat buttons: ' + railed.headerBtn);
 
-  const finale = 'Il primo usa `esbuild`, il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n';
+  const ending = 'The first one uses `esbuild`, the second does not:\n\n```json\n{ "build": "esbuild" }\n```\n';
   await post({ k: 'block_start', id: 'b2_0', kind: 'text' });
-  for (const t of ['Il primo ', 'usa `esbuild`, ', 'il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n'])
+  for (const t of ['The first one ', 'uses `esbuild`, ', 'the second does not:\n\n```json\n{ "build": "esbuild" }\n```\n'])
     await post({ k: 'delta', id: 'b2_0', kind: 'text', text: t });
-  await post({ k: 'block_final', id: 'b2_0', kind: 'text', text: finale });
+  await post({ k: 'block_final', id: 'b2_0', kind: 'text', text: ending });
   await post({ k: 'turn_end', ok: true, costUsd: 0.014, durationMs: 4200, tokens: 18234 });
   await post({ k: 'busy', value: false });
 
@@ -557,14 +556,14 @@ for (const surface of ['view', 'panel']) {
       carets: document.querySelectorAll('.caret').length,
       stopBtn: document.getElementById('send')?.className,
       isWide: document.body.classList.contains('wide'),
-      // non basta la proprieta' `hidden`: conta se si vede davvero
+      // the `hidden` property is not enough: what counts is whether it really shows
       tabBtnHidden: getComputedStyle(document.getElementById('btnTab')).display === 'none',
       composerLeft: Math.round(document.getElementById('composer').getBoundingClientRect().left),
       msgLeft: first ? Math.round(first.getBoundingClientRect().left) : 0,
-      // larghezza della colonna di lettura e sfondamento orizzontale
+      // width of the reading column and horizontal overflow
       colWidth: first ? Math.round(first.getBoundingClientRect().width) : 0,
       hOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      // nessun messaggio deve essere schiacciato dal flex quando il log e' pieno
+      // no message should be squashed by the flex when the log is full
       squashed: [...log.querySelectorAll('.msg')]
         .filter((n) => n.scrollHeight > n.clientHeight + 2 && !n.querySelector('.plan, .out, .detail'))
         .map((n) => n.className),
@@ -574,42 +573,42 @@ for (const surface of ['view', 'panel']) {
     };
   });
 
-  t(errors.length === 0, 'errori JS in pagina: ' + errors.join(' | '));
-  t(r.tools.length === 7, 'attesi 7 tool in prima fila, trovati ' + r.tools.length);
-  t(r.tools[0]?.name === 'Read' && r.tools[0]?.out === 'RISULTATO-DI-A', 'Read ha preso l’esito sbagliato: ' + r.tools[0]?.out);
-  t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RISULTATO-DI-B', 'Bash ha preso l’esito sbagliato: ' + r.tools[1]?.out);
-  t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read non è marcato completato');
-  t(/\bfail\b/.test(r.tools[2]?.cls || ''), 'Write non è marcato fallito');
-  t(!r.headOverflow, 'la testata sfonda: le pillole non ci stanno nella faccia stretta');
-  t(/differenza/.test(r.user || ''), 'messaggio utente mancante');
-  t(/tutti e due i file/.test(r.think || ''), 'blocco ragionamento mancante');
-  t(r.codeBlocks === 1, 'blocco di codice non reso: ' + r.codeBlocks);
-  t(r.inlineCode === 2, 'codice inline non reso: ' + r.inlineCode);
-  t(r.carets === 0, 'cursore rimasto acceso a turno finito');
-  t(!/stop/.test(r.stopBtn || ''), 'il tasto è rimasto su "ferma"');
-  t(!r.hOverflow, 'la pagina sfonda in orizzontale');
-  t(!r.squashed.length, 'messaggi schiacciati dal flex: ' + r.squashed.join(' | '));
+  t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
+  t(r.tools.length === 7, 'expected 7 top-level tools, found ' + r.tools.length);
+  t(r.tools[0]?.name === 'Read' && r.tools[0]?.out === 'RESULT-OF-A', 'Read took the wrong result: ' + r.tools[0]?.out);
+  t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RESULT-OF-B', 'Bash took the wrong result: ' + r.tools[1]?.out);
+  t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read is not marked as completed');
+  t(/\bfail\b/.test(r.tools[2]?.cls || ''), 'Write is not marked as failed');
+  t(!r.headOverflow, 'the header overflows: the pills do not fit in the narrow face');
+  t(/difference/.test(r.user || ''), 'user message missing');
+  t(/both files/.test(r.think || ''), 'reasoning block missing');
+  t(r.codeBlocks === 1, 'code block not rendered: ' + r.codeBlocks);
+  t(r.inlineCode === 2, 'inline code not rendered: ' + r.inlineCode);
+  t(r.carets === 0, 'caret left switched on after the turn ended');
+  t(!/stop/.test(r.stopBtn || ''), 'the button is still on "stop"');
+  t(!r.hOverflow, 'the page overflows sideways');
+  t(!r.squashed.length, 'messages squashed by the flex: ' + r.squashed.join(' | '));
   const joined = r.textMsgs.join('\n');
-  t((joined.match(/Apro i due file insieme\./g) || []).length === 1, 'testo duplicato dopo block_final');
+  t((joined.match(/Opening the two files together\./g) || []).length === 1, 'text duplicated after block_final');
 
-  t(r.isWide === wide, 'la faccia non ha riconosciuto se stessa');
-  t(r.tabBtnHidden === wide, 'il tasto "apri come scheda" è nel posto sbagliato');
+  t(r.isWide === wide, 'the face did not recognise itself');
+  t(r.tabBtnHidden === wide, 'the "open as tab" button is in the wrong place');
   if (wide) {
-    // La scheda usa tutta la finestra: quello che non e' discorso e' la colonna
-    // del contesto, non spazio buttato.
+    // The tab uses the whole window: whatever is not thread is the context column,
+    // not wasted space.
     t(
       r.logWidth + r.railWidth >= r.winWidth - 2,
-      'la scheda non usa la larghezza della finestra: ' + r.logWidth + '+' + r.railWidth + ' su ' + r.winWidth
+      'the tab does not use the width of the window: ' + r.logWidth + '+' + r.railWidth + ' out of ' + r.winWidth
     );
-    t(r.railWidth > 200, 'la colonna del contesto e’ sparita dalla scheda: ' + r.railWidth);
-    t(r.colWidth <= 880, 'da scheda le righe sono troppo lunghe: ' + r.colWidth + 'px');
+    t(r.railWidth > 200, 'the context column has vanished from the tab: ' + r.railWidth);
+    t(r.colWidth <= 880, 'in the tab the lines are too long: ' + r.colWidth + 'px');
     t(
       Math.abs(r.composerLeft - r.msgLeft) <= 1,
-      'campo di scrittura e messaggi non incolonnati: ' + r.composerLeft + ' vs ' + r.msgLeft
+      'composer and messages are not aligned in a column: ' + r.composerLeft + ' vs ' + r.msgLeft
     );
   }
 
-  // ---- errori: quello che arriva dal motore, detto in italiano ----
+  // ---- errors: whatever the engine sends, said in plain words ----
   await post({
     k: 'error',
     message: 'Error: API error 429 rate_limit_error: too many requests\n    at send (/x/sdk.mjs:12:3)',
@@ -623,21 +622,21 @@ for (const surface of ['view', 'panel']) {
       raw: n?.querySelector('.err-raw pre')?.textContent || '',
     };
   });
-  t(/limite d’uso/.test(err.title), 'l’errore non è tradotto in una frase leggibile: ' + err.title);
-  t(!/at send/.test(err.title + err.hint), 'lo stack tecnico è finito nel titolo dell’errore');
-  t(/rate_limit_error/.test(err.raw), 'il messaggio vero del motore non è più raggiungibile');
+  t(/usage limit/.test(err.title), 'the error is not turned into a readable sentence: ' + err.title);
+  t(!/at send/.test(err.title + err.hint), 'the technical stack ended up in the error title');
+  t(/rate_limit_error/.test(err.raw), 'the engine\u2019s real message is no longer reachable');
 
-  // un turno fermato da te non e' un guasto: stesso riquadro, tono diverso
-  await post({ k: 'error', message: 'Turno interrotto.' });
+  // a turn you stopped yourself is not a fault: same box, different tone
+  await post({ k: 'error', message: 'Turn interrupted.' });
   await page.waitForTimeout(120);
-  t(await page.isVisible('.err.calm'), 'un turno interrotto viene mostrato come un errore rosso');
+  t(await page.isVisible('.err.calm'), 'an interrupted turn is shown as a red error');
 
-  // ---- le scorciatoie ----
+  // ---- the shortcuts ----
   await page.click('#input');
   await post({ k: 'busy', value: true });
-  await page.waitForTimeout(120); // Esc ferma solo se la pagina sa gia' di essere occupata
-  // e mentre aspetta si vedono tutti e due i movimenti dell'attesa
-  const attesa = await page.evaluate(() => {
+  await page.waitForTimeout(120); // Esc only stops if the page already knows it is busy
+  // and while it waits you should see both movements of the wait
+  const waiting = await page.evaluate(() => {
     const ring = document.querySelector('.pulse .thinking-ring');
     return {
       ring: !!ring,
@@ -645,37 +644,37 @@ for (const surface of ['view', 'panel']) {
       spinning: ring ? getComputedStyle(ring).animationName : '',
     };
   });
-  t(attesa.ring && attesa.halo, 'all’attesa manca un pezzo: alone=' + attesa.halo + ' anello=' + attesa.ring);
-  t(attesa.spinning === 'cs-spin', 'l’anello dell’attesa non gira: ' + attesa.spinning);
+  t(waiting.ring && waiting.halo, 'the wait is missing a piece: halo=' + waiting.halo + ' ring=' + waiting.ring);
+  t(waiting.spinning === 'cs-spin', 'the waiting ring does not spin: ' + waiting.spinning);
   await page.keyboard.press('Escape');
   const sEsc = await lastSent();
-  t(sEsc?.cmd === 'interrupt', 'Esc non ferma il turno: ' + JSON.stringify(sEsc));
+  t(sEsc?.cmd === 'interrupt', 'Esc does not stop the turn: ' + JSON.stringify(sEsc));
   await post({ k: 'busy', value: false });
 
   await page.keyboard.press('Alt+n');
   const sAlt = await lastSent();
-  t(sAlt?.cmd === 'newSession', 'Alt+N non apre una sessione nuova: ' + JSON.stringify(sAlt));
+  t(sAlt?.cmd === 'newSession', 'Alt+N does not open a new session: ' + JSON.stringify(sAlt));
 
-  // la freccia in su ripesca l'ultimo messaggio mandato ("senza", qui sopra)
+  // the up arrow fishes back the last message sent ("without", just above)
   await page.fill('#input', '');
   await page.keyboard.press('ArrowUp');
   t(
-    (await page.inputValue('#input')) === 'senza',
-    'la freccia in su non ripesca l’ultimo messaggio: ' + (await page.inputValue('#input'))
+    (await page.inputValue('#input')) === 'without',
+    'the up arrow does not fish back the last message: ' + (await page.inputValue('#input'))
   );
   await page.fill('#input', '');
 
-  // gli scatti: la coda del discorso (dove stanno gli errori appena provati)…
+  // the screenshots: the tail of the thread (where the errors we just tested are)…
   await page.evaluate(() => (document.getElementById('log').scrollTop = 1e6));
   await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}.png`), fullPage: true });
-  // il log scorre dentro di se': per vedere anche la prima meta' serve un secondo scatto
+  // the log scrolls inside itself: to see the first half too you need a second shot
   await page.evaluate(() => (document.getElementById('log').scrollTop = 0));
   await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-top.png`), fullPage: true });
 
-  // ---- cambio conversazione: il discorso vecchio esce scorrendo ----
-  // Si prova per ultimo, perche' lascia la chat vuota e rovinerebbe gli scatti.
+  // ---- switching conversation: the old thread slides out ----
+  // Tested last, because it leaves the chat empty and would ruin the screenshots.
   await page.evaluate(() => (document.getElementById('log').scrollTop = 1e6));
   await post({ k: 'reset' });
   await page.waitForTimeout(60);
@@ -686,26 +685,26 @@ for (const surface of ['view', 'panel']) {
     const lb = log.getBoundingClientRect();
     return {
       ghost: !!ghost,
-      // il fantasma sta esattamente sopra il discorso, non altrove nella pagina
+      // the ghost sits exactly on top of the thread, not somewhere else on the page
       onLog: gb ? Math.abs(gb.top - lb.top) < 2 && Math.abs(gb.width - lb.width) < 2 : false,
-      // e porta con se' quello che stavi guardando, non una pagina bianca
+      // and it carries along what you were looking at, not a blank page
       hasKids: ghost ? ghost.querySelectorAll('.msg').length : 0,
       swapping: log.classList.contains('swap-in'),
-      // intanto il discorso nuovo e' gia' al suo posto
+      // meanwhile the new thread is already in place
       empty: !!log.querySelector('.empty'),
       strayInLog: log.querySelectorAll('.msg').length,
     };
   });
-  t(swap.ghost && swap.onLog, 'il discorso vecchio non esce di scena sopra il log');
-  t(swap.hasKids > 0, 'il fantasma del cambio conversazione è vuoto');
-  t(swap.swapping, 'il discorso nuovo non entra con la sua animazione');
-  t(swap.empty && swap.strayInLog === 0, 'dopo il cambio la chat non riparte pulita');
+  t(swap.ghost && swap.onLog, 'the old thread does not exit above the log');
+  t(swap.hasKids > 0, 'the ghost of the conversation switch is empty');
+  t(swap.swapping, 'the new thread does not come in with its animation');
+  t(swap.empty && swap.strayInLog === 0, 'after the switch the chat does not restart clean');
   await page.waitForTimeout(500);
   t(
     (await page.locator('.log-ghost').count()) === 0,
-    'il fantasma del cambio conversazione resta appeso sopra la chat'
+    'the ghost of the conversation switch hangs around above the chat'
   );
-  t(errors.length === 0, 'errori JS in pagina (fase 4): ' + errors.join(' | '));
+  t(errors.length === 0, 'JS errors on the page (phase 4): ' + errors.join(' | '));
 
   await page.close();
 }
@@ -713,7 +712,7 @@ for (const surface of ['view', 'panel']) {
 await browser.close();
 
 if (fails.length) {
-  console.error('FALLITO:\n- ' + fails.join('\n- '));
+  console.error('FAILED:\n- ' + fails.join('\n- '));
   process.exit(1);
 }
-console.log('ui-check ok — pannello e scheda, screenshot in dist/preview-*.png');
+console.log('ui-check ok — panel and tab, screenshots in dist/preview-*.png');

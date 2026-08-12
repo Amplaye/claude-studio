@@ -1,84 +1,80 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/mr-wilson-dev/claude-studio/main/media/icon.png" width="120" alt="Claude Studio" />
+<img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/media/icon.png" width="120" alt="Claude Studio" />
 
 # Claude Studio
 
-**Claude Code dentro VS Code.** Chat, permessi da approvare con un clic, e quanto contesto ti resta — sempre sott'occhio.
-
-*Claude Code inside VS Code. Chat, one-click permissions, and your remaining context — always in sight.*
+**Claude Code, inside VS Code.** Chat, one-click permissions, and how much context you have left — always in sight.
 
 </div>
 
 ---
 
-## Cos'è, in due righe
+## What it is, in two lines
 
-Claude Studio porta **Claude Code dentro VS Code**: gli scrivi come faresti da terminale, ma le risposte, i file che tocca e i permessi che chiede diventano schede da leggere e bottoni da premere.
+Claude Studio brings **Claude Code into VS Code**. You talk to it like you would in the terminal, but the answers, the files it touches and the permissions it asks for become cards you read and buttons you click.
 
-Non è un'altra AI: usa la **Claude Code che hai già installato**. Stesso account, stessi `CLAUDE.md`, stesse skill, stessi permessi. Cambia solo che li vedi.
+It's not another AI: it uses the **Claude Code you already have installed**. Same account, same `CLAUDE.md`, same skills, same permissions. The difference is you can see them.
 
-![Claude Studio](https://raw.githubusercontent.com/mr-wilson-dev/claude-studio/main/docs/img/chat-full.png)
+![Claude Studio](https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/chat-full.png)
 
-## Cosa fa
+## What it does
 
-**Chiede prima di toccare.** Quando Claude vuole lanciare un comando o modificare un file, te lo mostra e aspetta: *Consenti*, *Consenti sempre*, *Rifiuta*. Le modifiche le vedi come diff colorati, prima che succedano.
+**It asks before it touches anything.** When Claude wants to run a command or change a file, it shows you and waits: *Allow*, *Always allow*, *Deny*. Edits arrive as colored diffs — before they happen, not after.
 
-**Tre modi, un clic.** *Piano* ragiona senza toccare niente. *Chiede* domanda prima di agire. *Yolo* fa tutto da solo. Si cambia al volo, anche a metà conversazione.
+**Three modes, one click.** *Plan* thinks without touching anything. *Ask* checks with you before acting. *Yolo* just gets on with it. Switch any time, even mid-conversation.
 
-**Ti dice quanto contesto resta.** Una barra col consumo della sessione, il limite dell'account e quanto manca al prossimo reset. Niente più conversazioni che si fermano di colpo.
+**It tells you how much context is left.** A bar with what this session has spent, your account limit, and how long until the next reset. No more conversations that stop dead without warning.
 
-**Scegli il modello che vuoi.** Opus, Sonnet, Haiku: ognuno con il suo colore, così vedi al volo chi sta lavorando.
+**Pick the model you want.** Opus, Sonnet, Haiku — each with its own color, so you can see at a glance which one is working.
 
 <table>
 <tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/mr-wilson-dev/claude-studio/main/docs/img/modelli.png" alt="I modelli" /><br /><em>Ogni modello il suo colore</em></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/mr-wilson-dev/claude-studio/main/docs/img/contesto.png" alt="Il contesto" /><br /><em>Quanto contesto ti resta</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own color</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context bar" /><br /><em>How much context you have left</em></td>
 </tr>
 </table>
 
-## Come si parte
+## Getting started
 
-1. Serve la **CLI di Claude Code** installata e già collegata al tuo account:
+1. You need the **Claude Code CLI**, installed and already signed in to your account:
    ```
    npm install -g @anthropic-ai/claude-code
    claude
    ```
-2. Installa Claude Studio.
-3. Clicca l'icona nella barra a sinistra. Scrivi.
+2. Install Claude Studio.
+3. Click the icon in the left bar. Start typing.
 
-Nient'altro: niente chiavi API da incollare, niente configurazione. L'account è quello che usi già da terminale.
+That's it — no API keys to paste, nothing to configure. The account is the one you already use from the terminal.
 
-## Le cose comode
+## The handy bits
 
-- **`@` per un file, `/` per un comando** — gli stessi che hai da terminale, skill e plugin compresi.
-- **Incolla immagini** direttamente nella chat.
-- **Ti avvisa quando ha finito**, con un suono e una notifica, se nel frattempo sei andato altrove.
-- **Riprendi le conversazioni** di prima, anche quelle iniziate da terminale.
-- **Pannello o scheda intera**, come preferisci: stessa conversazione, due facce.
+- **`@` for a file, `/` for a command** — the same ones you have in the terminal, skills and plugins included.
+- **Paste images** straight into the chat.
+- **It tells you when it's done**, with a chime and a notification, if you've wandered off in the meantime.
+- **Pick up earlier conversations**, including ones you started in the terminal.
+- **Sidebar or full tab**, whichever you prefer: same conversation, two faces.
 
-## Scorciatoie
+## Shortcuts
 
 | | |
 |---|---|
-| `Alt+N` | Conversazione nuova |
-| `Alt+M` | Cambia modo |
-| `Alt+H` | Cronologia |
-| `Esc` | Ferma |
-| `@` / `/` | File / comando |
+| `Alt+N` | New conversation |
+| `Alt+M` | Switch mode |
+| `Alt+H` | History |
+| `Esc` | Stop |
+| `@` / `/` | File / command |
 
-## Impostazioni
+## Settings
 
-Tutte sotto `claudeStudio`: percorso della CLI, aggiornamenti automatici, limite di contesto, e come si apre (pannello o scheda).
+All under `claudeStudio`: path to the CLI, automatic updates, context limit, and how it opens (sidebar or tab).
 
 ---
 
 <div align="center">
 
-**In English** — Claude Studio brings [Claude Code](https://claude.com/claude-code) into VS Code. It uses the CLI you already have installed — same account, same `CLAUDE.md`, same skills — and turns its answers, file edits and permission requests into cards you read and buttons you click. See every command before it runs, approve diffs before they land, and keep an eye on how much context you have left.
+**Requires** the [Claude Code](https://claude.com/claude-code) CLI, installed and signed in.
 
-**Requires** the Claude Code CLI, installed and signed in.
-
-MIT · [Segnala un problema](https://github.com/mr-wilson-dev/claude-studio/issues) · [Note di sviluppo](https://github.com/mr-wilson-dev/claude-studio/blob/main/docs/SVILUPPO.md)
+MIT · [Report an issue](https://github.com/Amplaye/claude-studio/issues) · [Development notes](https://github.com/Amplaye/claude-studio/blob/main/docs/SVILUPPO.md)
 
 </div>

@@ -1,16 +1,16 @@
-// Il filo fra estensione e webview. Un solo posto per i tipi, cosi' la webview e
-// l'estensione non possono divergere in silenzio.
+// The wire between the extension and the webview. One single place for the types, so
+// the webview and the extension can't silently drift apart.
 
 export type BlockKind = 'text' | 'thinking';
 
-/** Le quattro modalita' che si scelgono dalla testata. L'SDK ne conosce altre. */
+/** The four modes you pick from the header. The SDK knows others. */
 export type Mode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
 
 /**
- * Un permesso non e' sempre la stessa domanda:
- *  - `tool`     "posso usare questo strumento?"
- *  - `plan`     ExitPlanMode: "il piano va bene?"
- *  - `question` AskUserQuestion: domande a scelta multipla
+ * A permission isn't always the same question:
+ *  - `tool`     "may I use this tool?"
+ *  - `plan`     ExitPlanMode: "is the plan alright?"
+ *  - `question` AskUserQuestion: multiple-choice questions
  */
 export type AskKind = 'tool' | 'plan' | 'question';
 
@@ -26,31 +26,31 @@ export interface AskQuestion {
   options: AskOption[];
 }
 
-/** Il pensiero: lo decide il motore ("auto"), o lo decidi tu. */
+/** The thinking: the engine decides it ("auto"), or you do. */
 export type Thinking = 'auto' | 'on' | 'off';
 
-/** I suoni di fine lavoro. `off` = muto. */
+/** The end-of-work sounds. `off` = muted. */
 export type SoundName = 'cozy' | 'harvest' | 'levelup' | 'starlit' | 'chest' | 'off';
 
 /**
- * Le preferenze che si cambiano dalla testata e restano fra una sessione e
- * l'altra. Model/effort/thinking valgono per il motore, il resto per l'avviso
- * di fine lavoro.
+ * The preferences you change from the header and that survive from one session to
+ * the next. Model/effort/thinking are for the engine, the rest for the end-of-work
+ * notice.
  */
 export interface Prefs {
-  /** '' = quello predefinito della CLI. */
+  /** '' = the CLI's default one. */
   model: string;
-  /** '' = lo decide il motore. */
+  /** '' = the engine decides. */
   effort: string;
   thinking: Thinking;
   sound: SoundName;
   /** 0..1 */
   volume: number;
-  /** Suona solo se la finestra di VSCode non e' in primo piano. */
+  /** Only plays if the VSCode window isn't in front. */
   onlyWhenAway: boolean;
-  /** Suona anche quando serve un permesso: anche li' il lavoro e' fermo. */
+  /** Plays when a permission is needed too: the work is stopped there as well. */
   soundOnAsk: boolean;
-  /** Avviso di VSCode quando finisce mentre stai altrove. */
+  /** VSCode notification when it finishes while you're elsewhere. */
   toast: boolean;
 }
 
@@ -66,42 +66,42 @@ export const DEFAULT_PREFS: Prefs = {
 };
 
 /**
- * Un modello fra quelli che la CLI dice di saper usare. L'elenco non sta scritto
- * da nessuna parte qui dentro: arriva dalla CLI installata, quindi il giorno che
- * esce un modello nuovo compare da solo, senza toccare l'estensione.
+ * One of the models the CLI says it knows how to use. The list isn't written
+ * anywhere in here: it comes from the installed CLI, so the day a new model ships it
+ * appears on its own, without touching the extension.
  */
 export interface ModelChoice {
   value: string;
   label: string;
   description: string;
-  /** Il modello vero dietro l'alias, es. "claude-opus-5[1m]". Serve solo a mostrarlo. */
+  /** The real model behind the alias, e.g. "claude-opus-5[1m]". Only used for display. */
   resolved: string;
-  /** Livelli di impegno accettati da questo modello; vuoto = non li accetta. */
+  /** Effort levels this model accepts; empty = it doesn't accept them. */
   efforts: string[];
-  /** Sa decidere da solo quanto pensare. */
+  /** It can decide by itself how much to think. */
   adaptive: boolean;
-  /** E' la scelta che la CLI consiglia: quella che avresti da terminale. */
+  /** It's the choice the CLI recommends: the one you'd get from the terminal. */
   recommended: boolean;
 }
 
-/** Una conversazione gia' avvenuta, come appare nella cronologia. */
+/** A conversation that already happened, as it appears in the history. */
 export interface HistoryItem {
   id: string;
   summary: string;
-  /** millisecondi, ultimo tocco */
+  /** milliseconds, last touch */
   when: number;
 }
 
-/** Estensione -> webview. */
+/** Extension -> webview. */
 export type Wire =
   | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
   | { k: 'session'; id: string; model: string; cwd: string }
-  // Le immagini tornano indietro insieme al messaggio: nella chat restano
-  // attaccate a quello che hai mandato, cosi' si vede che sono partite davvero.
+  // The images come back together with the message: in the chat they stay attached
+  // to what you sent, so you can see they really went out.
   | { k: 'user'; text: string; images?: Pasted[] }
   | { k: 'turn_start' }
-  // `parent` c'e' quando il pezzo arriva da un sub-agent: e' il tool_use_id del
-  // Task che lo ha lanciato, ed e' li' sotto che va disegnato.
+  // `parent` is there when the piece comes from a sub-agent: it's the tool_use_id of
+  // the Task that launched it, and that's where underneath it has to be drawn.
   | { k: 'block_start'; id: string; kind: BlockKind; parent?: string | null }
   | { k: 'delta'; id: string; kind: BlockKind; text: string; parent?: string | null }
   | { k: 'block_final'; id: string; kind: BlockKind; text: string; parent?: string | null }
@@ -122,44 +122,44 @@ export type Wire =
   | { k: 'mode'; value: Mode }
   | { k: 'prefs'; value: Prefs }
   | { k: 'models'; items: ModelChoice[] }
-  // Il "suona adesso" lo decide l'estensione, non la pagina: e' l'unica a sapere
-  // se la finestra e' in primo piano, e va detto a una faccia sola — due facce
-  // aperte suonerebbero due volte.
+  // The "play now" is decided by the extension, not the page: it's the only one that
+  // knows whether the window is in front, and it has to be told to a single face —
+  // two open faces would play twice.
   | { k: 'chime'; event: 'done' | 'ask'; sound: SoundName; volume: number }
   | { k: 'history'; items: HistoryItem[] }
   | { k: 'commands'; items: { name: string; description: string }[] }
   | { k: 'files'; items: string[] }
-  // `file` vuoto = non c'e' piu' niente di selezionato nell'editor
+  // empty `file` = there's nothing selected in the editor any more
   | { k: 'selection'; file: string; lines: string }
   | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
   | { k: 'reset' };
 
-/** Webview -> estensione. */
-/** Un'immagine incollata nel campo di scrittura. */
+/** Webview -> extension. */
+/** An image pasted into the composer. */
 export interface Pasted {
   mime: string;
-  /** base64 senza il prefisso data: */
+  /** base64 without the data: prefix */
   data: string;
 }
 
 export type Cmd =
   | { cmd: 'ready' }
-  // `withSelection` = attacca il codice selezionato nell'editor; il testo lo prende
-  // l'estensione dall'editor stesso, non viaggia due volte sul filo.
+  // `withSelection` = attach the code selected in the editor; the extension takes the
+  // text from the editor itself, it doesn't travel the wire twice.
   | { cmd: 'send'; text: string; images?: Pasted[]; withSelection?: boolean }
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'newTab' }
-  // La pagina ha gia' fatto la sua animazione di uscita: qui si chiude davvero.
+  // The page has already played its exit animation: here it really closes.
   | { cmd: 'closeTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
   | { cmd: 'setMode'; value: Mode }
   | { cmd: 'setPrefs'; value: Partial<Prefs> }
   | { cmd: 'history' }
-  // `fork` = riprendi ma su un ramo nuovo, senza toccare la conversazione originale
+  // `fork` = resume but on a new branch, without touching the original conversation
   | { cmd: 'open'; id: string; fork?: boolean }
   | { cmd: 'files'; q: string }
   | { cmd: 'openFile'; path: string; line?: number };

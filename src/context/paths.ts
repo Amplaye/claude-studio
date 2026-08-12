@@ -1,8 +1,8 @@
-// Dove Claude Code tiene le sue cose, e dove le teniamo noi.
+// Where Claude Code keeps its things, and where we keep ours.
 //
-// I due file che scriviamo in ~/.claude sono rinominati apposta: finche' la
-// context-bar 0.0.6 resta installata accanto a questa, le due estensioni non devono
-// scrivere sullo stesso file. Stesso posto, nomi diversi, nessuna lite.
+// The two files we write in ~/.claude are renamed on purpose: as long as
+// context-bar 0.0.6 stays installed next to this one, the two extensions must not
+// write to the same file. Same place, different names, no quarrel.
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -12,11 +12,11 @@ export function claudeDir(): string {
 }
 
 /**
- * Scrive un file nostro in ~/.claude, creando la cartella se manca.
- * Nella 0.0.6 la cartella non veniva creata e la scrittura falliva in silenzio: su
- * un PC dove Claude non aveva ancora scritto niente, la cache condivisa fra le
- * finestre semplicemente non esisteva — e ognuna tornava a interrogare l'API da
- * sola. Il posto dove si sbaglia e' uno solo, quindi il rimedio sta qui.
+ * Writes one of our files in ~/.claude, creating the folder if it's missing.
+ * In 0.0.6 the folder wasn't created and the write failed silently: on a PC where
+ * Claude had never written anything yet, the cache shared between windows simply
+ * didn't exist — and each one went back to querying the API on its own. There's
+ * only one place where this goes wrong, so the fix belongs here.
  */
 export function writeOurFile(file: string, value: unknown): boolean {
   try {
@@ -24,36 +24,36 @@ export function writeOurFile(file: string, value: unknown): boolean {
     fs.writeFileSync(file, JSON.stringify(value), 'utf8');
     return true;
   } catch {
-    return false; // disco pieno o cartella protetta: si tira avanti a memoria
+    return false; // disk full or protected folder: we carry on from memory
   }
 }
 
 /**
- * Claude Code mappa il cwd in ~/.claude/projects/<cwd con i caratteri non
- * alfanumerici sostituiti da ->. Su Windows servono anche \ e : (il ":" di "c:"
- * produce due trattini: c:\Users -> c--Users), altrimenti lo slug resta il percorso
- * grezzo, la cartella non si trova e i token restano a zero.
+ * Claude Code maps the cwd to ~/.claude/projects/<cwd with every non-alphanumeric
+ * character replaced by ->. On Windows that has to cover \ and : too (the ":" in
+ * "c:" produces two dashes: c:\Users -> c--Users), otherwise the slug stays the raw
+ * path, the folder isn't found and the tokens stay at zero.
  */
 export function projectsDirFor(cwd: string): string {
   return path.join(claudeDir(), 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'));
 }
 
-/** Il transcript di una conversazione: e' un jsonl, una riga per messaggio. */
+/** A conversation's transcript: it's a jsonl, one line per message. */
 export function transcriptPath(cwd: string, sessionId: string): string {
   return path.join(projectsDirFor(cwd), sessionId + '.jsonl');
 }
 
-/** Le sessioni vive che la CLI annuncia: un file per processo. */
+/** The live sessions the CLI announces: one file per process. */
 export function sessionsDir(): string {
   return path.join(claudeDir(), 'sessions');
 }
 
-/** Cache dell'uso account, condivisa fra tutte le finestre di VSCode. */
+/** Account usage cache, shared across all VSCode windows. */
 export function usageCachePath(): string {
   return path.join(claudeDir(), '.claude-studio-usage.json');
 }
 
-/** I nomi che dai tu alle sessioni dal pannello. */
+/** The names you give sessions from the panel. */
 export function sessionNamesPath(): string {
   return path.join(claudeDir(), 'claude-studio-session-names.json');
 }

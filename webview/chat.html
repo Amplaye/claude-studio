@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
@@ -17,85 +17,85 @@
         <header class="top">
           <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
           <span class="grow"></span>
-          <div class="modeseg" id="mode" title="Come si comporta coi permessi (Alt+M)">
-            <button class="modeseg-btn" data-mode="plan" title="Solo piano: ragiona ma non tocca niente">
-              <svg class="ico"><use href="#ion-list" /></svg><span>Piano</span>
+          <div class="modeseg" id="mode" title="How it handles permissions (Alt+M)">
+            <button class="modeseg-btn" data-mode="plan" title="Plan only: it thinks but touches nothing">
+              <svg class="ico"><use href="#ion-list" /></svg><span>Plan</span>
             </button>
-            <button class="modeseg-btn" data-mode="default" title="Chiede prima di agire">
-              <svg class="ico"><use href="#ion-shield-checkmark" /></svg><span>Chiede</span>
+            <button class="modeseg-btn" data-mode="default" title="Asks before acting">
+              <svg class="ico"><use href="#ion-shield-checkmark" /></svg><span>Ask</span>
             </button>
-            <button class="modeseg-btn yolo" data-mode="bypassPermissions" title="Non chiede: fa tutto da solo">
+            <button class="modeseg-btn yolo" data-mode="bypassPermissions" title="Never asks: does everything on its own">
               <svg class="ico"><use href="#ion-flash" /></svg><span>Yolo</span>
             </button>
           </div>
-          <button class="iconbtn" id="btnCfg" title="Modello, pensiero e avvisi (Alt+I)">
+          <button class="iconbtn" id="btnCfg" title="Model, thinking and notifications (Alt+I)">
             <svg class="ico"><use href="#ion-options" /></svg>
           </button>
-          <button class="iconbtn" id="btnHistory" title="Conversazioni di questo progetto (Alt+H)">
+          <button class="iconbtn" id="btnHistory" title="Conversations in this project (Alt+H)">
             <svg class="ico"><use href="#ion-time" /></svg>
           </button>
-          <button class="iconbtn" id="btnCtx" title="Mostra o nascondi il contesto (Alt+C)" hidden>
+          <button class="iconbtn" id="btnCtx" title="Show or hide the context (Alt+C)" hidden>
             <svg class="ico"><use href="#ion-speedometer" /></svg>
           </button>
-          <button class="iconbtn" id="btnTab" title="Apri come scheda">
+          <button class="iconbtn" id="btnTab" title="Open as a tab">
             <svg class="ico"><use href="#ion-open" /></svg>
           </button>
-          <button class="iconbtn" id="btnNew" title="Nuova sessione (Alt+N)">
+          <button class="iconbtn" id="btnNew" title="New session (Alt+N)">
             <svg class="ico"><use href="#ion-add" /></svg>
           </button>
-          <!-- Solo da scheda: chiude questa, con la sua animazione di uscita. -->
-          <button class="iconbtn" id="btnClose" title="Chiudi questa scheda (Alt+W)" hidden>
+          <!-- Tab only: closes this one, with its own exit animation. -->
+          <button class="iconbtn" id="btnClose" title="Close this tab (Alt+W)" hidden>
             <svg class="ico"><use href="#ion-close" /></svg>
           </button>
         </header>
 
         <div class="drawer" id="drawer" hidden>
           <div class="drawer-head">
-            <span>Conversazioni</span>
-            <button class="iconbtn" id="drawerClose" title="Chiudi">
+            <span>Conversations</span>
+            <button class="iconbtn" id="drawerClose" title="Close">
               <svg class="ico"><use href="#ion-close" /></svg>
             </button>
           </div>
           <div class="drawer-list" id="drawerList"></div>
         </div>
 
-        <!-- Le scelte che valgono per come lavora Claude e per come te lo dice
-             quando ha finito. Restano fra una finestra e l'altra. -->
+        <!-- The choices that shape how Claude works and how it tells you
+             when it's done. They survive from one window to the next. -->
         <div class="pop" id="cfg" hidden>
           <div class="pop-head">
-            <span>Impostazioni</span>
-            <button class="iconbtn" id="cfgClose" title="Chiudi">
+            <span>Settings</span>
+            <button class="iconbtn" id="cfgClose" title="Close">
               <svg class="ico"><use href="#ion-close" /></svg>
             </button>
           </div>
 
-          <div class="pop-sec">Modello</div>
+          <div class="pop-sec">Model</div>
           <div class="model-list" id="cfgModelList">
-            <!-- le card dei modelli le costruisce il JS -->
+            <!-- the model cards are built by the JS -->
           </div>
 
-          <div class="pop-sec">Impegno</div>
+          <div class="pop-sec">Effort</div>
           <div class="seg" id="cfgEffort">
-            <!-- i bottoni li costruisce il JS in base al modello scelto -->
+            <!-- the buttons are built by the JS based on the chosen model -->
           </div>
           <p class="phint" id="cfgEffortHint"></p>
 
-          <div class="pop-sec">Pensiero</div>
+          <div class="pop-sec">Thinking</div>
           <div class="seg" id="cfgThink">
-            <!-- Auto / Acceso / Spento -->
+            <!-- Auto / On / Off -->
           </div>
           <p class="phint" id="cfgThinkHint"></p>
 
-          <div class="pop-sec">Quando ha finito</div>
+          <div class="pop-sec">When it's done</div>
           <label class="prow">
-            <span class="plab">Suono</span>
+            <span class="plab">Sound</span>
             <select id="cfgSound">
-              <option value="cozy">Coccola</option>
-              <option value="harvest">Raccolto</option>
+              <option value="cozy">Cozy</option>
+              <option value="harvest">Harvest</option>
               <option value="levelup">Level up</option>
-              <option value="starlit">Stellina</option>
-              <option value="chest">Forziere</option>
-              <option value="off">Muto</option>
+              <option value="starlit">Starlit</option>
+              <option value="chest">Chest</option>
+              <option value="off">Mute</option>
             </select>
           </label>
           <label class="prow">
@@ -104,18 +104,18 @@
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgAway" />
-            <span>Solo se VSCode non e' in primo piano</span>
+            <span>Only when VS Code isn't in front</span>
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgAsk" />
-            <span>Suona anche quando serve un permesso</span>
+            <span>Also chime when a permission is needed</span>
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgToast" />
-            <span>Avviso di VSCode se sei altrove</span>
+            <span>VS Code notification when you're away</span>
           </label>
           <button class="pbtn" id="cfgTest" type="button">
-            <svg class="ico"><use href="#ion-play" /></svg>Prova il suono
+            <svg class="ico"><use href="#ion-play" /></svg>Test the sound
           </button>
         </div>
 
@@ -124,15 +124,15 @@
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
           <div class="attach" id="attach" hidden></div>
-          <textarea id="input" rows="1" placeholder="Scrivi a Claude…  (@ per un file, / per un comando, Invio manda)"></textarea>
-          <button class="send" id="send" type="submit" title="Manda">
+          <textarea id="input" rows="1" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
+          <button class="send" id="send" type="submit" title="Send">
             <svg class="ico send-arrow"><use href="#ion-navigate" /></svg>
           </button>
         </form>
       </div>
 
-      <!-- Da scheda a tutto schermo il contesto sta qui di fianco: nella barra
-           laterale ha un pannello suo, ma in una scheda quello non c'e'. -->
+      <!-- In the full-screen tab the context sits right here alongside: in the
+           sidebar it has a panel of its own, but in a tab that isn't there. -->
       <aside class="rail" id="rail"></aside>
     </div>
 
