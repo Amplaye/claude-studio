@@ -17,15 +17,17 @@
         <header class="top">
           <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
           <span class="grow"></span>
-          <label class="chip modechip" id="mode" title="Come si comporta coi permessi (Alt+M)">
-            <svg class="ico"><use href="#ion-shield-checkmark" /></svg>
-            <select id="modeSel">
-              <option value="default">Chiede</option>
-              <option value="acceptEdits">Modifiche ok</option>
-              <option value="plan">Solo piano</option>
-              <option value="bypassPermissions">Non chiede</option>
-            </select>
-          </label>
+          <div class="modeseg" id="mode" title="Come si comporta coi permessi (Alt+M)">
+            <button class="modeseg-btn" data-mode="plan" title="Solo piano: ragiona ma non tocca niente">
+              <svg class="ico"><use href="#ion-list" /></svg><span>Piano</span>
+            </button>
+            <button class="modeseg-btn" data-mode="default" title="Chiede prima di agire">
+              <svg class="ico"><use href="#ion-shield-checkmark" /></svg><span>Chiede</span>
+            </button>
+            <button class="modeseg-btn yolo" data-mode="bypassPermissions" title="Non chiede: fa tutto da solo">
+              <svg class="ico"><use href="#ion-flash" /></svg><span>Yolo</span>
+            </button>
+          </div>
           <span class="chip" id="spend" title="Contesto dell’ultimo turno e costo della conversazione" hidden>
             <svg class="ico"><use href="#ion-speedometer" /></svg><span id="spendTokens">0</span>
             <span class="sep">·</span><span id="spendCost">$0</span>
@@ -92,8 +94,10 @@
             <span class="plab">Suono</span>
             <select id="cfgSound">
               <option value="cozy">Coccola</option>
-              <option value="bell">Campanella</option>
-              <option value="soft">Sottovoce</option>
+              <option value="harvest">Raccolto</option>
+              <option value="levelup">Level up</option>
+              <option value="starlit">Stellina</option>
+              <option value="chest">Forziere</option>
               <option value="off">Muto</option>
             </select>
           </label>

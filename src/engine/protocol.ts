@@ -30,7 +30,7 @@ export interface AskQuestion {
 export type Thinking = 'auto' | 'on' | 'off';
 
 /** I suoni di fine lavoro. `off` = muto. */
-export type SoundName = 'cozy' | 'bell' | 'soft' | 'off';
+export type SoundName = 'cozy' | 'harvest' | 'levelup' | 'starlit' | 'chest' | 'off';
 
 /**
  * Le preferenze che si cambiano dalla testata e restano fra una sessione e

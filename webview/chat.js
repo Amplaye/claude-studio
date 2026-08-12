@@ -8,7 +8,7 @@
   const input = $('input');
   const composer = $('composer');
   const sendBtn = $('send');
-  const modeSel = $('modeSel');
+  const modeBox = $('mode');
   const SVG = 'http://www.w3.org/2000/svg';
 
   // ---------- utilita' DOM ----------
@@ -759,8 +759,7 @@
         swapLog(showEmpty);
         break;
       case 'mode':
-        modeSel.value = m.value;
-        document.body.dataset.mode = m.value;
+        paintMode(m.value);
         break;
       case 'prefs':
         prefs = Object.assign({}, prefs, m.value || {});
@@ -1084,9 +1083,19 @@
     composer.classList.add('sending');
   });
 
-  modeSel.addEventListener('change', () =>
-    vscode.postMessage({ cmd: 'setMode', value: modeSel.value })
-  );
+  // ---------- mode segmented control ----------
+  function paintMode(value) {
+    document.body.dataset.mode = value;
+    for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
+      btn.classList.toggle('on', btn.dataset.mode === value);
+    }
+  }
+  for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
+    btn.addEventListener('click', () => {
+      vscode.postMessage({ cmd: 'setMode', value: btn.dataset.mode });
+      paintMode(btn.dataset.mode);
+    });
+  }
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
@@ -1302,10 +1311,15 @@
         e.preventDefault();
         toggleCfg();
         return;
-      case 'm':
+      case 'm': {
         e.preventDefault();
-        modeSel.focus();
+        const modes = ['default', 'plan', 'bypassPermissions'];
+        const cur = document.body.dataset.mode || 'default';
+        const next = modes[(modes.indexOf(cur) + 1) % modes.length];
+        vscode.postMessage({ cmd: 'setMode', value: next });
+        paintMode(next);
         return;
+      }
       case 'c':
         // il contesto di fianco esiste solo nella scheda: dove non c'e', il tasto
         // non deve fare finta di esserci
@@ -1334,6 +1348,7 @@
 
   showEmpty();
   setBusy(false);
+  paintMode('default');
   paintCfg();
   vscode.postMessage({ cmd: 'ready' });
 })();

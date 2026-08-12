@@ -98,15 +98,9 @@ window.CtxPanel = (() => {
       paintBar(c._p.fill, pct);
     }
 
-    // ---------- la riga della sezione ----------
-    const count = el('span', 'count', '0');
-    const secline = el('div', 'secline');
-    const secLab = el('span', 'lab');
-    secLab.append(icon('layers'), document.createTextNode('Sessioni'));
-    secline.append(secLab, count);
-
-    // ---------- le card ----------
+    // ---------- le card (nascosto, ma servono i dati) ----------
     const host = el('main', 'cards');
+    host.hidden = true;
     const cards = new Map();
 
     function buildCard(id) {
@@ -200,7 +194,7 @@ window.CtxPanel = (() => {
     const foot = el('footer', 'foot');
     foot.append(fproject, fbranch, el('span', 'grow'), fcost);
 
-    root.append(head, secline, host, foot);
+    root.append(head, host, foot);
 
     btnRefresh.onclick = () => post({ cmd: 'refresh' });
     btnDiag.onclick = () => post({ cmd: 'diagnose' });
@@ -217,7 +211,7 @@ window.CtxPanel = (() => {
         if (acct.firstChild !== cells[0]) acct.replaceChildren(cells[0], cells[1]);
       }
 
-      count.textContent = d.cards.length;
+      // count not shown anymore
       if (!d.cards.length) {
         host.replaceChildren(el('div', 'empty', 'Nessuna conversazione aperta in questo progetto.'));
         cards.clear();

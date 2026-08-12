@@ -113,9 +113,10 @@
     src.start(t0);
   }
 
-  /* I tre suoni. `ask` e' sempre la versione corta e piu' bassa: serve a dire
+  /* I suoni. `ask` e' sempre la versione corta e piu' bassa: serve a dire
      "sono fermo qui", non "ho finito". */
   const SOUNDS = {
+    /* Coccola — l'originale, tre note calde che salgono */
     cozy(t, ev) {
       const notes = ev === 'ask' ? [523.25, 392.0] : [392.0, 523.25, 659.25];
       notes.forEach((f, i) =>
@@ -123,23 +124,57 @@
       );
       breath(t);
     },
-    bell(t, ev) {
-      const base = ev === 'ask' ? 587.33 : 783.99;
-      [1, 2.02, 3.01].forEach((m, i) =>
-        note(t, base * m, {
-          dur: 2.2 - i * 0.55,
-          gain: 0.15 / (i + 1),
-          type: 'sine',
-          cut: 3000,
-          sub: i === 0,
-        })
-      );
+    /* Raccolto — ispirato al suono di raccolta di Stardew Valley:
+       due note dolci che salgono veloci, come quando raccogli un frutto */
+    harvest(t, ev) {
+      if (ev === 'ask') {
+        note(t, 587.33, { dur: 0.3, gain: 0.22, type: 'sine', cut: 2200, sub: false });
+        note(t + 0.08, 698.46, { dur: 0.4, gain: 0.18, type: 'sine', cut: 1800, sub: false });
+      } else {
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+          note(t + i * 0.065, f, { dur: 0.5 - i * 0.08, gain: 0.2 - i * 0.03, type: 'sine', cut: 2400 - i * 300, sub: false })
+        );
+      }
+      breath(t);
     },
-    soft(t, ev) {
-      const notes = ev === 'ask' ? [523.25, 440.0] : [659.25, 523.25];
-      notes.forEach((f, i) =>
-        note(t + i * 0.13, f, { dur: 0.75, gain: 0.22, type: 'sine', cut: 1300, sub: false })
-      );
+    /* Level up — ispirato alla fanfara di livello su:
+       accordo maggiore arpeggiato con eco */
+    levelup(t, ev) {
+      if (ev === 'ask') {
+        note(t, 440.0, { dur: 0.5, gain: 0.2, type: 'triangle', cut: 1600 });
+        note(t + 0.12, 554.37, { dur: 0.5, gain: 0.18, type: 'triangle', cut: 1400 });
+      } else {
+        const chord = [392.0, 493.88, 587.33, 783.99];
+        chord.forEach((f, i) =>
+          note(t + i * 0.1, f, { dur: 1.4 - i * 0.2, gain: 0.24 - i * 0.04, type: 'triangle', cut: 2000, sub: i === 0 })
+        );
+        breath(t);
+      }
+    },
+    /* Stellina — ispirato alla stellina della notte di Stardew:
+       tintinnio breve e cristallino */
+    starlit(t, ev) {
+      if (ev === 'ask') {
+        note(t, 1046.5, { dur: 0.35, gain: 0.14, type: 'sine', cut: 3200, sub: false });
+      } else {
+        [1318.5, 1567.98, 1318.5, 1046.5].forEach((f, i) =>
+          note(t + i * 0.09, f, { dur: 0.6, gain: 0.13, type: 'sine', cut: 3000, sub: false })
+        );
+      }
+    },
+    /* Forziere — ispirato all'apertura di un forziere:
+       nota bassa che sale a una maggiore alta, trionfale */
+    chest(t, ev) {
+      if (ev === 'ask') {
+        note(t, 329.63, { dur: 0.6, gain: 0.22, type: 'triangle', cut: 1500 });
+        note(t + 0.15, 440.0, { dur: 0.5, gain: 0.2, type: 'triangle', cut: 1400 });
+      } else {
+        note(t, 261.63, { dur: 1.2, gain: 0.2, type: 'triangle', cut: 1600 });
+        note(t + 0.12, 329.63, { dur: 1.0, gain: 0.22, type: 'triangle', cut: 1800 });
+        note(t + 0.24, 392.0, { dur: 0.9, gain: 0.24, type: 'triangle', cut: 2000 });
+        note(t + 0.40, 523.25, { dur: 1.1, gain: 0.26, type: 'triangle', cut: 2200 });
+        breath(t);
+      }
     },
   };
 

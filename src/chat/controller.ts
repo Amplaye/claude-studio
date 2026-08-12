@@ -58,6 +58,10 @@ export class ChatController {
   constructor(private readonly ctx: vscode.ExtensionContext, opts?: { primary?: boolean }) {
     this.primary = opts?.primary !== false;
     this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
+    // Migrazione: suoni rimossi → si torna a coccola
+    if ((this.prefs.sound as string) === 'bell' || (this.prefs.sound as string) === 'soft') {
+      this.prefs.sound = 'cozy';
+    }
     this.models = ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? [];
   }
 
