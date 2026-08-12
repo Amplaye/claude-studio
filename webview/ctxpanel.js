@@ -74,9 +74,14 @@ window.CtxPanel = (() => {
     const headTop = el('div', 'hdr-top');
     const lab = el('span', 'lab');
     lab.append(icon('speedometer'), document.createTextNode('Account'));
-    const btnDiag = iconButton('eye', 'Cosa vede l’estensione', 'btnDiag');
-    const btnRefresh = iconButton('refresh', 'Aggiorna adesso', 'btnRefresh');
-    headTop.append(lab, el('span', 'grow'), btnDiag, btnRefresh);
+    // Qui c'erano due tasti che non servivano a chi guarda:
+    //  - "aggiorna adesso": i numeri si aggiornano da soli, col timer e stando a
+    //    sentire la cartella delle sessioni. Un tasto per rifare una cosa che gia'
+    //    si fa da se' e' solo un dubbio in piu' ("allora non e' aggiornato?").
+    //  - l'occhio, "cosa vede l'estensione": apriva un foglio di testo con percorsi
+    //    e id delle sessioni. E' roba da quando qualcosa non torna, non da tutti i
+    //    giorni: resta nella palette dei comandi, dove va cercata apposta.
+    headTop.append(lab, el('span', 'grow'));
     head.append(headTop, acct);
 
     function buildCell(title) {
@@ -176,9 +181,6 @@ window.CtxPanel = (() => {
     }
 
     root.append(head, host);
-
-    btnRefresh.onclick = () => post({ cmd: 'refresh' });
-    btnDiag.onclick = () => post({ cmd: 'diagnose' });
 
     // ---------- disegno ----------
     function render(d) {

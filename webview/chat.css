@@ -200,9 +200,11 @@ body.wide .msg.user {
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  opacity: 0.85;
+  color: #fff;
   margin-bottom: 4px;
 }
+/* Il colore lo portano bordi, aloni e gradienti: il testo resta bianco pieno,
+   la gerarchia la fanno dimensione e peso. */
 .pop-sec {
   margin: 10px 0 6px;
   padding-top: 8px;
@@ -211,7 +213,7 @@ body.wide .msg.user {
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--claude-2);
+  color: #fff;
 }
 .pop-sec:first-of-type {
   border-top: 0;
@@ -229,6 +231,7 @@ body.wide .msg.user {
   margin-bottom: 2px;
 }
 .model-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -241,7 +244,7 @@ body.wide .msg.user {
   cursor: pointer;
   transition: border-color 0.22s ease, background 0.22s ease, transform 0.2s ease, box-shadow 0.3s ease;
   text-align: center;
-  color: var(--fg);
+  color: #fff;
   font: inherit;
 }
 .model-card:hover {
@@ -253,11 +256,67 @@ body.wide .msg.user {
   border-color: var(--claude-1);
   background: color-mix(in srgb, var(--claude-1) 10%, transparent);
 }
-/* Opus premium: bordo brillante animato */
-.model-card.premium {
-  position: relative;
+
+/* ---------- l'effetto cresce col modello ----------
+   Quanto vale il modello lo dice la CLI, non un elenco scritto qui: la carta si
+   prende una fascia da 1 a 4 e l'animazione cresce di conseguenza. Cosi' il
+   modello piu' capace si vede che lo e' prima ancora di leggere il nome.
+
+     tier-1 (Haiku)   solo un bordo che si accende
+     tier-2 (Sonnet)  + un lampo che attraversa la carta
+     tier-3 (Opus)    + bordo a gradiente che gira, alone acceso
+     tier-4 (Fable)   + il giro e' piu' svelto, l'alone respira, la carta galleggia
+
+   Il bordo animato e' un ::before che sbuca da sotto la carta e un ::after che
+   gli ritaglia il centro: un bordo vero non si puo' far girare. */
+
+/* -- fascia 1: solo il bordo che si accende -- */
+.model-card.tier-1:hover {
+  box-shadow: 0 0 14px -8px color-mix(in srgb, var(--claude-1) 60%, transparent);
+}
+.model-card.tier-1.on {
+  box-shadow: 0 0 16px -8px color-mix(in srgb, var(--claude-1) 65%, transparent);
+}
+
+/* -- fascia 2: un lampo che attraversa la carta --
+   Qui niente ritaglio: basta un velo chiaro che scivola, tenuto basso di opacita'
+   perche' passa anche sopra al nome. */
+.model-card.tier-2 {
   overflow: hidden;
 }
+.model-card.tier-2::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  background-position: 130% 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.model-card.tier-2:hover::after,
+.model-card.tier-2.on::after {
+  opacity: 0.3;
+  animation: cs-sheen 2.6s ease-in-out infinite;
+}
+.model-card.tier-2.on {
+  box-shadow: 0 0 20px -8px color-mix(in srgb, var(--claude-1) 70%, transparent);
+}
+
+/* -- fascia 3 e 4 (e l'automatico): il bordo a gradiente che gira -- */
+.model-card.tier-3,
+.model-card.tier-4,
+.model-card.premium {
+  overflow: hidden;
+}
+.model-card.tier-3::before,
+.model-card.tier-4::before,
 .model-card.premium::before {
   content: '';
   position: absolute;
@@ -269,6 +328,8 @@ body.wide .msg.user {
   opacity: 0;
   transition: opacity 0.3s ease;
 }
+.model-card.tier-3::after,
+.model-card.tier-4::after,
 .model-card.premium::after {
   content: '';
   position: absolute;
@@ -277,13 +338,39 @@ body.wide .msg.user {
   background: var(--surface);
   z-index: -1;
 }
+.model-card.tier-3:hover::before,
+.model-card.tier-3.on::before,
+.model-card.tier-4:hover::before,
+.model-card.tier-4.on::before,
 .model-card.premium:hover::before,
 .model-card.premium.on::before {
   opacity: 1;
 }
+.model-card.tier-3.on,
 .model-card.premium.on {
-  box-shadow: 0 0 20px -6px color-mix(in srgb, var(--claude-1) 50%, transparent);
+  box-shadow: 0 0 22px -6px color-mix(in srgb, var(--claude-1) 55%, transparent);
 }
+
+/* -- fascia 4: il giro e' piu' svelto, l'alone respira, la carta galleggia -- */
+.model-card.tier-4::before {
+  inset: -2px;
+  background: conic-gradient(
+    from 0deg,
+    var(--claude-1),
+    #f5c87a,
+    var(--claude-2),
+    #ffe9c9,
+    var(--claude-1)
+  );
+  animation-duration: 2.2s;
+}
+.model-card.tier-4:hover {
+  animation: cs-float 3.4s ease-in-out infinite;
+}
+.model-card.tier-4.on {
+  animation: cs-float 3.4s ease-in-out infinite, cs-glow 2.6s ease-in-out infinite;
+}
+
 .mc-dot {
   display: none;
 }
@@ -296,6 +383,7 @@ body.wide .msg.user {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.3;
+  color: #fff;
 }
 /* La finestra di contesto ("1M context") va a capo sotto al nome: e' un dettaglio
    del modello, non parte di come si chiama. */
@@ -307,8 +395,8 @@ body.wide .msg.user {
   text-transform: uppercase;
   line-height: 1.2;
   margin-top: 1px;
-  color: var(--claude-2);
-  opacity: 0.9;
+  color: #fff;
+  opacity: 0.95;
 }
 /* Due righe, poi i puntini: le descrizioni le scrive la CLI e sono di lunghezza
    imprevedibile — su una riga sola resterebbe solo l'inizio. */
@@ -318,21 +406,11 @@ body.wide .msg.user {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   font-size: 10px;
-  opacity: 0.7;
+  color: #fff;
+  opacity: 0.8;
   line-height: 1.25;
   overflow: hidden;
   text-wrap: balance;
-}
-.mc-badge {
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 1px 6px;
-  border-radius: var(--pill);
-  background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
-  color: #2b1409;
-  margin-top: 2px;
 }
 
 /* ---------- segmented control ---------- */
@@ -356,7 +434,7 @@ body.wide .msg.user {
   border: 1.5px solid transparent;
   border-radius: var(--pill);
   background: transparent;
-  color: var(--fg);
+  color: #fff;
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -387,7 +465,7 @@ body.wide .msg.user {
 }
 .seg-btn.on {
   opacity: 1;
-  color: var(--claude-2);
+  color: #fff;
   font-weight: 700;
 }
 .seg-btn:disabled {
@@ -414,6 +492,7 @@ body.wide .msg.user {
 .phint {
   margin: 4px 0 4px;
   font-size: 11px;
+  color: #fff;
   opacity: 0.85;
   line-height: 1.35;
 }
@@ -431,6 +510,7 @@ body.wide .msg.user {
 .plab {
   flex: 0 0 76px;
   font-size: 11.5px;
+  color: #fff;
   opacity: 0.85;
 }
 .prow select,
@@ -442,7 +522,7 @@ body.wide .msg.user {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--card);
-  color: var(--fg);
+  color: #fff;
   font: inherit;
   font-size: 12px;
   padding: 4px 6px;
@@ -464,6 +544,7 @@ body.wide .msg.user {
   gap: 7px;
   margin-bottom: 6px;
   font-size: 11.5px;
+  color: #fff;
   opacity: 0.9;
   cursor: pointer;
 }
@@ -482,7 +563,7 @@ body.wide .msg.user {
   border: 1px solid var(--line);
   border-radius: var(--pill);
   background: var(--card);
-  color: var(--fg);
+  color: #fff;
   font: inherit;
   font-size: 11.5px;
   cursor: pointer;
@@ -1192,15 +1273,12 @@ body.wide .msg.user {
   border-color: color-mix(in srgb, #e74c3c 55%, transparent);
   box-shadow: 0 2px 8px -3px color-mix(in srgb, #e74c3c 40%, transparent);
 }
-/* Colori del testo per ciascun modo quando selezionato */
-.modeseg-btn[data-mode='default'].on {
-  color: var(--claude-2);
-}
-.modeseg-btn[data-mode='plan'].on {
-  color: #7ba8f7;
-}
+/* Il modo lo dice lo slider colorato dietro: il testo resta bianco, cosi' si
+   legge uguale acceso e spento. */
+.modeseg-btn[data-mode='default'].on,
+.modeseg-btn[data-mode='plan'].on,
 .modeseg-btn.yolo.on {
-  color: #f87171;
+  color: #fff;
 }
 
 /* stato "sta pensando" */

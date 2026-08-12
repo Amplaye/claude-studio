@@ -109,7 +109,15 @@ export class ChatController {
    */
   setPrefs(patch: Partial<Prefs>) {
     const before = this.prefs;
-    this.prefs = { ...before, ...patch };
+    const next = { ...before, ...patch };
+    // Cambiando modello, il livello d'impegno di prima puo' non esistere piu' —
+    // "massimo" su un modello che arriva ad "alto" e' una parola che il motore non
+    // conosce. In quel caso si torna ad Auto, che vale per tutti: e' l'unico modo
+    // perche' "automatico" resti una scelta vera e non una che si rompe da sola.
+    if (patch.model !== undefined && next.model !== before.model) {
+      next.effort = this.effortFor(next.model, next.effort);
+    }
+    this.prefs = next;
     void this.ctx.globalState.update(PREFS_KEY, this.prefs);
 
     if (this.session) {
@@ -422,12 +430,33 @@ export class ChatController {
    * vecchio senza accorgersene. Quando arriva l'elenco vero, una scelta che non
    * c'e' piu' si butta via e si torna al consigliato — che e' sempre l'ultimo.
    */
+  /**
+   * Il livello d'impegno buono per un modello: quello che hai scelto se lui lo
+   * accetta, altrimenti '' — cioe' "decidi tu". Finche' l'elenco dei modelli non
+   * e' arrivato non si tocca niente: meglio la scelta di prima che una cancellata
+   * per ignoranza.
+   */
+  private effortFor(model: string, effort: string): string {
+    if (!effort || !this.models.length) return effort;
+    const m = this.models.find((x) => (model ? x.value === model : x.recommended));
+    if (!m) return effort;
+    return m.efforts.includes(effort) ? effort : '';
+  }
+
   private dropStaleModel(items: ModelChoice[]) {
-    if (!this.prefs.model || !items.length) return;
-    if (items.some((m) => m.value === this.prefs.model)) return;
-    this.prefs = { ...this.prefs, model: '' };
+    if (!items.length) return;
+    const model =
+      this.prefs.model && !items.some((m) => m.value === this.prefs.model) ? '' : this.prefs.model;
+    // Caduto il modello cade anche il livello, se quello nuovo non lo accetta.
+    const effort = this.effortFor(model, this.prefs.effort);
+    if (model === this.prefs.model && effort === this.prefs.effort) return;
+
+    const modelChanged = model !== this.prefs.model;
+    const effortChanged = effort !== this.prefs.effort;
+    this.prefs = { ...this.prefs, model, effort };
     void this.ctx.globalState.update(PREFS_KEY, this.prefs);
-    void this.session?.setModel('');
+    if (modelChanged) void this.session?.setModel(model);
+    if (effortChanged) void this.session?.setEffort(effort);
     this.broadcast({ k: 'prefs', value: this.prefs });
   }
 

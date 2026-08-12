@@ -59,6 +59,40 @@
   }
 }
 
+/* ---- le carte dei modelli ----
+   Tre pezzi che si sommano man mano che il modello sale di fascia: il lampo che
+   attraversa, il galleggiamento, l'alone che respira. */
+
+@keyframes cs-sheen {
+  0% {
+    background-position: 130% 0;
+  }
+  60%,
+  100% {
+    background-position: -30% 0;
+  }
+}
+
+@keyframes cs-float {
+  0%,
+  100% {
+    transform: translateY(-1px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes cs-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 18px -8px color-mix(in srgb, var(--claude-2) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 34px -2px color-mix(in srgb, var(--claude-2) 75%, transparent);
+  }
+}
+
 @keyframes cs-sweep {
   from {
     transform: translateX(-100%);
@@ -286,6 +320,45 @@
 /* finche' nessuno risponde, la scheda respira: non e' un messaggio come gli altri */
 .perm:not(.resolved) .perm-ico {
   animation: cs-breathe 2s ease-in-out infinite;
+}
+
+/* ---- apertura e chiusura di una scheda ----
+   Le linguette di VSCode non si possono animare: quelle le disegna l'editor. Ma
+   quello che c'e' dentro si', ed e' quello che guardi — una scheda nuova entra
+   invece di comparire di colpo, e chiudendola dal tasto in testata se ne va
+   prima di sparire davvero. */
+.shell.tab-in {
+  animation: cs-tab-in 0.44s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+.shell.tab-out {
+  animation: cs-tab-out 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@keyframes cs-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+    filter: blur(8px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+@keyframes cs-tab-out {
+  from {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    filter: blur(6px);
+  }
 }
 
 /* il pannello delle impostazioni scende dal tasto che lo ha aperto */

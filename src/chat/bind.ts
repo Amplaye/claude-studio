@@ -66,6 +66,11 @@ export function bindWebview(
       case 'newTab':
         void vscode.commands.executeCommand('claudeStudio.openNewTab');
         return;
+      case 'closeTab':
+        // Solo dalla scheda: nella barra laterale il tasto non c'e' proprio, e
+        // chiudere "l'editor attivo" da li' vorrebbe dire chiudere il file altrui.
+        if (kind === 'panel') void vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        return;
       case 'answer':
         chat.answer(m.id, m.choice, m.answers);
         return;

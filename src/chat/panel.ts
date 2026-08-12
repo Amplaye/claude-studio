@@ -99,6 +99,9 @@ export class ChatPanel {
     }
     const state = panel.onDidChangeViewState(() => {
       if (isPrimary) owned.setPanelActive(panel.active);
+      // Tornata davanti dopo essere stata dietro: i numeri erano fermi da un po',
+      // e il tasto "aggiorna" non c'e' piu' perche' questo lo fa da solo.
+      if (panel.visible) monitor?.tickSoon();
     });
     panel.onDidDispose(() => {
       state.dispose();

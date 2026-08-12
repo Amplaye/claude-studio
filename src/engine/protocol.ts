@@ -153,6 +153,8 @@ export type Cmd =
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'newTab' }
+  // La pagina ha gia' fatto la sua animazione di uscita: qui si chiude davvero.
+  | { cmd: 'closeTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
   | { cmd: 'setMode'; value: Mode }
   | { cmd: 'setPrefs'; value: Partial<Prefs> }

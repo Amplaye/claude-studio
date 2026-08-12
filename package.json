@@ -164,7 +164,7 @@
         {
           "command": "claudeStudio.context.refresh",
           "when": "view == claudeStudio.context",
-          "group": "navigation@1"
+          "group": "1_studio"
         },
         {
           "command": "claudeStudio.context.diagnose",

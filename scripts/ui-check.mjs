@@ -344,11 +344,32 @@ for (const surface of ['view', 'panel']) {
   // La card Opus deve mostrare la descrizione nella card stessa
   const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-desc').textContent();
   t(opusDesc === 'Il più bravo.', 'il modello scelto non si racconta: ' + opusDesc);
-  // Clic su Haiku: impegno si deve spegnere
+  // "Opus" da solo non dice quale: il numero arriva dal modello risolto.
+  const opusName = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-name').textContent();
+  t(opusName === 'Opus 5', 'il nome del modello non porta la sua versione: ' + opusName);
+  const haikuName = await page.locator('#cfgModelList .model-card:nth-child(3) .mc-name').textContent();
+  t(haikuName === 'Haiku 4.5', 'la versione di Haiku non arriva: ' + haikuName);
+  // E l'effetto cresce col modello: Opus in fascia 3, Haiku in fascia 1.
+  t(
+    (await page.locator('#cfgModelList .model-card.tier-3.on').count()) === 1,
+    'Opus non prende la fascia alta dell’effetto'
+  );
+  // Clic su Haiku: non accetta livelli, quindi resta il solo "Auto" — e Auto deve
+  // restare cliccabile, perche' vuol dire "non dirgli niente" e vale per tutti.
   await page.locator('#cfgModelList .model-card:nth-child(3)').click();
   await page.waitForTimeout(80);
-  const disabledBtn = await page.locator('#cfgEffort .seg-btn:disabled').count();
-  t(disabledBtn > 0, 'impegno selezionabile su un modello che non lo accetta');
+  t(
+    (await page.locator('#cfgModelList .model-card.tier-1.on').count()) === 1,
+    'Haiku non prende la fascia bassa dell’effetto'
+  );
+  const haikuBtns = await page.locator('#cfgEffort .seg-btn').count();
+  t(haikuBtns === 1, 'su un modello senza livelli deve restare il solo Auto: ' + haikuBtns);
+  const autoOff = await page.locator('#cfgEffort .seg-btn:disabled').count();
+  t(autoOff === 0, 'Auto non deve mai essere spento: è sempre una scelta valida');
+  t(
+    await page.locator('#cfgEffort .seg-btn.on').isVisible(),
+    'senza livelli il pannello resta senza niente di acceso'
+  );
 
   // Il pensiero: clic su Spento (il terzo bottone; il primo figlio e' lo slider)
   await page.locator('#cfgThink .seg-btn').nth(2).click();

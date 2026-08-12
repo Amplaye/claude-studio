@@ -187,10 +187,13 @@ for (const width of [320, 620]) {
   const go = await lastSent();
   t(go?.cmd === 'focus' && go.id === 'bbbb', 'il clic sulla card non porta alla sessione: ' + JSON.stringify(go));
 
-  await page.click('.btnRefresh');
-  t((await lastSent())?.cmd === 'refresh', 'il tasto aggiorna non fa niente');
-  await page.click('.btnDiag');
-  t((await lastSent())?.cmd === 'diagnose', 'il tasto della diagnostica non fa niente');
+  // In testata non ci sono piu' tasti: l'aggiornamento e' continuo per conto suo,
+  // e la diagnostica vive nella palette dei comandi. Se ricompaiono qui, e' un
+  // ritorno indietro e va visto subito.
+  t(
+    (await page.locator('.hdr-top .iconbtn').count()) === 0,
+    'in testata al contesto sono tornati dei tasti'
+  );
 
   // ---- stati di magra: nessuna sessione, numeri dell'account non ancora arrivati ----
   await post(data({ cards: [], usage: null, usageWait: 'limite API — riprovo tra 8m', branch: '' }));

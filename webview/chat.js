@@ -781,12 +781,16 @@
         $('btnTab').hidden = m.surface === 'panel';
         // Il contesto di fianco ha senso solo dove c'e' spazio: nella scheda.
         $('btnCtx').hidden = m.surface !== 'panel';
+        // E una scheda si chiude; la barra laterale no.
+        $('btnClose').hidden = m.surface !== 'panel';
         if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         showEmpty();
-        // Animazione di apertura della scheda
+        // Animazione di apertura: la scheda entra tutta intera, il pannello
+        // laterale (che e' sempre li') si limita al suo discorso.
+        if (m.surface === 'panel') playTabIn();
         log.classList.remove('fresh-open');
         void log.offsetWidth;
         log.classList.add('fresh-open');
@@ -1304,6 +1308,38 @@
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
+  // ---------- apertura e chiusura della scheda ----------
+  //
+  // La linguetta in cima la disegna VSCode e non ce la lascia toccare; quello che
+  // c'e' dentro invece e' nostro. All'apertura la pagina entra, alla chiusura esce
+  // e solo dopo si chiude davvero — cosi' il gesto ha un principio e una fine
+  // invece di essere uno sfarfallio.
+  const shell = document.querySelector('.shell');
+
+  function playTabIn() {
+    if (!shell) return;
+    shell.classList.add('tab-in');
+    shell.addEventListener('animationend', () => shell.classList.remove('tab-in'), { once: true });
+  }
+
+  function closeTab() {
+    const bye = () => vscode.postMessage({ cmd: 'closeTab' });
+    if (!shell) return bye();
+    shell.classList.add('tab-out');
+    // Se l'animazione non parte (movimento ridotto, pagina nascosta) il tasto deve
+    // chiudere lo stesso: la rete di sicurezza e' il timer.
+    let done = false;
+    const fire = () => {
+      if (done) return;
+      done = true;
+      bye();
+    };
+    shell.addEventListener('animationend', fire, { once: true });
+    setTimeout(fire, 320);
+  }
+
+  $('btnClose').addEventListener('click', closeTab);
+
   // ---------- impostazioni: modello, pensiero, avvisi ----------
   //
   // Le scelte le tiene l'estensione (restano fra una finestra e l'altra): qui si
@@ -1365,18 +1401,69 @@
   /**
    * Il nome sulla carta, spezzato in due righe.
    *
-   * La CLI attacca al nome la finestra di contesto — "Opus 5 (1M context)" — e su
+   * La CLI attacca al nome la finestra di contesto — "Opus (1M context)" — e su
    * una riga sola la carta diventa illeggibile. Il nome resta grosso sopra, la
-   * precisazione va a capo piu' piccola sotto. "Default (recommended)" invece
-   * qui e' semplicemente "Automatico".
+   * precisazione va a capo piu' piccola sotto.
    */
-  function modelName(m) {
-    if (m.recommended) return { name: 'Automatico', note: '' };
+  function bareName(m) {
     const raw = String(m.label || m.value).trim();
     // Coda fra parentesi tonde o quadre: "(1M context)", "[1m]", ...
     const cut = raw.match(/^(.*?)[\s]*[([]([^)\]]+)[)\]]\s*$/);
     if (cut) return { name: cut[1].trim(), note: cut[2].trim() };
     return { name: raw, note: '' };
+  }
+
+  /**
+   * "Opus" da solo non dice quale Opus. Il numero pero' c'e' gia' nel modello
+   * risolto — claude-opus-5 — quindi si prende da li' invece di tenere qui una
+   * lista che invecchia: il giorno che la CLI risolvera' su claude-opus-6, la
+   * carta dira' "Opus 6" da sola, senza toccare niente.
+   */
+  const FALLBACK_VER = { opus: '5' };
+
+  function versioned(name, resolved) {
+    if (!name || /\d/.test(name)) return name; // la versione ce l'ha gia'
+    const key = name.trim().toLowerCase();
+    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const hit = String(resolved || '')
+      .toLowerCase()
+      .match(new RegExp(esc + '-(\\d+(?:-\\d+)?)'));
+    const ver = hit ? hit[1].replace(/-/g, '.') : FALLBACK_VER[key];
+    return ver ? name + ' ' + ver : name;
+  }
+
+  /** "Default (recommended)" qui e' semplicemente "Automatico". */
+  function modelName(m) {
+    if (m.recommended) return { name: 'Automatico', note: '' };
+    const b = bareName(m);
+    return { name: versioned(b.name, m.resolved), note: b.note };
+  }
+
+  /**
+   * Quanto vale il modello, da 1 a 4: e' questo che decide quanto si da' da fare
+   * l'effetto sulla carta. La famiglia si legge nel nome, e una versione che si
+   * porta dietro il numero e' una tenuta in giro per compatibilita' — scende di
+   * un gradino, perche' "Opus 4.6" non e' l'Opus di oggi.
+   */
+  const FAMILY_TIER = [
+    [/fable|mythos/i, 4],
+    [/opus/i, 3],
+    [/sonnet/i, 2],
+    [/haiku/i, 1],
+  ];
+
+  function modelTier(m) {
+    const bare = bareName(m).name;
+    const hay = bare + ' ' + String(m.value || '') + ' ' + String(m.resolved || '');
+    let tier = 2;
+    for (const [re, t] of FAMILY_TIER) {
+      if (re.test(hay)) {
+        tier = t;
+        break;
+      }
+    }
+    if (/\d/.test(bare)) tier = Math.max(1, tier - 1);
+    return tier;
   }
 
   function paintModels() {
@@ -1393,7 +1480,11 @@
       // cosi' quel che decide la CLI vale anche domani.
       const value = m.recommended ? '' : m.value;
       const isOn = prefs.model === value;
-      const cls = 'model-card' + (m.recommended ? ' premium' : '') + (isOn ? ' on' : '');
+      // L'automatico ha il suo effetto a parte; gli altri quello della loro fascia.
+      const cls =
+        'model-card ' +
+        (m.recommended ? 'premium' : 'tier-' + modelTier(m)) +
+        (isOn ? ' on' : '');
       const card = el('button', cls);
       card.type = 'button';
       card.title = String(m.description || m.resolved || m.value);
@@ -1472,14 +1563,23 @@
     requestAnimationFrame(() => placeSeg(container));
   }
 
-  function paintEffort() {
-    // Senza scelta vale il consigliato: i suoi livelli sono quelli buoni.
-    const chosen = prefs.model
+  /** Il modello su cui valgono impegno e pensiero: quello scelto, o il consigliato. */
+  function chosenModel() {
+    return prefs.model
       ? models.find((m) => m.value === prefs.model)
       : models.find((m) => m.recommended);
+  }
+
+  function paintEffort() {
+    // Senza scelta vale il consigliato: i suoi livelli sono quelli buoni.
+    const chosen = chosenModel();
     const levels = chosen ? chosen.efforts : ['low', 'medium', 'high'];
     const noEffort = !!chosen && !chosen.efforts.length;
-    const items = [{ value: '', label: 'Auto', disabled: noEffort }].concat(
+    // "Auto" non si spegne mai. Non e' un livello come gli altri: vuol dire "non
+    // dirgli niente", e non dire niente si puo' sempre — anche a un modello che i
+    // livelli non li accetta. Spegnerlo lasciava il pannello senza nessuna scelta
+    // accesa e lo slider sospeso nel vuoto.
+    const items = [{ value: '', label: 'Auto' }].concat(
       levels.map((l) => ({
         value: l,
         label: (EFFORT_INFO[l] || {}).label || l,
@@ -1489,14 +1589,23 @@
     paintSeg($('cfgEffort'), items, prefs.effort, (v) => push({ effort: v }));
     const info = EFFORT_INFO[prefs.effort] || EFFORT_INFO[''];
     $('cfgEffortHint').textContent = noEffort
-      ? 'Questo modello non accetta livelli di impegno'
+      ? 'Questo modello non accetta livelli di impegno: decide lui'
       : info.desc;
   }
 
   function paintThinking() {
+    const chosen = chosenModel();
+    // Non tutti i modelli sanno decidere da soli quanto pensare: dove non sanno,
+    // "Acceso" e' un tetto fisso di token, non pensiero adattivo. Meglio dirlo che
+    // mostrare tre tasti che sembrano voler dire la stessa cosa ovunque.
+    const adaptive = !chosen || chosen.adaptive !== false;
     const items = Object.entries(THINK_INFO).map(([v, i]) => ({ value: v, label: i.label }));
     paintSeg($('cfgThink'), items, prefs.thinking, (v) => push({ thinking: v }));
-    $('cfgThinkHint').textContent = (THINK_INFO[prefs.thinking] || {}).desc || '';
+    const base = (THINK_INFO[prefs.thinking] || {}).desc || '';
+    $('cfgThinkHint').textContent =
+      adaptive || prefs.thinking === 'off'
+        ? base
+        : base + ' — su questo modello vale un tetto fisso di token';
   }
 
   function paintCfg() {
@@ -1635,6 +1744,12 @@
         if ($('btnCtx').hidden) return;
         e.preventDefault();
         $('btnCtx').click();
+        return;
+      case 'w':
+        // idem: dalla barra laterale non c'e' nessuna scheda da chiudere
+        if ($('btnClose').hidden) return;
+        e.preventDefault();
+        closeTab();
         return;
     }
   });
