@@ -801,9 +801,8 @@
         if (busy) showWaiting();
         break;
       case 'session':
-        // "claude-" davanti non distingue niente: quello che conta e' cio' che segue.
-        $('modelName').textContent = (m.model || '—').replace(/^claude-/, '');
-        $('model').title = 'Modello della sessione: ' + (m.model || '—');
+        // L'icona del modello nella testata e' stata rimossa:
+        // il modello si sceglie nelle impostazioni.
         break;
       case 'user': {
         const n = el('div', 'msg user', m.text);
@@ -868,6 +867,20 @@
     menu.replaceChildren();
   }
 
+  /** Raggruppa i comandi per categoria (la parte prima di ':' o 'Generale'). */
+  function categorize(items) {
+    const cats = new Map();
+    for (const it of items) {
+      const m = it.label.match(/^\/([^:]+):/);
+      const cat = m ? m[1] : 'Generale';
+      if (!cats.has(cat)) cats.set(cat, []);
+      cats.get(cat).push(it);
+    }
+    return cats;
+  }
+
+  let cmdSearchInput = null;
+
   function paintMenu(items) {
     if (!picking) return;
     picking.items = items;
@@ -879,38 +892,105 @@
     }
     const isCmd = picking.kind === '/';
     if (isCmd) {
+      // Intestazione con barra di ricerca
       const head = el('div', 'menu-head');
       head.append(icon('terminal'), el('span', null, ' Comandi'));
       menu.append(head);
-    }
-    items.forEach((it, i) => {
-      const row = el('div', 'mitem' + (i === 0 ? ' on' : '') + (isCmd ? ' mitem-cmd' : ''));
-      if (isCmd) {
-        row.append(el('span', 'mico', '/'));
-        const info = el('span', 'minfo');
-        info.append(el('span', 'mlabel', it.label));
-        if (it.hint) info.append(el('span', 'mdesc', it.hint));
-        row.append(info);
-      } else {
+
+      const searchBox = el('div', 'menu-search');
+      cmdSearchInput = document.createElement('input');
+      cmdSearchInput.type = 'text';
+      cmdSearchInput.placeholder = 'Cerca un comando…';
+      searchBox.append(icon('search'), cmdSearchInput);
+      menu.append(searchBox);
+
+      // Griglia per categorie
+      const grid = el('div', 'menu-grid');
+      const cats = categorize(items);
+      let idx = 0;
+      for (const [cat, catItems] of cats) {
+        if (cats.size > 1) grid.append(el('div', 'menu-cat', cat));
+        for (const it of catItems) {
+          const row = el('div', 'mitem mitem-cmd' + (idx === 0 ? ' on' : ''));
+          row.dataset.idx = idx;
+          row.append(el('span', 'mico', '/'));
+          const info = el('span', 'minfo');
+          info.append(el('span', 'mlabel', it.label));
+          if (it.hint) info.append(el('span', 'mdesc', it.hint));
+          row.append(info);
+          const ci = idx;
+          row.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            choose(ci);
+          });
+          grid.append(row);
+          idx++;
+        }
+      }
+      menu.append(grid);
+
+      // Filtro in tempo reale nella barra di ricerca
+      cmdSearchInput.addEventListener('input', () => {
+        const q = cmdSearchInput.value.toLowerCase();
+        let first = -1;
+        for (const row of grid.querySelectorAll('.mitem-cmd')) {
+          const label = row.querySelector('.mlabel')?.textContent?.toLowerCase() || '';
+          const desc = row.querySelector('.mdesc')?.textContent?.toLowerCase() || '';
+          const show = !q || label.includes(q) || desc.includes(q);
+          row.hidden = !show;
+          row.classList.remove('on');
+          if (show && first < 0) first = Number(row.dataset.idx);
+        }
+        // Nascondi le categorie vuote
+        for (const cat of grid.querySelectorAll('.menu-cat')) {
+          let next = cat.nextElementSibling;
+          let visible = false;
+          while (next && !next.classList.contains('menu-cat')) {
+            if (!next.hidden) visible = true;
+            next = next.nextElementSibling;
+          }
+          cat.hidden = !visible;
+        }
+        if (first >= 0) {
+          picking.sel = first;
+          const r = grid.querySelector(`.mitem-cmd[data-idx="${first}"]`);
+          if (r) r.classList.add('on');
+        }
+      });
+      // Non perdere il focus dalla textarea — preventDefault sul mousedown basta
+      cmdSearchInput.addEventListener('mousedown', (e) => e.stopPropagation());
+      cmdSearchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); closeMenu(); input.focus(); }
+        else if (e.key === 'Enter') { e.preventDefault(); choose(); input.focus(); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); moveSel(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); moveSel(-1); }
+      });
+    } else {
+      items.forEach((it, i) => {
+        const row = el('div', 'mitem' + (i === 0 ? ' on' : ''));
         row.append(el('span', 'mlabel', it.label));
         if (it.hint) row.append(el('span', 'mhint', it.hint));
-      }
-      row.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        choose(i);
+        row.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          choose(i);
+        });
+        menu.append(row);
       });
-      menu.append(row);
-    });
+    }
     menu.hidden = false;
   }
 
   function moveSel(d) {
     if (!picking || !picking.items.length) return;
-    const rows = [...menu.children];
-    rows[picking.sel]?.classList.remove('on');
-    picking.sel = (picking.sel + d + rows.length) % rows.length;
-    rows[picking.sel]?.classList.add('on');
-    rows[picking.sel]?.scrollIntoView({ block: 'nearest' });
+    const rows = [...menu.querySelectorAll('.mitem, .mitem-cmd')].filter((r) => !r.hidden);
+    if (!rows.length) return;
+    const cur = rows.findIndex((r) => r.classList.contains('on'));
+    for (const r of rows) r.classList.remove('on');
+    const next = (cur + d + rows.length) % rows.length;
+    rows[next]?.classList.add('on');
+    rows[next]?.scrollIntoView({ block: 'nearest' });
+    if (rows[next]?.dataset.idx != null) picking.sel = Number(rows[next].dataset.idx);
+    else picking.sel = next;
   }
 
   function choose(i) {
@@ -961,6 +1041,16 @@
     paintMenu(items.map((p) => ({ label: p.split('/').pop(), hint: p, insert: '@' + p })));
   }
 
+  // ---------- lightbox ----------
+  function openLightbox(src) {
+    const overlay = el('div', 'lightbox');
+    const img = document.createElement('img');
+    img.src = src;
+    overlay.appendChild(img);
+    overlay.addEventListener('click', () => overlay.remove());
+    document.body.appendChild(overlay);
+  }
+
   // ---------- allegati: selezione dall'editor e immagini incollate ----------
   const attach = $('attach');
   let selection = null; // {file, lines}
@@ -988,6 +1078,11 @@
       const thumb = document.createElement('img');
       thumb.className = 'thumb';
       thumb.src = `data:${im.mime};base64,${im.data}`;
+      // Clic sulla miniatura: apre l'immagine a tutto schermo
+      thumb.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openLightbox(`data:${im.mime};base64,${im.data}`);
+      });
       const x = el('button', 'attx');
       x.type = 'button';
       x.title = 'Togli';
@@ -1083,12 +1178,26 @@
     composer.classList.add('sending');
   });
 
-  // ---------- mode segmented control ----------
+  // ---------- mode segmented control con slider ----------
+  // Lo slider scorre da un bottone all'altro senza ricreare nulla.
+  const modeSlider = el('div', 'modeseg-slider');
+  modeBox.appendChild(modeSlider);
+
   function paintMode(value) {
     document.body.dataset.mode = value;
     for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
       btn.classList.toggle('on', btn.dataset.mode === value);
     }
+    // Muovi lo slider sul bottone attivo
+    const active = modeBox.querySelector('.modeseg-btn.on');
+    if (active) {
+      const boxRect = modeBox.getBoundingClientRect();
+      const btnRect = active.getBoundingClientRect();
+      modeSlider.style.left = (btnRect.left - boxRect.left) + 'px';
+      modeSlider.style.width = btnRect.width + 'px';
+    }
+    // Colore dello slider
+    modeSlider.className = 'modeseg-slider mode-' + value;
   }
   for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
     btn.addEventListener('click', () => {
@@ -1135,33 +1244,72 @@
     off:  { label: 'Spento', desc: 'Risponde direttamente, senza ragionamento intermedio' },
   };
 
-  // -- model cards --
+  // -- model cards: 3 quadrati (Haiku, Opus al centro, Sonnet) --
+  // L'ordine e' fisso: prima il veloce, al centro il migliore, poi il bilanciato.
+  const MODEL_CATALOG = [
+    { key: 'haiku',  label: 'Haiku',  desc: 'Veloce', icon: 'flash' },
+    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond', premium: true },
+    { key: 'sonnet', label: 'Sonnet', desc: 'Bilanciato', icon: 'pulse' },
+  ];
+
+  function findModelValue(catalog, models) {
+    // Cerca il modello dalla CLI che corrisponde alla chiave del catalogo
+    for (const m of models) {
+      if (m.value.toLowerCase().includes(catalog.key)) return m.value;
+    }
+    return null;
+  }
+
   function paintModels() {
     const list = $('cfgModelList');
     list.replaceChildren();
-    const all = [
-      { value: '', label: 'Predefinito', desc: 'Il modello che useresti da terminale' },
-      ...models.map((m) => ({ value: m.value, label: m.label, desc: m.description })),
-    ];
-    for (const m of all) {
-      const card = el('button', 'model-card' + (m.value === prefs.model ? ' on' : ''));
-      card.type = 'button';
-      const dot = el('span', 'mc-dot');
-      const info = el('span', 'mc-info');
-      info.append(el('span', 'mc-name', m.label));
-      if (m.desc) info.append(el('span', 'mc-desc', m.desc));
-      card.append(dot, info);
-      card.addEventListener('click', () => push({ model: m.value }));
-      list.append(card);
-    }
+
     if (!models.length) {
-      list.append(el('p', 'phint', 'I modelli disponibili appariranno dopo il primo messaggio'));
+      // Prima che la CLI mandi la lista, mostra i 3 modelli con chiave vuota
+      for (const cat of MODEL_CATALOG) {
+        const cls = 'model-card' + (cat.premium ? ' premium' : '') + (!prefs.model ? '' : '');
+        const card = el('button', cls);
+        card.type = 'button';
+        const info = el('span', 'mc-info');
+        info.append(el('span', 'mc-name', cat.label));
+        info.append(el('span', 'mc-desc', cat.desc));
+        if (cat.premium) info.append(el('span', 'mc-badge', 'Premium'));
+        card.append(info);
+        card.style.opacity = '0.5';
+        card.style.cursor = 'default';
+        list.append(card);
+      }
+      list.append(el('p', 'phint', 'I modelli appariranno dopo il primo messaggio'));
+      return;
+    }
+
+    for (const cat of MODEL_CATALOG) {
+      const value = findModelValue(cat, models);
+      if (!value) continue;
+      const isOn = prefs.model === value;
+      const cls = 'model-card' + (cat.premium ? ' premium' : '') + (isOn ? ' on' : '');
+      const card = el('button', cls);
+      card.type = 'button';
+      const info = el('span', 'mc-info');
+      info.append(el('span', 'mc-name', cat.label));
+      info.append(el('span', 'mc-desc', cat.desc));
+      if (cat.premium) info.append(el('span', 'mc-badge', 'Premium'));
+      card.append(info);
+      card.addEventListener('click', () => push({ model: value }));
+      list.append(card);
     }
   }
 
-  // -- segmented control generico --
+  // -- segmented control generico con slider --
   function paintSeg(container, items, value, onChange) {
+    // Conserva o crea lo slider
+    let slider = container.querySelector('.seg-slider');
     container.replaceChildren();
+    if (!slider) {
+      slider = el('div', 'seg-slider');
+    }
+    container.appendChild(slider);
+
     for (const it of items) {
       const btn = el('button', 'seg-btn' + (it.value === value ? ' on' : ''));
       btn.type = 'button';
@@ -1173,6 +1321,20 @@
       });
       container.append(btn);
     }
+
+    // Posiziona lo slider dopo un frame per avere le dimensioni giuste
+    requestAnimationFrame(() => {
+      const active = container.querySelector('.seg-btn.on');
+      if (active) {
+        const boxRect = container.getBoundingClientRect();
+        const btnRect = active.getBoundingClientRect();
+        slider.style.left = (btnRect.left - boxRect.left) + 'px';
+        slider.style.width = btnRect.width + 'px';
+        slider.style.display = '';
+      } else {
+        slider.style.display = 'none';
+      }
+    });
   }
 
   function paintEffort() {
@@ -1225,11 +1387,22 @@
 
   function toggleCfg(on) {
     const show = on == null ? cfg.hidden : on;
-    cfg.hidden = !show;
-    btnCfg.classList.toggle('on', show);
-    // Aprire il pannello e' gia' un gesto: e' il momento buono per svegliare
-    // l'audio, che il browser tiene muto finche' non tocchi la pagina.
-    if (show && window.Chime) window.Chime.unlock();
+    if (show) {
+      cfg.hidden = false;
+      cfg.classList.remove('closing');
+      btnCfg.classList.add('on');
+      if (window.Chime) window.Chime.unlock();
+    } else {
+      // Animazione di chiusura: il pannello scivola via, poi si nasconde.
+      cfg.classList.add('closing');
+      btnCfg.classList.remove('on');
+      const done = () => {
+        cfg.hidden = true;
+        cfg.classList.remove('closing');
+        cfg.removeEventListener('animationend', done);
+      };
+      cfg.addEventListener('animationend', done);
+    }
   }
 
   btnCfg.addEventListener('click', () => toggleCfg());
@@ -1350,5 +1523,7 @@
   setBusy(false);
   paintMode('default');
   paintCfg();
+  // Lo slider del mode si posiziona dopo il primo render
+  requestAnimationFrame(() => paintMode(document.body.dataset.mode || 'default'));
   vscode.postMessage({ cmd: 'ready' });
 })();
