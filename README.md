@@ -12,8 +12,13 @@ che vive nel motore, non nell'interfaccia.
 - **Fase 1 — fatta**: scheletro, motore, risposta in streaming parola per parola.
   In piu', fuori piano: la chat si apre anche **come scheda** a tutto schermo, e le
   due facce (pannello laterale e scheda) condividono la stessa conversazione.
-- Fase 2: parita' con l'estensione ufficiale (permessi dentro la chat, rendering dei
-  tool, cronologia, ingressi, ponte con l'editor).
+- **Fase 2 — in corso**. Fatto: i **permessi dentro la chat**, con le tre facce della
+  stessa domanda — strumento (Consenti / Consenti sempre / Rifiuta), piano di
+  `ExitPlanMode` (approva, approva senza piu' chiedere le modifiche, continua a
+  pianificare), domande a scelta multipla di `AskUserQuestion`. In testata si sceglie
+  la **modalita'**: chiede / modifiche senza chiedere / solo piano / non chiede mai.
+  Resta da fare: rendering ricco dei tool (diff, todo, sub-agent), cronologia e
+  ripresa, ingressi (`@file`, slash command, immagini), ponte con l'editor.
 - Fase 3: la context bar assorbita.
 - Fase 4: repertorio completo delle animazioni e rifinitura.
 
@@ -33,6 +38,17 @@ materiale di riferimento, sta in
   in CJS senza strascichi. Serve solo sostituire `import.meta.url` (vedi `build.mjs`).
 - Chromium non segue i `<use href="file.svg#id">` verso un file esterno: lo sprite
   Ionicons si incolla dentro il documento.
+- Un `allow` **senza `updatedInput` viene rifiutato** dalla CLI, e lo fa in silenzio:
+  la scheda dice "consentito" e il tool torna fallito con uno `ZodError` dentro il
+  suo risultato. Si rimanda indietro l'input com'e' arrivato.
+- "Consenti sempre" **non e' una cosa della sessione**: le regole suggerite dalla CLI
+  hanno destinazione `localSettings`, quindi finiscono scritte in
+  `.claude/settings.local.json` del progetto. Va detto a chi clicca, e le prove
+  devono ripulire, altrimenti la seconda esecuzione passa senza chiedere niente —
+  cioe' per il motivo sbagliato.
+- La colonna della conversazione e' un flex: senza `flex: 0 0 auto` sui messaggi,
+  appena il discorso supera l'altezza della finestra i messaggi **si schiacciano**
+  invece di far scorrere. Si vede solo quando la pagina e' piena.
 
 ## Sviluppo
 
@@ -48,9 +64,11 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
 
 - `ui-check` fa recitare alla webview un turno intero, in entrambe le facce, con due
   tool in parallelo che finiscono in ordine invertito — e controlla che ogni esito
-  stia sotto il tool giusto.
-- `host-check` carica `dist/extension.js` con un `vscode` finto e gli fa fare due
-  turni sulla CLI vera: sessione, streaming, permesso chiesto e concesso, scheda
+  stia sotto il tool giusto. Poi clicca davvero le tre schede di permesso e cambia
+  modalita' dalla testata, controllando cosa parte verso l'estensione.
+- `host-check` carica `dist/extension.js` con un `vscode` finto e gli fa fare tre
+  turni sulla CLI vera: sessione, streaming, permesso chiesto e concesso *dentro la
+  chat*, "Consenti sempre" che al turno dopo non richiede piu' niente, e la scheda
   aperta a meta' discorso che si riprende la storia.
 - `smoke` e `trace-order` sono le prove secche del motore, utili quando si sospetta
   che sia cambiato qualcosa nel protocollo.

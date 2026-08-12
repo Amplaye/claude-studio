@@ -9,17 +9,33 @@ import type {
   Options,
   PermissionMode,
   PermissionResult,
+  PermissionUpdate,
   Query,
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { Wire } from './protocol';
 
-export type PermissionAsker = (
-  toolName: string,
-  input: Record<string, unknown>,
-  meta: { title?: string; displayName?: string; subtitle?: string }
-) => Promise<PermissionResult>;
+/**
+ * Tutto quello che serve per chiedere il permesso. `id` e' il `tool_use_id`:
+ * lo stesso che arriva col `tool_start`, cosi' la scheda si aggancia al tool giusto
+ * anche con piu' richieste in volo insieme.
+ */
+export interface AskRequest {
+  id: string;
+  tool: string;
+  input: Record<string, unknown>;
+  /** Frase gia' pronta dal motore ("Claude vuole leggere foo.txt"): meglio ricostruirla. */
+  title?: string;
+  displayName?: string;
+  description?: string;
+  /** Regole da rimandare indietro come `updatedPermissions` per "consenti sempre". */
+  suggestions?: PermissionUpdate[];
+  /** Scatta se il turno viene interrotto: la scheda va tolta di mezzo. */
+  signal: AbortSignal;
+}
+
+export type PermissionAsker = (r: AskRequest) => Promise<PermissionResult>;
 
 export interface SessionOptions {
   cwd: string;
@@ -143,12 +159,24 @@ export class Session {
   private canUseTool = async (
     toolName: string,
     input: Record<string, unknown>,
-    opts: { title?: string; displayName?: string; subtitle?: string }
+    opts: {
+      signal: AbortSignal;
+      toolUseID: string;
+      suggestions?: PermissionUpdate[];
+      title?: string;
+      displayName?: string;
+      description?: string;
+    }
   ): Promise<PermissionResult> =>
-    this.o.ask(toolName, input, {
+    this.o.ask({
+      id: opts.toolUseID,
+      tool: toolName,
+      input,
       title: opts.title,
       displayName: opts.displayName,
-      subtitle: opts.subtitle,
+      description: opts.description,
+      suggestions: opts.suggestions,
+      signal: opts.signal,
     });
 
   // ---- traduzione dei messaggi SDK in eventi per la webview --------------

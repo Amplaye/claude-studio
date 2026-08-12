@@ -8,6 +8,7 @@
   const input = $('input');
   const composer = $('composer');
   const sendBtn = $('send');
+  const modeSel = $('modeSel');
   const SVG = 'http://www.w3.org/2000/svg';
 
   // ---------- utilita' DOM ----------
@@ -226,6 +227,135 @@
     toBottom();
   }
 
+  // ---------- permessi ----------
+  const asks = new Map(); // id -> nodo della scheda
+
+  function button(cls, iconName, text) {
+    const b = el('button', 'btn ' + cls);
+    b.type = 'button';
+    b.append(icon(iconName), el('span', null, text));
+    return b;
+  }
+
+  /** Le domande a scelta multipla: una risposta per domanda, poi si manda. */
+  function questionBody(node, m, send) {
+    const answers = {};
+    const box = el('div', 'qs');
+    const go = button('ok', 'send', 'Manda');
+    go.disabled = true;
+
+    const check = () => {
+      go.disabled = m.questions.some((q) => !answers[q.question]);
+    };
+
+    for (const q of m.questions) {
+      const group = el('div', 'q');
+      const head = el('div', 'q-head');
+      if (q.header) head.append(el('span', 'tag', q.header));
+      head.append(el('span', 'q-text', q.question));
+      group.append(head);
+
+      const opts = el('div', 'opts');
+      for (const o of q.options) {
+        const b = el('button', 'opt');
+        b.type = 'button';
+        b.append(el('span', 'opt-label', o.label));
+        if (o.description) b.append(el('span', 'opt-desc', o.description));
+        b.addEventListener('click', () => {
+          if (q.multiSelect) {
+            b.classList.toggle('on');
+            const picked = [...opts.querySelectorAll('.opt.on .opt-label')].map((n) => n.textContent);
+            answers[q.question] = picked.join(', ');
+            if (!picked.length) delete answers[q.question];
+          } else {
+            for (const other of opts.querySelectorAll('.opt.on')) other.classList.remove('on');
+            b.classList.add('on');
+            answers[q.question] = o.label;
+          }
+          check();
+        });
+        opts.append(b);
+      }
+      group.append(opts);
+      box.append(group);
+    }
+
+    go.addEventListener('click', () => send('allow', answers));
+    node.append(box);
+    return [go];
+  }
+
+  function askCard(m) {
+    if (asks.has(m.id)) return;
+    const node = el('div', 'msg perm card-hover');
+    node.dataset.kind = m.kind;
+
+    const head = el('div', 'head');
+    const ic = m.kind === 'plan' ? 'list' : m.kind === 'question' ? 'options' : 'shield-checkmark';
+    head.append(icon(ic, 'perm-ico'), el('span', 'title', m.title || 'Serve il tuo permesso'));
+    node.append(head);
+
+    const acts = el('div', 'acts');
+    const answered = (choice, answers) => {
+      if (node.classList.contains('resolved')) return;
+      vscode.postMessage({ cmd: 'answer', id: m.id, choice, answers });
+      // Niente attesa dell'estensione: chi ha cliccato vede subito il tasto spegnersi.
+      for (const b of node.querySelectorAll('button')) b.disabled = true;
+    };
+
+    if (m.kind === 'plan') {
+      const body = el('div', 'plan');
+      body.replaceChildren(...markdown(m.plan || m.detail || ''));
+      node.append(body);
+      const ok = button('ok', 'checkmark', 'Approva ed esegui');
+      const auto = button('always', 'flash', 'Approva, non chiedermi le modifiche');
+      const no = button('no', 'close', 'Continua a pianificare');
+      ok.addEventListener('click', () => answered('allow'));
+      auto.addEventListener('click', () => answered('always'));
+      no.addEventListener('click', () => answered('deny'));
+      acts.append(ok, auto, no);
+    } else if (m.kind === 'question' && m.questions && m.questions.length) {
+      const [go] = questionBody(node, m, answered);
+      acts.append(go);
+    } else {
+      if (m.detail) node.append(el('div', 'detail', m.detail));
+      const ok = button('ok', 'checkmark', 'Consenti');
+      ok.addEventListener('click', () => answered('allow'));
+      acts.append(ok);
+      if (m.canAlways) {
+        const always = button('always', 'checkmark-circle', 'Consenti sempre');
+        // Non e' una promessa "per stavolta": la regola resta scritta sul disco.
+        always.title = 'La regola resta scritta nei permessi del progetto (.claude/settings.local.json).';
+        always.addEventListener('click', () => answered('always'));
+        acts.append(always);
+      }
+      const no = button('no', 'close', 'Rifiuta');
+      no.addEventListener('click', () => answered('deny'));
+      acts.append(no);
+    }
+
+    node.append(acts);
+    asks.set(m.id, node);
+    stick = true; // un permesso non si perde fuori schermo
+    add(node);
+  }
+
+  function askDone(m) {
+    const node = asks.get(m.id);
+    if (!node) return;
+    asks.delete(m.id);
+    node.classList.add('resolved', m.ok ? 'ok' : 'no');
+    const acts = node.querySelector('.acts');
+    const verdict = el('div', 'verdict');
+    verdict.append(m.ok ? drawnCheck('perm-ico') : icon('close', 'perm-ico'), el('span', null, m.label));
+    if (acts) acts.replaceWith(verdict);
+    else node.append(verdict);
+    for (const opts of node.querySelectorAll('.opts')) {
+      for (const b of opts.querySelectorAll('.opt:not(.on)')) b.remove();
+    }
+    toBottom();
+  }
+
   // ---------- attesa ----------
   let waiting = null;
   function showWaiting() {
@@ -267,8 +397,21 @@
       case 'reset':
         blocks.clear();
         tools.clear();
+        asks.clear();
         waiting = null;
         showEmpty();
+        break;
+      case 'mode':
+        modeSel.value = m.value;
+        document.body.dataset.mode = m.value;
+        break;
+      case 'ask':
+        hideWaiting();
+        askCard(m);
+        break;
+      case 'ask_done':
+        askDone(m);
+        if (busy) showWaiting();
         break;
       case 'session':
         $('modelName').textContent = m.model || '—';
@@ -343,6 +486,10 @@
     void composer.offsetWidth; // riavvia l'animazione anche a invii ravvicinati
     composer.classList.add('sending');
   });
+
+  modeSel.addEventListener('change', () =>
+    vscode.postMessage({ cmd: 'setMode', value: modeSel.value })
+  );
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));

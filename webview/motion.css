@@ -195,6 +195,17 @@
   animation: cs-rise 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
+/* la spunta del verdetto si disegna, come quella dei tool */
+.perm.resolved .verdict .perm-ico path {
+  stroke-dasharray: var(--len, 300);
+  animation: cs-draw 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+/* finche' nessuno risponde, la scheda respira: non e' un messaggio come gli altri */
+.perm:not(.resolved) .perm-ico {
+  animation: cs-breathe 2s ease-in-out infinite;
+}
+
 .composer.sending {
   animation: cs-squeeze 0.2s ease-out;
 }
@@ -236,6 +247,7 @@
 .offscreen .thinking-ring,
 .offscreen .tool-bar::after,
 .offscreen .tool-ico,
+.offscreen .perm-ico,
 .offscreen .caret {
   animation-play-state: paused;
 }

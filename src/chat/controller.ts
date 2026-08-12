@@ -2,8 +2,10 @@
 // aperta insieme nel pannello laterale e come scheda a tutto schermo: chi si attacca
 // dopo si riprende la storia e vede esattamente quello che vede l'altra faccia.
 import * as vscode from 'vscode';
+import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
-import type { Wire } from '../engine/protocol';
+import type { AskKind, AskQuestion, Mode, Wire } from '../engine/protocol';
+import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 
 export interface Surface {
@@ -14,11 +16,20 @@ export interface Surface {
 /** Oltre questo si buttano via gli eventi piu' vecchi: e' solo materiale da ridisegno. */
 const MAX_HISTORY = 4000;
 
+interface Pending {
+  req: AskRequest;
+  kind: AskKind;
+  settle: (r: PermissionResult) => void;
+}
+
 export class ChatController {
   private session?: Session;
   private history: Wire[] = [];
   private surfaces = new Set<Surface>();
   private busy = false;
+  private mode: Mode = 'default';
+  /** Permessi in attesa di risposta, per tool_use_id. */
+  private pending = new Map<string, Pending>();
 
   attach(s: Surface) {
     this.surfaces.add(s);
@@ -39,6 +50,7 @@ export class ChatController {
       cliVersion: cli ? claudeCliVersion(cli) : '',
       surface: s.kind,
     });
+    s.post({ k: 'mode', value: this.mode });
     for (const e of this.history) s.post(e);
     s.post({ k: 'busy', value: this.busy });
   }
@@ -52,15 +64,134 @@ export class ChatController {
   }
 
   newSession() {
+    this.closeAllPending('Sessione azzerata.');
     this.session?.dispose();
     this.session = undefined;
     this.history = [];
     this.busy = false;
     this.broadcast({ k: 'reset' });
+    this.broadcast({ k: 'mode', value: this.mode });
+  }
+
+  setMode(value: Mode) {
+    if (this.mode === value) return;
+    this.mode = value;
+    void this.session?.setPermissionMode(value);
+    this.broadcast({ k: 'mode', value });
   }
 
   dispose() {
+    this.closeAllPending('Estensione chiusa.');
     this.session?.dispose();
+  }
+
+  // ---- permessi ----------------------------------------------------------
+
+  /**
+   * La domanda arriva dal motore e si ferma qui finche' non risponde una delle due
+   * facce. La promessa e' una sola anche se le facce sono due: la prima che risponde
+   * chiude la partita, e l'altra vede la scheda chiudersi da sola.
+   */
+  private ask = (req: AskRequest): Promise<PermissionResult> => {
+    const kind = askKind(req.tool);
+    return new Promise<PermissionResult>((resolve) => {
+      let done = false;
+      const settle = (r: PermissionResult) => {
+        if (done) return;
+        done = true;
+        this.pending.delete(req.id);
+        resolve(r);
+      };
+      this.pending.set(req.id, { req, kind, settle });
+
+      // Se il turno viene interrotto la domanda non ha piu' senso: si toglie di
+      // mezzo la scheda invece di lasciarla appesa per sempre.
+      req.signal.addEventListener('abort', () => {
+        if (done) return;
+        this.emit({ k: 'ask_done', id: req.id, ok: false, label: 'Annullato' });
+        settle({ behavior: 'deny', message: 'Turno interrotto.', decisionClassification: 'user_reject' });
+      });
+
+      this.emit({
+        k: 'ask',
+        id: req.id,
+        kind,
+        tool: req.tool,
+        title: req.title || `Claude vuole usare ${req.displayName || req.tool}`,
+        detail: req.description || summarize(req.input),
+        canAlways: kind === 'tool' && !!req.suggestions?.length,
+        ...(kind === 'plan' ? { plan: planText(req.input) } : {}),
+        ...(kind === 'question' ? { questions: questionsOf(req.input) } : {}),
+      });
+    });
+  };
+
+  answer(id: string, choice: 'allow' | 'always' | 'deny', answers?: Record<string, string>) {
+    const p = this.pending.get(id);
+    if (!p) return;
+
+    if (choice === 'deny') {
+      this.emit({ k: 'ask_done', id, ok: false, label: p.kind === 'plan' ? 'Continua a pianificare' : 'Rifiutato' });
+      p.settle({
+        behavior: 'deny',
+        message:
+          p.kind === 'plan'
+            ? 'Il piano non e’ approvato: continua a pianificare, non modificare niente.'
+            : 'Permesso negato da chi usa Claude Studio.',
+        decisionClassification: 'user_reject',
+      });
+      return;
+    }
+
+    // Il piano approvato deve poter essere eseguito: restare in "plan" bloccherebbe
+    // ogni scrittura subito dopo aver detto di si'.
+    if (p.kind === 'plan') {
+      this.setMode(choice === 'always' ? 'acceptEdits' : 'default');
+      this.emit({
+        k: 'ask_done',
+        id,
+        ok: true,
+        label: choice === 'always' ? 'Approvato, modifiche automatiche' : 'Piano approvato',
+      });
+      p.settle(allow(p.req.input, {}, 'user_temporary'));
+      return;
+    }
+
+    if (p.kind === 'question') {
+      this.emit({ k: 'ask_done', id, ok: true, label: labelOf(answers) });
+      p.settle(allow({ ...p.req.input, answers: answers ?? {} }, {}, 'user_temporary'));
+      return;
+    }
+
+    const always = choice === 'always';
+    const updates: PermissionUpdate[] = always
+      ? p.req.suggestions?.length
+        ? p.req.suggestions
+        : [
+            {
+              type: 'addRules',
+              rules: [{ toolName: p.req.tool }],
+              behavior: 'allow',
+              destination: 'session',
+            },
+          ]
+      : [];
+    this.emit({ k: 'ask_done', id, ok: true, label: always ? 'Consentito sempre' : 'Consentito' });
+    p.settle(
+      allow(
+        p.req.input,
+        updates.length ? { updatedPermissions: updates } : {},
+        always ? 'user_permanent' : 'user_temporary'
+      )
+    );
+  }
+
+  private closeAllPending(why: string) {
+    for (const [id, p] of [...this.pending]) {
+      this.pending.delete(id);
+      this.broadcast({ k: 'ask_done', id, ok: false, label: 'Annullato' });
+      p.settle({ behavior: 'deny', message: why, decisionClassification: 'user_reject' });
+    }
   }
 
   // ---- motore -----------------------------------------------------------
@@ -81,7 +212,8 @@ export class ChatController {
       cwd: currentCwd(),
       cliPath: cli,
       emit: (e) => this.emit(e),
-      ask: askPermission,
+      ask: this.ask,
+      permissionMode: this.mode,
     });
     return this.session;
   }
@@ -127,24 +259,52 @@ function currentCwd(): string {
 }
 
 /**
- * Fase 1: il permesso si chiede con una finestra nativa di VSCode.
- * Nella fase 2 diventa la scheda animata dentro la chat — l'aggancio e' gia' qui.
+ * Il "si'" va sempre confezionato qui.
+ * `updatedInput` non e' facoltativo: la CLI 2.1.79 rifiuta un `allow` senza, e lo
+ * fa in silenzio — la scheda dice "consentito" e il tool torna fallito con un
+ * ZodError dentro il risultato. Si rimanda indietro l'input com'e' arrivato.
  */
-async function askPermission(
-  toolName: string,
+function allow(
   input: Record<string, unknown>,
-  meta: { title?: string; subtitle?: string }
-) {
-  const detail = meta.subtitle || summarize(input);
-  const choice = await vscode.window.showWarningMessage(
-    meta.title || `Claude vuole usare ${toolName}`,
-    { modal: true, detail },
-    'Consenti',
-    'Rifiuta'
-  );
-  return choice === 'Consenti'
-    ? ({ behavior: 'allow' } as const)
-    : ({ behavior: 'deny', message: 'Permesso negato da chi usa Claude Studio.' } as const);
+  extra: { updatedPermissions?: PermissionUpdate[] },
+  why: 'user_temporary' | 'user_permanent'
+): PermissionResult {
+  return { behavior: 'allow', updatedInput: input, ...extra, decisionClassification: why };
+}
+
+function askKind(tool: string): AskKind {
+  if (tool === 'ExitPlanMode') return 'plan';
+  if (tool === 'AskUserQuestion') return 'question';
+  return 'tool';
+}
+
+function planText(input: Record<string, unknown>): string {
+  const p = input?.plan;
+  return typeof p === 'string' ? p : '';
+}
+
+/** Si tiene solo cio' che la scheda sa disegnare: il resto e' rumore da non passare. */
+function questionsOf(input: Record<string, unknown>): AskQuestion[] {
+  const raw = (input as any)?.questions;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((q: any) => ({
+      question: String(q?.question ?? ''),
+      header: String(q?.header ?? ''),
+      multiSelect: !!q?.multiSelect,
+      options: Array.isArray(q?.options)
+        ? q.options.map((o: any) => ({
+            label: String(o?.label ?? ''),
+            description: typeof o?.description === 'string' ? o.description : undefined,
+          }))
+        : [],
+    }))
+    .filter((q) => q.question && q.options.length);
+}
+
+function labelOf(answers?: Record<string, string>): string {
+  const v = answers ? Object.values(answers).filter(Boolean) : [];
+  return v.length ? v.join(' · ').slice(0, 80) : 'Risposto';
 }
 
 function summarize(input: Record<string, unknown>): string {

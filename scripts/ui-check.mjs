@@ -26,6 +26,9 @@ for (const surface of ['view', 'panel']) {
   await page.goto(url);
 
   const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
+  const t = (cond, msg) => !cond && fails.push(`[${surface}] ` + msg);
+  /** L'ultimo messaggio che la pagina ha mandato all'estensione. */
+  const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
   await post({ k: 'session', id: 'abc', model: 'claude-opus-4-6[1m]', cwd: 'C:/Users/Steward/CRM' });
@@ -56,6 +59,110 @@ for (const surface of ['view', 'panel']) {
 
   await post({ k: 'tool_start', id: 'tu_C', name: 'Write', input: { file_path: 'out.txt' } });
   await post({ k: 'tool_end', id: 'tu_C', ok: false, text: 'permesso negato' });
+
+  // ---- permessi: i tre tipi di domanda, cliccati davvero ----
+  await post({
+    k: 'ask',
+    id: 'ask_1',
+    kind: 'tool',
+    tool: 'Bash',
+    title: 'Claude vuole eseguire un comando',
+    detail: 'rm -rf dist',
+    canAlways: true,
+  });
+  await page.waitForTimeout(120);
+  t(await page.isVisible('.perm[data-kind="tool"]'), 'la scheda del permesso non compare');
+  t(
+    (await page.locator('.perm[data-kind="tool"] .btn.always').count()) === 1,
+    '"Consenti sempre" non c’è quando il motore lo permette'
+  );
+  await page.click('.perm[data-kind="tool"] .btn.always');
+  const s1 = await lastSent();
+  t(
+    s1?.cmd === 'answer' && s1.id === 'ask_1' && s1.choice === 'always',
+    'risposta sbagliata al permesso: ' + JSON.stringify(s1)
+  );
+  t(
+    await page.locator('.perm[data-kind="tool"] .btn.ok').isDisabled(),
+    'dopo il clic i tasti restano cliccabili'
+  );
+  await post({ k: 'ask_done', id: 'ask_1', ok: true, label: 'Consentito sempre' });
+  await page.waitForTimeout(120);
+  t(await page.isVisible('.perm.resolved.ok .verdict'), 'la scheda non mostra l’esito');
+  t((await page.locator('.perm .acts').count()) === 0, 'i tasti restano dopo la risposta');
+
+  // il piano
+  await post({
+    k: 'ask',
+    id: 'ask_2',
+    kind: 'plan',
+    tool: 'ExitPlanMode',
+    title: 'Claude ha finito di pianificare',
+    detail: '',
+    canAlways: false,
+    plan: 'Passo uno: leggere.\nPasso due: scrivere.\n\n```js\nconst a = 1;\n```\n',
+  });
+  await page.waitForTimeout(120);
+  t(
+    (await page.locator('.perm[data-kind="plan"] .plan pre code').count()) === 1,
+    'il piano non è reso col suo blocco di codice'
+  );
+  t(
+    (await page.locator('.perm[data-kind="plan"] .btn').count()) === 3,
+    'al piano mancano le tre scelte'
+  );
+  await page.click('.perm[data-kind="plan"] .btn.no');
+  const s2 = await lastSent();
+  t(s2?.cmd === 'answer' && s2.id === 'ask_2' && s2.choice === 'deny', 'il rifiuto del piano non parte: ' + JSON.stringify(s2));
+  await post({ k: 'ask_done', id: 'ask_2', ok: false, label: 'Continua a pianificare' });
+
+  // le domande a scelta multipla
+  await post({
+    k: 'ask',
+    id: 'ask_3',
+    kind: 'question',
+    tool: 'AskUserQuestion',
+    title: 'Claude ti chiede una cosa',
+    detail: '',
+    canAlways: false,
+    questions: [
+      {
+        question: 'Quale motore uso?',
+        header: 'Motore',
+        options: [
+          { label: 'esbuild', description: 'Veloce.' },
+          { label: 'tsc', description: 'Lento ma ufficiale.' },
+        ],
+      },
+    ],
+  });
+  await page.waitForTimeout(120);
+  t(
+    await page.locator('.perm[data-kind="question"] .btn.ok').isDisabled(),
+    '"Manda" è attivo prima che ci sia una risposta'
+  );
+  await page.click('.perm[data-kind="question"] .opt:nth-child(2)');
+  await page.click('.perm[data-kind="question"] .btn.ok');
+  const s3 = await lastSent();
+  t(
+    s3?.cmd === 'answer' && s3.answers?.['Quale motore uso?'] === 'tsc',
+    'la risposta scelta non arriva all’estensione: ' + JSON.stringify(s3)
+  );
+  await post({ k: 'ask_done', id: 'ask_3', ok: true, label: 'tsc' });
+
+  // ---- la modalita' permessi ----
+  await post({ k: 'mode', value: 'plan' });
+  await page.waitForTimeout(80);
+  t(
+    (await page.inputValue('#modeSel')) === 'plan',
+    'la testata non segue la modalità decisa dall’estensione'
+  );
+  await page.selectOption('#modeSel', 'acceptEdits');
+  const s4 = await lastSent();
+  t(
+    s4?.cmd === 'setMode' && s4.value === 'acceptEdits',
+    'il cambio di modalità non arriva all’estensione: ' + JSON.stringify(s4)
+  );
 
   const finale = 'Il primo usa `esbuild`, il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n';
   await post({ k: 'block_start', id: 'b2_0', kind: 'text' });
@@ -93,11 +200,13 @@ for (const surface of ['view', 'panel']) {
       // larghezza della colonna di lettura e sfondamento orizzontale
       colWidth: first ? Math.round(first.getBoundingClientRect().width) : 0,
       hOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      // nessun messaggio deve essere schiacciato dal flex quando il log e' pieno
+      squashed: [...log.querySelectorAll('.msg')]
+        .filter((n) => n.scrollHeight > n.clientHeight + 2 && !n.querySelector('.plan, .out, .detail'))
+        .map((n) => n.className),
       logWidth: Math.round(box.width),
     };
   });
-
-  const t = (cond, msg) => !cond && fails.push(`[${surface}] ` + msg);
 
   t(errors.length === 0, 'errori JS in pagina: ' + errors.join(' | '));
   t(r.tools.length === 3, 'attesi 3 tool, trovati ' + r.tools.length);
@@ -113,6 +222,7 @@ for (const surface of ['view', 'panel']) {
   t(r.carets === 0, 'cursore rimasto acceso a turno finito');
   t(!/stop/.test(r.stopBtn || ''), 'il tasto è rimasto su "ferma"');
   t(!r.hOverflow, 'la pagina sfonda in orizzontale');
+  t(!r.squashed.length, 'messaggi schiacciati dal flex: ' + r.squashed.join(' | '));
   const joined = r.textMsgs.join('\n');
   t((joined.match(/Apro i due file insieme\./g) || []).length === 1, 'testo duplicato dopo block_final');
 

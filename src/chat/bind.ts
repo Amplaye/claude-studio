@@ -48,6 +48,12 @@ export function bindWebview(
       case 'openTab':
         void vscode.commands.executeCommand('claudeStudio.openTab');
         return;
+      case 'answer':
+        chat.answer(m.id, m.choice, m.answers);
+        return;
+      case 'setMode':
+        chat.setMode(m.value);
+        return;
     }
   });
 

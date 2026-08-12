@@ -3,6 +3,29 @@
 
 export type BlockKind = 'text' | 'thinking';
 
+/** Le quattro modalita' che si scelgono dalla testata. L'SDK ne conosce altre. */
+export type Mode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+
+/**
+ * Un permesso non e' sempre la stessa domanda:
+ *  - `tool`     "posso usare questo strumento?"
+ *  - `plan`     ExitPlanMode: "il piano va bene?"
+ *  - `question` AskUserQuestion: domande a scelta multipla
+ */
+export type AskKind = 'tool' | 'plan' | 'question';
+
+export interface AskOption {
+  label: string;
+  description?: string;
+}
+
+export interface AskQuestion {
+  question: string;
+  header: string;
+  multiSelect?: boolean;
+  options: AskOption[];
+}
+
 /** Estensione -> webview. */
 export type Wire =
   | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
@@ -14,6 +37,19 @@ export type Wire =
   | { k: 'block_final'; id: string; kind: BlockKind; text: string }
   | { k: 'tool_start'; id: string; name: string; input: unknown }
   | { k: 'tool_end'; id: string; ok: boolean; text: string }
+  | {
+      k: 'ask';
+      id: string;
+      kind: AskKind;
+      tool: string;
+      title: string;
+      detail: string;
+      canAlways: boolean;
+      plan?: string;
+      questions?: AskQuestion[];
+    }
+  | { k: 'ask_done'; id: string; ok: boolean; label: string }
+  | { k: 'mode'; value: Mode }
   | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
@@ -25,4 +61,6 @@ export type Cmd =
   | { cmd: 'send'; text: string }
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
-  | { cmd: 'openTab' };
+  | { cmd: 'openTab' }
+  | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
+  | { cmd: 'setMode'; value: Mode };

@@ -3,3 +3,5 @@ dist/
 out/
 media/ionicons.sprite.svg
 *.vsix
+# "Consenti sempre" scrive qui: sono permessi di questa macchina, non del progetto
+.claude/settings.local.json
