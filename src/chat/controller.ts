@@ -4,9 +4,12 @@
 import * as vscode from 'vscode';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
-import type { AskKind, AskQuestion, Mode, Wire } from '../engine/protocol';
+import type { AskKind, AskQuestion, Mode, Pasted, Wire } from '../engine/protocol';
+import { ideServer } from '../engine/ide';
+import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
+import { recentSessions, replaySession } from './history';
 
 export interface Surface {
   readonly kind: 'view' | 'panel';
@@ -28,6 +31,8 @@ export class ChatController {
   private surfaces = new Set<Surface>();
   private busy = false;
   private mode: Mode = 'default';
+  /** Conversazione da riprendere alla prossima accensione del motore. */
+  private resume?: { id: string; fork: boolean };
   /** Permessi in attesa di risposta, per tool_use_id. */
   private pending = new Map<string, Pending>();
 
@@ -55,8 +60,33 @@ export class ChatController {
     s.post({ k: 'busy', value: this.busy });
   }
 
-  send(text: string) {
-    this.ensureSession().send(text);
+  /**
+   * Il codice selezionato nell'editor si attacca al messaggio vero, non a quello
+   * che si legge nella chat: nella chat resta la frase, il muro di codice no.
+   */
+  send(text: string, images?: Pasted[], withSelection?: boolean) {
+    let full = text;
+    if (withSelection) {
+      const sel = currentSelection();
+      if (sel) {
+        full =
+          `${text}\n\n<selezione file="${sel.rel}" righe="${sel.lines}">\n${sel.text}\n</selezione>`.trim();
+      }
+    }
+    this.ensureSession().send(full, images, text);
+  }
+
+  /** L'elenco per il menu che si apre scrivendo "@". */
+  async sendFiles(q: string, s?: Surface) {
+    const e: Wire = { k: 'files', items: await findFiles(q) };
+    if (s) s.post(e);
+    else this.broadcast(e);
+  }
+
+  /** Cambia la selezione nell'editor: la chat lo fa sapere, non lo indovina. */
+  pushSelection() {
+    const sel = currentSelection();
+    this.broadcast({ k: 'selection', file: sel?.rel ?? '', lines: sel?.lines ?? '' });
   }
 
   interrupt() {
@@ -64,7 +94,32 @@ export class ChatController {
   }
 
   newSession() {
-    this.closeAllPending('Sessione azzerata.');
+    this.resume = undefined;
+    this.clear();
+  }
+
+  // ---- cronologia --------------------------------------------------------
+
+  async sendHistory(s?: Surface) {
+    const items = await recentSessions(currentCwd());
+    const e: Wire = { k: 'history', items };
+    if (s) s.post(e);
+    else this.broadcast(e);
+  }
+
+  /**
+   * Apre una conversazione passata: prima si ridipinge com'era, poi si dice al
+   * motore di riprenderla al prossimo messaggio. `fork` la lascia intatta e
+   * lavora su un ramo nuovo.
+   */
+  async open(id: string, fork = false) {
+    this.clear();
+    this.resume = { id, fork };
+    for (const e of await replaySession(id, currentCwd())) this.emit(e);
+  }
+
+  private clear() {
+    this.closeAllPending('Cambio conversazione.');
     this.session?.dispose();
     this.session = undefined;
     this.history = [];
@@ -118,7 +173,9 @@ export class ChatController {
         kind,
         tool: req.tool,
         title: req.title || `Claude vuole usare ${req.displayName || req.tool}`,
-        detail: req.description || summarize(req.input),
+        // Per il piano e per le domande il corpo lo disegna la scheda: qui dentro
+        // ci finirebbe solo il JSON dell'input, che non serve a nessuno.
+        detail: req.description || (kind === 'tool' ? summarize(req.input) : ''),
         canAlways: kind === 'tool' && !!req.suggestions?.length,
         ...(kind === 'plan' ? { plan: planText(req.input) } : {}),
         ...(kind === 'question' ? { questions: questionsOf(req.input) } : {}),
@@ -214,7 +271,12 @@ export class ChatController {
       emit: (e) => this.emit(e),
       ask: this.ask,
       permissionMode: this.mode,
+      ide: { editor: ideServer() },
+      ...(this.resume ? { resume: this.resume.id, fork: this.resume.fork } : {}),
     });
+    // La ripresa vale per l'accensione, non per sempre: se poi si azzera la
+    // conversazione non deve tornare fuori quella di prima.
+    this.resume = undefined;
     return this.session;
   }
 
@@ -253,10 +315,7 @@ function cliSetting(): string {
   return vscode.workspace.getConfiguration('claudeStudio').get<string>('cliPath', '') || '';
 }
 
-function currentCwd(): string {
-  const f = vscode.workspace.workspaceFolders;
-  return f && f.length ? f[0].uri.fsPath : process.cwd();
-}
+const currentCwd = workspaceRoot;
 
 /**
  * Il "si'" va sempre confezionato qui.

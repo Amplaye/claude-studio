@@ -71,9 +71,12 @@ function fakeWebview() {
 
 const vscode = {
   ViewColumn: { Active: -1, Beside: -2, One: 1 },
+  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
+  TextEditorRevealType: { InCenter: 2 },
   Uri: {
     file: uri,
     joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
+    from: (o) => uri(o.path || ''),
   },
   window: {
     registerWebviewViewProvider: (id, p) => {
@@ -103,6 +106,22 @@ const vscode = {
       return items[0]; // "Consenti": qui vogliamo vedere il tool girare davvero
     },
     showInformationMessage: async () => undefined,
+    showErrorMessage: async () => undefined,
+    showTextDocument: async () => ({}),
+    activeTextEditor: undefined,
+    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
+    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
+    tabGroups: {
+      all: [{ tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] }],
+    },
+  },
+  languages: {
+    getDiagnostics: () => [
+      [
+        uri(path.join(root, 'src', 'extension.ts')),
+        [{ severity: 0, message: 'errore finto per la prova', range: { start: { line: 3, character: 2 } } }],
+      ],
+    ],
   },
   commands: {
     registerCommand: (id, fn) => {
@@ -114,7 +133,18 @@ const vscode = {
   workspace: {
     workspaceFolders: [{ uri: uri(root) }],
     getConfiguration: () => ({ get: (_k, d) => d }),
+    findFiles: async () => [uri(path.join(root, 'package.json'))],
+    openTextDocument: async () => ({ getText: () => '' }),
+    registerTextDocumentContentProvider: () => ({ dispose() {} }),
+    fs: { stat: async () => ({}) },
+    asRelativePath: (p) => {
+      const s = String(p?.fsPath ?? p);
+      return s.startsWith(root) ? s.slice(root.length + 1).replace(/\\/g, '/') : s;
+    },
   },
+  Position: class {},
+  Range: class {},
+  Selection: class {},
 };
 
 const load = Module._load;
@@ -205,6 +235,36 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   // sessione, quindi nessuna seconda richiesta.
   onMsg({ cmd: 'send', text: bashTurn });
   await turns(3);
+  const asksAfterRepeat = answered.length;
+
+  // Quarto turno: il ponte con l'editor. Vive dentro questo stesso processo, quindi
+  // e' anche la prova che il server MCP sopravvive all'impacchettamento.
+  onMsg({
+    cmd: 'send',
+    text: 'Chiama il tool mcp__editor__errori_editor e riportami la riga che ti risponde, senza commenti.',
+  });
+  await turns(4);
+
+  // ---- cronologia: elenco, ripescaggio e ripresa ----
+  const sessionId = (got.find((m) => m.k === 'session') || {}).id;
+  // `from` non e' un dettaglio: senza, l'attesa trova subito i messaggi vecchi e
+  // non aspetta proprio niente.
+  const waitFor = async (pred, from, ms = 20000) => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      const hit = got.slice(from).filter(pred).pop();
+      if (hit) return hit;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    return undefined;
+  };
+  const beforeHist = got.length;
+  onMsg({ cmd: 'history' });
+  const hist = await waitFor((m) => m.k === 'history', beforeHist);
+  const mark = got.length;
+  if (hist?.items?.length) onMsg({ cmd: 'open', id: hist.items[0].id });
+  await waitFor((m) => m.k === 'user', mark);
+  const afterOpen = got.slice(mark);
 
   const kinds = got.map((m) => m.k);
   const fails = [...pageFails];
@@ -249,11 +309,45 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   );
   t(/42/.test((bash && bash.text) || ''), 'il tool consentito non ha dato il risultato atteso');
   t(
-    answered.length === asksAfterAlways,
+    asksAfterRepeat === asksAfterAlways,
     '"Consenti sempre" non ha retto: lo stesso comando ha chiesto di nuovo il permesso'
   );
   // la modalita' viaggia verso tutte le facce
   t(got.some((m) => m.k === 'mode'), 'la modalita’ permessi non e’ mai arrivata alla webview');
+
+  // ---- ponte con l'editor ----
+  const bridge = got.find((m) => m.k === 'tool_start' && /mcp__editor__/.test(m.name || ''));
+  t(!!bridge, 'il ponte con l’editor non e’ stato usato: nessun tool mcp__editor__*');
+  const bridgeOut = got.find((m) => m.k === 'tool_end' && m.id === bridge?.id);
+  t(
+    /errore finto per la prova/.test(bridgeOut?.text || ''),
+    'il ponte non ha riportato la diagnostica dell’editor: ' + (bridgeOut?.text || '').slice(0, 120)
+  );
+  t(
+    got.some((m) => m.k === 'commands' && (m.items || []).length > 0),
+    'gli slash command non sono mai arrivati alla webview'
+  );
+
+  // ---- cronologia ----
+  t(!!hist, 'la cronologia non e’ mai arrivata');
+  t(
+    (hist?.items || []).some((i) => i.id === sessionId),
+    'la conversazione appena fatta non compare nella cronologia'
+  );
+  t(
+    (hist?.items || []).every((i) => i.summary && typeof i.when === 'number'),
+    'una voce di cronologia e’ senza titolo o senza data'
+  );
+  t(afterOpen.some((m) => m.k === 'reset'), 'aprire una conversazione non ha ripulito la chat');
+  t(
+    afterOpen.some((m) => m.k === 'user' && /Read su package\.json/.test(m.text || '')),
+    'la conversazione ripescata non e’ stata ridipinta: ' +
+      JSON.stringify(afterOpen.filter((m) => m.k === 'user').map((m) => String(m.text).slice(0, 40)))
+  );
+  t(
+    afterOpen.some((m) => m.k === 'tool_start') && afterOpen.some((m) => m.k === 'block_final'),
+    'del ripescaggio mancano i tool o le risposte'
+  );
 
   const text = got
     .filter((m) => m.k === 'block_final' && m.kind === 'text')

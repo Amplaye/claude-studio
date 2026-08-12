@@ -26,16 +26,26 @@ export interface AskQuestion {
   options: AskOption[];
 }
 
+/** Una conversazione gia' avvenuta, come appare nella cronologia. */
+export interface HistoryItem {
+  id: string;
+  summary: string;
+  /** millisecondi, ultimo tocco */
+  when: number;
+}
+
 /** Estensione -> webview. */
 export type Wire =
   | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
   | { k: 'session'; id: string; model: string; cwd: string }
   | { k: 'user'; text: string }
   | { k: 'turn_start' }
-  | { k: 'block_start'; id: string; kind: BlockKind }
-  | { k: 'delta'; id: string; kind: BlockKind; text: string }
-  | { k: 'block_final'; id: string; kind: BlockKind; text: string }
-  | { k: 'tool_start'; id: string; name: string; input: unknown }
+  // `parent` c'e' quando il pezzo arriva da un sub-agent: e' il tool_use_id del
+  // Task che lo ha lanciato, ed e' li' sotto che va disegnato.
+  | { k: 'block_start'; id: string; kind: BlockKind; parent?: string | null }
+  | { k: 'delta'; id: string; kind: BlockKind; text: string; parent?: string | null }
+  | { k: 'block_final'; id: string; kind: BlockKind; text: string; parent?: string | null }
+  | { k: 'tool_start'; id: string; name: string; input: unknown; parent?: string | null }
   | { k: 'tool_end'; id: string; ok: boolean; text: string }
   | {
       k: 'ask';
@@ -50,17 +60,36 @@ export type Wire =
     }
   | { k: 'ask_done'; id: string; ok: boolean; label: string }
   | { k: 'mode'; value: Mode }
+  | { k: 'history'; items: HistoryItem[] }
+  | { k: 'commands'; items: { name: string; description: string }[] }
+  | { k: 'files'; items: string[] }
+  // `file` vuoto = non c'e' piu' niente di selezionato nell'editor
+  | { k: 'selection'; file: string; lines: string }
   | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
   | { k: 'reset' };
 
 /** Webview -> estensione. */
+/** Un'immagine incollata nel campo di scrittura. */
+export interface Pasted {
+  mime: string;
+  /** base64 senza il prefisso data: */
+  data: string;
+}
+
 export type Cmd =
   | { cmd: 'ready' }
-  | { cmd: 'send'; text: string }
+  // `withSelection` = attacca il codice selezionato nell'editor; il testo lo prende
+  // l'estensione dall'editor stesso, non viaggia due volte sul filo.
+  | { cmd: 'send'; text: string; images?: Pasted[]; withSelection?: boolean }
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
-  | { cmd: 'setMode'; value: Mode };
+  | { cmd: 'setMode'; value: Mode }
+  | { cmd: 'history' }
+  // `fork` = riprendi ma su un ramo nuovo, senza toccare la conversazione originale
+  | { cmd: 'open'; id: string; fork?: boolean }
+  | { cmd: 'files'; q: string }
+  | { cmd: 'openFile'; path: string; line?: number };

@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import type { Cmd } from '../engine/protocol';
 import { renderPage } from '../shared/html';
+import { openFile } from './editor';
 import type { ChatController, Surface } from './controller';
 
 export function bindWebview(
@@ -37,7 +38,7 @@ export function bindWebview(
         chat.hello(surface);
         return;
       case 'send':
-        chat.send(m.text);
+        chat.send(m.text, m.images, m.withSelection);
         return;
       case 'interrupt':
         chat.interrupt();
@@ -53,6 +54,18 @@ export function bindWebview(
         return;
       case 'setMode':
         chat.setMode(m.value);
+        return;
+      case 'history':
+        void chat.sendHistory(surface);
+        return;
+      case 'open':
+        void chat.open(m.id, !!m.fork);
+        return;
+      case 'files':
+        void chat.sendFiles(m.q, surface);
+        return;
+      case 'openFile':
+        void openFile(m.path, m.line);
         return;
     }
   });

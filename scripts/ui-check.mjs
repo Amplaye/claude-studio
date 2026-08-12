@@ -60,6 +60,77 @@ for (const surface of ['view', 'panel']) {
   await post({ k: 'tool_start', id: 'tu_C', name: 'Write', input: { file_path: 'out.txt' } });
   await post({ k: 'tool_end', id: 'tu_C', ok: false, text: 'permesso negato' });
 
+  // ---- i tool che si disegnano da soli: todo, diff, sub-agent ----
+  await post({
+    k: 'tool_start',
+    id: 'tu_T',
+    name: 'TodoWrite',
+    input: {
+      todos: [
+        { content: 'Leggere i file', status: 'completed', activeForm: 'Leggendo i file' },
+        { content: 'Scrivere il diff', status: 'in_progress', activeForm: 'Scrivendo il diff' },
+        { content: 'Provare', status: 'pending', activeForm: 'Provando' },
+      ],
+    },
+  });
+  await post({ k: 'tool_end', id: 'tu_T', ok: true, text: 'Todos have been modified successfully.' });
+
+  await post({
+    k: 'tool_start',
+    id: 'tu_E',
+    name: 'Edit',
+    input: {
+      file_path: 'C:/Users/Steward/CRM/src/app.ts',
+      old_string: 'const a = 1;\nconst b = 2;',
+      new_string: 'const a = 3;',
+    },
+  });
+  await post({ k: 'tool_end', id: 'tu_E', ok: true, text: 'The file has been updated successfully.' });
+
+  // un sub-agent: il suo lavoro va DENTRO la card del Task, non in fondo al discorso
+  await post({ k: 'tool_start', id: 'tu_S', name: 'Task', input: { description: 'Conta i file', prompt: 'Conta i file .ts' } });
+  await post({ k: 'tool_start', id: 'tu_S1', name: 'Glob', input: { pattern: '**/*.ts' }, parent: 'tu_S' });
+  await post({ k: 'tool_end', id: 'tu_S1', ok: true, text: 'src/a.ts\nsrc/b.ts' });
+  await post({ k: 'block_start', id: 'sub_0', kind: 'text', parent: 'tu_S' });
+  await post({ k: 'delta', id: 'sub_0', kind: 'text', text: 'Ho contato ', parent: 'tu_S' });
+  await post({ k: 'block_final', id: 'sub_0', kind: 'text', text: 'Ho contato 2 file.', parent: 'tu_S' });
+  await post({ k: 'tool_end', id: 'tu_S', ok: true, text: 'Sono 2 file.' });
+
+  // un output lungo: la card resta chiusa e dichiara quante righe ha
+  await post({ k: 'tool_start', id: 'tu_L', name: 'Bash', input: { command: 'git log' } });
+  await post({
+    k: 'tool_end',
+    id: 'tu_L',
+    ok: true,
+    text: Array.from({ length: 40 }, (_, i) => 'riga ' + i).join('\n'),
+  });
+  await page.waitForTimeout(200);
+
+  const tr = await page.evaluate(() => {
+    const task = document.querySelector('.tool[data-tool="Task"]');
+    return {
+      todoDone: document.querySelectorAll('.todo.completed').length,
+      todoNow: document.querySelector('.todo.in_progress span')?.textContent,
+      adds: [...document.querySelectorAll('.diff .add .code')].map((n) => n.textContent),
+      dels: [...document.querySelectorAll('.diff .del .code')].map((n) => n.textContent),
+      editArg: document.querySelector('.tool[data-tool="Edit"] .arg')?.textContent,
+      kidsTools: task ? task.querySelectorAll('.kids .tool').length : -1,
+      kidsText: task ? task.querySelector('.kids .msg.assistant')?.textContent : null,
+      strayGlob: !!document.querySelector('.log > .tool[data-tool="Glob"]'),
+      longOpen: document.querySelector('.tool[data-tool="Bash"][data-tool]:last-of-type')?.open,
+      counts: [...document.querySelectorAll('.count')].map((n) => n.textContent),
+    };
+  });
+  t(tr.todoDone === 1, 'i todo completati non sono segnati: ' + tr.todoDone);
+  t(tr.todoNow === 'Scrivendo il diff', 'il todo in corso non mostra la forma attiva: ' + tr.todoNow);
+  t(tr.dels.join('|') === 'const a = 1;|const b = 2;', 'il "prima" del diff è sbagliato: ' + tr.dels.join('|'));
+  t(tr.adds.join('|') === 'const a = 3;', 'il "dopo" del diff è sbagliato: ' + tr.adds.join('|'));
+  t(tr.editArg === 'src/app.ts', 'il percorso non è accorciato sulla cartella di lavoro: ' + tr.editArg);
+  t(tr.kidsTools === 1, 'il tool del sub-agent non è finito dentro il Task: ' + tr.kidsTools);
+  t(/Ho contato 2 file/.test(tr.kidsText || ''), 'il discorso del sub-agent non è annidato: ' + tr.kidsText);
+  t(!tr.strayGlob, 'il tool del sub-agent è finito anche in fondo alla conversazione');
+  t(tr.counts.includes('40 righe'), 'un output lungo non dichiara quante righe ha: ' + tr.counts.join(','));
+
   // ---- permessi: i tre tipi di domanda, cliccati davvero ----
   await post({
     k: 'ask',
@@ -164,6 +235,79 @@ for (const surface of ['view', 'panel']) {
     'il cambio di modalità non arriva all’estensione: ' + JSON.stringify(s4)
   );
 
+  // ---- gli ingressi: cronologia, "@", "/", selezione dall'editor ----
+  // Mentre Claude lavora il tasto e' "ferma", non "manda": per provare l'invio
+  // bisogna prima essere fermi davvero.
+  await post({ k: 'busy', value: false });
+  await post({
+    k: 'history',
+    items: [
+      { id: 's1', summary: 'Sistemare il diff', when: Date.now() - 3600000 },
+      { id: 's2', summary: 'Prima prova', when: Date.now() - 86400000 * 2 },
+    ],
+  });
+  await page.waitForTimeout(120);
+  t((await page.locator('.hrow').count()) === 2, 'la cronologia non elenca le conversazioni');
+  t(
+    (await page.locator('.hwhen').first().textContent()) === "un'ora fa",
+    'la data della conversazione è scritta male: ' + (await page.locator('.hwhen').first().textContent())
+  );
+  await page.locator('.hrow').nth(1).locator('.hfork').click();
+  const sh = await lastSent();
+  t(sh?.cmd === 'open' && sh.id === 's2' && sh.fork === true, 'il ramo nuovo non parte: ' + JSON.stringify(sh));
+  t(await page.locator('#drawer').isHidden(), 'il cassetto resta aperto dopo aver scelto');
+
+  await post({ k: 'commands', items: [{ name: 'commit', description: 'Fa un commit' }, { name: 'test', description: 'Lancia i test' }] });
+  await page.click('#input');
+  await page.type('#input', '/com');
+  await page.waitForTimeout(120);
+  t((await page.locator('.menu .mitem').count()) === 1, 'gli slash command non si filtrano');
+  await page.keyboard.press('Enter');
+  t((await page.inputValue('#input')) === '/commit ', 'lo slash command non si completa: ' + (await page.inputValue('#input')));
+
+  await page.fill('#input', '');
+  await page.type('#input', 'guarda @ap');
+  await page.waitForTimeout(250);
+  const sf = await lastSent();
+  t(sf?.cmd === 'files' && sf.q === 'ap', 'la ricerca dei file non parte: ' + JSON.stringify(sf));
+  await post({ k: 'files', items: ['src/app.ts', 'docs/appunti.md'] });
+  await page.waitForTimeout(120);
+  t((await page.locator('.menu .mitem').count()) === 2, 'i file non compaiono nel menu');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  t(
+    (await page.inputValue('#input')) === 'guarda @docs/appunti.md ',
+    'il file scelto non finisce nel messaggio: ' + (await page.inputValue('#input'))
+  );
+
+  await post({ k: 'selection', file: 'src/app.ts', lines: '12-38' });
+  await page.waitForTimeout(120);
+  t(await page.isVisible('.attach .att'), 'la selezione dell’editor non compare fra gli allegati');
+  await page.fill('#input', 'spiegami questo');
+  await page.locator('#send').click();
+  const ss = await lastSent();
+  t(
+    ss?.cmd === 'send' && ss.withSelection === true && ss.text === 'spiegami questo',
+    'la selezione non viene allegata al messaggio: ' + JSON.stringify(ss)
+  );
+  t(await page.locator('.attach').isHidden(), 'gli allegati restano appesi dopo l’invio');
+
+  // e se la togli, non deve piu' partire
+  await post({ k: 'selection', file: 'src/app.ts', lines: '12-38' });
+  await page.click('.attx');
+  await page.fill('#input', 'senza');
+  await page.locator('#send').click();
+  const ss2 = await lastSent();
+  t(!ss2?.withSelection, 'la selezione parte anche dopo che l’hai tolta');
+
+  // clic sul percorso di un tool -> apri il file nell'editor
+  await page.click('.tool[data-tool="Edit"] .arg.link');
+  const so = await lastSent();
+  t(
+    so?.cmd === 'openFile' && /app\.ts$/.test(so.path || ''),
+    'il percorso nel tool non apre il file: ' + JSON.stringify(so)
+  );
+
   const finale = 'Il primo usa `esbuild`, il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n';
   await post({ k: 'block_start', id: 'b2_0', kind: 'text' });
   for (const t of ['Il primo ', 'usa `esbuild`, ', 'il secondo no:\n\n```json\n{ "build": "esbuild" }\n```\n'])
@@ -179,13 +323,19 @@ for (const surface of ['view', 'panel']) {
     const box = log.getBoundingClientRect();
     const first = log.querySelector('.msg.assistant');
     return {
-      tools: [...document.querySelectorAll('.tool')].map((t) => ({
+      tools: [...log.querySelectorAll(':scope > .tool')].map((t) => ({
         name: t.querySelector('.name')?.textContent,
         out: t.querySelector('.out')?.textContent,
         cls: t.className,
       })),
       user: document.querySelector('.msg.user')?.textContent,
       model: document.getElementById('modelName')?.textContent,
+      spend: document.getElementById('spendTokens')?.textContent,
+      cost: document.getElementById('spendCost')?.textContent,
+      headOverflow: (() => {
+        const top = document.querySelector('.top');
+        return top.scrollWidth > top.clientWidth + 1;
+      })(),
       think: document.querySelector('.think .body')?.textContent,
       codeBlocks: document.querySelectorAll('.msg.assistant pre code').length,
       inlineCode: document.querySelectorAll('.msg.assistant code').length,
@@ -209,12 +359,14 @@ for (const surface of ['view', 'panel']) {
   });
 
   t(errors.length === 0, 'errori JS in pagina: ' + errors.join(' | '));
-  t(r.tools.length === 3, 'attesi 3 tool, trovati ' + r.tools.length);
+  t(r.tools.length === 7, 'attesi 7 tool in prima fila, trovati ' + r.tools.length);
   t(r.tools[0]?.name === 'Read' && r.tools[0]?.out === 'RISULTATO-DI-A', 'Read ha preso l’esito sbagliato: ' + r.tools[0]?.out);
   t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RISULTATO-DI-B', 'Bash ha preso l’esito sbagliato: ' + r.tools[1]?.out);
   t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read non è marcato completato');
   t(/\bfail\b/.test(r.tools[2]?.cls || ''), 'Write non è marcato fallito');
-  t(r.model === 'claude-opus-4-6[1m]', 'modello non mostrato: ' + r.model);
+  t(r.model === 'opus-4-6[1m]', 'modello non mostrato: ' + r.model);
+  t(!r.headOverflow, 'la testata sfonda: le pillole non ci stanno nella faccia stretta');
+  t(r.spend === '18k' && r.cost === '$0.014', 'costo e contesto non mostrati: ' + r.spend + ' ' + r.cost);
   t(/differenza/.test(r.user || ''), 'messaggio utente mancante');
   t(/tutti e due i file/.test(r.think || ''), 'blocco ragionamento mancante');
   t(r.codeBlocks === 1, 'blocco di codice non reso: ' + r.codeBlocks);
@@ -238,6 +390,10 @@ for (const surface of ['view', 'panel']) {
   }
 
   await page.screenshot({ path: path.join(outDir, `preview-${surface}.png`), fullPage: true });
+  // il log scorre dentro di se': per vedere anche la prima meta' serve un secondo scatto
+  await page.evaluate(() => (document.getElementById('log').scrollTop = 0));
+  await page.waitForTimeout(120);
+  await page.screenshot({ path: path.join(outDir, `preview-${surface}-top.png`), fullPage: true });
   await page.close();
 }
 

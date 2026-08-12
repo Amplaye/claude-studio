@@ -74,8 +74,16 @@ body.wide .msg.user {
   font-size: 11px;
   white-space: nowrap;
   max-width: 190px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Nella faccia stretta la testata e' contesa: il modello cede per primo. */
+#model {
+  max-width: 132px;
+}
+.chip .sep {
+  opacity: 0.45;
 }
 .chip .ico {
   font-size: 12px;
@@ -103,6 +111,75 @@ body.wide .msg.user {
 }
 .iconbtn:active {
   transform: scale(0.94);
+}
+
+/* ---------- cassetto della cronologia ---------- */
+.drawer {
+  flex: 0 0 auto;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 13px 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.drawer-list {
+  overflow-y: auto;
+  padding: 0 9px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.drawer-empty {
+  padding: 10px 4px 14px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+.hrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  padding: 2px 4px 2px 2px;
+}
+.hopen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  padding: 7px 9px;
+}
+.hsummary {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hwhen {
+  font-size: 10.5px;
+  opacity: 0.65;
+}
+.hfork {
+  flex: 0 0 auto;
 }
 
 /* ---------- conversazione ---------- */
@@ -172,7 +249,6 @@ body.wide .msg.user {
   padding: 0;
   background: none;
 }
-
 /* pensiero ripiegabile */
 .think {
   border: 1px dashed var(--line);
@@ -214,11 +290,159 @@ body.wide .msg.user {
   padding: 9px 12px 10px;
   overflow: hidden;
 }
+.tool > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.tool > summary::-webkit-details-marker {
+  display: none;
+}
+.tool.bare > summary {
+  cursor: default;
+}
 .tool .head {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+.tool .chev {
+  flex: 0 0 auto;
+  font-size: 13px;
+  opacity: 0.55;
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+.tool[open] .chev {
+  transform: rotate(180deg);
+}
+.tool.bare .chev {
+  display: none;
+}
+.tool .count {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.tool > .body {
+  margin-top: 9px;
+}
+
+/* diff: il colore lo portano il segno e la barra, il testo resta bianco pieno */
+.diff {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 320px;
+  background: rgba(0, 0, 0, 0.16);
+}
+.diff .row {
+  display: flex;
+  gap: 8px;
+  padding: 0 9px;
+  white-space: pre;
+}
+.diff .row .sign {
+  flex: 0 0 auto;
+  font-weight: 800;
+  opacity: 0.9;
+}
+.diff .row .code {
+  min-width: 0;
+}
+.diff .add {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--ok);
+}
+.diff .add .sign {
+  color: var(--ok);
+}
+.diff .del {
+  background: color-mix(in srgb, var(--bad) 13%, transparent);
+  box-shadow: inset 2px 0 0 var(--bad);
+}
+.diff .del .sign {
+  color: var(--bad);
+}
+.diff .more {
+  padding: 4px 9px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* lista dei todo */
+.todos {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.todo {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.todo .ico {
+  font-size: 14px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  opacity: 0.75;
+}
+.todo.completed .ico {
+  color: var(--ok);
+  opacity: 1;
+}
+.todo.completed span {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+.todo.in_progress .ico {
+  color: var(--claude-1);
+  opacity: 1;
+}
+.todo.in_progress span {
+  font-weight: 650;
+}
+
+/* sub-agent: il suo discorso vive dentro la card del Task che lo ha lanciato */
+.tool .prompt {
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.85;
+  border-left: 2px solid color-mix(in srgb, var(--claude-2) 60%, transparent);
+  padding-left: 9px;
+  margin-bottom: 9px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.kids {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-left: 11px;
+  border-left: 1px dashed var(--line);
+}
+.kids .msg {
+  flex: 0 0 auto;
+}
+.kids .msg.user {
+  align-self: stretch;
+  max-width: none;
+}
+.sub-result {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow: auto;
 }
 .tool .tool-ico {
   font-size: 15px;
@@ -257,7 +481,6 @@ body.wide .msg.user {
   color: var(--bad);
 }
 .tool .out {
-  margin-top: 8px;
   font-family: var(--mono);
   font-size: 11.5px;
   white-space: pre-wrap;
@@ -562,8 +785,26 @@ body[data-mode='plan'] .modechip .ico {
   opacity: 0.85;
 }
 
+/* percorso cliccabile nella testa di un tool */
+.arg.link {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  border-bottom: 1px dashed transparent;
+}
+.arg.link:hover {
+  border-bottom-color: color-mix(in srgb, var(--claude-2) 70%, transparent);
+}
+
 /* ---------- composer ---------- */
 .composer {
+  position: relative;
   flex: 0 0 auto;
   margin: 0 11px 11px;
   border: 1px solid var(--line);
@@ -571,6 +812,7 @@ body[data-mode='plan'] .modechip .ico {
   background: var(--card);
   padding: 8px 8px 8px 12px;
   display: flex;
+  flex-wrap: wrap; /* gli allegati stanno su una riga loro, sopra il testo */
   align-items: flex-end;
   gap: 8px;
   transition: border-color 0.2s ease, box-shadow 0.25s ease;
@@ -627,4 +869,100 @@ body[data-mode='plan'] .modechip .ico {
 }
 .send.stop {
   background: linear-gradient(135deg, var(--bad), #ff8a7a);
+}
+
+/* menu di "@" e "/": sale dal campo di scrittura, non lo copre */
+.menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: 0 20px 44px -26px #000;
+  padding: 5px;
+  z-index: 5;
+}
+.mitem {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  min-width: 0;
+}
+.mitem.on {
+  background: color-mix(in srgb, var(--claude-1) 20%, transparent);
+}
+.mlabel {
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.mhint {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* allegati: selezione dall'editor e immagini incollate */
+.attach {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 7px;
+}
+.att {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--claude-1) 45%, var(--line));
+  border-radius: var(--pill);
+  font-family: var(--mono);
+  font-size: 11px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.att .ico {
+  font-size: 12px;
+  color: var(--claude-2);
+}
+.att .thumb {
+  height: 30px;
+  width: auto;
+  max-width: 90px;
+  border-radius: 5px;
+  display: block;
+}
+.attx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0.6;
+}
+.attx:hover {
+  opacity: 1;
+}
+.attx .ico {
+  font-size: 12px;
+  color: inherit;
 }

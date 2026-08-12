@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ChatController } from './chat/controller';
+import { registerDiffProvider } from './chat/editor';
 import { ChatPanel } from './chat/panel';
 import { ChatView } from './chat/view';
 
@@ -7,6 +8,10 @@ export function activate(ctx: vscode.ExtensionContext) {
   const chat = new ChatController();
 
   ctx.subscriptions.push(
+    registerDiffProvider(),
+    // La chat deve sapere cosa hai selezionato senza chiedertelo.
+    vscode.window.onDidChangeTextEditorSelection(() => chat.pushSelection()),
+    vscode.window.onDidChangeActiveTextEditor(() => chat.pushSelection()),
     vscode.window.registerWebviewViewProvider(ChatView.id, new ChatView(ctx, chat), {
       webviewOptions: { retainContextWhenHidden: true },
     }),

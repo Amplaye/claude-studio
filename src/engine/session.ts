@@ -43,19 +43,32 @@ export interface SessionOptions {
   emit: (e: Wire) => void;
   ask: PermissionAsker;
   permissionMode?: PermissionMode;
+  /** Il ponte con l'editor, se c'e' un editor vero da questa parte. */
+  ide?: Options['mcpServers'];
+  /** Id di una conversazione da riprendere. */
+  resume?: string;
+  /** Riprendi su un ramo nuovo, lasciando intatta quella originale. */
+  fork?: boolean;
 }
 
+type Outgoing = { text: string; images?: { mime: string; data: string }[] };
+
 export class Session {
-  private pending: string[] = [];
+  private pending: Outgoing[] = [];
   private wake?: () => void;
   private disposed = false;
   private q?: Query;
   private running?: Promise<void>;
 
-  /** id del messaggio API in corso: entra negli id dei blocchi, che restano unici. */
-  private msgId = '';
-  /** indice del content block -> testo accumulato dallo streaming. */
-  private acc = new Map<number, { id: string; kind: 'text' | 'thinking'; text: string }>();
+  /**
+   * Con un sub-agent al lavoro ci sono piu' messaggi in volo insieme, e i loro
+   * blocchi hanno indici che ripartono da zero: tenere un solo "messaggio in corso"
+   * li farebbe accavallare. Si tiene quindi un filo per ciascuno, con chiave il
+   * sub-agent che lo produce ('' per il discorso principale).
+   */
+  private msgOf = new Map<string, string>();
+  /** "<filo>#<indice del blocco>" -> testo accumulato dallo streaming. */
+  private acc = new Map<string, { id: string; kind: 'text' | 'thinking'; text: string }>();
   /** Messaggi che hanno prodotto almeno un blocco in streaming. */
   private streamed = new Set<string>();
 
@@ -66,10 +79,12 @@ export class Session {
   constructor(private o: SessionOptions) {}
 
   /** Manda un messaggio. La prima volta accende anche il processo. */
-  send(text: string) {
+  send(text: string, images?: { mime: string; data: string }[], echo?: string) {
     if (this.disposed) return;
-    this.pending.push(text);
-    this.o.emit({ k: 'user', text });
+    this.pending.push({ text, images });
+    // `echo` e' quello che si vede nella chat: il messaggio vero puo' portarsi
+    // dietro anche il codice selezionato, che nella chat sarebbe un muro.
+    this.o.emit({ k: 'user', text: echo ?? text });
     this.setBusy(true);
     if (!this.running) this.running = this.run();
     this.wake?.();
@@ -108,10 +123,21 @@ export class Session {
         this.wake = undefined;
         continue;
       }
-      const text = this.pending.shift()!;
+      const out = this.pending.shift()!;
+      // Le immagini incollate viaggiano come blocchi, prima del testo: e' l'ordine
+      // in cui si guardano.
+      const content: any = out.images?.length
+        ? [
+            ...out.images.map((i) => ({
+              type: 'image',
+              source: { type: 'base64', media_type: i.mime, data: i.data },
+            })),
+            { type: 'text', text: out.text },
+          ]
+        : out.text;
       yield {
         type: 'user',
-        message: { role: 'user', content: text },
+        message: { role: 'user', content },
         parent_tool_use_id: null,
         session_id: this.sessionId ?? '',
       };
@@ -130,8 +156,12 @@ export class Session {
     const options: Options = {
       cwd: this.o.cwd,
       includePartialMessages: true, // e' questo che fa arrivare il testo parola per parola
+      // senza questo del sub-agent arrivano solo i tool: il suo discorso resta muto
+      forwardSubagentText: true,
       permissionMode: this.o.permissionMode ?? 'default',
       canUseTool: this.canUseTool,
+      ...(this.o.resume ? { resume: this.o.resume, forkSession: !!this.o.fork } : {}),
+      ...(this.o.ide ? { mcpServers: this.o.ide } : {}),
       // Chiamiamo la CLI installata sul PC: senza questo l'SDK cerca il proprio
       // binario nativo, che apposta non impacchettiamo.
       ...(this.o.cliPath ? { pathToClaudeCodeExecutable: this.o.cliPath } : {}),
@@ -139,7 +169,7 @@ export class Session {
         ...process.env,
         FORCE_COLOR: '0',
         NO_COLOR: '1',
-        CLAUDE_AGENT_SDK_CLIENT_APP: 'claude-studio/0.1.0',
+        CLAUDE_AGENT_SDK_CLIENT_APP: 'claude-studio',
       },
     };
 
@@ -153,6 +183,23 @@ export class Session {
     } finally {
       this.setBusy(false);
       this.running = undefined;
+    }
+  }
+
+  /** Gli slash command veri della CLI: skill, comandi del progetto, plugin. */
+  private async publishCommands() {
+    try {
+      const list = await this.q?.supportedCommands();
+      if (!list) return;
+      this.o.emit({
+        k: 'commands',
+        items: list.map((c: any) => ({
+          name: String(c.name ?? ''),
+          description: String(c.description ?? '').slice(0, 200),
+        })).filter((c) => c.name),
+      });
+    } catch {
+      /* una CLI piu' vecchia puo' non saperlo dire: si resta senza elenco */
     }
   }
 
@@ -188,15 +235,19 @@ export class Session {
           this.sessionId = m.session_id;
           this.model = m.model;
           this.o.emit({ k: 'session', id: m.session_id, model: m.model, cwd: this.o.cwd });
+          void this.publishCommands();
         }
+        // La lista degli slash command puo' cambiare a meta' sessione (skill trovate
+        // per strada): quando cambia si rilegge, non si tiene quella vecchia.
+        if ((m as any).subtype === 'commands_changed') void this.publishCommands();
         return;
 
       case 'stream_event':
-        this.onStreamEvent(m.event as any);
+        this.onStreamEvent(m.event as any, m.parent_tool_use_id ?? null);
         return;
 
       case 'assistant':
-        this.onAssistant(m.message.id, m.message.content as any[]);
+        this.onAssistant(m.message.id, m.message.content as any[], m.parent_tool_use_id ?? null);
         return;
 
       case 'user':
@@ -205,6 +256,7 @@ export class Session {
 
       case 'result': {
         this.acc.clear();
+        this.msgOf.clear();
         const ok = m.subtype === 'success';
         const u: any = (m as any).usage ?? {};
         this.o.emit({
@@ -228,34 +280,39 @@ export class Session {
     }
   }
 
-  private onStreamEvent(ev: any) {
+  private onStreamEvent(ev: any, parent: string | null) {
+    const thread = parent ?? '';
+    const key = `${thread}#${ev?.index}`;
+
     switch (ev?.type) {
       case 'message_start':
-        this.msgId = ev.message?.id || `m${Date.now()}`;
-        this.acc.clear();
+        this.msgOf.set(thread, ev.message?.id || `m${Date.now()}`);
+        // si azzera solo il proprio filo: quello del sub-agent va avanti per conto suo
+        for (const k of [...this.acc.keys()]) if (k.startsWith(thread + '#')) this.acc.delete(k);
         if (this.streamed.size > 64) this.streamed.clear();
-        this.o.emit({ k: 'turn_start' });
+        if (!parent) this.o.emit({ k: 'turn_start' });
         return;
 
       case 'content_block_start': {
         const kind = blockKind(ev.content_block?.type);
         if (!kind) return; // tool_use: lo prende il messaggio completo, con l'input gia' valido
-        const id = `${this.msgId}_${ev.index}`;
-        this.acc.set(ev.index, { id, kind, text: '' });
-        this.streamed.add(this.msgId);
-        this.o.emit({ k: 'block_start', id, kind });
+        const msgId = this.msgOf.get(thread) || 'm';
+        const id = `${msgId}_${ev.index}`;
+        this.acc.set(key, { id, kind, text: '' });
+        this.streamed.add(msgId);
+        this.o.emit({ k: 'block_start', id, kind, parent });
         return;
       }
 
       case 'content_block_delta': {
-        const b = this.acc.get(ev.index);
+        const b = this.acc.get(key);
         if (!b) return;
         const d = ev.delta;
         const thinking = d?.type === 'thinking_delta';
         const text = d?.type === 'text_delta' ? d.text : thinking ? d.thinking : '';
         if (!text) return;
         b.text += text;
-        this.o.emit({ k: 'delta', id: b.id, kind: b.kind, text });
+        this.o.emit({ k: 'delta', id: b.id, kind: b.kind, text, parent });
         return;
       }
 
@@ -263,10 +320,10 @@ export class Session {
       // assistant completo: quello arriva PRIMA che il blocco finisca di scorrere,
       // e chiudere li' lasciava per strada i frammenti arrivati dopo.
       case 'content_block_stop': {
-        const b = this.acc.get(ev.index);
+        const b = this.acc.get(key);
         if (!b) return;
-        this.acc.delete(ev.index);
-        this.o.emit({ k: 'block_final', id: b.id, kind: b.kind, text: b.text });
+        this.acc.delete(key);
+        this.o.emit({ k: 'block_final', id: b.id, kind: b.kind, text: b.text, parent });
         return;
       }
     }
@@ -277,19 +334,19 @@ export class Session {
    * mentre in streaming arriva a pezzi di JSON. Il testo lo possiede lo streaming;
    * si prende da qui solo se per quel messaggio lo streaming non ha prodotto niente.
    */
-  private onAssistant(msgId: string, content: any[]) {
+  private onAssistant(msgId: string, content: any[], parent: string | null) {
     if (!Array.isArray(content)) return;
     const viaStream = this.streamed.has(msgId);
     content.forEach((b, i) => {
       if (b?.type === 'tool_use') {
-        this.o.emit({ k: 'tool_start', id: b.id, name: b.name, input: b.input });
+        this.o.emit({ k: 'tool_start', id: b.id, name: b.name, input: b.input, parent });
         return;
       }
       if (viaStream) return;
       const kind = blockKind(b?.type);
       if (!kind) return;
       const text = kind === 'text' ? b.text ?? '' : b.thinking ?? '';
-      this.o.emit({ k: 'block_final', id: `${msgId}_${i}`, kind, text });
+      this.o.emit({ k: 'block_final', id: `${msgId}_${i}`, kind, text, parent });
     });
   }
 

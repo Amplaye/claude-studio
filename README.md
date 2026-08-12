@@ -12,13 +12,25 @@ che vive nel motore, non nell'interfaccia.
 - **Fase 1 — fatta**: scheletro, motore, risposta in streaming parola per parola.
   In piu', fuori piano: la chat si apre anche **come scheda** a tutto schermo, e le
   due facce (pannello laterale e scheda) condividono la stessa conversazione.
-- **Fase 2 — in corso**. Fatto: i **permessi dentro la chat**, con le tre facce della
-  stessa domanda — strumento (Consenti / Consenti sempre / Rifiuta), piano di
-  `ExitPlanMode` (approva, approva senza piu' chiedere le modifiche, continua a
-  pianificare), domande a scelta multipla di `AskUserQuestion`. In testata si sceglie
-  la **modalita'**: chiede / modifiche senza chiedere / solo piano / non chiede mai.
-  Resta da fare: rendering ricco dei tool (diff, todo, sub-agent), cronologia e
-  ripresa, ingressi (`@file`, slash command, immagini), ponte con l'editor.
+- **Fase 2 — fatta**: parita' di funzionamento con l'estensione ufficiale.
+  - **Permessi dentro la chat**, nelle tre facce della stessa domanda: strumento
+    (Consenti / Consenti sempre / Rifiuta), piano di `ExitPlanMode` (approva ed
+    esegui, approva senza piu' chiedere le modifiche, continua a pianificare),
+    domande a scelta multipla di `AskUserQuestion`.
+  - **Modalita'** scelta dalla testata: chiede / modifiche senza chiedere / solo
+    piano / non chiede mai.
+  - **Tool disegnati**: diff colorati (il "prima" dai dati del tool, mai riletto dal
+    disco), lista dei todo, output ripiegabile che dichiara quante righe ha,
+    sub-agent annidati dentro la card del Task che li ha lanciati, percorsi
+    cliccabili che aprono il file nell'editor.
+  - **Cronologia**: le conversazioni del progetto, ripescate e ridipinte com'erano,
+    riprese o continuate su un ramo nuovo.
+  - **Ingressi**: `@` per un file, `/` per gli slash command veri della CLI,
+    immagini incollate, e il codice selezionato nell'editor che si allega da solo.
+  - **Ponte con l'editor**: server MCP `editor` con diff nativo, errori/avvisi che
+    l'editor gia' conosce, file aperti e selezione, apertura di un file su una riga.
+  - **Testata**: modello, modalita', contesto dell'ultimo turno e costo della
+    conversazione.
 - Fase 3: la context bar assorbita.
 - Fase 4: repertorio completo delle animazioni e rifinitura.
 
@@ -49,6 +61,13 @@ materiale di riferimento, sta in
 - La colonna della conversazione e' un flex: senza `flex: 0 0 auto` sui messaggi,
   appena il discorso supera l'altezza della finestra i messaggi **si schiacciano**
   invece di far scorrere. Si vede solo quando la pagina e' piena.
+- Con un sub-agent al lavoro ci sono **piu' messaggi in volo insieme**, e i loro
+  blocchi hanno indici che ripartono da zero. Tenere un solo "messaggio in corso"
+  li fa accavallare: serve un filo per ciascuno, con chiave `parent_tool_use_id`.
+- Il ponte con l'editor **non ha bisogno di socket ne' di lockfile**: l'Agent SDK
+  ospita un server MCP dentro il nostro stesso processo (`createSdkMcpServer`).
+  Quindi e' una funzione, non una porta di rete — e non litiga con quello
+  dell'estensione ufficiale, che resta installata.
 
 ## Sviluppo
 
@@ -72,6 +91,20 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
   aperta a meta' discorso che si riprende la storia.
 - `smoke` e `trace-order` sono le prove secche del motore, utili quando si sospetta
   che sia cambiato qualcosa nel protocollo.
+
+Per usare la chat **a mano**, senza aprire VSCode, c'e' `scripts/drive.cjs`: carica
+il bundle vero con un `vscode` finto e stampa quello che vedrebbe la webview.
+
+```
+node scripts/drive.cjs "ciao"
+node scripts/drive.cjs --json "..."            # eventi grezzi, uno per riga
+node scripts/drive.cjs --deny --mode plan "..."
+node scripts/drive.cjs --image foto.png "che cosa mostra?"
+node scripts/drive.cjs --cmd '{"cmd":"history"}'
+```
+
+⚠️ Di suo dice **si' a ogni permesso**: puntato su un prompt che scrive, scrive
+davvero nel repo. Per le prove che toccano file si usa `--deny`.
 
 Per installarla: `npm run package` e poi
 `code --install-extension claude-studio.vsix --force`, quindi ricaricare la finestra.

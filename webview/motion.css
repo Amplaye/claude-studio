@@ -80,6 +80,17 @@
   }
 }
 
+@keyframes cs-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Le outline Ionicons sono tracciati: possono disegnarsi da sole. */
 @keyframes cs-draw {
   from {
@@ -175,6 +186,13 @@
 
 .tool.running .tool-ico {
   animation: cs-breathe 1.5s ease-in-out infinite;
+}
+
+/* apertura di un blocco tool: elastica, ma solo su transform e opacity */
+.tool[open] > .body,
+.think[open] > .body {
+  transform-origin: top center;
+  animation: cs-open 0.38s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
 .tool.done .tool-ico path {
