@@ -1,0 +1,241 @@
+/* Tutte le animazioni stanno qui: i tempi si ritoccano in un posto solo.
+   Si muovono soltanto transform e opacity — le due proprieta' che la scheda
+   video gestisce da sola — cosi' si puo' essere vistosi e restare fluidi. */
+
+@keyframes cs-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.965);
+    filter: blur(7px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes cs-chunk {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cs-caret {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scaleY(0.82);
+  }
+}
+
+@keyframes cs-halo {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 0.25;
+  }
+}
+
+@keyframes cs-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes cs-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes cs-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+}
+
+/* Le outline Ionicons sono tracciati: possono disegnarsi da sole. */
+@keyframes cs-draw {
+  from {
+    stroke-dashoffset: var(--len, 300);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cs-flash {
+  from {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+@keyframes cs-rise {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.96);
+  }
+  70% {
+    transform: translateY(-4px) scale(1.012);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cs-squeeze {
+  50% {
+    transform: scale(0.982);
+  }
+}
+
+/* ---- applicazione ---- */
+
+.msg {
+  animation: cs-enter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+.chunk {
+  animation: cs-chunk 0.22s ease-out both;
+}
+
+.caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.02em;
+  margin-left: 1px;
+  vertical-align: -0.16em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--claude-2), var(--claude-1));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--claude-1) 70%, transparent);
+  animation: cs-caret 1s ease-in-out infinite;
+}
+
+.thinking-halo::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--pill);
+  background: var(--claude-1);
+  animation: cs-halo 1.6s ease-in-out infinite;
+}
+
+.thinking-ring {
+  background: conic-gradient(
+    from 0turn,
+    transparent 0deg,
+    var(--claude-1) 130deg,
+    var(--claude-2) 210deg,
+    transparent 330deg
+  );
+  animation: cs-spin 2.4s linear infinite;
+}
+
+.tool.running .tool-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 32%;
+  border-radius: var(--pill);
+  background: linear-gradient(90deg, transparent, var(--claude-2), transparent);
+  animation: cs-sweep 1.25s ease-in-out infinite;
+}
+
+.tool.running .tool-ico {
+  animation: cs-breathe 1.5s ease-in-out infinite;
+}
+
+.tool.done .tool-ico path {
+  stroke-dasharray: var(--len, 300);
+  animation: cs-draw 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.spark {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--claude-2) 60%, transparent), transparent 65%);
+  animation: cs-flash 0.7s ease-out both;
+}
+
+.perm {
+  animation: cs-rise 0.5s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+.composer.sending {
+  animation: cs-squeeze 0.2s ease-out;
+}
+
+.card-hover {
+  transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.25, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px -20px var(--claude-1), 0 0 0 1px color-mix(in srgb, var(--claude-1) 30%, transparent);
+}
+
+/* Se il sistema chiede meno movimento restano solo le dissolvenze. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.12s !important;
+  }
+  .msg,
+  .perm,
+  .chunk {
+    animation: none !important;
+  }
+  .caret {
+    animation: none !important;
+    opacity: 0.8;
+  }
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
+/* I loop infiniti si fermano appena l'elemento esce dallo schermo: venti aloni
+   che pulsano fuori vista scaldano il portatile per niente. */
+.offscreen .thinking-halo::before,
+.offscreen .thinking-ring,
+.offscreen .tool-bar::after,
+.offscreen .tool-ico,
+.offscreen .caret {
+  animation-play-state: paused;
+}

@@ -1,0 +1,5 @@
+node_modules/
+dist/
+out/
+media/ionicons.sprite.svg
+*.vsix

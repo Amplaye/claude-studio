@@ -1,0 +1,88 @@
+{
+  "name": "claude-studio",
+  "displayName": "Claude Studio",
+  "description": "Chat Claude Code e barra di contesto in una sola estensione.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeStudio",
+          "title": "Claude Studio",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "claudeStudio": [
+        {
+          "type": "webview",
+          "id": "claudeStudio.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeStudio.show",
+        "title": "Claude Studio: Apri"
+      },
+      {
+        "command": "claudeStudio.newSession",
+        "title": "Claude Studio: Nuova sessione"
+      },
+      {
+        "command": "claudeStudio.interrupt",
+        "title": "Claude Studio: Ferma"
+      }
+    ],
+    "configuration": {
+      "title": "Claude Studio",
+      "properties": {
+        "claudeStudio.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Percorso di cli.js della CLI claude. Vuoto = rilevamento automatico."
+        },
+        "claudeStudio.contextLimit": {
+          "type": "number",
+          "default": 1000000,
+          "description": "Finestra di contesto totale in token (per il calcolo della %)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "package": "node build.mjs && vsce package --no-dependencies --allow-missing-repository --skip-license -o claude-studio.vsix",
+    "typecheck": "tsc --noEmit",
+    "preview": "node build.mjs && node scripts/preview.mjs",
+    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs",
+    "smoke": "node scripts/smoke-engine.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.7.0",
+    "esbuild": "^0.28.0",
+    "playwright": "^1.60.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.228",
+    "ionicons": "^8.1.0"
+  }
+}

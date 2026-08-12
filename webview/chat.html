@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <link rel="stylesheet" href="{{tokensCss}}" />
+    <link rel="stylesheet" href="{{motionCss}}" />
+    <link rel="stylesheet" href="{{chatCss}}" />
+    <title>Claude Studio</title>
+  </head>
+  <body>
+    {{sprite}}
+
+    <header class="top">
+      <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
+      <span class="grow"></span>
+      <span class="chip" id="model" title="Modello della sessione">
+        <svg class="ico"><use href="#ion-hardware-chip" /></svg><span id="modelName">—</span>
+      </span>
+      <button class="iconbtn" id="btnNew" title="Nuova sessione">
+        <svg class="ico"><use href="#ion-add" /></svg>
+      </button>
+    </header>
+
+    <main class="log" id="log"></main>
+
+    <form class="composer" id="composer">
+      <textarea id="input" rows="1" placeholder="Scrivi a Claude…  (Invio manda, Maiusc+Invio va a capo)"></textarea>
+      <button class="send" id="send" type="submit" title="Manda">
+        <svg class="ico"><use href="#ion-send" /></svg>
+      </button>
+    </form>
+
+    <script nonce="{{nonce}}" src="{{chatJs}}"></script>
+  </body>
+</html>
