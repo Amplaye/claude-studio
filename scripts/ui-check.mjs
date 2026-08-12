@@ -309,24 +309,28 @@ for (const surface of ['view', 'panel']) {
   await page.click('#btnCfg');
   await page.waitForTimeout(140);
   t(await page.isVisible('#cfg'), 'il pannello delle impostazioni non si apre');
-  t(
-    (await page.locator('#cfgModel option').count()) === 3,
-    'i modelli della CLI non arrivano nel menu: ' + (await page.locator('#cfgModel option').count())
-  );
-  await page.selectOption('#cfgModel', 'opus');
+  // I modelli sono card: Predefinito + 2 dalla CLI = 3 card
+  const modelCards = await page.locator('#cfgModelList .model-card').count();
+  t(modelCards === 3, 'le card dei modelli non arrivano: ' + modelCards);
+  // Clic sulla card Opus
+  await page.locator('#cfgModelList .model-card:nth-child(2)').click();
   const sm = await lastSent();
-  t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'il modello scelto non arriva all’estensione: ' + JSON.stringify(sm));
+  t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'il modello scelto non arriva: ' + JSON.stringify(sm));
   await page.waitForTimeout(80);
-  t(
-    (await page.locator('#cfgEffort option').count()) === 4,
-    'i livelli d’impegno non seguono il modello: ' + (await page.locator('#cfgEffort option').count())
-  );
-  t((await page.textContent('#cfgModelHint')) === 'Il più bravo.', 'il modello scelto non si racconta');
-  await page.selectOption('#cfgModel', 'haiku');
+  // Impegno segue il modello: Auto + 3 livelli = 4 bottoni
+  const effortBtns = await page.locator('#cfgEffort .seg-btn').count();
+  t(effortBtns === 4, 'i livelli di impegno non seguono il modello: ' + effortBtns);
+  // La card Opus deve mostrare la descrizione nella card stessa
+  const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-desc').textContent();
+  t(opusDesc === 'Il più bravo.', 'il modello scelto non si racconta: ' + opusDesc);
+  // Clic su Haiku: impegno si deve spegnere
+  await page.locator('#cfgModelList .model-card:nth-child(3)').click();
   await page.waitForTimeout(80);
-  t(await page.locator('#cfgEffort').isDisabled(), 'l’impegno resta scegliibile su un modello che non lo accetta');
+  const disabledBtn = await page.locator('#cfgEffort .seg-btn:disabled').count();
+  t(disabledBtn > 0, 'impegno selezionabile su un modello che non lo accetta');
 
-  await page.selectOption('#cfgThink', 'off');
+  // Il pensiero: clic su Spento
+  await page.locator('#cfgThink .seg-btn:nth-child(3)').click();
   const st = await lastSent();
   t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'il pensiero non si spegne: ' + JSON.stringify(st));
   await page.selectOption('#cfgSound', 'bell');
@@ -334,7 +338,7 @@ for (const surface of ['view', 'panel']) {
   t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'bell', 'il suono scelto non arriva: ' + JSON.stringify(ssnd));
   await page.click('#cfgTest');
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-cfg.png`) });
-  // e l'avviso vero: arriva dall'estensione e la pagina lo suona senza lamentarsi
+  // avviso vero: arriva dall'estensione e la pagina lo suona senza lamentarsi
   await post({ k: 'chime', event: 'done', sound: 'cozy', volume: 0.4 });
   await page.waitForTimeout(120);
   await page.click('#cfgClose');

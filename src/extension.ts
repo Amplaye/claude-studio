@@ -43,6 +43,9 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('claudeStudio.openTabBeside', () =>
       ChatPanel.open(ctx, chat, vscode.ViewColumn.Beside, monitor)
     ),
+    vscode.commands.registerCommand('claudeStudio.openNewTab', () =>
+      ChatPanel.openNew(ctx, monitor)
+    ),
     vscode.commands.registerCommand('claudeStudio.newSession', () => chat.newSession()),
     vscode.commands.registerCommand('claudeStudio.interrupt', () => chat.interrupt()),
     vscode.commands.registerCommand('claudeStudio.context.show', () =>

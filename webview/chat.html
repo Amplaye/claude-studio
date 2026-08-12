@@ -70,24 +70,22 @@
             </button>
           </div>
 
-          <div class="pop-sec">Motore</div>
-          <label class="prow">
-            <span class="plab">Modello</span>
-            <select id="cfgModel"></select>
-          </label>
-          <p class="phint" id="cfgModelHint"></p>
-          <label class="prow">
-            <span class="plab">Impegno</span>
-            <select id="cfgEffort"></select>
-          </label>
-          <label class="prow">
-            <span class="plab">Pensiero</span>
-            <select id="cfgThink">
-              <option value="auto">Come decide lui</option>
-              <option value="on">Sempre acceso</option>
-              <option value="off">Spento</option>
-            </select>
-          </label>
+          <div class="pop-sec">Modello</div>
+          <div class="model-list" id="cfgModelList">
+            <!-- le card dei modelli le costruisce il JS -->
+          </div>
+
+          <div class="pop-sec">Impegno</div>
+          <div class="seg" id="cfgEffort">
+            <!-- i bottoni li costruisce il JS in base al modello scelto -->
+          </div>
+          <p class="phint" id="cfgEffortHint"></p>
+
+          <div class="pop-sec">Pensiero</div>
+          <div class="seg" id="cfgThink">
+            <!-- Auto / Acceso / Spento -->
+          </div>
+          <p class="phint" id="cfgThinkHint"></p>
 
           <div class="pop-sec">Quando ha finito</div>
           <label class="prow">

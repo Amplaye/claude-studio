@@ -48,8 +48,15 @@ export class ChatController {
   private pending = new Map<string, Pending>();
   private prefs: Prefs;
   private models: ModelChoice[];
+  /**
+   * Solo il controller principale interagisce con la barra di contesto
+   * (`owned`) e col bollino. Le schede secondarie hanno un controller loro
+   * che non deve pestare i piedi al principale.
+   */
+  private readonly primary: boolean;
 
-  constructor(private readonly ctx: vscode.ExtensionContext) {
+  constructor(private readonly ctx: vscode.ExtensionContext, opts?: { primary?: boolean }) {
+    this.primary = opts?.primary !== false;
     this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
     this.models = ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? [];
   }
@@ -104,6 +111,7 @@ export class ChatController {
 
   /** Sei tornato a guardare: il bollino ha finito il suo mestiere. */
   onWindowFocus() {
+    if (!this.primary) return;
     setChatBadge(0);
   }
 
@@ -116,7 +124,7 @@ export class ChatController {
     const p = this.prefs;
     const focused = vscode.window.state.focused;
 
-    if (!focused) setChatBadge(1);
+    if (!focused && this.primary) setChatBadge(1);
     if (event === 'done' && p.toast && !focused) {
       const cwd = currentCwd();
       void vscode.window
@@ -198,7 +206,7 @@ export class ChatController {
     this.session = undefined;
     this.history = [];
     this.busy = false;
-    owned.end(); // la card della barra di contesto non ha piu' niente da mostrare
+    if (this.primary) owned.end(); // la card della barra di contesto non ha piu' niente da mostrare
     this.broadcast({ k: 'reset' });
     this.broadcast({ k: 'mode', value: this.mode });
   }
@@ -213,7 +221,7 @@ export class ChatController {
   dispose() {
     this.closeAllPending('Estensione chiusa.');
     this.session?.dispose();
-    owned.end();
+    if (this.primary) owned.end();
   }
 
   // ---- permessi ----------------------------------------------------------
@@ -374,7 +382,7 @@ export class ChatController {
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
-    owned.observe(e, currentCwd());
+    if (this.primary) owned.observe(e, currentCwd());
     this.broadcast(e);
   }
 

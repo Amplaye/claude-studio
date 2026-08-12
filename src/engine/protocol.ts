@@ -142,6 +142,7 @@ export type Cmd =
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
+  | { cmd: 'newTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
   | { cmd: 'setMode'; value: Mode }
   | { cmd: 'setPrefs'; value: Partial<Prefs> }

@@ -164,7 +164,7 @@ body.wide .msg.user {
   top: 42px;
   right: 10px;
   z-index: 6;
-  width: 290px;
+  width: 340px;
   max-width: calc(100% - 20px);
   max-height: calc(100% - 60px);
   overflow-y: auto;
@@ -202,6 +202,122 @@ body.wide .msg.user {
   margin-top: 2px;
 }
 
+/* ---------- model cards ---------- */
+.model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+.model-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+  text-align: left;
+  color: var(--fg);
+  font: inherit;
+}
+.model-card:hover {
+  border-color: color-mix(in srgb, var(--claude-1) 40%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 4%, transparent);
+}
+.model-card.on {
+  border-color: var(--claude-1);
+  background: color-mix(in srgb, var(--claude-1) 10%, transparent);
+}
+.mc-dot {
+  flex: 0 0 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--fg) 35%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.model-card.on .mc-dot {
+  background: var(--claude-1);
+  border-color: var(--claude-1);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--claude-1) 40%, transparent);
+}
+.mc-info {
+  flex: 1;
+  min-width: 0;
+}
+.mc-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.mc-desc {
+  display: block;
+  font-size: 10.5px;
+  opacity: 0.55;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- segmented control ---------- */
+.seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--pill);
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.seg-btn {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1.5px solid transparent;
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: background 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+.seg-btn:hover:not(:disabled) {
+  opacity: 0.85;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+.seg-btn.on {
+  background: color-mix(in srgb, var(--claude-1) 18%, var(--surface));
+  border-color: color-mix(in srgb, var(--claude-1) 45%, transparent);
+  opacity: 1;
+  color: var(--claude-2);
+  font-weight: 700;
+}
+.seg-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* La descrizione della scelta: una riga, sparisce se e' vuota. */
+.phint {
+  margin: 4px 0 4px;
+  font-size: 11px;
+  opacity: 0.55;
+  line-height: 1.35;
+}
+.phint:empty {
+  display: none;
+}
+
+/* ---------- sezione suono (label + select / range / check) ---------- */
 .prow {
   display: flex;
   align-items: center;
@@ -232,21 +348,10 @@ body.wide .msg.user {
   accent-color: var(--claude-1);
   cursor: pointer;
 }
-/* un menu spento deve sembrarlo: il modello scelto non accetta quella scelta */
 .prow select:disabled,
 .prow input:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-/* La descrizione del modello scelto: una riga, e solo se dice qualcosa. */
-.phint {
-  margin: -3px 0 8px;
-  font-size: 11px;
-  opacity: 0.65;
-}
-.phint:empty {
-  display: none;
 }
 
 .pcheck {
@@ -1146,7 +1251,7 @@ body[data-mode='plan'] .modechip .ico {
   left: 0;
   right: 0;
   bottom: calc(100% + 6px);
-  max-height: 260px;
+  max-height: 340px;
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: var(--r);
@@ -1155,6 +1260,23 @@ body[data-mode='plan'] .modechip .ico {
   padding: 5px;
   z-index: 5;
 }
+.menu-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  color: var(--claude-2);
+}
+.menu-head .ico {
+  width: 12px;
+  height: 12px;
+}
+/* riga file: una riga sola, nome e percorso affiancati */
 .mitem {
   display: flex;
   align-items: baseline;
@@ -1165,7 +1287,7 @@ body[data-mode='plan'] .modechip .ico {
   min-width: 0;
 }
 .mitem.on {
-  background: color-mix(in srgb, var(--claude-1) 20%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 16%, transparent);
 }
 .mlabel {
   font-size: 12.5px;
@@ -1181,6 +1303,44 @@ body[data-mode='plan'] .modechip .ico {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+}
+/* riga comando: nome e descrizione su due righe, con simbolo a sinistra */
+.mitem-cmd {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+}
+.mico {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
+  color: var(--claude-2);
+  font-size: 12px;
+  font-weight: 800;
+  font-family: var(--mono, monospace);
+}
+.minfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.minfo .mlabel {
+  font-size: 12.5px;
+}
+.mdesc {
+  font-size: 11px;
+  opacity: 0.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* allegati: selezione dall'editor e immagini incollate */

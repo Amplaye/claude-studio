@@ -63,6 +63,9 @@ export function bindWebview(
       case 'openTab':
         void vscode.commands.executeCommand('claudeStudio.openTab');
         return;
+      case 'newTab':
+        void vscode.commands.executeCommand('claudeStudio.openNewTab');
+        return;
       case 'answer':
         chat.answer(m.id, m.choice, m.answers);
         return;

@@ -878,10 +878,24 @@
       closeMenu();
       return;
     }
+    const isCmd = picking.kind === '/';
+    if (isCmd) {
+      const head = el('div', 'menu-head');
+      head.append(icon('terminal'), el('span', null, ' Comandi'));
+      menu.append(head);
+    }
     items.forEach((it, i) => {
-      const row = el('div', 'mitem' + (i === 0 ? ' on' : ''));
-      row.append(el('span', 'mlabel', it.label));
-      if (it.hint) row.append(el('span', 'mhint', it.hint));
+      const row = el('div', 'mitem' + (i === 0 ? ' on' : '') + (isCmd ? ' mitem-cmd' : ''));
+      if (isCmd) {
+        row.append(el('span', 'mico', '/'));
+        const info = el('span', 'minfo');
+        info.append(el('span', 'mlabel', it.label));
+        if (it.hint) info.append(el('span', 'mdesc', it.hint));
+        row.append(info);
+      } else {
+        row.append(el('span', 'mlabel', it.label));
+        if (it.hint) row.append(el('span', 'mhint', it.hint));
+      }
       row.addEventListener('mousedown', (e) => {
         e.preventDefault();
         choose(i);
@@ -1074,7 +1088,7 @@
     vscode.postMessage({ cmd: 'setMode', value: modeSel.value })
   );
 
-  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
+  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   // ---------- impostazioni: modello, pensiero, avvisi ----------
@@ -1097,52 +1111,89 @@
   };
   let models = [];
 
-  const EFFORT_LABELS = {
-    low: 'Basso',
-    medium: 'Medio',
-    high: 'Alto',
-    xhigh: 'Molto alto',
-    max: 'Massimo',
+  // Ogni livello di impegno ha un nome e una spiegazione semplice.
+  const EFFORT_INFO = {
+    '':     { label: 'Auto',          desc: 'Claude decide quanto impegnarsi in base alla domanda' },
+    low:    { label: 'Veloce',        desc: 'Risponde subito — buono per domande semplici' },
+    medium: { label: 'Equilibrato',   desc: 'Il giusto mix tra velocita\u0300 e precisione' },
+    high:   { label: 'Approfondito',  desc: 'Si prende il tempo per fare le cose per bene' },
+    xhigh:  { label: 'Molto approfondito', desc: 'Analizza tutto a fondo prima di agire' },
+    max:    { label: 'Massimo',       desc: 'Non si risparmia niente, la massima qualita\u0300' },
   };
-  const ALL_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+  const THINK_INFO = {
+    auto: { label: 'Auto',   desc: 'Claude decide quando ragionare a fondo' },
+    on:   { label: 'Acceso', desc: 'Ragiona passo passo prima di ogni risposta' },
+    off:  { label: 'Spento', desc: 'Risponde direttamente, senza ragionamento intermedio' },
+  };
 
-  function fillSelect(sel, items, value) {
-    sel.replaceChildren();
-    for (const it of items) {
-      const o = el('option', null, it.label);
-      o.value = it.value;
-      sel.appendChild(o);
+  // -- model cards --
+  function paintModels() {
+    const list = $('cfgModelList');
+    list.replaceChildren();
+    const all = [
+      { value: '', label: 'Predefinito', desc: 'Il modello che useresti da terminale' },
+      ...models.map((m) => ({ value: m.value, label: m.label, desc: m.description })),
+    ];
+    for (const m of all) {
+      const card = el('button', 'model-card' + (m.value === prefs.model ? ' on' : ''));
+      card.type = 'button';
+      const dot = el('span', 'mc-dot');
+      const info = el('span', 'mc-info');
+      info.append(el('span', 'mc-name', m.label));
+      if (m.desc) info.append(el('span', 'mc-desc', m.desc));
+      card.append(dot, info);
+      card.addEventListener('click', () => push({ model: m.value }));
+      list.append(card);
     }
-    // Se la scelta di prima non esiste piu' (CLI cambiata, modello ritirato) si
-    // torna alla prima voce invece di restare su un valore che non c'e'.
-    const ok = items.some((i) => i.value === value);
-    sel.value = ok ? value : items.length ? items[0].value : '';
+    if (!models.length) {
+      list.append(el('p', 'phint', 'I modelli disponibili appariranno dopo il primo messaggio'));
+    }
+  }
+
+  // -- segmented control generico --
+  function paintSeg(container, items, value, onChange) {
+    container.replaceChildren();
+    for (const it of items) {
+      const btn = el('button', 'seg-btn' + (it.value === value ? ' on' : ''));
+      btn.type = 'button';
+      btn.textContent = it.label;
+      if (it.disabled) btn.disabled = true;
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        onChange(it.value);
+      });
+      container.append(btn);
+    }
+  }
+
+  function paintEffort() {
+    const chosen = models.find((m) => m.value === prefs.model);
+    const levels = chosen ? chosen.efforts : ['low', 'medium', 'high'];
+    const noEffort = !!chosen && !chosen.efforts.length;
+    const items = [{ value: '', label: 'Auto', disabled: noEffort }].concat(
+      levels.map((l) => ({
+        value: l,
+        label: (EFFORT_INFO[l] || {}).label || l,
+        disabled: noEffort,
+      }))
+    );
+    paintSeg($('cfgEffort'), items, prefs.effort, (v) => push({ effort: v }));
+    const info = EFFORT_INFO[prefs.effort] || EFFORT_INFO[''];
+    $('cfgEffortHint').textContent = noEffort
+      ? 'Questo modello non accetta livelli di impegno'
+      : info.desc;
+  }
+
+  function paintThinking() {
+    const items = Object.entries(THINK_INFO).map(([v, i]) => ({ value: v, label: i.label }));
+    paintSeg($('cfgThink'), items, prefs.thinking, (v) => push({ thinking: v }));
+    $('cfgThinkHint').textContent = (THINK_INFO[prefs.thinking] || {}).desc || '';
   }
 
   function paintCfg() {
-    fillSelect(
-      $('cfgModel'),
-      [{ value: '', label: 'Predefinito della CLI' }].concat(
-        models.map((m) => ({ value: m.value, label: m.label }))
-      ),
-      prefs.model
-    );
-    const chosen = models.find((m) => m.value === prefs.model);
-    $('cfgModelHint').textContent = chosen ? chosen.description : '';
-
-    // I livelli d'impegno li detta il modello: quelli che non accetta non si
-    // mostrano, e se non ne accetta nessuno il menu si spegne.
-    const levels = chosen ? chosen.efforts : ALL_EFFORTS;
-    fillSelect(
-      $('cfgEffort'),
-      [{ value: '', label: 'Come decide lui' }].concat(
-        levels.map((l) => ({ value: l, label: EFFORT_LABELS[l] || l }))
-      ),
-      prefs.effort
-    );
-    $('cfgEffort').disabled = !!chosen && !chosen.efforts.length;
-
-    $('cfgThink').value = prefs.thinking;
+    paintModels();
+    paintEffort();
+    paintThinking();
     $('cfgSound').value = prefs.sound;
     $('cfgVol').value = Math.round((prefs.volume == null ? 0.6 : prefs.volume) * 100);
     $('cfgVol').disabled = prefs.sound === 'off';
@@ -1179,9 +1230,6 @@
     toggleCfg(false);
   });
 
-  $('cfgModel').addEventListener('change', (e) => push({ model: e.target.value }));
-  $('cfgEffort').addEventListener('change', (e) => push({ effort: e.target.value }));
-  $('cfgThink').addEventListener('change', (e) => push({ thinking: e.target.value }));
   $('cfgSound').addEventListener('change', (e) => {
     push({ sound: e.target.value });
     previewSound();
