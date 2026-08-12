@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Rilascio in un comando: bump versione → verify → package → Marketplace + Open VSX → git tag.
+// Rilascio in un comando: bump versione → verify → package → VS Code Marketplace → git tag.
 //
 //   npm run release                 patch (0.5.0 → 0.5.1)
 //   npm run release -- minor        0.5.0 → 0.6.0
@@ -9,21 +9,19 @@
 //
 // Flag:
 //   --skip-verify        salta typecheck/ui-check/data-check/host-check
-//   --only=ovsx          pubblica solo su Open VSX
-//   --only=marketplace   pubblica solo sul VS Code Marketplace
 //   --no-git             non committa e non tagga
 //   --dry-run            fa tutto tranne pubblicare
 //
-// Nessun argomento viene passato attraverso una shell e il token Open VSX viaggia
-// solo via variabile d'ambiente (non compare nella lista processi).
+// Un solo negozio: il VS Code Marketplace. Open VSX e gli altri store non li
+// facciamo piu', quindi qui dentro non c'e' piu' niente che li riguardi — niente
+// token da tenere, niente namespace da creare, niente flag --only da ricordarsi.
+// Nessun argomento passa da una shell.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
-const val = (p) => args.find((a) => a.startsWith(p))?.slice(p.length);
 
-const only = val('--only=');
 const dryRun = has('--dry-run');
 const skipVerify = has('--skip-verify');
 const noGit = has('--no-git');
@@ -48,7 +46,6 @@ const must = (cmd, cmdArgs, opts) => {
 // Node >= 18 rifiuta di eseguire .cmd senza shell (CVE-2024-27980), quindi non
 // passiamo da npm/npx: invochiamo direttamente gli entrypoint JS con node.
 const VSCE = 'node_modules/@vscode/vsce/vsce';
-const OVSX = 'node_modules/ovsx/bin/ovsx';
 const node = (script, scriptArgs = [], opts) => exec(process.execPath, [script, ...scriptArgs], opts);
 const nodeMust = (script, scriptArgs = [], opts) => must(process.execPath, [script, ...scriptArgs], opts);
 const step = (n) => console.log(`\n\x1b[1m▸ ${n}\x1b[0m`);
@@ -78,26 +75,6 @@ if (!noGit) {
     console.log('\n⚠ modifiche non committate (verranno incluse nel commit di rilascio):');
     console.log(dirty.split('\n').slice(0, 12).map((l) => '   ' + l).join('\n'));
   }
-}
-
-// ---------- token Open VSX
-let ovsxToken = process.env.OVSX_PAT;
-if (!ovsxToken && existsSync('.publish-tokens.json')) {
-  ovsxToken = JSON.parse(readFileSync('.publish-tokens.json', 'utf8')).ovsx;
-}
-let wantOvsx = !only || only === 'ovsx';
-const wantMarket = !only || only === 'marketplace';
-if (wantOvsx && !ovsxToken && !dryRun) {
-  if (only === 'ovsx') {
-    console.error('\n✗ Token Open VSX assente ed è stato richiesto --only=ovsx.');
-    console.error('  Genera il token su https://open-vsx.org/user-settings/tokens');
-    console.error('  e salvalo in .publish-tokens.json come {"ovsx":"<token>"} (oppure esporta OVSX_PAT).');
-    process.exit(1);
-  }
-  console.log('\n⚠ Token Open VSX assente: pubblico solo sul Marketplace.');
-  console.log('  Per abilitare Open VSX serve il Publisher Agreement Eclipse firmato, poi il token');
-  console.log('  in .publish-tokens.json come {"ovsx":"<token>"}.');
-  wantOvsx = false;
 }
 
 // ---------- bump
@@ -145,18 +122,10 @@ if (dryRun) {
 // ---------- pubblicazione
 const esiti = [];
 
-if (wantMarket) {
-  step('VS Code Marketplace (portale web via browser)');
-  const r = exec(process.execPath, ['scripts/publish-marketplace.mjs', 'claude-studio.vsix']);
+step('VS Code Marketplace (portale web via browser)');
+{
+  const r = node('scripts/publish-marketplace.mjs', ['claude-studio.vsix']);
   esiti.push(['Marketplace', r.status === 0]);
-}
-
-if (wantOvsx) {
-  step('Open VSX');
-  const env = { ...process.env, OVSX_PAT: ovsxToken };
-  node(OVSX, ['create-namespace', 'MrWilson'], { env, stdio: 'pipe' }); // idempotente
-  const r = node(OVSX, ['publish', 'claude-studio.vsix'], { env });
-  esiti.push(['Open VSX', r.status === 0]);
 }
 
 // ---------- git
@@ -174,5 +143,4 @@ if (!noGit && tuttoOk) {
 console.log('\n\x1b[1m── Riepilogo ──\x1b[0m');
 esiti.forEach(([nome, ok]) => console.log(`  ${ok ? '✓' : '✗'} ${nome}`));
 console.log(`\n  Marketplace: https://marketplace.visualstudio.com/items?itemName=MrWilson.claude-studio`);
-console.log(`  Open VSX:    https://open-vsx.org/extension/MrWilson/claude-studio`);
 process.exit(tuttoOk ? 0 : 1);

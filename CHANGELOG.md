@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9.0
+
+- **The shortcuts work on a Mac.** They never had: Option is a compose key over
+  there, so Option+N doesn't report "n" — it reports "˜", the dead key for a
+  tilde. Option+M reports "µ", Option+C reports "ç". The chat was reading the
+  character instead of the key, so on macOS every single one of these did
+  nothing. It now reads the key you physically pressed, which says the same
+  thing on a Mac, on a PC, and on a French keyboard. New session, mode,
+  conversations, settings, context, close tab — all of them answer now.
+- **And they're written the way your keyboard writes them.** Every label that
+  names a shortcut used to say "Alt+N" to everybody, which is the wrong name for
+  that key on half the machines reading it. The tooltips, the hints on the empty
+  screen and the "open a new one" in the full-context error now say `Alt+N` on
+  Windows and Linux and `⌥N` on a Mac. Same shortcuts, same interface, same
+  everywhere — only the name of the modifier changes.
+- **The shop window shows the models you actually have.** The screenshots and the
+  film were still full of last year's names. They now show Opus 5, Fable 5,
+  Sonnet 5 and Haiku 4.5, each with its own colour and its own effect.
+- **The attachments say what they mean.** The paperclip's tooltip, the text on
+  the empty screen, the README and the marketplace description now spell out what
+  can go into a message — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video,
+  audio, logs, source code, images — instead of leaving "any kind" to be taken on
+  trust. The picture and the film show six of them at once, and not one is an
+  image.
+- One shop only: the VS Code Marketplace. Open VSX and the rest are gone from the
+  release script, the package and the login setup.
+
 ## 0.8.0
 
 - **Attach any file at all — this is the big one.** There's a paperclip in the

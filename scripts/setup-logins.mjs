@@ -1,12 +1,13 @@
-// Prepara il profilo di publishing: apre le due pagine di login necessarie.
+// Prepara il profilo di publishing: apre la pagina di login necessaria.
 // Da fare UNA VOLTA. Dopo, le pubblicazioni sono automatiche.
+//
+// Un negozio solo: il VS Code Marketplace. Quindi un login solo.
 import { ensureBrowser } from './lib/browser.mjs';
 
 const browser = await ensureBrowser();
 const ctx = browser.contexts()[0];
 
 const target = [
-  ['Eclipse (per firmare il Publisher Agreement di Open VSX)', 'https://open-vsx.org/oauth2/authorization/eclipse'],
   ['Microsoft (per il portale VS Code Marketplace)', 'https://marketplace.visualstudio.com/manage/publishers/MrWilson'],
 ];
 
@@ -19,5 +20,5 @@ for (const [etichetta, url] of target) {
   console.log(`  titolo: ${await page.title().catch(() => '?')}`);
 }
 
-console.log('\n>>> Completa i due login nelle tab aperte, poi fammelo sapere.');
+console.log('\n>>> Completa il login nella tab aperta, poi fammelo sapere.');
 await browser.close();

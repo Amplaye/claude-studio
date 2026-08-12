@@ -33,12 +33,32 @@ your reading off the screen.
 it asks you to choose between options, there's always a line to write your own
 answer on — because the answer often isn't one of the three.
 
-**Attach any file, not just pictures.** A paperclip in the box you type in, and
-VS Code's own picker with no filter on it: a PDF, a spreadsheet, a log, a zip,
-a video. Drop them on the message and they attach too. Images travel as images;
-everything else travels as a path Claude opens with its own tools — which is
-both the only thing that works for every format and the only thing that doesn't
-push a forty-megabyte file through the chat.
+**Attach any file. Not "any image" — any file.** This is the big one, and it is
+the thing the official panel will not do: there, the paperclip only opens
+pictures. Here it opens VS Code's own picker with **no filter on it at all**, so
+whatever is on your disk can go into the message:
+
+| | |
+|---|---|
+| **Documents** | PDF, Word (`.docx`), Pages, RTF, plain text, Markdown |
+| **Spreadsheets & data** | Excel (`.xlsx`, `.xls`), CSV, TSV, JSON, XML, YAML, `.sql` dumps, SQLite files |
+| **Slides** | PowerPoint (`.pptx`), Keynote |
+| **Images** | PNG, JPG, GIF, WebP — these Claude actually *looks* at, and you see them in the chat |
+| **Archives** | zip, tar, gz, 7z — hand over a whole folder in one go |
+| **Logs & config** | `.log`, `.env`, `.ini`, `.toml`, `.conf`, crash dumps, stack traces |
+| **Code** | any source file, in any language, from any project — not only the one you have open |
+| **Audio & video** | `.mp4`, `.mov`, `.mp3`, `.wav` — the path goes over, and Claude reaches for the right tool |
+| **Anything else** | there is no list to be on. If it is a file, it attaches. |
+
+Three ways in: the paperclip, **drag and drop straight onto the message**, or
+paste. Sizes are not a problem either — images travel as images, and everything
+else travels as a *path* that Claude opens with its own tools, so a
+forty-megabyte video never gets pushed through the chat. That is also the only
+approach that works for every format at once, which is exactly why it is the one
+used here.
+
+Attach several at a time and ask one question about all of them: *"read the PDF
+and the spreadsheet, watch the video, and tell me what doesn't match."*
 
 **You know which conversation finished.** With three of them open, a chime tells
 you *something* is ready, not *which* — and you go through the tabs one by one to
@@ -71,11 +91,11 @@ and close with a recap of what changed.
 <td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/permessi.png" alt="Permissions and questions" /><br /><em>You decide — and you can write your own answer</em></td>
 </tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own colour — and every switch moves</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Opus 5, Fable 5, Sonnet 5, Haiku 4.5 — each its own colour</em></td>
 <td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context panel" /><br /><em>Context left, everywhere — and which one finished</em></td>
 </tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>Any file at all, not just pictures</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>PDF, Excel, Word, video, zip, logs — any file at all</em></td>
 <td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/suoni.png" alt="Sounds" /><br /><em>Even the lists are ours, and they open</em></td>
 </tr>
 </table>
@@ -93,19 +113,38 @@ Switch any time, even halfway through a conversation.
 ## The handy bits
 
 - **`@` for a file, `/` for a command** — your skills and plugins included.
-- **Paste an image**, **drop a file**, or use the paperclip — any format.
+- **Paste an image**, **drop a file**, or use the paperclip — any format, any size.
 - **A chime and a notification** when it's done, if you've wandered off — and a
   mark on the conversation that finished, so you know which one.
 - **24 past conversations** a click away, terminal ones included.
 - **Sidebar or full tab**, same conversation on both.
 - **English or Italian**, switched on the spot.
+- **Windows, macOS and Linux** — same interface, same shortcuts, written the way
+  your own keyboard writes them.
 
 ## Shortcuts
 
-| | | | |
-|---|---|---|---|
-| `Alt+N` new | `Alt+M` mode | `Alt+H` history | `Alt+I` settings |
-| `Alt+C` context | `Esc` stop | `@` file | `/` command |
+Every shortcut works the same everywhere. Only the name of the modifier changes,
+and the interface already writes it the way your machine does — `Alt` on Windows
+and Linux, `⌥` (Option) on a Mac.
+
+| | Windows · Linux | macOS |
+|---|---|---|
+| New session in a new tab | `Alt+N` | `⌥N` |
+| Change mode (Plan · Ask · Yolo) | `Alt+M` | `⌥M` |
+| Conversations | `Alt+H` | `⌥H` |
+| Settings | `Alt+I` | `⌥I` |
+| Show or hide the context | `Alt+C` | `⌥C` |
+| Close this tab | `Alt+W` | `⌥W` |
+| Stop | `Esc` | `Esc` |
+| A file · a command | `@` · `/` | `@` · `/` |
+
+And from anywhere in VS Code, with the chat not even focused:
+
+| | Windows · Linux | macOS |
+|---|---|---|
+| Open Claude Studio | `Ctrl+Alt+C` | `⌘⌥C` |
+| New session in a new tab | `Ctrl+Alt+N` | `⌘⌥N` |
 
 ## Settings
 

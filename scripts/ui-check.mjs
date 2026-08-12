@@ -870,6 +870,33 @@ for (const surface of ['view', 'panel']) {
   // whatever is running in it is not interrupted.
   t(sAlt?.cmd === 'newTab', 'Alt+N does not open a new session in a new tab: ' + JSON.stringify(sAlt));
 
+  // …and the same keystroke as a Mac reports it. Option is a compose key over
+  // there: Option+N arrives with key "˜", Option+M with "µ", Option+C with "ç".
+  // Anything reading `e.key` sees a tilde and does nothing, which is exactly how
+  // every one of these shortcuts came to be dead on macOS. Only `e.code` survives
+  // it, so that is what gets tested — with the real characters a Mac sends.
+  for (const [ch, code, cmd] of [
+    ['˜', 'KeyN', 'newTab'],
+    ['µ', 'KeyM', 'setMode'],
+  ]) {
+    // Empty the outbox first. Alt+N above already sent a "newTab", so a handler
+    // that did nothing at all would leave that one sitting there and the check
+    // would pass on the previous test's result.
+    await page.evaluate(() => (window.__sent = []));
+    await page.evaluate(
+      ([key, code]) =>
+        document.dispatchEvent(
+          new KeyboardEvent('keydown', { key, code, altKey: true, bubbles: true, cancelable: true })
+        ),
+      [ch, code]
+    );
+    const sMac = await lastSent();
+    t(sMac?.cmd === cmd, `Option+${code.slice(3)} is dead on macOS (key "${ch}"): ` + JSON.stringify(sMac));
+  }
+  // Option+M really did cycle the mode: put it back where the rest of the run
+  // expects to find it, or the screenshots below show a header nobody asked for.
+  await post({ k: 'mode', value: 'bypassPermissions' });
+
   // the up arrow fishes back the last message sent ("what is this", just above)
   await page.fill('#input', '');
   await page.keyboard.press('ArrowUp');

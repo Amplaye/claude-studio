@@ -12,22 +12,32 @@
  *   data-i18n="key"        -> textContent
  *   data-i18n-title="key"  -> title attribute
  *   data-i18n-ph="key"     -> placeholder attribute
+ *
+ * One more thing every string can ask for: {alt}. The key next to the spacebar is
+ * called Alt on a PC and Option on a Mac, and a Mac writes it ⌥ with the letter
+ * stuck straight onto it — "⌥N", never "Option+N". A label that hard-codes "Alt+N"
+ * is wrong on half the machines that read it, so no label hard-codes it: they
+ * write "{alt}N" and get back the one this computer uses.
  */
 (() => {
+  const IS_MAC = /mac|iphone|ipad/i.test(
+    (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || ''
+  );
+  const ALT = IS_MAC ? '⌥' : 'Alt+';
   const EN = {
     // ---- header ----
-    'top.mode': 'How it handles permissions (Alt+M)',
+    'top.mode': 'How it handles permissions ({alt}M)',
     'top.mode.plan': 'Plan only: it thinks but touches nothing',
     'top.mode.plan.label': 'Plan',
     'top.mode.ask': 'Asks before acting',
     'top.mode.ask.label': 'Ask',
     'top.mode.yolo': 'Never asks: does everything on its own',
     'top.mode.yolo.label': 'Yolo',
-    'top.settings': 'Model, thinking and notifications (Alt+I)',
-    'top.history': 'Conversations in this project (Alt+H)',
-    'top.context': 'Show or hide the context (Alt+C)',
+    'top.settings': 'Model, thinking and notifications ({alt}I)',
+    'top.history': 'Conversations in this project ({alt}H)',
+    'top.context': 'Show or hide the context ({alt}C)',
     'top.tab': 'Open as a tab',
-    'top.new': 'New session in a new tab (Alt+N)',
+    'top.new': 'New session in a new tab ({alt}N)',
 
     // ---- history drawer ----
     'drawer.title': 'Conversations',
@@ -95,7 +105,8 @@
     'composer.removeImage': 'Remove',
     'composer.removeFile': 'Remove this attachment',
     'composer.attachedImage': 'Attached image',
-    'composer.attach': 'Attach files — any kind',
+    'composer.attach':
+      'Attach any file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, logs, source code. Images too.',
     'composer.attachedFiles': '{n} attached',
 
     // ---- the "@" and "/" menu ----
@@ -107,7 +118,8 @@
     // ---- empty state ----
     'empty.title': 'Ready.',
     'empty.body':
-      'Write below: you get the same Claude Code you use from the terminal, with your CLAUDE.md, skills, MCP and permissions.',
+      'Write below: you get the same Claude Code you use from the terminal, with your CLAUDE.md, skills, MCP and permissions. ' +
+      'And you can hand it any file you like — a PDF, a spreadsheet, a contract, a zip, a video, a log — not just pictures.',
     'empty.key.file': 'a file',
     'empty.key.command': 'a command',
     'empty.key.new': 'new',
@@ -180,7 +192,7 @@
     'err.credit.title': "The account doesn't have the credit to answer.",
     'err.credit.hint': 'The context panel shows how much has been spent so far.',
     'err.context.title': 'The conversation has filled up the context window.',
-    'err.context.hint': 'Open a new one (Alt+N) and start again from a summary: nothing else fits in here.',
+    'err.context.hint': 'Open a new one ({alt}N) and start again from a summary: nothing else fits in here.',
     'err.net.title': 'The connection dropped.',
     'err.net.hint': "Check the network and send the message again: the conversation wasn't lost.",
     'err.stopped.title': 'Turn interrupted.',
@@ -226,18 +238,18 @@
   };
 
   const IT = {
-    'top.mode': 'Come gestisce i permessi (Alt+M)',
+    'top.mode': 'Come gestisce i permessi ({alt}M)',
     'top.mode.plan': 'Solo piano: ragiona ma non tocca niente',
     'top.mode.plan.label': 'Piano',
     'top.mode.ask': 'Chiede prima di agire',
     'top.mode.ask.label': 'Chiedi',
     'top.mode.yolo': 'Non chiede mai: fa tutto da solo',
     'top.mode.yolo.label': 'Yolo',
-    'top.settings': 'Modello, ragionamento e notifiche (Alt+I)',
-    'top.history': 'Conversazioni di questo progetto (Alt+H)',
-    'top.context': 'Mostra o nascondi il contesto (Alt+C)',
+    'top.settings': 'Modello, ragionamento e notifiche ({alt}I)',
+    'top.history': 'Conversazioni di questo progetto ({alt}H)',
+    'top.context': 'Mostra o nascondi il contesto ({alt}C)',
     'top.tab': 'Apri come scheda',
-    'top.new': 'Nuova sessione in una nuova scheda (Alt+N)',
+    'top.new': 'Nuova sessione in una nuova scheda ({alt}N)',
 
     'drawer.title': 'Conversazioni',
     'drawer.empty': 'Nessuna conversazione salvata per questo progetto.',
@@ -299,7 +311,8 @@
     'composer.removeImage': 'Togli',
     'composer.removeFile': 'Togli questo allegato',
     'composer.attachedImage': 'Immagine allegata',
-    'composer.attach': 'Allega file — di qualunque tipo',
+    'composer.attach':
+      'Allega qualunque file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, log, codice. Anche immagini.',
     'composer.attachedFiles': '{n} allegati',
 
     'menu.commands': ' Comandi',
@@ -309,7 +322,8 @@
 
     'empty.title': 'Pronto.',
     'empty.body':
-      'Scrivi qui sotto: è lo stesso Claude Code che usi dal terminale, con il tuo CLAUDE.md, le skill, gli MCP e i permessi.',
+      'Scrivi qui sotto: è lo stesso Claude Code che usi dal terminale, con il tuo CLAUDE.md, le skill, gli MCP e i permessi. ' +
+      'E puoi passargli qualunque file — un PDF, un foglio di calcolo, un contratto, uno zip, un video, un log — non solo immagini.',
     'empty.key.file': 'un file',
     'empty.key.command': 'un comando',
     'empty.key.new': 'nuova',
@@ -374,7 +388,7 @@
     'err.credit.title': "L'account non ha il credito per rispondere.",
     'err.credit.hint': 'Il pannello del contesto dice quanto è stato speso finora.',
     'err.context.title': 'La conversazione ha riempito la finestra di contesto.',
-    'err.context.hint': 'Aprine una nuova (Alt+N) e riparti da un riassunto: qui dentro non ci sta altro.',
+    'err.context.hint': 'Aprine una nuova ({alt}N) e riparti da un riassunto: qui dentro non ci sta altro.',
     'err.net.title': 'La connessione è caduta.',
     'err.net.hint': 'Controlla la rete e rimanda il messaggio: la conversazione non è andata persa.',
     'err.stopped.title': 'Turno interrotto.',
@@ -424,8 +438,10 @@
    *  itself — a visible label beats a blank one. */
   function t(key, vars) {
     const s = (DICT[lang] && DICT[lang][key]) ?? EN[key] ?? key;
-    if (!vars) return s;
-    return s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] == null ? m : String(vars[k])));
+    // {alt} is always available, even when the caller passed nothing: it belongs to
+    // the machine, not to the sentence.
+    const all = vars ? { alt: ALT, ...vars } : { alt: ALT };
+    return s.replace(/\{(\w+)\}/g, (m, k) => (all[k] == null ? m : String(all[k])));
   }
 
   /** Rewrites everything the HTML declared. Safe to call as often as you like. */
@@ -440,6 +456,9 @@
     get lang() {
       return lang;
     },
+    /** "Alt+" or "⌥", ready to have a letter stuck on the end of it. */
+    alt: ALT,
+    isMac: IS_MAC,
     t,
     apply,
     /** Switches language and tells whoever draws by hand to draw again. */

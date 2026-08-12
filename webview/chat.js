@@ -148,11 +148,13 @@
 
   // ---------- empty state ----------
   /** Shortcuts only get learned if they're written where you look while waiting. */
+  // The modifier is written the way this machine writes it: "Alt+N" on a PC, "⌥N"
+  // on a Mac. Nobody looks up a shortcut written for somebody else's keyboard.
   const KEYS = [
     ['@', 'empty.key.file'],
     ['/', 'empty.key.command'],
-    ['Alt+N', 'empty.key.new'],
-    ['Alt+H', 'empty.key.history'],
+    [I18N.alt + 'N', 'empty.key.new'],
+    [I18N.alt + 'H', 'empty.key.history'],
     ['Esc', 'empty.key.stop'],
   ];
 
@@ -2627,7 +2629,13 @@
     }
 
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
-    switch ((e.key || '').toLowerCase()) {
+    // Not `e.key`: on a Mac, Option is a compose key, so Option+N never reports "n".
+    // It reports "˜" (Option+N is the dead key for a tilde), Option+M reports "µ",
+    // Option+C reports "ç". Every one of these shortcuts was dead on macOS for that
+    // one reason. `e.code` is the key you physically pressed — "KeyN" — and it says
+    // the same thing on a Mac, on a PC, and on a French keyboard.
+    const key = /^Key[A-Z]$/.test(e.code || '') ? e.code.slice(3).toLowerCase() : (e.key || '').toLowerCase();
+    switch (key) {
       case 'n':
         // A new session is a new tab, not this one wiped: whatever is running here
         // keeps running.

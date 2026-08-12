@@ -61,40 +61,43 @@ document.documentElement.dataset.theme = theme;
 
 > Tests: \`npm test\` green, 34 passed.`;
 
+// The models the CLI offers today. The pictures have to show the models people
+// actually have in the picker — a shop window with last year's names in it reads
+// as an extension nobody has touched since last year.
 const MODELS = [
   {
     value: 'default',
     label: 'Default',
     description: 'Recommended',
-    resolved: 'claude-opus-4-6[1m]',
+    resolved: 'claude-opus-5[1m]',
     efforts: ['low', 'medium', 'high'],
     adaptive: true,
     recommended: true,
   },
   {
-    value: 'claude-opus-4-6',
+    value: 'claude-opus-5',
     label: 'Opus (1M context)',
     description: 'Most capable for your hardest and longest-running tasks',
-    resolved: 'claude-opus-4-6[1m]',
+    resolved: 'claude-opus-5[1m]',
     efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
     adaptive: true,
     recommended: false,
   },
   {
-    value: 'claude-fable-1',
+    value: 'claude-fable-5',
     label: 'Fable',
-    description: 'Best for everyday, complex tasks',
-    resolved: 'claude-fable-1',
-    efforts: ['low', 'medium', 'high'],
+    description: 'The most capable of all, for the very hardest work',
+    resolved: 'claude-fable-5',
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
     adaptive: true,
     recommended: false,
   },
   {
-    value: 'claude-sonnet-4-5',
+    value: 'claude-sonnet-5',
     label: 'Sonnet',
     description: 'Best for everyday, complex tasks',
-    resolved: 'claude-sonnet-4-5',
-    efforts: ['low', 'medium', 'high'],
+    resolved: 'claude-sonnet-5',
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
     adaptive: true,
     recommended: false,
   },
@@ -169,12 +172,20 @@ const CTX_BUSY = {
   ],
 };
 
-/** Gli allegati: la cosa che l'estensione ufficiale non ti lascia fare. */
+/**
+ * Gli allegati: la cosa che l'estensione ufficiale non ti lascia fare — e il
+ * motivo per cui questa foto esiste. Sei file, sei famiglie diverse, nessuna
+ * immagine: un PDF, un foglio di calcolo, un documento, un video, un archivio e
+ * un log. Chi guarda la foto deve capire in un secondo che il limite "solo
+ * immagini" qui non c'e'.
+ */
 const ATTACHED = [
   { kind: 'file', path: 'C:/work/shop/docs/brand-guide.pdf', name: 'brand-guide.pdf', size: 2_412_000 },
   { kind: 'file', path: 'C:/work/shop/data/sales-q3.xlsx', name: 'sales-q3.xlsx', size: 486_000 },
-  { kind: 'file', path: 'C:/work/shop/logs/build.log', name: 'build.log', size: 91_000 },
+  { kind: 'file', path: 'C:/work/shop/docs/contract.docx', name: 'contract.docx', size: 128_000 },
+  { kind: 'file', path: 'C:/work/shop/media/walkthrough.mp4', name: 'walkthrough.mp4', size: 41_300_000 },
   { kind: 'file', path: 'C:/work/shop/design/mockups.zip', name: 'mockups.zip', size: 18_900_000 },
+  { kind: 'file', path: 'C:/work/shop/logs/build.log', name: 'build.log', size: 91_000 },
 ];
 
 /** Types a message out one piece at a time, the way it arrives from the engine. */
@@ -193,7 +204,7 @@ async function act(page, { slow = false, upTo = 'end' } = {}) {
   const beat = (ms) => wait(slow ? ms : Math.round(ms / 3));
 
   await post({ k: 'models', items: MODELS });
-  await post({ k: 'prefs', value: { model: 'claude-opus-4-6', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
+  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
   await post({ k: 'mode', value: 'default' });
   await post({ k: 'ctx', d: CTX });
   await beat(900);
@@ -201,7 +212,7 @@ async function act(page, { slow = false, upTo = 'end' } = {}) {
 
   await post({ k: 'user', text: ASK });
   await post({ k: 'busy', value: true });
-  await post({ k: 'session', id: 'aaaaaaaa', model: 'claude-opus-4-6', cwd: 'C:/work/shop' });
+  await post({ k: 'session', id: 'aaaaaaaa', model: 'claude-opus-5', cwd: 'C:/work/shop' });
   await beat(700);
 
   await post({ k: 'turn_start' });
@@ -368,7 +379,7 @@ await shot(browser, {
   },
 });
 
-// 5c. attachments: the paperclip, and four files that are not pictures
+// 5c. attachments: the paperclip, and six files, not one of them a picture
 await shot(browser, {
   file: 'allegati.png',
   width: 560,
@@ -378,7 +389,7 @@ await shot(browser, {
   then: async (page, post) => {
     await post({ k: 'attached', items: ATTACHED });
     await page.click('#input');
-    await page.type('#input', 'Check these against the brand guide and tell me what does not match.', { delay: 12 });
+    await page.type('#input', 'Read the PDF and the spreadsheet, watch the video, and tell me what does not match.', { delay: 12 });
     await wait(400);
   },
 });
@@ -416,19 +427,28 @@ const TOUR = [
   ['It asks, and you can answer in your own words', 'Ti chiede, e rispondi con parole tue'],
   ['A recap you can actually read', 'Un riepilogo che si legge davvero'],
   ['Model, effort, thinking — every switch answers back', 'Modello, impegno, ragionamento — ogni switch risponde'],
-  ['Attach any file. Not just pictures.', 'Allega qualunque file. Non solo immagini.'],
+  ['PDF, Excel, Word, video, zip, logs — any file at all', 'PDF, Excel, Word, video, zip, log — qualunque file'],
   ['Every conversation in sight — and which one finished', 'Tutte le conversazioni — e quale ha finito'],
 ];
 
-/** The strip of writing at the bottom of the film. */
+/**
+ * The strip of writing at the bottom of the film.
+ *
+ * It has to clear the composer, and the composer is not always the same height:
+ * the moment six attachments arrive it grows a tray two rows tall, and a caption
+ * pinned to a fixed offset lands straight on top of the very chips it is pointing
+ * at. So the offset isn't fixed — it's measured from the composer, every time.
+ */
 async function caption(page, text) {
   await page.evaluate((s) => {
+    const dock = document.getElementById('composer');
+    const clear = (dock ? dock.getBoundingClientRect().height : 60) + 20;
     let box = document.getElementById('cs-cap');
     if (!box) {
       const st = document.createElement('style');
       st.textContent = `
         /* Above the writing field, not on top of it: the last thing a film about
-           a chat should hide is the line you type into. */
+           a chat should hide is the line you type into — or what you attached to it. */
         #cs-cap {
           position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%);
           z-index: 999; padding: 9px 18px; border-radius: 999px;
@@ -444,6 +464,7 @@ async function caption(page, text) {
       box.id = 'cs-cap';
       document.body.appendChild(box);
     }
+    box.style.bottom = clear + 'px';
     if (!s) {
       box.classList.remove('on');
       return;
@@ -472,7 +493,7 @@ async function caption(page, text) {
   await page.goto(chatUrl);
   await post({ k: 'hello', cwd: 'C:/work/shop', project: 'shop', cliVersion: '2.1.228', surface: 'panel' });
   await post({ k: 'models', items: MODELS });
-  await post({ k: 'prefs', value: { model: 'claude-opus-4-6', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
+  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
   await post({ k: 'mode', value: 'default' });
   // The film opens with the other conversation still working: the green mark has
   // to *arrive*, at the end, or nobody reads it as "this one has just finished" —
@@ -488,7 +509,7 @@ async function caption(page, text) {
   await page.fill('#input', '');
   await post({ k: 'user', text: ASK });
   await post({ k: 'busy', value: true });
-  await post({ k: 'session', id: 'aaaaaaaa', model: 'claude-opus-4-6', cwd: 'C:/work/shop' });
+  await post({ k: 'session', id: 'aaaaaaaa', model: 'claude-opus-5', cwd: 'C:/work/shop' });
   await post({ k: 'turn_start' });
 
   // ---- 2. the reasoning, and the pill in the header (2.6 → 5.4) ----
@@ -590,11 +611,17 @@ async function caption(page, text) {
   await wait(280);
 
   // ---- 8. the paperclip (17.6 → 19.6) ----
-  await cap(7);
+  // The caption steps out of the way first. It measures the composer to know how
+  // far to sit above it, and the composer only reaches its full height once the
+  // tray of attachments is in it — so the order is: hide, attach, re-measure,
+  // show. Otherwise the strip spends half a second sitting on top of the very
+  // files it is announcing.
+  await caption(page, '');
   await post({ k: 'attached', items: ATTACHED });
-  await wait(600);
+  await wait(450);
+  await cap(7);
   await page.click('#input');
-  await page.type('#input', 'Check these against the brand guide.', { delay: 16 });
+  await page.type('#input', 'Read the PDF and the spreadsheet, watch the video.', { delay: 16 });
   await wait(700);
 
   // ---- 9. the column beside, and which conversation finished ----
