@@ -31,6 +31,29 @@ for (const surface of ['view', 'panel']) {
   const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
+
+  // ---- lo stato vuoto: e' li' che si imparano le scorciatoie ----
+  await page.waitForTimeout(120);
+  const vuoto = await page.evaluate(() => {
+    const ico = document.querySelector('.empty .ico');
+    return {
+      keys: [...document.querySelectorAll('.empty .key kbd')].map((n) => n.textContent),
+      dash: ico ? getComputedStyle(ico).strokeDasharray : '',
+    };
+  });
+  t(
+    vuoto.keys.includes('@') && vuoto.keys.includes('Alt+N') && vuoto.keys.includes('Esc'),
+    'lo stato vuoto non dice le scorciatoie: ' + vuoto.keys.join(',')
+  );
+  t(
+    /\d/.test(vuoto.dash),
+    'l’icona dello stato vuoto non si disegna da sola (niente stroke-dasharray): ' + vuoto.dash
+  );
+  // lo scatto si aspetta che l'icona abbia finito di disegnarsi: a meta' strada
+  // sembrerebbe un'icona rotta
+  await page.waitForTimeout(1100);
+  await page.screenshot({ path: path.join(outDir, `preview-${surface}-empty.png`), fullPage: true });
+
   await post({ k: 'session', id: 'abc', model: 'claude-opus-4-6[1m]', cwd: 'C:/Users/Steward/CRM' });
   await post({ k: 'busy', value: true });
   await post({ k: 'user', text: 'Leggi i due file di configurazione e dimmi che differenza c’è.' });
@@ -461,11 +484,104 @@ for (const surface of ['view', 'panel']) {
     );
   }
 
+  // ---- errori: quello che arriva dal motore, detto in italiano ----
+  await post({
+    k: 'error',
+    message: 'Error: API error 429 rate_limit_error: too many requests\n    at send (/x/sdk.mjs:12:3)',
+  });
+  await page.waitForTimeout(120);
+  const err = await page.evaluate(() => {
+    const n = document.querySelector('.err:not(.calm)');
+    return {
+      title: n?.querySelector('.err-title')?.textContent || '',
+      hint: n?.querySelector('.err-hint')?.textContent || '',
+      raw: n?.querySelector('.err-raw pre')?.textContent || '',
+    };
+  });
+  t(/limite d’uso/.test(err.title), 'l’errore non è tradotto in una frase leggibile: ' + err.title);
+  t(!/at send/.test(err.title + err.hint), 'lo stack tecnico è finito nel titolo dell’errore');
+  t(/rate_limit_error/.test(err.raw), 'il messaggio vero del motore non è più raggiungibile');
+
+  // un turno fermato da te non e' un guasto: stesso riquadro, tono diverso
+  await post({ k: 'error', message: 'Turno interrotto.' });
+  await page.waitForTimeout(120);
+  t(await page.isVisible('.err.calm'), 'un turno interrotto viene mostrato come un errore rosso');
+
+  // ---- le scorciatoie ----
+  await page.click('#input');
+  await post({ k: 'busy', value: true });
+  await page.waitForTimeout(120); // Esc ferma solo se la pagina sa gia' di essere occupata
+  // e mentre aspetta si vedono tutti e due i movimenti dell'attesa
+  const attesa = await page.evaluate(() => {
+    const ring = document.querySelector('.pulse .thinking-ring');
+    return {
+      ring: !!ring,
+      halo: !!document.querySelector('.pulse .thinking-halo'),
+      spinning: ring ? getComputedStyle(ring).animationName : '',
+    };
+  });
+  t(attesa.ring && attesa.halo, 'all’attesa manca un pezzo: alone=' + attesa.halo + ' anello=' + attesa.ring);
+  t(attesa.spinning === 'cs-spin', 'l’anello dell’attesa non gira: ' + attesa.spinning);
+  await page.keyboard.press('Escape');
+  const sEsc = await lastSent();
+  t(sEsc?.cmd === 'interrupt', 'Esc non ferma il turno: ' + JSON.stringify(sEsc));
+  await post({ k: 'busy', value: false });
+
+  await page.keyboard.press('Alt+n');
+  const sAlt = await lastSent();
+  t(sAlt?.cmd === 'newSession', 'Alt+N non apre una sessione nuova: ' + JSON.stringify(sAlt));
+
+  // la freccia in su ripesca l'ultimo messaggio mandato ("senza", qui sopra)
+  await page.fill('#input', '');
+  await page.keyboard.press('ArrowUp');
+  t(
+    (await page.inputValue('#input')) === 'senza',
+    'la freccia in su non ripesca l’ultimo messaggio: ' + (await page.inputValue('#input'))
+  );
+  await page.fill('#input', '');
+
+  // gli scatti: la coda del discorso (dove stanno gli errori appena provati)…
+  await page.evaluate(() => (document.getElementById('log').scrollTop = 1e6));
+  await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}.png`), fullPage: true });
   // il log scorre dentro di se': per vedere anche la prima meta' serve un secondo scatto
   await page.evaluate(() => (document.getElementById('log').scrollTop = 0));
   await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-top.png`), fullPage: true });
+
+  // ---- cambio conversazione: il discorso vecchio esce scorrendo ----
+  // Si prova per ultimo, perche' lascia la chat vuota e rovinerebbe gli scatti.
+  await page.evaluate(() => (document.getElementById('log').scrollTop = 1e6));
+  await post({ k: 'reset' });
+  await page.waitForTimeout(60);
+  const swap = await page.evaluate(() => {
+    const ghost = document.querySelector('.log-ghost');
+    const log = document.getElementById('log');
+    const gb = ghost?.getBoundingClientRect();
+    const lb = log.getBoundingClientRect();
+    return {
+      ghost: !!ghost,
+      // il fantasma sta esattamente sopra il discorso, non altrove nella pagina
+      onLog: gb ? Math.abs(gb.top - lb.top) < 2 && Math.abs(gb.width - lb.width) < 2 : false,
+      // e porta con se' quello che stavi guardando, non una pagina bianca
+      hasKids: ghost ? ghost.querySelectorAll('.msg').length : 0,
+      swapping: log.classList.contains('swap-in'),
+      // intanto il discorso nuovo e' gia' al suo posto
+      empty: !!log.querySelector('.empty'),
+      strayInLog: log.querySelectorAll('.msg').length,
+    };
+  });
+  t(swap.ghost && swap.onLog, 'il discorso vecchio non esce di scena sopra il log');
+  t(swap.hasKids > 0, 'il fantasma del cambio conversazione è vuoto');
+  t(swap.swapping, 'il discorso nuovo non entra con la sua animazione');
+  t(swap.empty && swap.strayInLog === 0, 'dopo il cambio la chat non riparte pulita');
+  await page.waitForTimeout(500);
+  t(
+    (await page.locator('.log-ghost').count()) === 0,
+    'il fantasma del cambio conversazione resta appeso sopra la chat'
+  );
+  t(errors.length === 0, 'errori JS in pagina (fase 4): ' + errors.join(' | '));
+
   await page.close();
 }
 

@@ -56,7 +56,27 @@ che vive nel motore, non nell'interfaccia.
     finalmente mostrato), gruppi editor oltre il quarto raggiungibili, `~/.claude`
     creata se manca, codice morto tolto, e i nostri due file in `~/.claude`
     rinominati per non pestare i piedi alla 0.0.6 finche' resta installata.
-- Fase 4: repertorio completo delle animazioni e rifinitura.
+- **Fase 4 — fatta**: il repertorio completo delle animazioni e la rifinitura.
+  - **Cambio conversazione**: il discorso vecchio esce scorrendo mentre quello
+    nuovo entra dall'altra parte. Non e' una copia: sono gli stessi nodi, spostati
+    in un fantasma appoggiato sopra il log e tagliato alla finestra che stavi
+    guardando — se ne va proprio quello che vedevi.
+  - **Attesa completa**: alone argilla che pulsa *e* gradiente che gira, i due
+    movimenti insieme; e l'icona dello stato vuoto si disegna da sola, tracciato
+    dopo tracciato, perche' le Ionicons outline sono tracciati veri.
+  - **Errori leggibili**: dal motore arriva quello che arriva; qui si legge cos'e'
+    successo e cosa si puo' fare (limite d'uso, autenticazione, credito, contesto
+    pieno, rete, processo chiuso, CLI mancante). Il testo originale resta sotto,
+    in "Dettagli tecnici", per chi lo vuole. Un turno che hai fermato tu non e'
+    un guasto: stesso riquadro, tono diverso.
+  - **Scorciatoie**: `Esc` ferma (o chiude la cronologia), `Alt+N` nuova
+    conversazione, `Alt+H` cronologia, `Alt+M` modalita' permessi, `Alt+C` colonna
+    del contesto, freccia in su sul campo vuoto per ripescare l'ultimo messaggio.
+    Da VSCode: `Ctrl+Alt+C` apre la chat, `Ctrl+Alt+N` ne apre una nuova.
+  - **Stato vuoto**: dice cos'e' questa chat e mostra le scorciatoie li', dove
+    guardi mentre non c'e' ancora niente da leggere.
+  - **Icona dell'estensione**: le sparkles di Ionicons sul gradiente argilla →
+    pesca (`npm run icon`, poi committata: non pesa sulla build di tutti i giorni).
 
 Il piano completo, con le indagini gia' fatte sul protocollo e i percorsi del
 materiale di riferimento, sta in
@@ -107,6 +127,21 @@ materiale di riferimento, sta in
   "costruisci una volta, poi ridipingi" vale anche per le due celle in testa.
 - `os.homedir()` su Windows legge `USERPROFILE`: basta cambiarlo prima di caricare il
   bundle e le prove scrivono in una cartella usa e getta invece che nella tua.
+- Per far uscire di scena una conversazione, i messaggi si **spostano**, non si
+  copiano: una copia dovrebbe ricostruire anche lo scorrimento. E il fantasma va
+  appeso **fuori** dal log — dentro un contenitore che scorre si porterebbe dietro
+  lo scorrimento invece di restare fermo sotto i tuoi occhi.
+- `stroke-dasharray` e `stroke-dashoffset` si **ereditano**: si possono mettere sul
+  `<svg>` e arrivano fin dentro la forma richiamata con `<use>`. E' l'unico motivo
+  per cui un'icona presa dallo sprite puo' disegnarsi da sola.
+- Un alone senza sfocatura non e' un alone: e' un secondo pallino. Con un anello che
+  gira intorno diventa una macchia unica. La sfocatura resta **ferma** (si muovono
+  solo scala e opacita'), quindi non costa niente.
+- Sulla tastiera italiana `Ctrl+Alt` **e'** AltGr: le lettere da evitare sono quelle
+  che ci scrivono un carattere (e, o, a, +, ...). `c` e `n` sono libere.
+- Nelle prove, `postMessage` arriva **dopo**: se premi il tasto subito dopo aver
+  detto alla pagina "sto lavorando", il tasto arriva prima del messaggio e la prova
+  fallisce per il motivo sbagliato. Ci vuole un attimo di attesa in mezzo.
 
 ## Sviluppo
 
@@ -114,6 +149,7 @@ materiale di riferimento, sta in
 npm run build       # build di produzione
 npm run watch       # ricompila a ogni salvataggio
 npm run typecheck   # tsc --noEmit
+npm run icon        # ridisegna media/icon.png (serve solo se cambia il segno)
 npm run package     # produce claude-studio.vsix
 npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
 ```
@@ -123,7 +159,12 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
 - `ui-check` fa recitare alla webview un turno intero, in entrambe le facce, con due
   tool in parallelo che finiscono in ordine invertito — e controlla che ogni esito
   stia sotto il tool giusto. Poi clicca davvero le tre schede di permesso e cambia
-  modalita' dalla testata, controllando cosa parte verso l'estensione.
+  modalita' dalla testata, controllando cosa parte verso l'estensione. Alla fine
+  prova la rifinitura: lo stato vuoto con le scorciatoie, l'errore grezzo del motore
+  che diventa una frase (col testo originale ancora raggiungibile), i due movimenti
+  dell'attesa, `Esc` e `Alt+N` che partono davvero, e il cambio conversazione — che
+  il fantasma stia **sopra** il log, si porti dietro quello che stavi guardando e
+  non resti appeso.
 - `context-check` fa lo stesso col pannello del contesto: controlla che le card si
   **ridipingano** invece di essere ricreate (marchia un nodo e verifica che
   sopravviva ai giri seguenti), che la barra scivoli e la scia non riparta da sola,
@@ -171,6 +212,24 @@ Impostazioni → Claude Studio → Cli Path.
 | `claudeStudio.refreshSeconds` | Ogni quanto la barra di contesto rifa' i conti (1,5s). |
 | `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |
 | `claudeStudio.openAsTab` | Cliccando l'icona si apre la scheda e il pannello laterale si chiude. Spegnilo per restare nel pannello. |
+
+## Scorciatoie
+
+| Tasti | Cosa fa |
+|---|---|
+| `Ctrl+Alt+C` | Apre Claude Studio (da qualsiasi punto di VSCode). |
+| `Ctrl+Alt+N` | Apre una conversazione nuova. |
+| `Esc` | Ferma quello che sta facendo; a cronologia aperta, la chiude. |
+| `Alt+N` | Conversazione nuova. |
+| `Alt+H` | Cronologia del progetto. |
+| `Alt+M` | Modalita' dei permessi. |
+| `Alt+C` | Colonna del contesto (solo nella scheda a tutto schermo). |
+| `↑` | Sul campo vuoto, ripesca l'ultimo messaggio mandato. |
+| `@` / `/` | File del progetto / slash command veri della CLI. |
+| `Invio` | Manda. `Maiusc+Invio` va a capo. |
+
+Le prime due si cambiano da VSCode → File → Preferenze → Scorciatoie da tastiera,
+cercando "Claude Studio". Le altre vivono dentro la chat.
 
 ## Convivenza con la context-bar 0.0.6
 

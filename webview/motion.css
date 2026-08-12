@@ -45,11 +45,11 @@
   0%,
   100% {
     transform: scale(1);
-    opacity: 0.85;
+    opacity: 0.6;
   }
   50% {
-    transform: scale(1.35);
-    opacity: 0.25;
+    transform: scale(1.3);
+    opacity: 0.12;
   }
 }
 
@@ -132,6 +132,30 @@
   }
 }
 
+/* Cambio conversazione: quella vecchia scorre via, la nuova entra dall'altra
+   parte. Sono due meta' dello stesso gesto, e devono durare uguale. */
+@keyframes cs-swap-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.985);
+  }
+}
+
+@keyframes cs-swap-in {
+  from {
+    opacity: 0;
+    transform: translateX(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Il pallino di una sessione che sta scrivendo proprio ora. */
 @keyframes cs-ping {
   0%,
@@ -165,12 +189,16 @@
   animation: cs-caret 1s ease-in-out infinite;
 }
 
+/* Un alone, non un secondo pallino: senza la sfocatura resta un disco pieno che
+   copre tutto quello che ha intorno. La sfocatura e' ferma, si muovono solo
+   scala e opacita'. */
 .thinking-halo::before {
   content: '';
   position: absolute;
   inset: -3px;
   border-radius: var(--pill);
   background: var(--claude-1);
+  filter: blur(3px);
   animation: cs-halo 1.6s ease-in-out infinite;
 }
 
@@ -239,6 +267,36 @@
   animation: cs-squeeze 0.2s ease-out;
 }
 
+/* Cambio conversazione. Il discorso vecchio non viene copiato: sono gli stessi
+   nodi, spostati dentro un fantasma sovrapposto al log e tagliati alla stessa
+   finestra che stavi guardando. Cosi' esce quello che vedevi davvero, e intanto
+   il nuovo entra al suo posto. */
+.log-ghost {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  animation: cs-swap-out 0.35s cubic-bezier(0.4, 0, 1, 1) both;
+}
+/* Dentro il fantasma non si muove piu' niente: e' un'immagine che se ne va. */
+.log-ghost *,
+.log-ghost *::before,
+.log-ghost *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.log.swap-in {
+  animation: cs-swap-in 0.35s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+/* Lo stato vuoto e' l'unico posto dove un'icona ha spazio per disegnarsi da sola:
+   le Ionicons outline sono tracciati, e stroke-dasharray si eredita fin dentro
+   la forma richiamata con <use>. */
+.empty .ico {
+  stroke-dasharray: var(--len, 900);
+  animation: cs-draw 1.1s cubic-bezier(0.65, 0, 0.35, 1) both, cs-chunk 0.5s ease-out both;
+}
+
 .card-hover {
   transition: transform 0.25s cubic-bezier(0.2, 0.9, 0.25, 1), box-shadow 0.25s ease, border-color 0.2s ease;
 }
@@ -287,8 +345,15 @@
   .perm,
   .chunk,
   .ctxcard,
+  .log.swap-in,
+  .empty .ico,
   .fill.glide::after {
     animation: none !important;
+  }
+  /* Il fantasma del cambio conversazione non serve piu': senza movimento sarebbe
+     solo un doppione fermo sopra il discorso nuovo. */
+  .log-ghost {
+    display: none !important;
   }
   .caret {
     animation: none !important;

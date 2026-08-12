@@ -145,11 +145,67 @@
   }
 
   // ---------- stato vuoto ----------
+  /** Le scorciatoie si imparano solo se stanno scritte dove guardi mentre aspetti. */
+  const KEYS = [
+    ['@', 'un file'],
+    ['/', 'un comando'],
+    ['Alt+N', 'nuova'],
+    ['Alt+H', 'cronologia'],
+    ['Esc', 'ferma'],
+  ];
+
   function showEmpty() {
     log.replaceChildren();
     const box = el('div', 'empty');
-    box.append(icon('chatbubble-ellipses'), el('h2', null, 'Pronti.'), el('p', null, 'Scrivi qui sotto: risponde la stessa Claude Code che usi da terminale, con i tuoi CLAUDE.md, skill, MCP e permessi.'));
+    box.append(
+      icon('chatbubble-ellipses'),
+      el('h2', null, 'Pronti.'),
+      el('p', null, 'Scrivi qui sotto: risponde la stessa Claude Code che usi da terminale, con i tuoi CLAUDE.md, skill, MCP e permessi.')
+    );
+    const keys = el('div', 'keys');
+    for (const [k, what] of KEYS) {
+      const item = el('span', 'key');
+      item.append(el('kbd', null, k), el('span', null, what));
+      keys.append(item);
+    }
+    box.append(keys);
     log.appendChild(box);
+  }
+
+  /**
+   * Cambio conversazione: quella vecchia scorre via mentre la nuova entra.
+   * I nodi non si copiano, si spostano dentro un fantasma sovrapposto al log e
+   * tagliato alla stessa finestra che stavi guardando — cosi' se ne va proprio
+   * quello che vedevi, non una ricostruzione.
+   */
+  function swapLog(paint) {
+    const kids = [...log.children];
+    if (!kids.length) {
+      paint();
+      return;
+    }
+    const col = document.querySelector('.chatcol');
+    const box = log.getBoundingClientRect();
+    const host = col.getBoundingClientRect();
+    const ghost = el('div', 'log-ghost');
+    ghost.style.top = box.top - host.top + 'px';
+    ghost.style.left = box.left - host.left + 'px';
+    ghost.style.width = box.width + 'px';
+    ghost.style.height = box.height + 'px';
+    // stesso foglio del log, cosi' i nodi spostati restano identici a com'erano
+    const inner = el('div', 'log log-ghost-in');
+    inner.style.transform = `translateY(${-log.scrollTop}px)`;
+    inner.append(...kids);
+    ghost.append(inner);
+    col.appendChild(ghost);
+    setTimeout(() => ghost.remove(), 420);
+
+    log.replaceChildren();
+    log.classList.remove('swap-in');
+    void log.offsetWidth; // riparte anche su due cambi ravvicinati
+    log.classList.add('swap-in');
+    stick = true;
+    paint();
   }
 
   // ---------- blocchi ----------
@@ -497,13 +553,100 @@
     toBottom();
   }
 
+  // ---------- errori ----------
+  //
+  // Dal motore arriva quello che arriva: a volte una frase, spesso un messaggio
+  // scritto per chi legge i log. Qui si dice cos'e' successo e cosa si puo' fare,
+  // e il testo originale resta sotto per chi lo vuole vedere.
+  const ERRORS = [
+    {
+      re: /cli\.js|@anthropic-ai\/claude-code|non trovo la cli|command not found|ENOENT|spawn/i,
+      title: 'Non trovo la CLI di Claude Code su questo computer.',
+      hint: 'Installala con "npm i -g @anthropic-ai/claude-code", oppure indica il percorso di cli.js in Impostazioni → Claude Studio → Cli Path.',
+      keep: false,
+    },
+    {
+      re: /rate.?limit|\b429\b|too many requests|usage limit/i,
+      title: 'Hai raggiunto il limite d’uso dell’account.',
+      hint: 'Nel pannello del contesto c’è quanto manca al prossimo reset.',
+    },
+    {
+      re: /\b401\b|\b403\b|unauthor|authentic|not logged in|invalid api key|oauth/i,
+      title: 'Claude Code non è autenticato.',
+      hint: 'Apri un terminale, lancia "claude" e rifai l’accesso: la chat usa la stessa autenticazione.',
+    },
+    {
+      re: /credit|billing|insufficient|payment/i,
+      title: 'L’account non ha credito per rispondere.',
+      hint: 'Il pannello del contesto mostra quanto è stato speso finora.',
+    },
+    {
+      re: /prompt is too long|context (window|length|limit)|too many tokens|exceeds? .{0,20}tokens/i,
+      title: 'La conversazione ha riempito la finestra di contesto.',
+      hint: 'Aprine una nuova (Alt+N) e riparti da un riassunto: qui non ci sta più niente.',
+    },
+    {
+      re: /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|network|offline/i,
+      title: 'La connessione si è interrotta.',
+      hint: 'Controlla la rete e rimanda il messaggio: la conversazione non è andata persa.',
+    },
+    {
+      re: /interrupt|interrott|abort|cancell?ed|annullat/i,
+      title: 'Turno interrotto.',
+      hint: 'Il prossimo messaggio riparte da qui.',
+      calm: true,
+    },
+    {
+      re: /exit(ed)? (with )?code|process (exited|terminated|died)|SIGTERM|SIGKILL|killed/i,
+      title: 'Il processo di Claude si è chiuso da solo.',
+      hint: 'Rimanda il messaggio: la sessione riparte in automatico.',
+    },
+  ];
+
+  function readableError(raw) {
+    const s = String(raw || '').trim() || 'Errore senza descrizione.';
+    for (const e of ERRORS) {
+      if (e.re.test(s)) return { title: e.title, hint: e.hint, calm: !!e.calm, raw: e.keep === false ? '' : s };
+    }
+    // Un messaggio gia' scritto per una persona si mostra com'e': riscriverlo
+    // significherebbe nasconderlo.
+    if (s.length <= 220 && !/\n|Error:|Exception|\bat .+:\d+|[{}]/.test(s)) {
+      return { title: s, hint: '', calm: false, raw: '' };
+    }
+    return {
+      title: 'Qualcosa è andato storto.',
+      hint: 'Di solito basta rimandare il messaggio. Qui sotto c’è quello che ha detto il motore.',
+      calm: false,
+      raw: s,
+    };
+  }
+
+  function errorCard(message) {
+    const e = readableError(message);
+    const node = el('div', 'msg err' + (e.calm ? ' calm' : ''));
+    const body = el('div', 'err-body');
+    body.append(el('div', 'err-title', e.title));
+    if (e.hint) body.append(el('div', 'err-hint', e.hint));
+    if (e.raw && e.raw !== e.title) {
+      const det = document.createElement('details');
+      det.className = 'err-raw';
+      det.append(el('summary', null, 'Dettagli tecnici'), el('pre', null, e.raw.slice(0, 4000)));
+      body.append(det);
+    }
+    node.append(icon(e.calm ? 'stop-circle' : 'alert-circle'), body);
+    add(node);
+  }
+
   // ---------- attesa ----------
   let waiting = null;
   function showWaiting() {
     if (waiting) return;
     waiting = el('div', 'msg pulse');
-    const dot = el('span', 'dot thinking-halo');
-    waiting.append(dot, el('span', null, 'Claude sta pensando…'));
+    // Due movimenti, non uno: l'alone che pulsa dice "sta lavorando", il gradiente
+    // che gira dice "e' ancora vivo". Insieme sono l'attesa.
+    const orb = el('span', 'orb');
+    orb.append(el('span', 'thinking-ring'), el('span', 'dot thinking-halo'));
+    waiting.append(orb, el('span', null, 'Claude sta pensando…'));
     add(waiting);
   }
   function hideWaiting() {
@@ -555,13 +698,7 @@
     drawer.hidden = false;
   }
 
-  $('btnHistory').addEventListener('click', () => {
-    if (!drawer.hidden) {
-      drawer.hidden = true;
-      return;
-    }
-    vscode.postMessage({ cmd: 'history' });
-  });
+  $('btnHistory').addEventListener('click', () => toggleHistory());
   $('drawerClose').addEventListener('click', () => (drawer.hidden = true));
 
   // ---------- quanto e' costato ----------
@@ -618,7 +755,8 @@
         waiting = null;
         spent = { usd: 0, tokens: 0 };
         paintSpent();
-        showEmpty();
+        // il discorso di prima esce scorrendo mentre quello nuovo prende posto
+        swapLog(showEmpty);
         break;
       case 'mode':
         modeSel.value = m.value;
@@ -690,12 +828,9 @@
       case 'busy':
         setBusy(m.value);
         break;
-      case 'error': {
-        const n = el('div', 'msg err');
-        n.append(icon('alert-circle'), el('span', null, m.message));
-        add(n);
+      case 'error':
+        errorCard(m.message);
         break;
-      }
     }
   });
 
@@ -858,6 +993,9 @@
   });
 
   // ---------- invio ----------
+  /** L'ultimo messaggio mandato: la freccia in su lo ripesca. */
+  let lastText = '';
+
   function grow() {
     input.style.height = 'auto';
     input.style.height = Math.min(190, input.scrollHeight) + 'px';
@@ -879,6 +1017,15 @@
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       composer.requestSubmit();
+      return;
+    }
+    // Freccia in su sul campo vuoto: torna l'ultimo messaggio mandato, da
+    // ritoccare invece che da riscrivere.
+    if (e.key === 'ArrowUp' && !input.value && lastText) {
+      e.preventDefault();
+      input.value = lastText;
+      grow();
+      input.setSelectionRange(lastText.length, lastText.length);
     }
   });
 
@@ -890,6 +1037,7 @@
     }
     const text = input.value.trim();
     if (!text && !images.length) return;
+    lastText = text;
     vscode.postMessage({
       cmd: 'send',
       text,
@@ -915,6 +1063,62 @@
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
+
+  // ---------- scorciatoie ----------
+  //
+  // Valgono ovunque nella pagina, anche mentre scrivi: sono le stesse cose che
+  // fanno i tasti in testata, senza staccare le mani dalla tastiera. Chi le ha
+  // gia' gestite (il menu di "@" e "/") lascia il segno con preventDefault, e qui
+  // non ci si mette sopra.
+  function toggleHistory() {
+    if (!drawer.hidden) {
+      drawer.hidden = true;
+      return;
+    }
+    vscode.postMessage({ cmd: 'history' });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.isComposing) return;
+
+    if (e.key === 'Escape') {
+      if (!drawer.hidden) {
+        e.preventDefault();
+        drawer.hidden = true;
+        return;
+      }
+      // Ferma solo se c'e' davvero qualcosa da fermare: altrimenti Escape resta
+      // il tasto che non fa niente, ed e' giusto cosi'.
+      if (busy) {
+        e.preventDefault();
+        vscode.postMessage({ cmd: 'interrupt' });
+      }
+      return;
+    }
+
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    switch ((e.key || '').toLowerCase()) {
+      case 'n':
+        e.preventDefault();
+        vscode.postMessage({ cmd: 'newSession' });
+        return;
+      case 'h':
+        e.preventDefault();
+        toggleHistory();
+        return;
+      case 'm':
+        e.preventDefault();
+        modeSel.focus();
+        return;
+      case 'c':
+        // il contesto di fianco esiste solo nella scheda: dove non c'e', il tasto
+        // non deve fare finta di esserci
+        if ($('btnCtx').hidden) return;
+        e.preventDefault();
+        $('btnCtx').click();
+        return;
+    }
+  });
 
   // ---------- la colonna del contesto (solo nella scheda) ----------
   // Nella barra laterale il contesto ha un pannello suo, sotto la chat; in una

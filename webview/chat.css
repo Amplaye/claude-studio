@@ -18,6 +18,17 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* il fantasma del cambio conversazione si appoggia qui, non dentro il log:
+     dentro un contenitore che scorre si porterebbe dietro lo scorrimento */
+  position: relative;
+}
+
+/* Il fantasma riusa il foglio del log per restare identico a com'era, ma non e'
+   piu' una colonna che scorre: e' un'immagine ferma, tagliata dal suo riquadro. */
+.log-ghost-in {
+  height: auto;
+  overflow: visible;
+  will-change: transform;
 }
 
 /* La colonna del contesto esiste solo nella scheda a tutto schermo: nella barra
@@ -764,6 +775,15 @@ body[data-mode='plan'] .modechip .ico {
   gap: 10px;
   font-size: 12px;
 }
+.pulse .orb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 .pulse .dot {
   position: relative;
   width: 9px;
@@ -772,20 +792,82 @@ body[data-mode='plan'] .modechip .ico {
   background: var(--claude-1);
   flex: 0 0 auto;
 }
+/* L'anello e' un gradiente conico bucato in mezzo: una ciambella che gira intorno
+   al pallino, senza un solo pixel di immagine. */
+.pulse .thinking-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--pill);
+  -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 82%);
+  mask: radial-gradient(closest-side, transparent 78%, #000 82%);
+}
 
-/* errori: leggibili, non urlati */
+/* errori: leggibili, non urlati. Prima cos'e' successo, poi cosa si puo' fare, e
+   solo per chi lo cerca il testo grezzo del motore. */
 .err {
   border: 1px solid color-mix(in srgb, var(--bad) 55%, var(--line));
   border-radius: var(--r);
   padding: 9px 12px;
   display: flex;
-  gap: 8px;
+  gap: 9px;
   align-items: flex-start;
 }
 .err .ico {
+  flex: 0 0 auto;
   font-size: 15px;
   color: var(--bad);
   margin-top: 2px;
+}
+/* un turno fermato non e' un guasto: stesso riquadro, tono diverso */
+.err.calm {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+}
+.err.calm .ico {
+  color: var(--warn);
+}
+.err-body {
+  min-width: 0;
+  flex: 1;
+}
+.err-title {
+  font-size: 13px;
+  font-weight: 650;
+}
+.err-hint {
+  margin-top: 3px;
+  font-size: 12px;
+  opacity: 0.82;
+}
+.err-raw {
+  margin-top: 7px;
+}
+.err-raw > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.err-raw > summary::-webkit-details-marker {
+  display: none;
+}
+.err-raw > summary:hover {
+  opacity: 1;
+}
+.err-raw pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* stato vuoto */
@@ -793,7 +875,7 @@ body[data-mode='plan'] .modechip .ico {
   margin: auto;
   text-align: center;
   padding: 24px 18px;
-  max-width: 330px;
+  max-width: 360px;
 }
 .empty .ico {
   font-size: 34px;
@@ -809,6 +891,31 @@ body[data-mode='plan'] .modechip .ico {
   margin: 0;
   font-size: 12.5px;
   opacity: 0.85;
+}
+/* le scorciatoie stanno dove guardi mentre non c'e' ancora niente da leggere */
+.empty .keys {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.empty .key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  font-size: 11px;
+  opacity: 0.9;
+}
+.empty kbd {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--claude-2);
 }
 
 /* percorso cliccabile nella testa di un tool */

@@ -152,9 +152,23 @@ const options = {
   },
 };
 
+/**
+ * L'icona dell'estensione e' un PNG committato, non un prodotto di questa build:
+ * costa Chromium e cambia quasi mai (`npm run icon`). Qui si controlla solo che ci
+ * sia, perche' senza `vsce package` si ferma a meta' con un messaggio oscuro.
+ */
+function checkIcon() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  if (!pkg.icon) return;
+  if (!fs.existsSync(path.join(root, pkg.icon))) {
+    throw new Error(`manca ${pkg.icon}: rifallo con "npm run icon"`);
+  }
+}
+
 const n = buildSprite();
 const bar = await buildBarFont();
 checkIconContributions(bar);
+checkIcon();
 copyWebview();
 
 const made = `${n} Ionicons nello sprite, ${bar.length} nel font della barra`;

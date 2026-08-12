@@ -2,9 +2,10 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Chat Claude Code e barra di contesto in una sola estensione.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "local",
   "license": "MIT",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -137,6 +138,18 @@
         "title": "Claude Studio: Cosa vede la barra di contesto"
       }
     ],
+    "keybindings": [
+      {
+        "command": "claudeStudio.show",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c"
+      },
+      {
+        "command": "claudeStudio.newSession",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -193,6 +206,7 @@
     "watch": "node build.mjs --watch",
     "package": "node build.mjs && vsce package --no-dependencies --allow-missing-repository --skip-license -o claude-studio.vsix",
     "typecheck": "tsc --noEmit",
+    "icon": "node scripts/make-icon.mjs",
     "preview": "node build.mjs && node scripts/preview.mjs",
     "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs",
     "smoke": "node scripts/smoke-engine.mjs",
