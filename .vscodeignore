@@ -17,3 +17,9 @@ package-lock.json
 # Le immagini del README stanno su GitHub: nel pacchetto peserebbero e basta,
 # perche' il Marketplace le va comunque a prendere dai link assoluti.
 docs/**
+# Artefatti di publishing. La prima riga e' critica: contiene il token Open VSX
+# e senza questa regola verrebbe distribuito dentro il .vsix.
+.publish-tokens.json
+.publish-*.png
+.az-shot.png
+.env*
