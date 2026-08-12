@@ -690,15 +690,29 @@
     drawer.hidden = false;
   }
 
+  /**
+   * Nascondi dopo l'animazione di uscita — ma non solo dopo quella: se il sistema
+   * ha le animazioni spente, `animationend` non arriva mai e il pannello resterebbe
+   * li' aperto per sempre. La rete di sicurezza e' un timer poco piu' lungo
+   * dell'animazione.
+   */
+  function hideAfterClosing(node, ms) {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      node.hidden = true;
+      node.classList.remove('closing');
+      node.removeEventListener('animationend', finish);
+    };
+    node.classList.add('closing');
+    node.addEventListener('animationend', finish);
+    setTimeout(finish, ms || 320);
+  }
+
   function closeDrawer() {
     if (drawer.hidden) return;
-    drawer.classList.add('closing');
-    const done = () => {
-      drawer.hidden = true;
-      drawer.classList.remove('closing');
-      drawer.removeEventListener('animationend', done);
-    };
-    drawer.addEventListener('animationend', done);
+    hideAfterClosing(drawer);
   }
 
   $('btnHistory').addEventListener('click', () => toggleHistory());
@@ -712,7 +726,12 @@
     n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n);
 
   function paintSpent() {
+    // Il chip del consumo e' stato tolto dalla testata: quello che si spende si
+    // legge nel pannello del contesto. Finche' non c'e' non si tocca niente —
+    // senza questo controllo la funzione esplodeva a ogni fine turno, e con lei
+    // tutto il resto del messaggio.
     const chip = $('spend');
+    if (!chip) return;
     if (!spent.tokens && !spent.usd) {
       chip.hidden = true;
       return;
@@ -1277,28 +1296,33 @@
     off:  { label: 'Spento', desc: 'Risponde direttamente, senza ragionamento intermedio' },
   };
 
-  // -- model cards: 3 quadrati (Haiku, Opus al centro, Sonnet) --
-  // L'ordine e' fisso: prima il veloce, al centro il migliore, poi il bilanciato.
-  const MODEL_CATALOG = [
-    { key: 'haiku',  label: 'Haiku',  desc: 'Veloce', icon: 'flash' },
-    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond', premium: true },
-    { key: 'sonnet', label: 'Sonnet', desc: 'Bilanciato', icon: 'pulse' },
-  ];
+  // -- model cards --
+  //
+  // Le carte le detta la CLI installata, non una lista scritta qui: il giorno che
+  // esce un modello nuovo appare da solo, e uno che sparisce non resta a fare
+  // finta. Il nome e la descrizione sono quelli suoi, tradotti solo quel poco che
+  // serve a starci dentro.
 
-  function findModelValue(catalog, models) {
-    // Cerca il modello dalla CLI che corrisponde alla chiave del catalogo
-    for (const m of models) {
-      if (m.value.toLowerCase().includes(catalog.key)) return m.value;
-    }
-    return null;
+  /** Dalla descrizione della CLI si tiene l'ultimo pezzo: il "a cosa serve". */
+  function modelPurpose(m) {
+    const d = String(m.description || '');
+    const parts = d.split('·');
+    const tail = (parts[parts.length - 1] || '').trim();
+    return PURPOSE_IT[tail] || tail || String(m.resolved || '');
   }
 
-  /** Estrae un numero di versione leggibile dal valore del modello.
-      es. "claude-sonnet-4-6-20250514" → "4.6" */
-  function modelVersion(value) {
-    // Pattern: "claude-<name>-<major>-<minor>" o simili
-    const m = value.match(/(\d+)-(\d+)/);
-    return m ? m[1] + '.' + m[2] : '';
+  /** Le poche frasi che la CLI dice sempre uguali: qui in italiano. */
+  const PURPOSE_IT = {
+    'Best for everyday, complex tasks': 'Per tutti i giorni, anche complessi',
+    'Most capable for your hardest and longest-running tasks': 'Il più capace, per i lavori tosti',
+    'Efficient for routine tasks': 'Efficiente per le cose di routine',
+    'Fastest for quick answers': 'Il più veloce, risposte al volo',
+  };
+
+  /** Il nome sulla carta: "Default (recommended)" qui e' semplicemente "Automatico". */
+  function modelName(m) {
+    if (m.recommended) return 'Automatico';
+    return String(m.label || m.value);
   }
 
   function paintModels() {
@@ -1306,35 +1330,22 @@
     list.replaceChildren();
 
     if (!models.length) {
-      // Prima che la CLI mandi la lista, mostra i 3 modelli con chiave vuota
-      for (const cat of MODEL_CATALOG) {
-        const cls = 'model-card' + (cat.premium ? ' premium' : '') + (!prefs.model ? '' : '');
-        const card = el('button', cls);
-        card.type = 'button';
-        const info = el('span', 'mc-info');
-        info.append(el('span', 'mc-name', cat.label));
-        info.append(el('span', 'mc-desc', cat.desc));
-        /* badge Premium rimosso */
-        card.append(info);
-        card.style.opacity = '0.5';
-        card.style.cursor = 'default';
-        list.append(card);
-      }
       list.append(el('p', 'phint', 'I modelli appariranno dopo il primo messaggio'));
       return;
     }
 
-    for (const cat of MODEL_CATALOG) {
-      const value = findModelValue(cat, models);
-      if (!value) continue;
+    for (const m of models) {
+      // "Automatico" e "nessuna scelta" sono la stessa cosa: si tiene la seconda,
+      // cosi' quel che decide la CLI vale anche domani.
+      const value = m.recommended ? '' : m.value;
       const isOn = prefs.model === value;
-      const ver = modelVersion(value);
-      const cls = 'model-card' + (cat.premium ? ' premium' : '') + (isOn ? ' on' : '');
+      const cls = 'model-card' + (m.recommended ? ' premium' : '') + (isOn ? ' on' : '');
       const card = el('button', cls);
       card.type = 'button';
+      card.title = String(m.description || m.resolved || m.value);
       const info = el('span', 'mc-info');
-      info.append(el('span', 'mc-name', cat.label + (ver ? ' ' + ver : '')));
-      info.append(el('span', 'mc-desc', cat.desc));
+      info.append(el('span', 'mc-name', modelName(m)));
+      info.append(el('span', 'mc-desc', modelPurpose(m)));
       card.append(info);
       card.addEventListener('click', () => push({ model: value }));
       list.append(card);
@@ -1370,7 +1381,9 @@
         const boxRect = container.getBoundingClientRect();
         const btnRect = active.getBoundingClientRect();
         slider.style.left = (btnRect.left - boxRect.left) + 'px';
+        slider.style.top = (btnRect.top - boxRect.top) + 'px';
         slider.style.width = btnRect.width + 'px';
+        slider.style.height = btnRect.height + 'px';
         slider.style.display = '';
       } else {
         slider.style.display = 'none';
@@ -1379,7 +1392,10 @@
   }
 
   function paintEffort() {
-    const chosen = models.find((m) => m.value === prefs.model);
+    // Senza scelta vale il consigliato: i suoi livelli sono quelli buoni.
+    const chosen = prefs.model
+      ? models.find((m) => m.value === prefs.model)
+      : models.find((m) => m.recommended);
     const levels = chosen ? chosen.efforts : ['low', 'medium', 'high'];
     const noEffort = !!chosen && !chosen.efforts.length;
     const items = [{ value: '', label: 'Auto', disabled: noEffort }].concat(
@@ -1435,14 +1451,8 @@
       if (window.Chime) window.Chime.unlock();
     } else {
       // Animazione di chiusura: il pannello scivola via, poi si nasconde.
-      cfg.classList.add('closing');
       btnCfg.classList.remove('on');
-      const done = () => {
-        cfg.hidden = true;
-        cfg.classList.remove('closing');
-        cfg.removeEventListener('animationend', done);
-      };
-      cfg.addEventListener('animationend', done);
+      hideAfterClosing(cfg);
     }
   }
 

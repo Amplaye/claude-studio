@@ -89,6 +89,11 @@ const vscode = {
     from: (o) => uri(o.path || ''),
   },
   window: {
+    createOutputChannel: () => ({
+      appendLine() {},
+      show() {},
+      dispose() {},
+    }),
     createStatusBarItem: () => {
       statusBar = { text: '', tooltip: '', show() {}, hide() {}, dispose() {} };
       return statusBar;
@@ -139,7 +144,9 @@ const vscode = {
   },
   workspace: {
     workspaceFolders: [{ uri: uri(work) }],
-    getConfiguration: () => ({ get: (_k, d) => d }),
+    // Le prove non devono andare su npm a cercare aggiornamenti: qui il
+    // controllo automatico e' spento, come se lo avessi spento tu.
+    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
     findFiles: async () => [],
     openTextDocument: async (o) => ({ getText: () => o?.content ?? '' }),
     registerTextDocumentContentProvider: () => ({ dispose() {} }),
@@ -283,7 +290,11 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   t(d3?.cards?.[0]?.cost === '$3.75', 'il costo del sub-agent non e’ contato: ' + d3?.cards?.[0]?.cost);
 
   // ---- la barra di stato ----
-  t(/crm-e6/.test(statusBar?.text || ''), 'la barra di stato non dice dove sei: ' + statusBar?.text);
+  // Il nome del progetto e' passato nel tooltip: nella barra ci stanno i numeri.
+  t(
+    /crm-e6/.test(String(statusBar?.tooltip?.value || statusBar?.tooltip || '')),
+    'la barra di stato non dice dove sei: ' + (statusBar?.tooltip?.value || statusBar?.tooltip)
+  );
   t(/ctx 30%/.test(statusBar?.text || ''), 'la barra di stato non mostra il contesto: ' + statusBar?.text);
   t(
     /\$\(studio-(chat|layers|pulse|warn|alert|gauge|branch|off)\)/.test(statusBar?.text || ''),

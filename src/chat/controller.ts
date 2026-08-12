@@ -42,7 +42,7 @@ export class ChatController {
   private history: Wire[] = [];
   private surfaces = new Set<Surface>();
   private busy = false;
-  private mode: Mode = 'default';
+  private mode: Mode = 'bypassPermissions';
   /** Conversazione da riprendere alla prossima accensione del motore. */
   private resume?: { id: string; fork: boolean };
   /** Permessi in attesa di risposta, per tool_use_id. */
@@ -64,7 +64,12 @@ export class ChatController {
     if ((this.prefs.sound as string) === 'bell' || (this.prefs.sound as string) === 'soft') {
       this.prefs.sound = 'cozy';
     }
-    this.models = ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? [];
+    // L'elenco messo da parte da una versione precedente puo' parlare di modelli
+    // che non esistono piu': si tiene solo se e' nel formato di oggi, tanto al
+    // primo messaggio la CLI lo ridice comunque.
+    this.models = (ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? []).filter(
+      (m) => typeof m?.resolved === 'string'
+    );
     this.commands = ctx.globalState.get<{ name: string; description: string }[]>(COMMANDS_KEY) ?? [];
   }
 
@@ -365,7 +370,7 @@ export class ChatController {
       this.emit({
         k: 'error',
         message:
-          'Non trovo la CLI di Claude Code su questo computer. Installala con "npm i -g @anthropic-ai/claude-code", oppure indica il percorso di cli.js in Impostazioni > Claude Studio > Cli Path.',
+          'Non trovo la CLI di Claude Code su questo computer. Installala con "npm i -g @anthropic-ai/claude-code", oppure indica il percorso del comando claude in Impostazioni > Claude Studio > Cli Path.',
       });
     }
 
@@ -393,6 +398,7 @@ export class ChatController {
     if (e.k === 'models') {
       this.models = e.items;
       void this.ctx.globalState.update(MODELS_KEY, e.items);
+      this.dropStaleModel(e.items);
     }
     if (e.k === 'commands') {
       this.commands = e.items;
@@ -408,6 +414,21 @@ export class ChatController {
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
     if (this.primary) owned.observe(e, currentCwd());
     this.broadcast(e);
+  }
+
+  /**
+   * Un modello scelto mesi fa resta scritto nelle preferenze anche quando la CLI
+   * ha smesso di offrirlo: e' cosi' che ci si ritrova a lavorare con un modello
+   * vecchio senza accorgersene. Quando arriva l'elenco vero, una scelta che non
+   * c'e' piu' si butta via e si torna al consigliato — che e' sempre l'ultimo.
+   */
+  private dropStaleModel(items: ModelChoice[]) {
+    if (!this.prefs.model || !items.length) return;
+    if (items.some((m) => m.value === this.prefs.model)) return;
+    this.prefs = { ...this.prefs, model: '' };
+    void this.ctx.globalState.update(PREFS_KEY, this.prefs);
+    void this.session?.setModel('');
+    this.broadcast({ k: 'prefs', value: this.prefs });
   }
 
   private broadcast(e: Wire) {

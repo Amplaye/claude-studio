@@ -85,9 +85,13 @@ che vive nel motore, non nell'interfaccia.
     classe, e `ui-check` toglie gli `style` dal markup prima di misurare, cosi' la
     prova vede quello che vede VSCode.
   - **Impostazioni nella testata** (`Alt+I`): modello, impegno e pensiero. L'elenco
-    dei modelli lo dice la **CLI installata** (`supportedModels`), quindi non
-    invecchia e si porta dietro quali livelli d'impegno accetta ciascuno — se un
-    modello non li accetta, il menu si spegne. Le scelte valgono **dal turno dopo**
+    dei modelli lo dice la **CLI installata** (`supportedModels`) — una carta per
+    modello, col nome e la descrizione sue, nessuna scritta a mano qui dentro:
+    quello che esce domani compare da solo. La prima e' **Automatico**, che non
+    fissa niente e segue il consigliato della CLI; un modello scelto tempo fa e
+    che la CLI non offre piu' viene lasciato cadere, invece di restare appeso a
+    lavorare con un modello vecchio. Si porta dietro anche quali livelli
+    d'impegno accetta ciascuno — se un modello non li accetta, il menu si spegne. Le scelte valgono **dal turno dopo**
     senza buttare via la conversazione (`setModel`, `applyFlagSettings`,
     `setMaxThinkingTokens`) e restano fra una finestra e l'altra.
   - **Avviso di fine lavoro**: un suono caldo costruito con Web Audio (nessun file
@@ -238,14 +242,38 @@ Per installarla: `npm run package` e poi
 `code --install-extension claude-studio.vsix --force`, quindi ricaricare la finestra.
 
 L'estensione **non** impacchetta una copia di `claude`: usa quella installata
-globalmente. Se sta in un posto insolito, il percorso di `cli.js` si indica in
-Impostazioni → Claude Studio → Cli Path.
+globalmente. Dalla 2.1 il pacchetto npm non porta piu' `cli.js` ma un binario
+nativo in `bin/`: si cercano tutte e due le forme, piu' l'installer nativo. Se
+sta in un posto insolito, il percorso si indica in Impostazioni → Claude Studio →
+Cli Path.
+
+### Restare aggiornati
+
+I modelli non li decide questa estensione: li dice la CLI installata. Una CLI
+ferma a sei mesi fa vuol dire lavorare con i modelli di sei mesi fa, per quanto
+nuova sia l'estensione. Per questo trenta secondi dopo l'avvio, e poi ogni sei
+ore, Claude Studio guarda da solo se c'e' qualcosa di piu' nuovo:
+
+- la **CLI** (`@anthropic-ai/claude-code`), se e' installata via npm: la aggiorna
+  e te lo dice a cose fatte. Con l'installer nativo non la tocca, perche' quella
+  si aggiorna da sola;
+- l'**estensione**, ricostruendola dal sorgente da cui e' uscita — quando un
+  `git pull` porta una versione piu' alta, o quando esce un Agent SDK piu' nuovo
+  di quello cotto in questa build. Se nel sorgente c'e' lavoro non committato non
+  tocca niente e riprova al giro dopo.
+
+Si guida da `claudeStudio.autoUpdate` (`auto` fa, `check` avvisa e basta, `off`
+sta zitto) e dal comando **Claude Studio: Controlla gli aggiornamenti**, che non
+aspetta il giro delle sei ore. Il registro sta in Output → *Claude Studio —
+Aggiornamenti*.
 
 ## Impostazioni
 
 | Chiave | Cosa fa |
 |---|---|
-| `claudeStudio.cliPath` | Percorso di `cli.js`. Vuoto = lo trova da solo. |
+| `claudeStudio.cliPath` | Percorso del comando `claude`. Vuoto = lo trova da solo. |
+| `claudeStudio.autoUpdate` | `auto` aggiorna CLI ed estensione da solo, `check` avvisa, `off` non guarda. |
+| `claudeStudio.updateSourcePath` | Da dove ricostruire l'estensione. Vuoto = la cartella da cui e' stata compilata. |
 | `claudeStudio.contextLimit` | La finestra di contesto su cui si calcola la %. |
 | `claudeStudio.refreshSeconds` | Ogni quanto la barra di contesto rifa' i conti (1,5s). |
 | `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |

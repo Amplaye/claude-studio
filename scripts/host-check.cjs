@@ -91,6 +91,11 @@ const vscode = {
     from: (o) => uri(o.path || ''),
   },
   window: {
+    createOutputChannel: () => ({
+      appendLine() {},
+      show() {},
+      dispose() {},
+    }),
     createStatusBarItem: () => {
       statusBar = { text: '', tooltip: '', show() {}, hide() {}, dispose() {} };
       return statusBar;
@@ -157,7 +162,9 @@ const vscode = {
   },
   workspace: {
     workspaceFolders: [{ uri: uri(root) }],
-    getConfiguration: () => ({ get: (_k, d) => d }),
+    // Le prove non devono andare su npm a cercare aggiornamenti: qui il
+    // controllo automatico e' spento, come se lo avessi spento tu.
+    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
     findFiles: async () => [uri(path.join(root, 'package.json'))],
     openTextDocument: async () => ({ getText: () => '' }),
     registerTextDocumentContentProvider: () => ({ dispose() {} }),
@@ -245,6 +252,10 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
 // ---- un turno vero ---------------------------------------------------------
 (async () => {
   onMsg({ cmd: 'ready' });
+  // La chat parte in "fa tutto da solo": li' i permessi non li chiede nessuno, e
+  // sotto non ci sarebbe niente da provare. Qui si vuole vedere il giro completo,
+  // quindi si torna alla modalita' che chiede.
+  onMsg({ cmd: 'setMode', value: 'default' });
   onMsg({
     cmd: 'send',
     text: 'Usa il tool Read su package.json e poi dimmi in una riga il campo "name". Non fare altro.',

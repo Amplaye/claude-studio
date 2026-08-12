@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Chat Claude Code e barra di contesto in una sola estensione.",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "local",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -136,6 +136,10 @@
       {
         "command": "claudeStudio.context.diagnose",
         "title": "Claude Studio: Cosa vede la barra di contesto"
+      },
+      {
+        "command": "claudeStudio.update",
+        "title": "Claude Studio: Controlla gli aggiornamenti"
       }
     ],
     "keybindings": [
@@ -175,7 +179,27 @@
         "claudeStudio.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Percorso di cli.js della CLI claude. Vuoto = rilevamento automatico."
+          "description": "Percorso del comando claude (il binario in bin/, o cli.js sulle versioni vecchie). Vuoto = rilevamento automatico."
+        },
+        "claudeStudio.autoUpdate": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "check",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Aggiorna da solo la CLI di Claude Code e l'estensione, e lo dice a cose fatte.",
+            "Guarda e basta: avvisa che c'è qualcosa di nuovo, ma non tocca niente.",
+            "Non controlla niente. Resta il comando \"Claude Studio: Controlla gli aggiornamenti\"."
+          ],
+          "default": "auto",
+          "description": "Come restare aggiornati. Il controllo parte 30 secondi dopo l'avvio e poi ogni 6 ore. La CLI è quella che porta i modelli nuovi: tenerla indietro vuol dire lavorare con modelli vecchi."
+        },
+        "claudeStudio.updateSourcePath": {
+          "type": "string",
+          "default": "",
+          "description": "Cartella del sorgente di Claude Studio, da cui ricostruire l'estensione quando esce qualcosa di nuovo. Vuoto = quella da cui è stata compilata."
         },
         "claudeStudio.contextLimit": {
           "type": "number",

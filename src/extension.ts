@@ -5,6 +5,7 @@ import { ChatPanel } from './chat/panel';
 import { ChatView, stayInSidebar } from './chat/view';
 import { ContextMonitor } from './context/monitor';
 import { ContextView } from './context/view';
+import { checkForUpdates, startAutoUpdate } from './update/updater';
 
 export function activate(ctx: vscode.ExtensionContext) {
   const chat = new ChatController(ctx);
@@ -53,6 +54,10 @@ export function activate(ctx: vscode.ExtensionContext) {
     ),
     vscode.commands.registerCommand('claudeStudio.context.refresh', () => monitor.tick()),
     vscode.commands.registerCommand('claudeStudio.context.diagnose', () => monitor.diagnose()),
+    // Gli aggiornamenti arrivano da soli; questo comando serve solo a non dover
+    // aspettare il giro delle sei ore.
+    vscode.commands.registerCommand('claudeStudio.update', () => checkForUpdates(ctx, { manual: true })),
+    startAutoUpdate(ctx),
     { dispose: () => chat.dispose() },
     { dispose: () => monitor.dispose() }
   );

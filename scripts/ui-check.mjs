@@ -278,16 +278,17 @@ for (const surface of ['view', 'panel']) {
   await post({ k: 'ask_done', id: 'ask_3', ok: true, label: 'tsc' });
 
   // ---- la modalita' permessi ----
+  // Non e' piu' un menu a tendina ma tre bottoni con lo slider sotto.
   await post({ k: 'mode', value: 'plan' });
   await page.waitForTimeout(80);
   t(
-    (await page.inputValue('#modeSel')) === 'plan',
+    (await page.locator('#mode .modeseg-btn.on').getAttribute('data-mode')) === 'plan',
     'la testata non segue la modalità decisa dall’estensione'
   );
-  await page.selectOption('#modeSel', 'acceptEdits');
+  await page.locator('#mode .modeseg-btn[data-mode="bypassPermissions"]').click();
   const s4 = await lastSent();
   t(
-    s4?.cmd === 'setMode' && s4.value === 'acceptEdits',
+    s4?.cmd === 'setMode' && s4.value === 'bypassPermissions',
     'il cambio di modalità non arriva all’estensione: ' + JSON.stringify(s4)
   );
 
@@ -299,19 +300,39 @@ for (const surface of ['view', 'panel']) {
       sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true,
     },
   });
+  // L'elenco e' esattamente quello che dice la CLI, nell'ordine in cui lo dice:
+  // il primo e' il consigliato, che qui si chiama "Automatico".
   await post({
     k: 'models',
     items: [
-      { value: 'opus', label: 'Opus', description: 'Il più bravo.', efforts: ['low', 'medium', 'high'], adaptive: true },
-      { value: 'haiku', label: 'Haiku', description: 'Il più svelto.', efforts: [], adaptive: false },
+      {
+        value: 'default', label: 'Default (recommended)',
+        description: 'Opus 5 · Best for everyday, complex tasks',
+        resolved: 'claude-opus-5[1m]',
+        efforts: ['low', 'medium', 'high', 'xhigh', 'max'], adaptive: true, recommended: true,
+      },
+      { value: 'opus', label: 'Opus', description: 'Il più bravo.', resolved: 'claude-opus-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      { value: 'haiku', label: 'Haiku', description: 'Il più svelto.', resolved: 'claude-haiku-4-5', efforts: [], adaptive: false, recommended: false },
     ],
   });
   await page.click('#btnCfg');
   await page.waitForTimeout(140);
   t(await page.isVisible('#cfg'), 'il pannello delle impostazioni non si apre');
-  // I modelli sono card: Predefinito + 2 dalla CLI = 3 card
+  // Una card per modello, nessuna inventata e nessuna persa
   const modelCards = await page.locator('#cfgModelList .model-card').count();
   t(modelCards === 3, 'le card dei modelli non arrivano: ' + modelCards);
+  const autoName = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-name').textContent();
+  t(autoName === 'Automatico', 'il consigliato non si chiama Automatico: ' + autoName);
+  // Il consigliato non fissa nessun modello: cosi' domani vale quello nuovo
+  await page.locator('#cfgModelList .model-card:nth-child(1)').click();
+  const sauto = await lastSent();
+  t(sauto?.cmd === 'setPrefs' && sauto.value?.model === '', 'Automatico fissa un modello: ' + JSON.stringify(sauto));
+  await page.waitForTimeout(80);
+  // Senza scelta valgono i livelli del consigliato: Auto + 5 = 6 bottoni
+  t(
+    (await page.locator('#cfgEffort .seg-btn').count()) === 6,
+    'i livelli del consigliato non arrivano'
+  );
   // Clic sulla card Opus
   await page.locator('#cfgModelList .model-card:nth-child(2)').click();
   const sm = await lastSent();
@@ -329,20 +350,21 @@ for (const surface of ['view', 'panel']) {
   const disabledBtn = await page.locator('#cfgEffort .seg-btn:disabled').count();
   t(disabledBtn > 0, 'impegno selezionabile su un modello che non lo accetta');
 
-  // Il pensiero: clic su Spento
-  await page.locator('#cfgThink .seg-btn:nth-child(3)').click();
+  // Il pensiero: clic su Spento (il terzo bottone; il primo figlio e' lo slider)
+  await page.locator('#cfgThink .seg-btn').nth(2).click();
   const st = await lastSent();
   t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'il pensiero non si spegne: ' + JSON.stringify(st));
-  await page.selectOption('#cfgSound', 'bell');
+  await page.selectOption('#cfgSound', 'harvest');
   const ssnd = await lastSent();
-  t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'bell', 'il suono scelto non arriva: ' + JSON.stringify(ssnd));
+  t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'harvest', 'il suono scelto non arriva: ' + JSON.stringify(ssnd));
   await page.click('#cfgTest');
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-cfg.png`) });
   // avviso vero: arriva dall'estensione e la pagina lo suona senza lamentarsi
   await post({ k: 'chime', event: 'done', sound: 'cozy', volume: 0.4 });
   await page.waitForTimeout(120);
   await page.click('#cfgClose');
-  await page.waitForTimeout(80);
+  // il pannello esce con la sua animazione: si aspetta che finisca davvero
+  await page.waitForTimeout(360);
   t(await page.locator('#cfg').isHidden(), 'il pannello delle impostazioni non si chiude');
 
   // ---- gli ingressi: cronologia, "@", "/", selezione dall'editor ----
@@ -362,9 +384,10 @@ for (const surface of ['view', 'panel']) {
     (await page.locator('.hwhen').first().textContent()) === "un'ora fa",
     'la data della conversazione è scritta male: ' + (await page.locator('.hwhen').first().textContent())
   );
-  await page.locator('.hrow').nth(1).locator('.hfork').click();
+  await page.locator('.hrow').nth(1).locator('.hopen').click();
   const sh = await lastSent();
-  t(sh?.cmd === 'open' && sh.id === 's2' && sh.fork === true, 'il ramo nuovo non parte: ' + JSON.stringify(sh));
+  t(sh?.cmd === 'open' && sh.id === 's2', 'la conversazione scelta non si riapre: ' + JSON.stringify(sh));
+  await page.waitForTimeout(360);
   t(await page.locator('#drawer').isHidden(), 'il cassetto resta aperto dopo aver scelto');
 
   await post({ k: 'commands', items: [{ name: 'commit', description: 'Fa un commit' }, { name: 'test', description: 'Lancia i test' }] });
@@ -454,7 +477,7 @@ for (const surface of ['view', 'panel']) {
       btn: getComputedStyle(document.getElementById('btnCtx')).display !== 'none',
       cards: rail.querySelectorAll('.ctxcard').length,
       name: rail.querySelector('.cname')?.textContent,
-      cost: rail.querySelector('.fcost .v')?.textContent,
+      cost: rail.querySelector('.ctxcard .ccost')?.textContent,
       // niente sovrapposizioni: la colonna sta a destra del discorso
       apart: box.width === 0 || box.left >= log.right - 1,
       // le classi della chat non devono essere ridipinte dal foglio del contesto
@@ -467,7 +490,7 @@ for (const surface of ['view', 'panel']) {
   if (wide) {
     t(railed.cards === 1, 'la colonna del contesto non disegna le sessioni: ' + railed.cards);
     t(railed.name === 'Questa conversazione', 'nome sbagliato nella colonna: ' + railed.name);
-    t(railed.cost === '$1.20', 'il totale speso non arriva nella colonna: ' + railed.cost);
+    t(railed.cost === '$0.42', 'il costo della conversazione non arriva nella colonna: ' + railed.cost);
     t(railed.apart, 'la colonna del contesto si sovrappone al discorso');
     // e si toglie di mezzo quando lo chiedi
     await page.click('#btnCtx');
@@ -503,9 +526,6 @@ for (const surface of ['view', 'panel']) {
         cls: t.className,
       })),
       user: document.querySelector('.msg.user')?.textContent,
-      model: document.getElementById('modelName')?.textContent,
-      spend: document.getElementById('spendTokens')?.textContent,
-      cost: document.getElementById('spendCost')?.textContent,
       headOverflow: (() => {
         const top = document.querySelector('.top');
         return top.scrollWidth > top.clientWidth + 1;
@@ -540,9 +560,7 @@ for (const surface of ['view', 'panel']) {
   t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RISULTATO-DI-B', 'Bash ha preso l’esito sbagliato: ' + r.tools[1]?.out);
   t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read non è marcato completato');
   t(/\bfail\b/.test(r.tools[2]?.cls || ''), 'Write non è marcato fallito');
-  t(r.model === 'opus-4-6[1m]', 'modello non mostrato: ' + r.model);
   t(!r.headOverflow, 'la testata sfonda: le pillole non ci stanno nella faccia stretta');
-  t(r.spend === '18k' && r.cost === '$0.014', 'costo e contesto non mostrati: ' + r.spend + ' ' + r.cost);
   t(/differenza/.test(r.user || ''), 'messaggio utente mancante');
   t(/tutti e due i file/.test(r.think || ''), 'blocco ragionamento mancante');
   t(r.codeBlocks === 1, 'blocco di codice non reso: ' + r.codeBlocks);

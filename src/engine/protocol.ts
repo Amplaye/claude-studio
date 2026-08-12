@@ -65,15 +65,23 @@ export const DEFAULT_PREFS: Prefs = {
   toast: true,
 };
 
-/** Un modello fra quelli che la CLI dice di saper usare. */
+/**
+ * Un modello fra quelli che la CLI dice di saper usare. L'elenco non sta scritto
+ * da nessuna parte qui dentro: arriva dalla CLI installata, quindi il giorno che
+ * esce un modello nuovo compare da solo, senza toccare l'estensione.
+ */
 export interface ModelChoice {
   value: string;
   label: string;
   description: string;
+  /** Il modello vero dietro l'alias, es. "claude-opus-5[1m]". Serve solo a mostrarlo. */
+  resolved: string;
   /** Livelli di impegno accettati da questo modello; vuoto = non li accetta. */
   efforts: string[];
   /** Sa decidere da solo quanto pensare. */
   adaptive: boolean;
+  /** E' la scelta che la CLI consiglia: quella che avresti da terminale. */
+  recommended: boolean;
 }
 
 /** Una conversazione gia' avvenuta, come appare nella cronologia. */

@@ -77,7 +77,6 @@ for (const width of [320, 620]) {
     return {
       cells: [...document.querySelectorAll('.acell .av')].map((n) => n.textContent),
       resets: [...document.querySelectorAll('.acell .ar')].map((n) => n.textContent),
-      count: document.querySelector('.count').textContent,
       name: document.querySelector('.cname')?.textContent,
       pct: document.querySelector('.cpct')?.textContent,
       tok: document.querySelector('.ctok')?.textContent,
@@ -90,15 +89,11 @@ for (const width of [320, 620]) {
       busyDot: !!document.querySelector('.dot.busy'),
       kind: document.querySelector('.cico use')?.getAttribute('href'),
       fillW: document.querySelector('.ctxcard .fill')?.style.width,
-      project: document.querySelector('.fproject .v').textContent,
-      branch: document.querySelector('.fbranch .v').textContent,
-      total: document.querySelector('.fcost .v').textContent,
     };
   });
 
   t(first.cells.join('|') === '34%|71%', 'i numeri dell’account non ci sono: ' + first.cells.join('|'));
   t(first.resets[0] === 'reset tra 2h 15m', 'il reset non e’ scritto: ' + first.resets[0]);
-  t(first.count === '1', 'il contatore delle sessioni e’ sbagliato: ' + first.count);
   t(/Fase 3/.test(first.name || ''), 'il nome della card manca: ' + first.name);
   t(first.pct === '18%', 'la percentuale non c’e’: ' + first.pct);
   t(first.tok === '182.0k / 1M', 'i token non sono scritti sul limite: ' + first.tok);
@@ -111,9 +106,6 @@ for (const width of [320, 620]) {
   t(first.fillW === '18%', 'la barra non segue la percentuale: ' + first.fillW);
   // con l'aggancio certo non si deve leggere nessun dubbio
   t(!/stimata|ultima attiva/.test(first.sub || ''), 'la card dubita di un aggancio certo: ' + first.sub);
-  t(first.project === 'claude-studio', 'il progetto non e’ scritto: ' + first.project);
-  t(first.branch === 'master*', 'il ramo non dice che ci sono modifiche: ' + first.branch);
-  t(first.total === '$1.20', 'il totale speso non si vede: ' + first.total);
 
   // ---- secondo giro: stessa sessione, numeri nuovi ----
   await post(
@@ -171,7 +163,6 @@ for (const width of [320, 620]) {
       firstKind: cs[0].querySelector('.cico use')?.getAttribute('href'),
       firstFill: cs[0].querySelector('.fill')?.style.background,
       badges: cs.filter((c) => !c.querySelector('.badge').hidden).length,
-      count: document.querySelector('.count').textContent,
       hOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       squashed: cs.filter((c) => c.scrollHeight > c.clientHeight + 2).map((c) => c.className),
     };
@@ -184,7 +175,6 @@ for (const width of [320, 620]) {
   t(third.firstKind === '#ion-chatbubble-ellipses', 'icona sbagliata per una tab dell’ufficiale: ' + third.firstKind);
   t(/bad/.test(third.firstFill || ''), 'oltre l’80% la barra non passa al rosso: ' + third.firstFill);
   t(third.badges === 1, 'il badge "qui" e’ su piu’ di una card: ' + third.badges);
-  t(third.count === '2', 'il contatore non segue: ' + third.count);
   t(!third.hOverflow, 'il pannello sfonda in orizzontale');
   t(!third.squashed.length, 'card schiacciate dal flex: ' + third.squashed.join(' | '));
 
@@ -208,13 +198,9 @@ for (const width of [320, 620]) {
   const empty = await page.evaluate(() => ({
     empty: document.querySelector('.empty')?.textContent,
     wait: document.querySelector('.await')?.textContent,
-    branchHidden: document.querySelector('.fbranch').hidden,
-    count: document.querySelector('.count').textContent,
   }));
   t(/Nessuna conversazione/.test(empty.empty || ''), 'manca lo stato vuoto: ' + empty.empty);
   t(/limite API/.test(empty.wait || ''), 'non si distingue l’attesa dal limite API: ' + empty.wait);
-  t(empty.branchHidden, 'il ramo resta scritto anche fuori da una repo');
-  t(empty.count === '0', 'il contatore non torna a zero: ' + empty.count);
 
   // e tornando indietro le card si ricostruiscono senza lasciare buchi
   await post(data());

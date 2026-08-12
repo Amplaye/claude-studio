@@ -131,6 +131,17 @@ function checkIconContributions(names) {
   }
 }
 
+/** La versione vera dell'Agent SDK che finisce nel bundle, non l'intervallo scritto
+ *  in package.json: e' quella che l'aggiornamento automatico deve confrontare. */
+function sdkVersion() {
+  try {
+    const p = path.join(root, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'package.json');
+    return JSON.parse(fs.readFileSync(p, 'utf8')).version || '';
+  } catch {
+    return '';
+  }
+}
+
 // ---- 4. webview ---------------------------------------------------------
 function copyWebview() {
   const src = path.join(root, 'webview');
@@ -152,7 +163,16 @@ const options = {
   logLevel: 'info',
   // sdk.mjs usa createRequire(import.meta.url): in uscita CJS import.meta non
   // esiste, quindi lo si sostituisce con l'URL del file bundle.
-  define: { 'import.meta.url': '__claudeStudioModuleUrl' },
+  //
+  // __CS_SOURCE_ROOT e __CS_SDK_VERSION servono all'aggiornamento automatico: da
+  // installata, l'estensione non ha modo di sapere da dove e' uscita ne' che SDK
+  // si porta dentro, e sono le due cose che deve confrontare per capire se e'
+  // rimasta indietro. Si scrivono qui, dove si sanno per certo.
+  define: {
+    'import.meta.url': '__claudeStudioModuleUrl',
+    __CS_SOURCE_ROOT: JSON.stringify(root),
+    __CS_SDK_VERSION: JSON.stringify(sdkVersion()),
+  },
   banner: {
     js: "const __claudeStudioModuleUrl = require('node:url').pathToFileURL(__filename).href;",
   },

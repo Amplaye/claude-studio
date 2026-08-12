@@ -274,8 +274,12 @@ export class Session {
           value: String(m.value ?? ''),
           label: String(m.displayName || m.value || ''),
           description: String(m.description ?? '').slice(0, 160),
+          resolved: String((m as { resolvedModel?: string }).resolvedModel ?? ''),
           efforts: m.supportsEffort ? [...(m.supportedEffortLevels ?? ['low', 'medium', 'high'])] : [],
           adaptive: m.supportsAdaptiveThinking !== false,
+          // "default" e' l'alias che segue quello che la CLI consiglia oggi: chi lo
+          // sceglie si ritrova il modello nuovo il giorno che esce, senza fare niente.
+          recommended: String(m.value ?? '') === 'default',
         })).filter((m) => m.value),
       });
     } catch {
