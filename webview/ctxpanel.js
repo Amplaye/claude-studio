@@ -175,26 +175,7 @@ window.CtxPanel = (() => {
       paintBar(p.fill, s.pct);
     }
 
-    // ---------- il piede ----------
-    const fprojectName = el('span', 'v', '—');
-    const fproject = el('span', 'fitem fproject');
-    fproject.title = 'Progetto';
-    fproject.append(icon('cube'), fprojectName);
-
-    const fbranchName = el('span', 'v');
-    const fbranch = el('span', 'fitem fbranch');
-    fbranch.hidden = true;
-    fbranch.append(icon('git-branch'), fbranchName);
-
-    const fcostVal = el('span', 'v', '$0');
-    const fcost = el('span', 'fitem fcost');
-    fcost.title = 'Speso in tutto dalle conversazioni aperte';
-    fcost.append(icon('cash'), fcostVal);
-
-    const foot = el('footer', 'foot');
-    foot.append(fproject, fbranch, el('span', 'grow'), fcost);
-
-    root.append(head, host, foot);
+    root.append(head);
 
     btnRefresh.onclick = () => post({ cmd: 'refresh' });
     btnDiag.onclick = () => post({ cmd: 'diagnose' });
@@ -210,37 +191,6 @@ window.CtxPanel = (() => {
         paintCell(cells[1], d.usage.week, d.weekReset);
         if (acct.firstChild !== cells[0]) acct.replaceChildren(cells[0], cells[1]);
       }
-
-      // count not shown anymore
-      if (!d.cards.length) {
-        host.replaceChildren(el('div', 'empty', 'Nessuna conversazione aperta in questo progetto.'));
-        cards.clear();
-      } else {
-        if (host.querySelector('.empty')) host.replaceChildren();
-        const seen = new Set();
-        d.cards.forEach((s, i) => {
-          seen.add(s.id);
-          let c = cards.get(s.id);
-          if (!c) {
-            c = buildCard(s.id);
-            cards.set(s.id, c);
-          }
-          paintCard(c, s, d.limit, d.focusHow);
-          if (host.children[i] !== c) host.insertBefore(c, host.children[i] || null);
-        });
-        for (const [id, c] of [...cards]) {
-          if (!seen.has(id)) {
-            c.remove();
-            cards.delete(id);
-          }
-        }
-      }
-
-      fprojectName.textContent = d.project;
-      fbranch.hidden = !d.branch;
-      fbranchName.textContent = d.branch + (d.dirty ? '*' : '');
-      fbranch.title = d.dirty ? 'Ramo git — ci sono modifiche non salvate' : 'Ramo git';
-      fcostVal.textContent = d.totalCost;
     }
 
     return { render };

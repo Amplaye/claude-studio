@@ -682,24 +682,27 @@
       open.append(el('span', 'hsummary', it.summary), el('span', 'hwhen', fmtAgo(it.when)));
       open.addEventListener('click', () => {
         vscode.postMessage({ cmd: 'open', id: it.id });
-        drawer.hidden = true;
+        closeDrawer();
       });
-      const fork = el('button', 'iconbtn hfork');
-      fork.type = 'button';
-      fork.title = 'Riprendi su un ramo nuovo, lasciando intatta l’originale';
-      fork.append(icon('git-branch'));
-      fork.addEventListener('click', () => {
-        vscode.postMessage({ cmd: 'open', id: it.id, fork: true });
-        drawer.hidden = true;
-      });
-      row.append(open, fork);
+      row.append(open);
       list.append(row);
     }
     drawer.hidden = false;
   }
 
+  function closeDrawer() {
+    if (drawer.hidden) return;
+    drawer.classList.add('closing');
+    const done = () => {
+      drawer.hidden = true;
+      drawer.classList.remove('closing');
+      drawer.removeEventListener('animationend', done);
+    };
+    drawer.addEventListener('animationend', done);
+  }
+
   $('btnHistory').addEventListener('click', () => toggleHistory());
-  $('drawerClose').addEventListener('click', () => (drawer.hidden = true));
+  $('drawerClose').addEventListener('click', closeDrawer);
 
   // ---------- quanto e' costato ----------
   // Il costo si somma turno per turno; i token sono quelli dell'ultimo turno, cioe'
@@ -747,6 +750,10 @@
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         showEmpty();
+        // Animazione di apertura della scheda
+        log.classList.remove('fresh-open');
+        void log.offsetWidth;
+        log.classList.add('fresh-open');
         break;
       case 'reset':
         blocks.clear();
@@ -1015,6 +1022,15 @@
     }
     picking = { kind: t.kind, start: t.start, end: t.end, items: [], sel: 0 };
     if (t.kind === '/') {
+      if (!commands.length) {
+        // Senza sessione attiva non ci sono comandi: mostra un messaggio
+        menu.replaceChildren();
+        const hint = el('div', 'menu-head');
+        hint.append(icon('terminal'), el('span', null, ' Manda un messaggio per caricare i comandi'));
+        menu.append(hint);
+        menu.hidden = false;
+        return;
+      }
       const q = t.q.toLowerCase();
       paintMenu(
         commands
@@ -1248,7 +1264,7 @@
   // L'ordine e' fisso: prima il veloce, al centro il migliore, poi il bilanciato.
   const MODEL_CATALOG = [
     { key: 'haiku',  label: 'Haiku',  desc: 'Veloce', icon: 'flash' },
-    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond' },
+    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond', premium: true },
     { key: 'sonnet', label: 'Sonnet', desc: 'Bilanciato', icon: 'pulse' },
   ];
 
@@ -1258,6 +1274,14 @@
       if (m.value.toLowerCase().includes(catalog.key)) return m.value;
     }
     return null;
+  }
+
+  /** Estrae un numero di versione leggibile dal valore del modello.
+      es. "claude-sonnet-4-6-20250514" → "4.6" */
+  function modelVersion(value) {
+    // Pattern: "claude-<name>-<major>-<minor>" o simili
+    const m = value.match(/(\d+)-(\d+)/);
+    return m ? m[1] + '.' + m[2] : '';
   }
 
   function paintModels() {
@@ -1273,7 +1297,7 @@
         const info = el('span', 'mc-info');
         info.append(el('span', 'mc-name', cat.label));
         info.append(el('span', 'mc-desc', cat.desc));
-        if (cat.premium) info.append(el('span', 'mc-badge', 'Premium'));
+        /* badge Premium rimosso */
         card.append(info);
         card.style.opacity = '0.5';
         card.style.cursor = 'default';
@@ -1287,13 +1311,13 @@
       const value = findModelValue(cat, models);
       if (!value) continue;
       const isOn = prefs.model === value;
+      const ver = modelVersion(value);
       const cls = 'model-card' + (cat.premium ? ' premium' : '') + (isOn ? ' on' : '');
       const card = el('button', cls);
       card.type = 'button';
       const info = el('span', 'mc-info');
-      info.append(el('span', 'mc-name', cat.label));
+      info.append(el('span', 'mc-name', cat.label + (ver ? ' ' + ver : '')));
       info.append(el('span', 'mc-desc', cat.desc));
-      if (cat.premium) info.append(el('span', 'mc-badge', 'Premium'));
       card.append(info);
       card.addEventListener('click', () => push({ model: value }));
       list.append(card);
@@ -1441,7 +1465,7 @@
   // non ci si mette sopra.
   function toggleHistory() {
     if (!drawer.hidden) {
-      drawer.hidden = true;
+      closeDrawer();
       return;
     }
     vscode.postMessage({ cmd: 'history' });
@@ -1458,7 +1482,7 @@
       }
       if (!drawer.hidden) {
         e.preventDefault();
-        drawer.hidden = true;
+        closeDrawer();
         return;
       }
       // Ferma solo se c'e' davvero qualcosa da fermare: altrimenti Escape resta
