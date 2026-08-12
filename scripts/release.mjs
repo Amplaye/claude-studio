@@ -85,15 +85,19 @@ let ovsxToken = process.env.OVSX_PAT;
 if (!ovsxToken && existsSync('.publish-tokens.json')) {
   ovsxToken = JSON.parse(readFileSync('.publish-tokens.json', 'utf8')).ovsx;
 }
-const wantOvsx = !only || only === 'ovsx';
+let wantOvsx = !only || only === 'ovsx';
 const wantMarket = !only || only === 'marketplace';
 if (wantOvsx && !ovsxToken && !dryRun) {
-  console.error('\n✗ Token Open VSX assente.');
-  console.error('  Prepara i login con: node scripts/setup-logins.mjs');
-  console.error('  Poi genera il token su https://open-vsx.org/user-settings/tokens e salvalo in .publish-tokens.json');
-  console.error('  come {"ovsx":"<token>"}, oppure esporta OVSX_PAT.');
-  console.error('  Per pubblicare solo sul Marketplace: npm run release -- --only=marketplace');
-  process.exit(1);
+  if (only === 'ovsx') {
+    console.error('\n✗ Token Open VSX assente ed è stato richiesto --only=ovsx.');
+    console.error('  Genera il token su https://open-vsx.org/user-settings/tokens');
+    console.error('  e salvalo in .publish-tokens.json come {"ovsx":"<token>"} (oppure esporta OVSX_PAT).');
+    process.exit(1);
+  }
+  console.log('\n⚠ Token Open VSX assente: pubblico solo sul Marketplace.');
+  console.log('  Per abilitare Open VSX serve il Publisher Agreement Eclipse firmato, poi il token');
+  console.log('  in .publish-tokens.json come {"ovsx":"<token>"}.');
+  wantOvsx = false;
 }
 
 // ---------- bump
