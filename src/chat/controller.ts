@@ -31,6 +31,26 @@ const PREFS_KEY = 'claudeStudio.prefs';
 const MODELS_KEY = 'claudeStudio.models';
 const COMMANDS_KEY = 'claudeStudio.commands';
 
+/**
+ * Il modello da mettere quando non ce n'e' uno scelto. Non essendoci piu'
+ * l'"automatico", qualcuno deve pur essere acceso: si prende quello che la CLI
+ * indica come consigliato — ma il suo nome vero, non l'alias 'default', se no
+ * sulla carta non si vedrebbe quale sta lavorando. Se l'alias non si sa
+ * sciogliere si ripiega sul primo modello vero dell'elenco.
+ */
+function pickDefaultModel(items: ModelChoice[]): string {
+  const real = items.filter((m) => m.value && m.value !== 'default');
+  const rec = items.find((m) => m.recommended);
+  if (rec?.resolved) {
+    // "claude-sonnet-4-5[1m]" → si cerca il modello vero che gli somiglia
+    const hit = real.find(
+      (m) => m.value === rec.resolved || rec.resolved.startsWith(m.value)
+    );
+    if (hit) return hit.value;
+  }
+  return real[0]?.value ?? '';
+}
+
 interface Pending {
   req: AskRequest;
   kind: AskKind;
@@ -445,8 +465,12 @@ export class ChatController {
 
   private dropStaleModel(items: ModelChoice[]) {
     if (!items.length) return;
-    const model =
+    let model =
       this.prefs.model && !items.some((m) => m.value === this.prefs.model) ? '' : this.prefs.model;
+    // Il modello adesso si sceglie sempre a mano: "nessuna scelta" (che prima
+    // voleva dire "automatico") e l'alias 'default' diventano il modello vero che
+    // la CLI consiglia oggi, cosi' sulla carta si vede quale sta lavorando.
+    if (!model || model === 'default') model = pickDefaultModel(items);
     // Caduto il modello cade anche il livello, se quello nuovo non lo accetta.
     const effort = this.effortFor(model, this.prefs.effort);
     if (model === this.prefs.model && effort === this.prefs.effort) return;

@@ -741,21 +741,9 @@
     $('spendCost').textContent = '$' + spent.usd.toFixed(spent.usd < 1 ? 3 : 2);
   }
 
-  /** Freccia futuristica verso destra — disegnata a mano, non da un icon font. */
+  /** Freccia futuristica: la punta di "navigate" delle Ionicons, tipo jet. */
   function sendArrow() {
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('class', 'ico send-arrow');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    // Punta di freccia aggressiva + linea centrale
-    const p = document.createElementNS(SVG, 'path');
-    p.setAttribute('d', 'M5 12h12m0 0l-5-5.5m5 5.5l-5 5.5');
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke', 'currentColor');
-    p.setAttribute('stroke-width', '2.4');
-    p.setAttribute('stroke-linecap', 'round');
-    p.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(p);
-    return svg;
+    return icon('navigate', 'send-arrow');
   }
 
   // ---------- busy ----------
@@ -1432,38 +1420,33 @@
     return ver ? name + ' ' + ver : name;
   }
 
-  /** "Default (recommended)" qui e' semplicemente "Automatico". */
   function modelName(m) {
-    if (m.recommended) return { name: 'Automatico', note: '' };
     const b = bareName(m);
     return { name: versioned(b.name, m.resolved), note: b.note };
   }
 
   /**
-   * Quanto vale il modello, da 1 a 4: e' questo che decide quanto si da' da fare
-   * l'effetto sulla carta. La famiglia si legge nel nome, e una versione che si
-   * porta dietro il numero e' una tenuta in giro per compatibilita' — scende di
-   * un gradino, perche' "Opus 4.6" non e' l'Opus di oggi.
+   * Ogni famiglia ha il suo colore e il suo effetto: non e' una scala da poco a
+   * tanto, sono quattro cose diverse. Cosi' il modello si riconosce a colpo
+   * d'occhio dal colore, prima ancora di leggere il nome.
+   *
+   *   haiku   ciano    scia veloce che attraversa
+   *   sonnet  viola    respiro morbido
+   *   opus    argilla  bordo a gradiente che gira
+   *   fable   oro      giro svelto + alone + galleggia
    */
-  const FAMILY_TIER = [
-    [/fable|mythos/i, 4],
-    [/opus/i, 3],
-    [/sonnet/i, 2],
-    [/haiku/i, 1],
+  const FAMILY = [
+    [/fable|mythos/i, 'fable'],
+    [/opus/i, 'opus'],
+    [/sonnet/i, 'sonnet'],
+    [/haiku/i, 'haiku'],
   ];
 
-  function modelTier(m) {
-    const bare = bareName(m).name;
-    const hay = bare + ' ' + String(m.value || '') + ' ' + String(m.resolved || '');
-    let tier = 2;
-    for (const [re, t] of FAMILY_TIER) {
-      if (re.test(hay)) {
-        tier = t;
-        break;
-      }
-    }
-    if (/\d/.test(bare)) tier = Math.max(1, tier - 1);
-    return tier;
+  function modelFamily(m) {
+    const hay =
+      bareName(m).name + ' ' + String(m.value || '') + ' ' + String(m.resolved || '');
+    for (const [re, name] of FAMILY) if (re.test(hay)) return name;
+    return 'sonnet';
   }
 
   function paintModels() {
@@ -1476,15 +1459,12 @@
     }
 
     for (const m of models) {
-      // "Automatico" e "nessuna scelta" sono la stessa cosa: si tiene la seconda,
-      // cosi' quel che decide la CLI vale anche domani.
-      const value = m.recommended ? '' : m.value;
+      // Niente "Automatico": il modello lo si sceglie sempre a mano.
+      if (m.recommended) continue;
+      const value = m.value;
       const isOn = prefs.model === value;
-      // L'automatico ha il suo effetto a parte; gli altri quello della loro fascia.
-      const cls =
-        'model-card ' +
-        (m.recommended ? 'premium' : 'tier-' + modelTier(m)) +
-        (isOn ? ' on' : '');
+      // Ogni famiglia ha il suo colore e il suo effetto.
+      const cls = 'model-card fam-' + modelFamily(m) + (isOn ? ' on' : '');
       const card = el('button', cls);
       card.type = 'button';
       card.title = String(m.description || m.resolved || m.value);

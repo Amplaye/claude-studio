@@ -248,51 +248,57 @@ body.wide .msg.user {
   font: inherit;
 }
 .model-card:hover {
-  border-color: color-mix(in srgb, var(--claude-1) 40%, var(--line));
-  background: color-mix(in srgb, var(--claude-1) 4%, transparent);
+  border-color: color-mix(in srgb, var(--fam) 45%, var(--line));
+  background: color-mix(in srgb, var(--fam) 6%, transparent);
   transform: translateY(-1px);
 }
 .model-card.on {
-  border-color: var(--claude-1);
-  background: color-mix(in srgb, var(--claude-1) 10%, transparent);
+  border-color: var(--fam);
+  background: color-mix(in srgb, var(--fam) 12%, transparent);
 }
 
-/* ---------- l'effetto cresce col modello ----------
-   Quanto vale il modello lo dice la CLI, non un elenco scritto qui: la carta si
-   prende una fascia da 1 a 4 e l'animazione cresce di conseguenza. Cosi' il
-   modello piu' capace si vede che lo e' prima ancora di leggere il nome.
+/* ---------- ogni famiglia il suo colore e il suo effetto ----------
+   Non e' una scala da poco a tanto: sono quattro effetti diversi, cosi' il
+   modello si riconosce dal colore prima ancora di leggere il nome.
 
-     tier-1 (Haiku)   solo un bordo che si accende
-     tier-2 (Sonnet)  + un lampo che attraversa la carta
-     tier-3 (Opus)    + bordo a gradiente che gira, alone acceso
-     tier-4 (Fable)   + il giro e' piu' svelto, l'alone respira, la carta galleggia
+     haiku   ciano    la scia veloce che attraversa
+     sonnet  viola    il respiro morbido
+     opus    argilla  il bordo a gradiente che gira
+     fable   oro      il giro svelto, l'alone che respira, la carta che galleggia
 
    Il bordo animato e' un ::before che sbuca da sotto la carta e un ::after che
    gli ritaglia il centro: un bordo vero non si puo' far girare. */
 
-/* -- fascia 1: solo il bordo che si accende -- */
-.model-card.tier-1:hover {
-  box-shadow: 0 0 14px -8px color-mix(in srgb, var(--claude-1) 60%, transparent);
+.model-card.fam-haiku {
+  --fam: #22d3ee;
+  --fam-2: #67e8f9;
 }
-.model-card.tier-1.on {
-  box-shadow: 0 0 16px -8px color-mix(in srgb, var(--claude-1) 65%, transparent);
+.model-card.fam-sonnet {
+  --fam: #a78bfa;
+  --fam-2: #d8b4fe;
+}
+.model-card.fam-opus {
+  --fam: var(--claude-1);
+  --fam-2: var(--claude-2);
+}
+.model-card.fam-fable {
+  --fam: #f5c87a;
+  --fam-2: #ffe9c9;
 }
 
-/* -- fascia 2: un lampo che attraversa la carta --
-   Qui niente ritaglio: basta un velo chiaro che scivola, tenuto basso di opacita'
-   perche' passa anche sopra al nome. */
-.model-card.tier-2 {
+/* -- haiku: una scia che attraversa di corsa, come un lampo -- */
+.model-card.fam-haiku {
   overflow: hidden;
 }
-.model-card.tier-2::after {
+.model-card.fam-haiku::after {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
     115deg,
-    transparent 38%,
-    rgba(255, 255, 255, 0.45) 50%,
-    transparent 62%
+    transparent 42%,
+    color-mix(in srgb, var(--fam-2) 70%, transparent) 50%,
+    transparent 58%
   );
   background-size: 260% 100%;
   background-position: 130% 0;
@@ -300,37 +306,43 @@ body.wide .msg.user {
   pointer-events: none;
   transition: opacity 0.3s ease;
 }
-.model-card.tier-2:hover::after,
-.model-card.tier-2.on::after {
-  opacity: 0.3;
-  animation: cs-sheen 2.6s ease-in-out infinite;
+.model-card.fam-haiku:hover::after,
+.model-card.fam-haiku.on::after {
+  opacity: 0.55;
+  /* svelta: e' il modello veloce */
+  animation: cs-sheen 1.3s ease-in-out infinite;
 }
-.model-card.tier-2.on {
-  box-shadow: 0 0 20px -8px color-mix(in srgb, var(--claude-1) 70%, transparent);
+.model-card.fam-haiku.on {
+  box-shadow: 0 0 18px -8px color-mix(in srgb, var(--fam) 75%, transparent);
 }
 
-/* -- fascia 3 e 4 (e l'automatico): il bordo a gradiente che gira -- */
-.model-card.tier-3,
-.model-card.tier-4,
-.model-card.premium {
+/* -- sonnet: nessuna corsa, un alone che respira piano -- */
+.model-card.fam-sonnet:hover {
+  box-shadow: 0 0 20px -8px color-mix(in srgb, var(--fam) 70%, transparent);
+}
+.model-card.fam-sonnet.on {
+  animation: cs-fam-breathe 3.2s ease-in-out infinite;
+}
+
+/* -- opus: il bordo a gradiente che gira -- */
+.model-card.fam-opus,
+.model-card.fam-fable {
   overflow: hidden;
 }
-.model-card.tier-3::before,
-.model-card.tier-4::before,
-.model-card.premium::before {
+.model-card.fam-opus::before,
+.model-card.fam-fable::before {
   content: '';
   position: absolute;
   inset: -1px;
   border-radius: 13px;
-  background: conic-gradient(from 0deg, var(--claude-1), var(--claude-2), #f5c87a, var(--claude-1));
+  background: conic-gradient(from 0deg, var(--fam), var(--fam-2), #fff, var(--fam));
   z-index: -1;
   animation: cs-spin 4s linear infinite;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
-.model-card.tier-3::after,
-.model-card.tier-4::after,
-.model-card.premium::after {
+.model-card.fam-opus::after,
+.model-card.fam-fable::after {
   content: '';
   position: absolute;
   inset: 1.5px;
@@ -338,37 +350,26 @@ body.wide .msg.user {
   background: var(--surface);
   z-index: -1;
 }
-.model-card.tier-3:hover::before,
-.model-card.tier-3.on::before,
-.model-card.tier-4:hover::before,
-.model-card.tier-4.on::before,
-.model-card.premium:hover::before,
-.model-card.premium.on::before {
+.model-card.fam-opus:hover::before,
+.model-card.fam-opus.on::before,
+.model-card.fam-fable:hover::before,
+.model-card.fam-fable.on::before {
   opacity: 1;
 }
-.model-card.tier-3.on,
-.model-card.premium.on {
-  box-shadow: 0 0 22px -6px color-mix(in srgb, var(--claude-1) 55%, transparent);
+.model-card.fam-opus.on {
+  box-shadow: 0 0 22px -6px color-mix(in srgb, var(--fam) 60%, transparent);
 }
 
-/* -- fascia 4: il giro e' piu' svelto, l'alone respira, la carta galleggia -- */
-.model-card.tier-4::before {
+/* -- fable: il giro e' piu' svelto, l'alone respira, la carta galleggia -- */
+.model-card.fam-fable::before {
   inset: -2px;
-  background: conic-gradient(
-    from 0deg,
-    var(--claude-1),
-    #f5c87a,
-    var(--claude-2),
-    #ffe9c9,
-    var(--claude-1)
-  );
   animation-duration: 2.2s;
 }
-.model-card.tier-4:hover {
+.model-card.fam-fable:hover {
   animation: cs-float 3.4s ease-in-out infinite;
 }
-.model-card.tier-4.on {
-  animation: cs-float 3.4s ease-in-out infinite, cs-glow 2.6s ease-in-out infinite;
+.model-card.fam-fable.on {
+  animation: cs-float 3.4s ease-in-out infinite, cs-fam-glow 2.6s ease-in-out infinite;
 }
 
 .mc-dot {
@@ -1224,9 +1225,11 @@ body.wide .msg.user {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  opacity: 0.5;
-  transition: opacity 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
-              color 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
+  /* Testo sempre bianco pieno: la scelta la dice lo slider colorato dietro,
+     non il grigio. Spento e acceso si leggono uguale. */
+  opacity: 1;
+  transition: color 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
+              text-shadow 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
               font-weight 0.2s ease;
   white-space: nowrap;
   position: relative;
@@ -1236,10 +1239,10 @@ body.wide .msg.user {
   font-size: 12px;
 }
 .modeseg-btn:hover {
-  opacity: 0.85;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
 }
 .modeseg-btn.on {
-  opacity: 1;
   font-weight: 700;
 }
 /* Lo slider e' un figlio aggiunto dal JS: scorre da un bottone all'altro. */
@@ -1503,13 +1506,25 @@ body.wide .msg.user {
   background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
   transition: transform 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
 }
+/* "navigate" punta in alto a destra: la ruoto perche' punti a destra, come un
+   jet che parte. Il filtro le da' la scia luminosa. */
 .send-arrow {
   width: 18px;
   height: 18px;
+  transform: rotate(45deg);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.2s ease;
 }
 .send:hover {
   filter: brightness(1.12);
   transform: translateX(1px);
+}
+.send:hover .send-arrow {
+  transform: rotate(45deg) translate(1.5px, -1.5px);
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.75));
+}
+.send.stop .send-arrow {
+  transform: none;
 }
 .send:active {
   transform: scale(0.92);

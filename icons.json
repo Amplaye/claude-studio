@@ -43,7 +43,8 @@
     "options-outline",
     "cash-outline",
     "code-slash-outline",
-    "image-outline"
+    "image-outline",
+    "navigate-outline"
   ],
   "bar": {
     "studio-chat": "chatbubble-ellipses",

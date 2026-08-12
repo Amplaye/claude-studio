@@ -300,8 +300,9 @@ for (const surface of ['view', 'panel']) {
       sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true,
     },
   });
-  // L'elenco e' esattamente quello che dice la CLI, nell'ordine in cui lo dice:
-  // il primo e' il consigliato, che qui si chiama "Automatico".
+  // L'elenco e' esattamente quello che dice la CLI, nell'ordine in cui lo dice —
+  // meno il consigliato ('default'), che non si mostra piu': il modello lo si
+  // sceglie sempre a mano.
   await post({
     k: 'models',
     items: [
@@ -312,29 +313,23 @@ for (const surface of ['view', 'panel']) {
         efforts: ['low', 'medium', 'high', 'xhigh', 'max'], adaptive: true, recommended: true,
       },
       { value: 'opus', label: 'Opus', description: 'Il più bravo.', resolved: 'claude-opus-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      { value: 'sonnet', label: 'Sonnet', description: 'Il bilanciato.', resolved: 'claude-sonnet-4-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
       { value: 'haiku', label: 'Haiku', description: 'Il più svelto.', resolved: 'claude-haiku-4-5', efforts: [], adaptive: false, recommended: false },
     ],
   });
   await page.click('#btnCfg');
   await page.waitForTimeout(140);
   t(await page.isVisible('#cfg'), 'il pannello delle impostazioni non si apre');
-  // Una card per modello, nessuna inventata e nessuna persa
+  // Una card per modello vero. Il consigliato ('default') non si mostra: era
+  // l'"automatico", e adesso il modello lo scegli tu.
   const modelCards = await page.locator('#cfgModelList .model-card').count();
   t(modelCards === 3, 'le card dei modelli non arrivano: ' + modelCards);
-  const autoName = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-name').textContent();
-  t(autoName === 'Automatico', 'il consigliato non si chiama Automatico: ' + autoName);
-  // Il consigliato non fissa nessun modello: cosi' domani vale quello nuovo
-  await page.locator('#cfgModelList .model-card:nth-child(1)').click();
-  const sauto = await lastSent();
-  t(sauto?.cmd === 'setPrefs' && sauto.value?.model === '', 'Automatico fissa un modello: ' + JSON.stringify(sauto));
-  await page.waitForTimeout(80);
-  // Senza scelta valgono i livelli del consigliato: Auto + 5 = 6 bottoni
   t(
-    (await page.locator('#cfgEffort .seg-btn').count()) === 6,
-    'i livelli del consigliato non arrivano'
+    !(await page.locator('#cfgModelList .model-card .mc-name').allTextContents()).includes('Automatico'),
+    'la card "Automatico" c’e’ ancora: il modello si sceglie a mano'
   );
-  // Clic sulla card Opus
-  await page.locator('#cfgModelList .model-card:nth-child(2)').click();
+  // Clic sulla card Opus (la prima, ora che il consigliato non c'e' piu')
+  await page.locator('#cfgModelList .model-card:nth-child(1)').click();
   const sm = await lastSent();
   t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'il modello scelto non arriva: ' + JSON.stringify(sm));
   await page.waitForTimeout(80);
@@ -342,25 +337,29 @@ for (const surface of ['view', 'panel']) {
   const effortBtns = await page.locator('#cfgEffort .seg-btn').count();
   t(effortBtns === 4, 'i livelli di impegno non seguono il modello: ' + effortBtns);
   // La card Opus deve mostrare la descrizione nella card stessa
-  const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-desc').textContent();
+  const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-desc').textContent();
   t(opusDesc === 'Il più bravo.', 'il modello scelto non si racconta: ' + opusDesc);
   // "Opus" da solo non dice quale: il numero arriva dal modello risolto.
-  const opusName = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-name').textContent();
+  const opusName = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-name').textContent();
   t(opusName === 'Opus 5', 'il nome del modello non porta la sua versione: ' + opusName);
   const haikuName = await page.locator('#cfgModelList .model-card:nth-child(3) .mc-name').textContent();
   t(haikuName === 'Haiku 4.5', 'la versione di Haiku non arriva: ' + haikuName);
-  // E l'effetto cresce col modello: Opus in fascia 3, Haiku in fascia 1.
+  // Ogni famiglia il suo effetto: Opus, Sonnet e Haiku hanno classi diverse.
   t(
-    (await page.locator('#cfgModelList .model-card.tier-3.on').count()) === 1,
-    'Opus non prende la fascia alta dell’effetto'
+    (await page.locator('#cfgModelList .model-card.fam-opus.on').count()) === 1,
+    'Opus non prende l’effetto della sua famiglia'
+  );
+  t(
+    (await page.locator('#cfgModelList .model-card.fam-sonnet').count()) === 1,
+    'Sonnet non prende l’effetto della sua famiglia'
   );
   // Clic su Haiku: non accetta livelli, quindi resta il solo "Auto" — e Auto deve
   // restare cliccabile, perche' vuol dire "non dirgli niente" e vale per tutti.
   await page.locator('#cfgModelList .model-card:nth-child(3)').click();
   await page.waitForTimeout(80);
   t(
-    (await page.locator('#cfgModelList .model-card.tier-1.on').count()) === 1,
-    'Haiku non prende la fascia bassa dell’effetto'
+    (await page.locator('#cfgModelList .model-card.fam-haiku.on').count()) === 1,
+    'Haiku non prende l’effetto della sua famiglia'
   );
   const haikuBtns = await page.locator('#cfgEffort .seg-btn').count();
   t(haikuBtns === 1, 'su un modello senza livelli deve restare il solo Auto: ' + haikuBtns);

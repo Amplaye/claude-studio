@@ -93,6 +93,30 @@
   }
 }
 
+/* Come cs-glow e cs-breathe, ma sul colore della famiglia (--fam) invece che
+   sul colore del marchio: cosi' ogni modello alita del suo. */
+@keyframes cs-fam-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 18px -8px color-mix(in srgb, var(--fam) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 34px -2px color-mix(in srgb, var(--fam) 80%, transparent);
+  }
+}
+
+@keyframes cs-fam-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 14px -8px color-mix(in srgb, var(--fam) 55%, transparent);
+    border-color: color-mix(in srgb, var(--fam) 70%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 30px -6px color-mix(in srgb, var(--fam) 75%, transparent);
+    border-color: var(--fam);
+  }
+}
+
 @keyframes cs-sweep {
   from {
     transform: translateX(-100%);
