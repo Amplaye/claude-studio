@@ -45,14 +45,37 @@ export class ChatPanel {
    */
   static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
     const chat = new ChatController(ctx, { primary: false });
-    const n = ChatPanel.all.size + 1;
-    const panel = vscode.window.createWebviewPanel(
-      TYPE,
-      `Claude Studio #${n}`,
-      vscode.ViewColumn.Active,
-      { enableScripts: true, retainContextWhenHidden: true }
-    );
+    // No number in the name: "Claude Studio #2" told you nothing, and three of them
+    // side by side were three identical labels. The tab takes the conversation's
+    // name as soon as there is one — see followName below.
+    const panel = vscode.window.createWebviewPanel(TYPE, 'Claude Studio', vscode.ViewColumn.Active, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+    });
     return new ChatPanel(panel, ctx, chat, monitor, false);
+  }
+
+  /** The tab that holds a given chat, for going back to it. */
+  static byKey(key: string): ChatPanel | undefined {
+    return [...ChatPanel.all].find((p) => p.chat.key === key);
+  }
+
+  /** The Studio tab in front, if one is. */
+  static active(): ChatPanel | undefined {
+    return [...ChatPanel.all].find((p) => p.panel.active);
+  }
+
+  /** Brings a specific chat's tab to the front. */
+  static revealKey(key: string): boolean {
+    const p = ChatPanel.byKey(key);
+    if (!p) return false;
+    p.panel.reveal(undefined, false);
+    return true;
+  }
+
+  /** Is the primary tab open at all — in front, or behind other editors? */
+  static exists(): boolean {
+    return !!ChatPanel.primary;
   }
 
   /** Is the primary tab on screen? Asked before opening another face onto the same
@@ -82,6 +105,13 @@ export class ChatPanel {
   readonly chat: ChatController;
   /** true = primary tab, false = secondary tab (which has its own). */
   private readonly isPrimary: boolean;
+  /** Rewrites the label from the conversation's name. */
+  private followName: () => void = () => {};
+
+  /** The name changed somewhere else (a rename from the context card). */
+  refreshName() {
+    this.followName();
+  }
 
   private constructor(
     private readonly panel: vscode.WebviewPanel,
@@ -104,21 +134,29 @@ export class ChatPanel {
       monitor,
       () => panel.visible
     );
-    // Only the primary governs the bar's badge: the secondary ones are conversations
-    // of their own, and the context bar ignores them.
-    if (isPrimary) {
-      owned.setPanelActive(panel.active);
-    }
+    // Every tab says where it is: the context panel draws one card per conversation
+    // and puts the "here" badge on the one you're actually looking at. It used to be
+    // the primary only, so with three tabs open the badge never moved.
+    owned.setFace(chat.key, 'panel', panel.active);
+    // The tab is named after its conversation, and follows it: the first thing you
+    // write becomes the label, and renaming the card renames the tab.
+    this.followName = () => {
+      const name = chat.name();
+      if (panel.title !== name) panel.title = name;
+    };
+    this.followName();
+    const named = chat.onTitle(this.followName);
     const state = panel.onDidChangeViewState(() => {
-      if (isPrimary) owned.setPanelActive(panel.active);
+      owned.setFace(chat.key, 'panel', panel.active);
       // Back in front after being behind: the numbers had been frozen for a while,
       // and the "refresh" button is gone because this does it by itself.
       if (panel.visible) monitor?.tickSoon();
     });
     panel.onDidDispose(() => {
       state.dispose();
+      named.dispose();
       listener.dispose();
-      if (isPrimary) owned.setPanelActive(false);
+      owned.setFace(chat.key, 'panel', false);
       chat.detach(surface);
       // Secondary tabs carry their controller with them: when they die, it dies too.
       if (!isPrimary) chat.dispose();

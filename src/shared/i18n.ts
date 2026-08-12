@@ -36,10 +36,16 @@ const STRINGS = {
   en: {
     'toast.done': 'Claude has finished · {project}',
     'toast.open': 'Open',
+    'rename.prompt': 'Name for this conversation (empty = back to the starting name)',
+    'rename.placeholder': 'e.g. Picnic — fixing the reminders',
+    'rename.none': "This conversation hasn't started yet: write something first.",
   },
   it: {
     'toast.done': 'Claude ha finito · {project}',
     'toast.open': 'Apri',
+    'rename.prompt': 'Nome di questa conversazione (vuoto = torna al nome di partenza)',
+    'rename.placeholder': 'es. Picnic — sistemo i promemoria',
+    'rename.none': 'Questa conversazione non e’ ancora cominciata: scrivi qualcosa prima.',
   },
 } satisfies Record<Lang, Record<string, string>>;
 

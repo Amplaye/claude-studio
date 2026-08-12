@@ -121,8 +121,13 @@ body.wide .composer {
    wordmark folds away — the sparkle stays, so the panel is still recognisably
    ours — and comes straight back the moment the turn ends. The wide tab has room
    for both and keeps both. */
-body:not(.wide) .top.busy .brand-t {
+body:not(.wide) .top.busy .brand {
   display: none;
+}
+/* and the pill closes up its own spacing to earn the last few characters */
+body:not(.wide) .top.busy .activity {
+  gap: 6px;
+  padding: 0 9px;
 }
 body:not(.wide) .top.busy .grow {
   flex: 0 1 auto;
@@ -162,8 +167,8 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: var(--ctl);
+  height: var(--ctl);
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 8px;
@@ -1645,7 +1650,12 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 /* mode selector in the header — segmented control */
 .modeseg {
   display: flex;
+  align-items: stretch;
+  /* it never gives up width to its neighbours: squeezed, it would clip the very
+     word that tells you what Claude is allowed to do */
+  flex: 0 0 auto;
   gap: 2px;
+  height: var(--ctl);
   padding: 3px;
   border-radius: var(--pill);
   background: var(--card);
@@ -1656,7 +1666,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 10px;
+  padding: 0 10px;
   border: 1.5px solid transparent;
   border-radius: var(--pill);
   background: transparent;
@@ -1923,7 +1933,8 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   align-items: center;
   gap: 7px;
   min-width: 0;
-  padding: 3px 9px;
+  height: var(--ctl);
+  padding: 0 11px;
   border: 1px solid color-mix(in srgb, var(--claude-1) 34%, var(--line));
   border-radius: var(--pill);
   background: color-mix(in srgb, var(--claude-1) 9%, var(--card));

@@ -14,7 +14,7 @@ import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
 import { sound } from './sound';
-import { forgetSession } from '../context/sessions';
+import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
 
 export interface Surface {
@@ -60,6 +60,9 @@ interface Pending {
   settle: (r: PermissionResult) => void;
 }
 
+/** Un contatore per dare a ogni chat un nome interno che non si ripete. */
+let keySeq = 0;
+
 export class ChatController {
   private session?: Session;
   private history: Wire[] = [];
@@ -74,14 +77,18 @@ export class ChatController {
   private models: ModelChoice[];
   private commands: { name: string; description: string }[];
   /**
-   * Solo il controller principale interagisce con la barra di contesto
-   * (`owned`) e col bollino. Le schede secondarie hanno un controller loro
-   * che non deve pestare i piedi al principale.
+   * Il bollino sull'icona e' uno solo per finestra: lo governa il principale.
+   * La barra di contesto invece li ascolta tutti — ogni scheda e' una conversazione
+   * vera, con i suoi token, e prima erano tre e se ne vedeva una.
    */
   private readonly primary: boolean;
+  /** Chi e' questa chat per la barra di contesto: uno per controller, stabile. */
+  readonly key: string;
+  private titleFns = new Set<() => void>();
 
   constructor(private readonly ctx: vscode.ExtensionContext, opts?: { primary?: boolean }) {
     this.primary = opts?.primary !== false;
+    this.key = 'chat' + ++keySeq;
     this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
     // Migrazione: suoni rimossi → si torna a coccola
     if ((this.prefs.sound as string) === 'bell' || (this.prefs.sound as string) === 'soft') {
@@ -102,6 +109,56 @@ export class ChatController {
 
   detach(s: Surface) {
     this.surfaces.delete(s);
+  }
+
+  // ---- come si chiama questa conversazione --------------------------------
+  //
+  // "Claude Studio #2" non dice niente: con tre schede aperte sono tre etichette
+  // identiche e per sapere dove sei devi aprirle a una a una. Il nome e' quello
+  // della conversazione — quello che le hai dato, o la prima cosa che hai scritto.
+
+  /** Il nome da scrivere sulla scheda. */
+  name(): string {
+    const mine = owned.all().find((s) => s.key === this.key);
+    const given = mine?.id ? readSessionNames()[mine.id] : '';
+    const text = (given || mine?.title || '').replace(/\s+/g, ' ').trim();
+    if (!text) return 'Claude Studio';
+    return text.length > 42 ? text.slice(0, 41).trimEnd() + '…' : text;
+  }
+
+  /** Ogni volta che quel nome puo' essere cambiato. */
+  onTitle(fn: () => void): vscode.Disposable {
+    this.titleFns.add(fn);
+    return { dispose: () => this.titleFns.delete(fn) };
+  }
+
+  private titleChanged() {
+    for (const fn of this.titleFns) {
+      try {
+        fn();
+      } catch {
+        /* un titolo non deve poter buttare giu' la chat */
+      }
+    }
+  }
+
+  /** Rinomina la conversazione aperta qui. Il nome resta scritto sul disco. */
+  async rename() {
+    const mine = owned.all().find((s) => s.key === this.key);
+    if (!mine?.id) {
+      void vscode.window.showInformationMessage(
+        t(this.prefs.lang, 'rename.none')
+      );
+      return;
+    }
+    const val = await vscode.window.showInputBox({
+      prompt: t(this.prefs.lang, 'rename.prompt'),
+      value: readSessionNames()[mine.id] || mine.title || '',
+      placeHolder: t(this.prefs.lang, 'rename.placeholder'),
+    });
+    if (val === undefined) return; // annullato
+    writeSessionName(mine.id, val.trim());
+    this.titleChanged();
   }
 
   /** Il saluto e' per forza per singola faccia: dice anche quale faccia e'. */
@@ -255,8 +312,9 @@ export class ChatController {
     // parte solo quando scrivi, e fino ad allora il pannello indicherebbe ancora
     // la conversazione di prima. Un fork non ha ancora un id suo: quello arriva
     // dal motore, e la card compare allora.
-    if (this.primary && !fork) owned.adopt(id, currentCwd());
+    if (!fork) owned.adopt(this.key, id, currentCwd());
     for (const e of await replaySession(id, currentCwd())) this.emit(e);
+    this.titleChanged();
   }
 
   private clear() {
@@ -264,9 +322,10 @@ export class ChatController {
     this.endEngine();
     this.history = [];
     this.busy = false;
-    if (this.primary) owned.end(); // la card della barra di contesto non ha piu' niente da mostrare
+    owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
     this.broadcast({ k: 'reset' });
     this.broadcast({ k: 'mode', value: this.mode });
+    this.titleChanged();
   }
 
   setMode(value: Mode) {
@@ -291,7 +350,7 @@ export class ChatController {
   dispose() {
     this.closeAllPending('Extension closed.');
     this.endEngine();
-    if (this.primary) owned.end();
+    owned.end(this.key);
   }
 
   /**
@@ -475,7 +534,11 @@ export class ChatController {
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
-    if (this.primary) owned.observe(e, currentCwd());
+    // Tutte le chat, non solo la principale: ogni scheda e' una conversazione vera
+    // e i suoi token sono tuoi quanto quelli della prima.
+    owned.observe(this.key, e, currentCwd());
+    // Il nome della scheda e' la prima cosa che hai scritto: si sa da qui.
+    if (e.k === 'user' || e.k === 'session') this.titleChanged();
     this.broadcast(e);
   }
 

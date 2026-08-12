@@ -5,6 +5,13 @@
 // at" and "which session it is" stays a cascade of attempts, and when it fails the
 // card says so ("estimated"). Not for ours: we opened the session, so the id, the
 // title, whether it's working and where you're looking at it are facts, not riddles.
+//
+// One entry per chat controller, not one full stop. Every Studio tab opened with "+"
+// is a conversation of its own with its own engine; only the first one used to be
+// tracked, so with three tabs open the panel drew one card, the "here" badge never
+// moved and the tokens you were spending in the other two were nobody's. Now each
+// one registers itself under its own key, and the one whose face is in front is the
+// one wearing the badge.
 import type { Wire } from '../engine/protocol';
 
 export interface OwnSession {
@@ -20,13 +27,23 @@ export interface OwnSession {
   /** Cost the engine declares for the conversation. */
   costUsd: number;
   busy: boolean;
+  /** Which chat this belongs to: the key that reveals its face again. */
+  key: string;
 }
 
+/** Where a conversation is on screen. */
+export type Face = 'panel' | 'view';
+
 class OwnedSessions {
-  private cur?: OwnSession;
-  /** Where you're looking at the chat: tab in front, sidebar panel open. */
-  private panelActive = false;
-  private viewVisible = false;
+  private byKey = new Map<string, OwnSession>();
+  /** Where each conversation is on show right now, if it is. */
+  private faces = new Map<string, Face>();
+  /**
+   * The last face to come to the front. Visibility alone isn't enough: with the
+   * sidebar open beside a tab, two are on screen and only one is the one you're
+   * working in — the one you touched last.
+   */
+  private front: string | null = null;
   private listeners = new Set<() => void>();
 
   onChange(fn: () => void): { dispose(): void } {
@@ -34,82 +51,44 @@ class OwnedSessions {
     return { dispose: () => this.listeners.delete(fn) };
   }
 
-  current(): OwnSession | undefined {
-    return this.cur;
+  /** Every conversation this extension has open, newest activity first. */
+  all(): OwnSession[] {
+    return [...this.byKey.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  /** Is the chat in front of your eyes right now? It decides which session is focused. */
-  looking(): 'panel' | 'view' | null {
-    if (this.panelActive) return 'panel';
-    if (this.viewVisible) return 'view';
+  /** The one you're in: the face in front, or the only one there is. */
+  current(): OwnSession | undefined {
+    if (this.front && this.byKey.has(this.front)) return this.byKey.get(this.front);
+    const shown = [...this.faces.keys()].find((k) => this.byKey.has(k));
+    if (shown) return this.byKey.get(shown);
+    return this.byKey.size === 1 ? [...this.byKey.values()][0] : undefined;
+  }
+
+  /** Is a chat of ours in front of your eyes right now? */
+  looking(): Face | null {
+    const cur = this.current();
+    return (cur && this.faces.get(cur.key)) ?? null;
+  }
+
+  /** Which chat holds this conversation, and where it is: for going back to it. */
+  hosting(id: string): { key: string; face: Face | null } | null {
+    for (const s of this.byKey.values()) {
+      if (s.id && s.id === id) return { key: s.key, face: this.faces.get(s.key) ?? null };
+    }
     return null;
   }
 
-  setPanelActive(v: boolean) {
-    if (this.panelActive === v) return;
-    this.panelActive = v;
-    this.changed();
-  }
-
-  setViewVisible(v: boolean) {
-    if (this.viewVisible === v) return;
-    this.viewVisible = v;
-    this.changed();
-  }
-
-  /**
-   * The chat hands over everything it sends to the webview: here we keep only what
-   * the card needs. That way the controller doesn't have to remember to notify twice.
-   */
-  observe(e: Wire, cwd: string) {
-    switch (e.k) {
-      case 'session': {
-        const now = Date.now();
-        // Same session picked up again: we keep what we already knew.
-        if (this.cur?.id === e.id) {
-          this.cur.model = e.model;
-          this.cur.updatedAt = now;
-          break;
-        }
-        this.cur = {
-          id: e.id,
-          cwd: e.cwd || cwd,
-          model: e.model,
-          startedAt: now,
-          updatedAt: now,
-          title: this.cur?.title ?? '',
-          tokens: 0,
-          costUsd: 0,
-          busy: false,
-        };
-        break;
-      }
-      case 'user':
-        // The card's name is the first thing you wrote, not the last: changing it on
-        // every message would make the list dance in front of your eyes.
-        if (!this.cur) {
-          this.cur = blank(cwd);
-        }
-        if (!this.cur.title) this.cur.title = e.text.replace(/\s+/g, ' ').trim().slice(0, 80);
-        this.cur.updatedAt = Date.now();
-        break;
-      case 'turn_end':
-        if (!this.cur) break;
-        if (e.tokens) this.cur.tokens = e.tokens;
-        if (e.costUsd) this.cur.costUsd = e.costUsd;
-        this.cur.updatedAt = Date.now();
-        break;
-      case 'busy':
-        if (!this.cur) break;
-        this.cur.busy = e.value;
-        this.cur.updatedAt = Date.now();
-        break;
-      case 'tool_start':
-      case 'block_final':
-        if (this.cur) this.cur.updatedAt = Date.now();
-        return; // continuous stuff: not worth a redraw for every piece
-      default:
-        return;
+  /** A face came on screen, or left it. */
+  setFace(key: string, face: Face, on: boolean) {
+    const had = this.faces.get(key);
+    if (on) {
+      if (had === face && this.front === key) return;
+      this.faces.set(key, face);
+      this.front = key;
+    } else {
+      if (had !== face) return;
+      this.faces.delete(key);
+      if (this.front === key) this.front = null;
     }
     this.changed();
   }
@@ -123,27 +102,88 @@ class OwnedSessions {
    * would still be pointing at the one before, or at somebody else's tab. The id
    * is known the moment you click: there's nothing to wait for.
    */
-  adopt(id: string, cwd: string, title = '') {
+  adopt(key: string, id: string, cwd: string, title = '') {
     if (!id) return;
     const now = Date.now();
-    this.cur = {
+    this.byKey.set(key, {
       id,
       cwd,
-      model: this.cur?.model ?? '',
+      model: this.byKey.get(key)?.model ?? '',
       startedAt: now,
       updatedAt: now,
       title,
       tokens: 0,
       costUsd: 0,
       busy: false,
-    };
+      key,
+    });
     this.changed();
   }
 
-  /** Conversation cleared or extension closed: the card has no reason to exist. */
-  end() {
-    if (!this.cur) return;
-    this.cur = undefined;
+  /**
+   * The chat hands over everything it sends to the webview: here we keep only what
+   * the card needs. That way the controller doesn't have to remember to notify twice.
+   */
+  observe(key: string, e: Wire, cwd: string) {
+    const cur = this.byKey.get(key);
+    switch (e.k) {
+      case 'session': {
+        const now = Date.now();
+        // Same session picked up again: we keep what we already knew.
+        if (cur?.id === e.id) {
+          cur.model = e.model;
+          cur.updatedAt = now;
+          break;
+        }
+        this.byKey.set(key, {
+          id: e.id,
+          cwd: e.cwd || cwd,
+          model: e.model,
+          startedAt: now,
+          updatedAt: now,
+          title: cur?.title ?? '',
+          tokens: 0,
+          costUsd: 0,
+          busy: false,
+          key,
+        });
+        break;
+      }
+      case 'user': {
+        // The card's name is the first thing you wrote, not the last: changing it on
+        // every message would make the list dance in front of your eyes.
+        const s = cur ?? blank(cwd, key);
+        if (!cur) this.byKey.set(key, s);
+        if (!s.title) s.title = e.text.replace(/\s+/g, ' ').trim().slice(0, 80);
+        s.updatedAt = Date.now();
+        break;
+      }
+      case 'turn_end':
+        if (!cur) break;
+        if (e.tokens) cur.tokens = e.tokens;
+        if (e.costUsd) cur.costUsd = e.costUsd;
+        cur.updatedAt = Date.now();
+        break;
+      case 'busy':
+        if (!cur) break;
+        cur.busy = e.value;
+        cur.updatedAt = Date.now();
+        break;
+      case 'tool_start':
+      case 'block_final':
+        if (cur) cur.updatedAt = Date.now();
+        return; // continuous stuff: not worth a redraw for every piece
+      default:
+        return;
+    }
+    this.changed();
+  }
+
+  /** Conversation cleared or chat closed: the card has no reason to exist. */
+  end(key: string) {
+    if (!this.byKey.delete(key)) return;
+    this.faces.delete(key);
+    if (this.front === key) this.front = null;
     this.changed();
   }
 
@@ -158,7 +198,7 @@ class OwnedSessions {
   }
 }
 
-function blank(cwd: string): OwnSession {
+function blank(cwd: string, key: string): OwnSession {
   const now = Date.now();
   return {
     id: '',
@@ -170,6 +210,7 @@ function blank(cwd: string): OwnSession {
     tokens: 0,
     costUsd: 0,
     busy: false,
+    key,
   };
 }
 

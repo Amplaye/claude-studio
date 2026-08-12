@@ -1776,20 +1776,26 @@
   /**
    * Puts the slider over the active button.
    *
-   * Offsets, not bounding rects: they're already relative to the container (which
-   * is `position: relative`), so they don't drift by half a pixel and they don't
-   * lie while something else on the page is still animating. The old version
-   * measured with getBoundingClientRect at load, before the web font had settled,
-   * and the red pill ended up a few pixels off the Yolo button — until you clicked
-   * it and the measurement was taken again on a page that had stopped moving.
+   * The measurement is taken from the container's *padding* box, because that's
+   * what an absolutely-positioned child resolves `left` against — while offsetLeft
+   * counts from the border box. The switch has a 1px border, so the two differ by
+   * exactly that, and the slider sat one pixel to the right of its button forever.
+   * Widths come from the rect, not from offsetWidth: offsetWidth is rounded to a
+   * whole pixel and the buttons are not whole pixels wide.
+   *
+   * (Whoever wrote this before was right about one thing: don't measure while the
+   * page is still moving. Hence the guard below and the re-measure on the font,
+   * on a resize and after a repaint.)
    */
   function placeMode() {
     const active = modeBox.querySelector('.modeseg-btn.on');
     // Nothing to measure while the header is hidden: better to leave the slider
     // where it is than to pin it to zero and watch it jump later.
     if (!active || !modeBox.offsetParent) return;
-    modeSlider.style.left = active.offsetLeft + 'px';
-    modeSlider.style.width = active.offsetWidth + 'px';
+    const box = modeBox.getBoundingClientRect();
+    const on = active.getBoundingClientRect();
+    modeSlider.style.left = on.left - box.left - modeBox.clientLeft + 'px';
+    modeSlider.style.width = on.width + 'px';
   }
 
   function paintMode(value) {
@@ -1802,9 +1808,18 @@
     requestAnimationFrame(placeMode);
   }
 
-  // The buttons change width when the font arrives and when the sidebar is
-  // dragged: the slider follows on its own instead of waiting for a click.
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(placeMode).observe(modeBox);
+  // The buttons change width when the font arrives, when the sidebar is dragged,
+  // and when a label folds away to make room for the activity pill: the slider
+  // follows on its own instead of waiting for a click.
+  //
+  // Every button is watched, not just the box around them. In a tight header the
+  // switch can be squeezed by its neighbours, so its own width stays put while the
+  // buttons inside it move — and the slider was left behind, a pixel at a time.
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(placeMode);
+    ro.observe(modeBox);
+    for (const btn of modeBox.querySelectorAll('.modeseg-btn')) ro.observe(btn);
+  }
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeMode);
   for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
     btn.addEventListener('click', () => {

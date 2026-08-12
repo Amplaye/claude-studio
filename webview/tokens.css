@@ -24,6 +24,11 @@
   --pad: 11px;
   --sbw: 10px;
 
+  /* Every control in the header is this tall: the icon buttons, the mode switch
+     and the activity pill. They used to be 30, 34.5 and 24.5 — three heights in
+     one row of six things, which reads as three rows that didn't quite line up. */
+  --ctl: 30px;
+
   --mono: var(--vscode-editor-font-family, ui-monospace, "Cascadia Mono", Consolas, monospace);
   --sans: var(--vscode-font-family, ui-sans-serif, system-ui, "Segoe UI", sans-serif);
 }

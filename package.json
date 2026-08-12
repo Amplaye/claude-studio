@@ -151,6 +151,10 @@
         "title": "Claude Studio: Clear This Conversation"
       },
       {
+        "command": "claudeStudio.rename",
+        "title": "Claude Studio: Rename This Conversation"
+      },
+      {
         "command": "claudeStudio.interrupt",
         "title": "Claude Studio: Stop"
       },
@@ -265,7 +269,7 @@
     "typecheck": "tsc --noEmit",
     "icon": "node scripts/make-icon.mjs",
     "preview": "node build.mjs && node scripts/preview.mjs",
-    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/lang-check.mjs",
+    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/lang-check.mjs && node scripts/sessions-check.cjs",
     "smoke": "node scripts/smoke-engine.mjs",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",

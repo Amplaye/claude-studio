@@ -20,6 +20,7 @@ import {
   studioTabActive,
   type FocusHow,
 } from './focus';
+import { ChatPanel } from '../chat/panel';
 import { owned } from './owned';
 import { projectsDirFor, sessionsDir, transcriptPath } from './paths';
 import type { CtxCard, CtxData } from './protocol';
@@ -166,11 +167,15 @@ export class ContextMonitor {
     const now = Date.now();
 
     const official = liveSessions(cwd);
-    const mine = owned.current();
+    // Tutte le nostre, non solo quella davanti: ogni scheda di Studio e' una
+    // conversazione con i suoi token, e vederne una sola su tre era il motivo per
+    // cui il bollino "sei qui" non si spostava mai.
+    const mineAll = owned.all().filter((s) => s.id);
+    const mineIds = new Set(mineAll.map((s) => s.id));
     const rows: { card: CtxCard; mtimeMs: number; costUsd: number }[] = [];
 
-    // La nostra: niente da indovinare, la conversazione l'ha aperta questa estensione.
-    if (mine?.id) {
+    // Le nostre: niente da indovinare, le conversazioni le ha aperte questa estensione.
+    for (const mine of mineAll) {
       const scan = scanTranscript(transcriptPath(mine.cwd || cwd, mine.id));
       // I numeri del motore arrivano prima di quelli del disco: si preferiscono,
       // ma solo se sono plausibili. Il contesto non puo' superare la finestra: se
@@ -202,7 +207,7 @@ export class ContextMonitor {
     }
 
     for (const s of official) {
-      if (mine?.id === s.id) continue; // stessa conversazione: la nostra sa di piu'
+      if (mineIds.has(s.id)) continue; // stessa conversazione: la nostra sa di piu'
       const scan = scanTranscript(s.file);
       const idle = now - s.mtimeMs;
       rows.push({
@@ -227,7 +232,7 @@ export class ContextMonitor {
       });
     }
 
-    const focusId = this.resolveFocus(official, names, mine?.id);
+    const focusId = this.resolveFocus(official, names, owned.current()?.id, mineIds);
     for (const r of rows) r.card.focused = r.card.id === focusId;
     // La sessione in cui sei sta sempre in cima, poi si va per recenza.
     rows.sort((a, b) => Number(b.card.focused) - Number(a.card.focused) || b.mtimeMs - a.mtimeMs);
@@ -259,7 +264,8 @@ export class ContextMonitor {
   private resolveFocus(
     official: ReturnType<typeof liveSessions>,
     names: Record<string, string>,
-    mineId?: string
+    mineId: string | undefined,
+    mineIds: Set<string>
   ): string | null {
     // Hai cambiato conversazione nella chat: l'appunto di prima parla di una
     // sessione in cui non sei piu'. Si sposta subito, poi la cascata qui sotto
@@ -282,7 +288,7 @@ export class ContextMonitor {
     if (mineId && owned.looking()) return this.settle(mineId, 'studio');
 
     // Stai guardando un file: si tiene l'ultima nota, se e' ancora viva.
-    const alive = (id: string) => id === mineId || official.some((s) => s.id === id);
+    const alive = (id: string) => mineIds.has(id) || official.some((s) => s.id === id);
     if (this.focusedId && alive(this.focusedId)) return this.focusedId;
 
     this.how = 'recency';
@@ -341,17 +347,26 @@ export class ContextMonitor {
     });
     if (val === undefined) return; // annullato
     writeSessionName(id, val.trim());
+    // Se la conversazione e' nostra, la scheda porta lo stesso nome: rinominare la
+    // card rinomina la scheda, che e' l'unico posto dove il nome si vede sempre.
+    const host = owned.hosting(id);
+    if (host) ChatPanel.byKey(host.key)?.refreshName();
     this.tickSoon();
   }
 
   /** Clic su una card: ci si va davvero. */
   async focus(id: string) {
-    const mine = owned.current();
-    if (mine?.id === id) {
-      // La nostra: si apre la faccia che gia' c'e', senza aprirne una nuova.
-      await vscode.commands.executeCommand(
-        owned.looking() === 'panel' ? 'claudeStudio.openTab' : 'claudeStudio.openSidebar'
-      );
+    // Una delle nostre: si va esattamente alla scheda che la tiene, non "a Studio".
+    // Con piu' schede aperte "apri Studio" ti portava alla prima, cioe' quasi mai a
+    // quella su cui avevi appena cliccato; e guardando la sidebar ti apriva la chat
+    // nella sidebar, lasciando la scheda dov'era.
+    const host = owned.hosting(id);
+    if (host) {
+      if (!ChatPanel.revealKey(host.key)) {
+        await vscode.commands.executeCommand(
+          ChatPanel.exists() ? 'claudeStudio.openTab' : 'claudeStudio.openSidebar'
+        );
+      }
       this.tickSoon();
       return;
     }

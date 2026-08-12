@@ -308,6 +308,15 @@ for (const surface of ['view', 'panel']) {
       time: document.getElementById('actTime').textContent,
       steps: !!document.getElementById('actSteps'),
       overflow: top.scrollWidth > top.clientWidth + 1,
+      // one row, one height: pill, mode switch and icon buttons
+      heights: [a, mode, document.getElementById('btnCfg')].map((n) =>
+        Math.round(n.getBoundingClientRect().height)
+      ),
+      // and the state is readable in full, not cut down to one letter
+      whatCut: (() => {
+        const n = document.getElementById('actWhat');
+        return n.scrollWidth > n.clientWidth + 1;
+      })(),
     };
   });
   t(act.inHeader, 'the activity pill is no longer in the header');
@@ -316,6 +325,11 @@ for (const surface of ['view', 'panel']) {
   t(!act.steps, 'the step counter is back in the pill: it belongs to the recap');
   t(/^\d+:\d\d$/.test(act.time), 'the pill has lost its clock: ' + act.time);
   t(!act.overflow, 'with the activity pill on, the header overflows: ' + surface);
+  t(
+    new Set(act.heights).size === 1,
+    'the header controls are not all the same height: ' + act.heights.join('/')
+  );
+  t(!act.whatCut, 'the state in the pill is cut off instead of fitting');
   await page.locator('.top').screenshot({ path: path.join(outDir, `preview-${surface}-act.png`) });
 
   // ---- one column: every box lines up with the writing field ----

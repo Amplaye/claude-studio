@@ -41,7 +41,7 @@ export class ChatView implements vscode.WebviewViewProvider {
     const seen = () => {
       // The context bar wants to know whether the chat is in front of your eyes:
       // that's what lets it say "you are here" without guessing.
-      owned.setViewVisible(view.visible);
+      owned.setFace(this.chat.key, 'view', view.visible);
       if (view.visible) this.maybeJumpToTab();
     };
     seen();
@@ -50,7 +50,7 @@ export class ChatView implements vscode.WebviewViewProvider {
     view.onDidDispose(() => {
       vis.dispose();
       listener.dispose();
-      owned.setViewVisible(false);
+      owned.setFace(this.chat.key, 'view', false);
       useBadgeHost(undefined);
       this.chat.detach(surface);
     });

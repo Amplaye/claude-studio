@@ -48,15 +48,25 @@ export function activate(ctx: vscode.ExtensionContext) {
       ChatPanel.openNew(ctx, monitor)
     ),
     vscode.commands.registerCommand('claudeStudio.newSession', () => chat.newSession()),
+    // Rinomina la conversazione della scheda in primo piano — o della sidebar, se e'
+    // quella che stai guardando. Il nome finisce sull'etichetta della scheda e sulla
+    // card del contesto: e' lo stesso nome, scritto una volta sola.
+    vscode.commands.registerCommand('claudeStudio.rename', () => {
+      const here = ChatPanel.active();
+      return (here?.chat ?? chat).rename();
+    }),
     // Click a card in the context panel and you land in that conversation. If it
     // belongs to a tab of the official extension we go to the tab; if that tab
     // isn't in this window the conversation is still on disk, and we reopen it
     // here — the click keeps its promise either way.
     vscode.commands.registerCommand('claudeStudio.openConversation', async (id: string) => {
       if (!id) return;
-      // Whichever face is already in sight: opening a second one to read the same
-      // conversation is a window you then have to close.
-      if (!ChatPanel.isVisible()) {
+      // The tab if there is one — brought to the front even from behind other
+      // editors — and the sidebar only when there's no tab at all. Opening a second
+      // face onto the same conversation is a window you then have to close.
+      if (ChatPanel.exists()) {
+        ChatPanel.open(ctx, chat, undefined, monitor);
+      } else {
         stayInSidebar();
         await vscode.commands.executeCommand('workbench.view.extension.claudeStudio');
       }
