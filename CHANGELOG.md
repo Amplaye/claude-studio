@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.7.0
+
+- **What it's doing is now in the header**, next to the mode switch: the state and
+  a clock, nothing else. It used to be a full-width strip above the writing field
+  repeating the command it was running — a second line of log in the one place
+  your eye should find the thread. The step count is still kept; you read it once
+  at the end, in the recap. In a narrow sidebar the row gives way in order: the
+  wordmark folds, then the switch goes to icons, then history and "open as tab"
+  step aside until the turn ends.
+- **One column, to the pixel — on both sides.** The right edge was off and it was
+  hard to say why: the scrollbar lives inside the thread and was taking ten pixels
+  off every card on that side. The gutter is now always reserved and the padding
+  docked by the same amount, so the cards end where the writing field ends.
+- **Your messages take the full column** like everything else, instead of hugging
+  the right edge as bubbles, and **attached images sit above the text** — where
+  they sat in the composer while you were writing it.
+- **Links are clickable wherever they appear**, bare or in brackets, code blocks
+  included, and they open in the browser. **Every code block has a copy button.**
+- **The chime is heard again.** It used to go to "this conversation's page", which
+  with several sessions open is often a tab you have never clicked in — and a page
+  that has never been touched isn't allowed to make a sound. Now every page says
+  whether its audio is awake and the chime goes to one that can be heard.
+- **The context panel sees every conversation**, not just the first. With three
+  tabs open it drew one card, the "you are here" badge never moved and the tokens
+  you were spending in the other two belonged to nobody.
+- **Tabs are named after their conversation** instead of "Claude Studio #2".
+  Renaming the card in the context panel renames the tab; there's a command too
+  (*Claude Studio: Rename This Conversation*).
+- **Clicking a card takes you to the tab that holds it** — not to "Studio", which
+  with several tabs open was the first one, hardly ever the one you clicked. And
+  reopening a conversation from the history is known to the panel straight away,
+  instead of at the next message.
+- **The send arrow is a paper plane**, and Stop is the same black as the arrow.
+- Fixed: the mode slider drifted a pixel at a time and never came back — it was
+  measuring from the container's border instead of its padding.
+
 ## 0.6.0
 
 - **No more ghost sessions.** A card could stay lit for hours on a conversation

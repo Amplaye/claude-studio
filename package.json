@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions and your context always in sight.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
