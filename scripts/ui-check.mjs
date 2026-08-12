@@ -653,7 +653,9 @@ for (const surface of ['view', 'panel']) {
 
   await page.keyboard.press('Alt+n');
   const sAlt = await lastSent();
-  t(sAlt?.cmd === 'newSession', 'Alt+N does not open a new session: ' + JSON.stringify(sAlt));
+  // A new session opens in a tab of its own: the one you're in keeps working, and
+  // whatever is running in it is not interrupted.
+  t(sAlt?.cmd === 'newTab', 'Alt+N does not open a new session in a new tab: ' + JSON.stringify(sAlt));
 
   // the up arrow fishes back the last message sent ("without", just above)
   await page.fill('#input', '');

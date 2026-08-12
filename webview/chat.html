@@ -17,42 +17,38 @@
         <header class="top">
           <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
           <span class="grow"></span>
-          <div class="modeseg" id="mode" title="How it handles permissions (Alt+M)">
-            <button class="modeseg-btn" data-mode="plan" title="Plan only: it thinks but touches nothing">
-              <svg class="ico"><use href="#ion-list" /></svg><span>Plan</span>
+          <div class="modeseg" id="mode" data-i18n-title="top.mode" title="How it handles permissions (Alt+M)">
+            <button class="modeseg-btn" data-mode="plan" data-i18n-title="top.mode.plan" title="Plan only: it thinks but touches nothing">
+              <svg class="ico"><use href="#ion-list" /></svg><span data-i18n="top.mode.plan.label">Plan</span>
             </button>
-            <button class="modeseg-btn" data-mode="default" title="Asks before acting">
-              <svg class="ico"><use href="#ion-shield-checkmark" /></svg><span>Ask</span>
+            <button class="modeseg-btn" data-mode="default" data-i18n-title="top.mode.ask" title="Asks before acting">
+              <svg class="ico"><use href="#ion-shield-checkmark" /></svg><span data-i18n="top.mode.ask.label">Ask</span>
             </button>
-            <button class="modeseg-btn yolo" data-mode="bypassPermissions" title="Never asks: does everything on its own">
-              <svg class="ico"><use href="#ion-flash" /></svg><span>Yolo</span>
+            <button class="modeseg-btn yolo" data-mode="bypassPermissions" data-i18n-title="top.mode.yolo" title="Never asks: does everything on its own">
+              <svg class="ico"><use href="#ion-flash" /></svg><span data-i18n="top.mode.yolo.label">Yolo</span>
             </button>
           </div>
-          <button class="iconbtn" id="btnCfg" title="Model, thinking and notifications (Alt+I)">
+          <button class="iconbtn" id="btnCfg" data-i18n-title="top.settings" title="Model, thinking and notifications (Alt+I)">
             <svg class="ico"><use href="#ion-options" /></svg>
           </button>
-          <button class="iconbtn" id="btnHistory" title="Conversations in this project (Alt+H)">
+          <button class="iconbtn" id="btnHistory" data-i18n-title="top.history" title="Conversations in this project (Alt+H)">
             <svg class="ico"><use href="#ion-time" /></svg>
           </button>
-          <button class="iconbtn" id="btnCtx" title="Show or hide the context (Alt+C)" hidden>
+          <button class="iconbtn" id="btnCtx" data-i18n-title="top.context" title="Show or hide the context (Alt+C)" hidden>
             <svg class="ico"><use href="#ion-speedometer" /></svg>
           </button>
-          <button class="iconbtn" id="btnTab" title="Open as a tab">
+          <button class="iconbtn" id="btnTab" data-i18n-title="top.tab" title="Open as a tab">
             <svg class="ico"><use href="#ion-open" /></svg>
           </button>
-          <button class="iconbtn" id="btnNew" title="New session (Alt+N)">
+          <button class="iconbtn" id="btnNew" data-i18n-title="top.new" title="New session in a new tab (Alt+N)">
             <svg class="ico"><use href="#ion-add" /></svg>
-          </button>
-          <!-- Tab only: closes this one, with its own exit animation. -->
-          <button class="iconbtn" id="btnClose" title="Close this tab (Alt+W)" hidden>
-            <svg class="ico"><use href="#ion-close" /></svg>
           </button>
         </header>
 
         <div class="drawer" id="drawer" hidden>
           <div class="drawer-head">
-            <span>Conversations</span>
-            <button class="iconbtn" id="drawerClose" title="Close">
+            <span data-i18n="drawer.title">Conversations</span>
+            <button class="iconbtn" id="drawerClose" data-i18n-title="common.close" title="Close">
               <svg class="ico"><use href="#ion-close" /></svg>
             </button>
           </div>
@@ -63,59 +59,67 @@
              when it's done. They survive from one window to the next. -->
         <div class="pop" id="cfg" hidden>
           <div class="pop-head">
-            <span>Settings</span>
-            <button class="iconbtn" id="cfgClose" title="Close">
+            <span data-i18n="cfg.title">Settings</span>
+            <button class="iconbtn" id="cfgClose" data-i18n-title="common.close" title="Close">
               <svg class="ico"><use href="#ion-close" /></svg>
             </button>
           </div>
 
-          <div class="pop-sec">Model</div>
+          <div class="pop-sec" data-i18n="cfg.model">Model</div>
           <div class="model-list" id="cfgModelList">
             <!-- the model cards are built by the JS -->
           </div>
 
-          <div class="pop-sec">Effort</div>
+          <div class="pop-sec" data-i18n="cfg.effort">Effort</div>
           <div class="seg" id="cfgEffort">
             <!-- the buttons are built by the JS based on the chosen model -->
           </div>
           <p class="phint" id="cfgEffortHint"></p>
 
-          <div class="pop-sec">Thinking</div>
+          <div class="pop-sec" data-i18n="cfg.thinking">Thinking</div>
           <div class="seg" id="cfgThink">
             <!-- Auto / On / Off -->
           </div>
           <p class="phint" id="cfgThinkHint"></p>
 
-          <div class="pop-sec">When it's done</div>
+          <!-- The language of the interface. It sits above the sounds because it
+               changes everything below it, this panel included, on the spot. -->
+          <div class="pop-sec" data-i18n="cfg.language">Language</div>
+          <div class="seg" id="cfgLang">
+            <!-- EN / IT, built by the JS -->
+          </div>
+          <p class="phint" data-i18n="cfg.language.hint">Changes the whole interface straight away</p>
+
+          <div class="pop-sec" data-i18n="cfg.done">When it's done</div>
           <label class="prow">
-            <span class="plab">Sound</span>
+            <span class="plab" data-i18n="cfg.sound">Sound</span>
             <select id="cfgSound">
-              <option value="cozy">Cozy</option>
-              <option value="harvest">Harvest</option>
-              <option value="levelup">Level up</option>
-              <option value="starlit">Starlit</option>
-              <option value="chest">Chest</option>
-              <option value="off">Mute</option>
+              <option value="cozy" data-i18n="sound.cozy">Cozy</option>
+              <option value="harvest" data-i18n="sound.harvest">Harvest</option>
+              <option value="levelup" data-i18n="sound.levelup">Level up</option>
+              <option value="starlit" data-i18n="sound.starlit">Starlit</option>
+              <option value="chest" data-i18n="sound.chest">Chest</option>
+              <option value="off" data-i18n="sound.off">Mute</option>
             </select>
           </label>
           <label class="prow">
-            <span class="plab">Volume</span>
+            <span class="plab" data-i18n="cfg.volume">Volume</span>
             <input type="range" id="cfgVol" min="0" max="100" step="5" />
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgAway" />
-            <span>Only when VS Code isn't in front</span>
+            <span data-i18n="cfg.away">Only when VS Code isn't in front</span>
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgAsk" />
-            <span>Also chime when a permission is needed</span>
+            <span data-i18n="cfg.onAsk">Also chime when a permission is needed</span>
           </label>
           <label class="pcheck">
             <input type="checkbox" id="cfgToast" />
-            <span>VS Code notification when you're away</span>
+            <span data-i18n="cfg.toast">VS Code notification when you're away</span>
           </label>
           <button class="pbtn" id="cfgTest" type="button">
-            <svg class="ico"><use href="#ion-play" /></svg>Test the sound
+            <svg class="ico"><use href="#ion-play" /></svg><span data-i18n="cfg.test">Test the sound</span>
           </button>
         </div>
 
@@ -124,8 +128,10 @@
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
           <div class="attach" id="attach" hidden></div>
-          <textarea id="input" rows="1" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
-          <button class="send" id="send" type="submit" title="Send">
+          <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
+          <!-- Not a submit button: while Claude is working this is Stop, and Enter
+               must stay Enter — it queues the next message instead of interrupting. -->
+          <button class="send" id="send" type="button" title="Send">
             <svg class="ico send-arrow"><use href="#ion-navigate" /></svg>
           </button>
         </form>
@@ -136,6 +142,9 @@
       <aside class="rail" id="rail"></aside>
     </div>
 
+    <!-- i18n first: everything after it draws in the chosen language from the
+         very first frame, instead of flashing English and then correcting itself. -->
+    <script nonce="{{nonce}}" src="{{i18nJs}}"></script>
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{chimeJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>

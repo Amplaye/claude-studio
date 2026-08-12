@@ -5,7 +5,7 @@
 import { getSessionMessages, listSessions } from '@anthropic-ai/claude-agent-sdk';
 import type { HistoryItem, Wire } from '../engine/protocol';
 
-export async function recentSessions(cwd: string, limit = 40): Promise<HistoryItem[]> {
+export async function recentSessions(cwd: string, limit = 20): Promise<HistoryItem[]> {
   try {
     const list = await listSessions({ dir: cwd, limit });
     return list.map((s) => ({

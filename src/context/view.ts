@@ -3,6 +3,9 @@
 // never HTML.
 import * as vscode from 'vscode';
 import { renderPage } from '../shared/html';
+import { onDidChangeLang } from '../shared/i18n';
+import { DEFAULT_PREFS } from '../engine/protocol';
+import type { Prefs } from '../engine/protocol';
 import type { ContextMonitor } from './monitor';
 import type { CtxCmd, CtxWire } from './protocol';
 
@@ -27,6 +30,7 @@ export class ContextView implements vscode.WebviewViewProvider {
       tokensCss: 'tokens.css',
       motionCss: 'motion.css',
       contextCss: 'context.css',
+      i18nJs: 'i18n.js',
       ctxpanelJs: 'ctxpanel.js',
       contextJs: 'context.js',
     });
@@ -40,6 +44,9 @@ export class ContextView implements vscode.WebviewViewProvider {
           // We only subscribe once the page is ready to receive: otherwise the first
           // snapshot would land in the void and everything would stay grey.
           sub?.dispose();
+          // The language before the data: the first paint should already be in the
+          // right words rather than correcting itself a moment later.
+          post({ k: 'lang', value: this.lang() });
           sub = this.monitor.subscribe((d) => post({ k: 'data', d }));
           return;
         case 'refresh':
@@ -59,11 +66,19 @@ export class ContextView implements vscode.WebviewViewProvider {
 
     // Visible again after being hidden: the numbers had been frozen for a while.
     const vis = view.onDidChangeVisibility(() => view.visible && this.monitor.tickSoon());
+    const lang = onDidChangeLang((value) => post({ k: 'lang', value }));
 
     view.onDidDispose(() => {
       listener.dispose();
       vis.dispose();
+      lang.dispose();
       sub?.dispose();
     });
+  }
+
+  /** The same choice the chat saved: one setting, two panels. */
+  private lang() {
+    const saved = this.ctx.globalState.get<Partial<Prefs>>('claudeStudio.prefs');
+    return saved?.lang ?? DEFAULT_PREFS.lang;
   }
 }

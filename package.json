@@ -139,8 +139,12 @@
         "title": "Claude Studio: Open as Tab Beside"
       },
       {
+        "command": "claudeStudio.openNewTab",
+        "title": "Claude Studio: New Session in a New Tab"
+      },
+      {
         "command": "claudeStudio.newSession",
-        "title": "Claude Studio: New Session"
+        "title": "Claude Studio: Clear This Conversation"
       },
       {
         "command": "claudeStudio.interrupt",
@@ -171,7 +175,7 @@
         "mac": "cmd+alt+c"
       },
       {
-        "command": "claudeStudio.newSession",
+        "command": "claudeStudio.openNewTab",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n"
       }
@@ -257,7 +261,7 @@
     "typecheck": "tsc --noEmit",
     "icon": "node scripts/make-icon.mjs",
     "preview": "node build.mjs && node scripts/preview.mjs",
-    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs",
+    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/lang-check.mjs",
     "smoke": "node scripts/smoke-engine.mjs",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",

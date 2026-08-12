@@ -383,7 +383,11 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   t(asked.length === 0, 'the permission went through a modal dialog: ' + asked.join(' | '));
   t(answered.length > 0, 'the permission was never asked');
   const ask = answered[0] || {};
-  t(!!ask.title, 'the permission request has no title to show');
+  // The card needs something to put in its heading. The engine supplies a title when
+  // it has one to give; when it doesn't, the page writes "Claude wants to use X"
+  // around `tool` — in whatever language the interface is set to, which is why that
+  // sentence is no longer composed here. Either way, one of the two has to be there.
+  t(!!(ask.title || ask.tool), 'the permission request has nothing to show as a title');
   t(ask.kind === 'tool', 'unexpected request kind: ' + ask.kind);
   t(
     tools.some((s) => s.id === ask.id),

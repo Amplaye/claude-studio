@@ -9,6 +9,7 @@
        animated bar it would relaunch the sweep every second and a half, forever. */
 window.CtxPanel = (() => {
   const SVG = 'http://www.w3.org/2000/svg';
+  const t = (key, vars) => window.I18N.t(key, vars);
 
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -72,7 +73,8 @@ window.CtxPanel = (() => {
     const head = el('header', 'hdr');
     const headTop = el('div', 'hdr-top');
     const lab = el('span', 'lab');
-    lab.append(icon('speedometer'), document.createTextNode('Account'));
+    const labText = document.createTextNode(t('ctx.account'));
+    lab.append(icon('speedometer'), labText);
     // There used to be two buttons here that did nothing for the person looking:
     //  - "refresh now": the numbers refresh on their own, on a timer and by
     //    listening to the sessions folder. A button to redo something that already
@@ -83,22 +85,24 @@ window.CtxPanel = (() => {
     headTop.append(lab, el('span', 'grow'));
     head.append(headTop, acct);
 
-    function buildCell(title) {
+    function buildCell(key) {
       const c = el('div', 'acell');
       const val = el('div', 'av');
       const bar = makeBar();
       const reset = el('div', 'ar');
-      c.append(el('div', 'an', title), val, bar, reset);
-      c._p = { val, reset, fill: bar.firstChild };
+      const name = el('div', 'an', t(key));
+      c.append(name, val, bar, reset);
+      c._p = { val, reset, name, key, fill: bar.firstChild };
       return c;
     }
 
-    const cells = [buildCell('Session · 5h'), buildCell('Week · 7d')];
+    const cells = [buildCell('ctx.session'), buildCell('ctx.week')];
     const waiting = el('div', 'await');
 
     function paintCell(c, pct, reset) {
+      c._p.name.textContent = t(c._p.key);
       c._p.val.textContent = pct == null ? '—' : Math.round(pct) + '%';
-      c._p.reset.textContent = reset ? 'resets ' + reset : ' ';
+      c._p.reset.textContent = reset ? t('ctx.resets', { when: reset }) : ' ';
       paintBar(c._p.fill, pct);
     }
 
@@ -113,8 +117,8 @@ window.CtxPanel = (() => {
       const dot = el('span', 'dot');
       const kind = icon('sparkles', 'cico');
       const name = el('span', 'cname');
-      const badge = el('span', 'badge', 'here');
-      const ren = iconButton('pencil', 'Rename', 'ren');
+      const badge = el('span', 'badge', t('ctx.here'));
+      const ren = iconButton('pencil', t('ctx.rename'), 'ren');
       chead.append(dot, kind, name, badge, ren);
 
       const meta = el('div', 'cmeta');
@@ -138,7 +142,7 @@ window.CtxPanel = (() => {
       };
       c.onclick = () => post({ cmd: 'focus', id });
 
-      c._p = { dot, kind, name, badge, pill, sub, pct, tok, fill: bar.firstChild };
+      c._p = { dot, kind, name, badge, ren, pill, sub, pct, tok, fill: bar.firstChild };
       return c;
     }
 
@@ -149,18 +153,20 @@ window.CtxPanel = (() => {
 
       p.dot.classList.toggle('busy', !!s.busy);
       p.dot.classList.toggle('recent', !s.busy && !!s.recent);
-      p.dot.title = s.busy ? 'active now' : s.recent ? 'recently active' : 'idle';
+      p.dot.title = s.busy ? t('ctx.busy') : s.recent ? t('ctx.recent') : t('ctx.idle');
 
       p.kind.firstChild.setAttribute('href', s.own ? '#ion-sparkles' : '#ion-chatbubble-ellipses');
-      p.kind.setAttribute('title', s.own ? 'Claude Studio conversation' : 'Tab from the official extension');
+      p.kind.setAttribute('title', s.own ? t('ctx.own') : t('ctx.foreign'));
 
       p.name.textContent = s.name;
       p.name.title = s.preview || s.name;
+      p.badge.textContent = t('ctx.here');
       p.badge.hidden = !s.focused;
+      p.ren.title = t('ctx.rename');
       p.pill.textContent = s.own ? 'Studio' : s.tabName || s.shortId;
       p.pill.title = s.own
-        ? 'opened by Claude Studio · id ' + s.shortId
-        : 'tab "' + (s.tabName || '?') + '" · id ' + s.shortId;
+        ? t('ctx.ownPill', { id: s.shortId })
+        : t('ctx.foreignPill', { tab: s.tabName || '?', id: s.shortId });
 
       // If the match isn't certain it has to be said, and said on the focused card:
       // better a doubt in writing than a wrong certainty about where you are.
@@ -168,9 +174,9 @@ window.CtxPanel = (() => {
         !s.focused || how === 'studio' || how === 'tab'
           ? ''
           : how === 'position'
-            ? ' · estimated'
-            : ' · last active';
-      p.sub.textContent = s.lastClock + ' · ' + s.lastAgo + (s.busy ? ' · active now' : '') + via;
+            ? t('ctx.estimated')
+            : t('ctx.lastActive');
+      p.sub.textContent = s.lastClock + ' · ' + s.lastAgo + (s.busy ? t('ctx.activeNow') : '') + via;
 
       p.pct.textContent = s.pct == null ? '—' : s.pct + '%';
       p.tok.textContent = s.tokens + ' / ' + limit;
@@ -180,8 +186,20 @@ window.CtxPanel = (() => {
     root.append(head, host);
 
     // ---------- drawing ----------
+    // The last thing we were told, kept so the panel can be drawn again in another
+    // language without waiting for the extension to send an update — the numbers
+    // only move every second and a half, and a stale label is what you'd stare at
+    // in the meantime.
+    let last = null;
+
+    window.I18N.onChange(() => {
+      labText.nodeValue = t('ctx.account');
+      if (last) render(last);
+    });
+
     function render(d) {
       if (!d) return;
+      last = d;
       if (!d.usage) {
         waiting.textContent = d.usageWait;
         if (acct.firstChild !== waiting) acct.replaceChildren(waiting);
@@ -194,7 +212,7 @@ window.CtxPanel = (() => {
       // The cards for the active sessions with their token usage
       host.hidden = false;
       if (!d.cards.length) {
-        host.replaceChildren(el('div', 'empty', 'No conversations open in this project.'));
+        host.replaceChildren(el('div', 'empty', t('ctx.empty')));
         cards.clear();
       } else {
         if (host.querySelector('.empty')) host.replaceChildren();

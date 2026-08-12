@@ -33,6 +33,13 @@ export type Thinking = 'auto' | 'on' | 'off';
 export type SoundName = 'cozy' | 'harvest' | 'levelup' | 'starlit' | 'chest' | 'off';
 
 /**
+ * The language the whole extension speaks. It isn't taken from VS Code's own
+ * setting on purpose: plenty of people run an English editor and still want to
+ * read their tools in Italian, and the other way round.
+ */
+export type Lang = 'en' | 'it';
+
+/**
  * The preferences you change from the header and that survive from one session to
  * the next. Model/effort/thinking are for the engine, the rest for the end-of-work
  * notice.
@@ -52,6 +59,8 @@ export interface Prefs {
   soundOnAsk: boolean;
   /** VSCode notification when it finishes while you're elsewhere. */
   toast: boolean;
+  /** The language of the interface: it changes on the spot, nothing reloads. */
+  lang: Lang;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -63,6 +72,7 @@ export const DEFAULT_PREFS: Prefs = {
   onlyWhenAway: false,
   soundOnAsk: true,
   toast: true,
+  lang: 'en',
 };
 
 /**

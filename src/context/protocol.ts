@@ -43,7 +43,11 @@ export interface CtxData {
 }
 
 /** Extension -> panel. */
-export type CtxWire = { k: 'data'; d: CtxData };
+export type CtxWire =
+  | { k: 'data'; d: CtxData }
+  // The panel has no settings of its own: the language is picked in the chat, and
+  // this is how it gets here.
+  | { k: 'lang'; value: 'en' | 'it' };
 
 /**
  * Extension -> chat. The same data, but aimed at the context column the fullscreen

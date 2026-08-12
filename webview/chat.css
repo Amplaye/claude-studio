@@ -223,11 +223,13 @@ body.wide .msg.user {
 }
 
 /* ---------- model cards ----------
-   How many there are is up to the CLI, not us: the grid adapts by itself, so one
-   more model tomorrow doesn't break the row. */
+   Two columns, always: four models on one line each became a strip of unreadable
+   slivers in the sidebar. Two by two the card has room for the name, the context
+   window and what it's for. The JS puts the heavyweights (Opus, Fable) on the top
+   row; a fifth model tomorrow just starts a third row. */
 .model-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 2px;
 }
@@ -265,7 +267,7 @@ body.wide .msg.user {
      haiku   cyan    the fast sweep that crosses over
      sonnet  purple  the soft breathing
      opus    clay    the spinning gradient border
-     fable   gold    the quick spin, the breathing halo, the floating card
+     fable   gold    the gold aurora drifting behind, and the card floats
 
    The animated border is a ::before poking out from under the card and an
    ::after that cuts out its centre: a real border can't be made to spin. */
@@ -326,12 +328,10 @@ body.wide .msg.user {
 }
 
 /* -- opus: the spinning gradient border -- */
-.model-card.fam-opus,
-.model-card.fam-fable {
+.model-card.fam-opus {
   overflow: hidden;
 }
-.model-card.fam-opus::before,
-.model-card.fam-fable::before {
+.model-card.fam-opus::before {
   content: '';
   position: absolute;
   inset: -1px;
@@ -342,8 +342,7 @@ body.wide .msg.user {
   opacity: 0;
   transition: opacity 0.3s ease;
 }
-.model-card.fam-opus::after,
-.model-card.fam-fable::after {
+.model-card.fam-opus::after {
   content: '';
   position: absolute;
   inset: 1.5px;
@@ -352,25 +351,59 @@ body.wide .msg.user {
   z-index: -1;
 }
 .model-card.fam-opus:hover::before,
-.model-card.fam-opus.on::before,
-.model-card.fam-fable:hover::before,
-.model-card.fam-fable.on::before {
+.model-card.fam-opus.on::before {
   opacity: 1;
 }
 .model-card.fam-opus.on {
   box-shadow: 0 0 22px -6px color-mix(in srgb, var(--fam) 60%, transparent);
 }
 
-/* -- fable: the spin is quicker, the halo breathes, the card floats -- */
+/* -- fable: a gold aurora drifting behind the words, and the card floats --
+   It used to borrow Opus's spinning border, only faster: two cards side by side
+   doing the same thing, and the whole point of these effects is telling them
+   apart at a glance. This one doesn't turn — it drifts, wide and slow, lit from
+   inside. Nothing else on the panel moves sideways. */
+.model-card.fam-fable {
+  overflow: hidden;
+}
 .model-card.fam-fable::before {
-  inset: -2px;
-  animation-duration: 2.2s;
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    color-mix(in srgb, var(--fam) 55%, transparent) 22%,
+    color-mix(in srgb, var(--fam-2) 85%, transparent) 40%,
+    color-mix(in srgb, var(--fam) 55%, transparent) 58%,
+    transparent 82%
+  );
+  background-size: 220% 100%;
+  background-position: 110% 0;
+  /* Above the card's background, under its words — not z-index:-1 like Opus's
+     ring, which only stays visible because the hover transform happens to open a
+     stacking context. Here the light has to hold up while the card sits still. */
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+.model-card.fam-fable .mc-info {
+  position: relative;
+  z-index: 1;
+}
+.model-card.fam-fable:hover::before,
+.model-card.fam-fable.on::before {
+  opacity: 0.5;
+  animation: cs-aurora 5.5s ease-in-out infinite;
 }
 .model-card.fam-fable:hover {
   animation: cs-float 3.4s ease-in-out infinite;
 }
 .model-card.fam-fable.on {
+  /* No spinning ring: the light comes from the edge, warm and steady. */
   animation: cs-float 3.4s ease-in-out infinite, cs-fam-glow 2.6s ease-in-out infinite;
+  border-color: var(--fam-2);
 }
 
 .mc-dot {
@@ -1230,6 +1263,7 @@ body.wide .msg.user {
      not by grey. Off and on read the same. */
   opacity: 1;
   transition: color 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
+              background 0.22s ease,
               text-shadow 0.3s cubic-bezier(0.2, 0.9, 0.25, 1),
               font-weight 0.2s ease;
   white-space: nowrap;
@@ -1239,9 +1273,27 @@ body.wide .msg.user {
 .modeseg-btn .ico {
   font-size: 12px;
 }
+/* The hover fills the whole pill, in the colour of the mode it's offering: before,
+   it only lit the text, so on Yolo the red slider showing through underneath read
+   like a highlight that had been clipped short. */
 .modeseg-btn:hover {
   color: #fff;
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.12);
+}
+.modeseg-btn[data-mode='default']:hover {
+  background: color-mix(in srgb, var(--claude-1) 26%, transparent);
+}
+.modeseg-btn[data-mode='plan']:hover {
+  background: color-mix(in srgb, #5b8def 26%, transparent);
+}
+.modeseg-btn.yolo:hover {
+  background: color-mix(in srgb, #e74c3c 26%, transparent);
+}
+/* On the one already chosen the slider is the fill: a second one on top of it
+   would only muddy the colour. */
+.modeseg-btn.on:hover {
+  background: transparent;
 }
 .modeseg-btn.on {
   font-weight: 700;
@@ -1524,7 +1576,12 @@ body.wide .msg.user {
   transform: rotate(45deg) translate(1.5px, -1.5px);
   filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.75));
 }
-.send.stop .send-arrow {
+/* Stop is a different icon, not the arrow rotated: the old rule aimed at
+   .send-arrow and never matched anything, so the square sat at 1em — a speck in a
+   32px button. It's the control you go for in a hurry: give it the room. */
+.send.stop .ico {
+  width: 22px;
+  height: 22px;
   transform: none;
 }
 .send:active {

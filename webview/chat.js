@@ -10,6 +10,8 @@
   const sendBtn = $('send');
   const modeBox = $('mode');
   const SVG = 'http://www.w3.org/2000/svg';
+  /** Every word you can read on this page goes through here. See i18n.js. */
+  const t = (key, vars) => window.I18N.t(key, vars);
 
   // ---------- DOM helpers ----------
   const el = (tag, cls, text) => {
@@ -92,13 +94,13 @@
     // The whole todo list shows up below: up top the JSON would just be noise.
     if (name === 'TodoWrite') {
       const n = (inp.todos || []).length;
-      return n === 1 ? '1 item' : n + ' items';
+      return n === 1 ? t('msg.item') : t('msg.items', { n });
     }
     for (const k of ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'description', 'prompt']) {
       const v = inp[k];
       if (typeof v === 'string' && v.trim()) {
-        const t = k === 'file_path' || k === 'path' ? shortPath(v) : v;
-        return t.replace(/\s+/g, ' ').slice(0, 200);
+        const shown = k === 'file_path' || k === 'path' ? shortPath(v) : v;
+        return shown.replace(/\s+/g, ' ').slice(0, 200);
       }
     }
     try {
@@ -147,11 +149,11 @@
   // ---------- empty state ----------
   /** Shortcuts only get learned if they're written where you look while waiting. */
   const KEYS = [
-    ['@', 'a file'],
-    ['/', 'a command'],
-    ['Alt+N', 'new'],
-    ['Alt+H', 'history'],
-    ['Esc', 'stop'],
+    ['@', 'empty.key.file'],
+    ['/', 'empty.key.command'],
+    ['Alt+N', 'empty.key.new'],
+    ['Alt+H', 'empty.key.history'],
+    ['Esc', 'empty.key.stop'],
   ];
 
   function showEmpty() {
@@ -159,13 +161,13 @@
     const box = el('div', 'empty');
     box.append(
       icon('chatbubble-ellipses'),
-      el('h2', null, 'Ready.'),
-      el('p', null, 'Write below: you get the same Claude Code you use from the terminal, with your CLAUDE.md, skills, MCP and permissions.')
+      el('h2', null, t('empty.title')),
+      el('p', null, t('empty.body'))
     );
     const keys = el('div', 'keys');
     for (const [k, what] of KEYS) {
       const item = el('span', 'key');
-      item.append(el('kbd', null, k), el('span', null, what));
+      item.append(el('kbd', null, k), el('span', null, t(what)));
       keys.append(item);
     }
     box.append(keys);
@@ -231,7 +233,7 @@
     node.className = 'msg think';
     node.open = false;
     const sum = el('summary');
-    sum.append(icon('bulb'), el('span', null, 'Reasoning'));
+    sum.append(icon('bulb'), el('span', null, t('msg.reasoning')));
     const body = el('div', 'body');
     const caret = el('span', 'caret');
     body.appendChild(caret);
@@ -314,8 +316,8 @@
       row.append(el('span', 'sign', sign), el('span', 'code', text || ' '));
       box.append(row);
     }
-    if (rows.length > MAX) box.append(el('div', 'more', `… ${rows.length - MAX} more lines`));
-    if (inp.replace_all) box.append(el('div', 'more', 'all occurrences replaced'));
+    if (rows.length > MAX) box.append(el('div', 'more', t('msg.moreLines', { n: rows.length - MAX })));
+    if (inp.replace_all) box.append(el('div', 'more', t('msg.replaceAll')));
     return box;
   }
 
@@ -348,7 +350,7 @@
     if (typeof file === 'string') {
       arg.type = 'button';
       arg.classList.add('link');
-      arg.title = 'Open in the editor';
+      arg.title = t('msg.openInEditor');
       arg.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -401,20 +403,20 @@
 
     // "File updated successfully" under a diff you can already see is noise:
     // for these tools the result only shows up when something goes wrong.
-    const t = ok && QUIET[node.dataset.tool] ? '' : String(text || '').trim();
-    if (t) {
-      const lines = t.split('\n');
-      const out = el('div', 'out', lines.length > 400 ? lines.slice(0, 400).join('\n') + '\n…' : t);
+    const res = ok && QUIET[node.dataset.tool] ? '' : String(text || '').trim();
+    if (res) {
+      const lines = res.split('\n');
+      const out = el('div', 'out', lines.length > 400 ? lines.slice(0, 400).join('\n') + '\n…' : res);
       // In cards that already have something to show (diff, todo, sub-agent)
       // the result is a note at the bottom, not the main content.
-      if (node._kids) node._body.append(el('div', 'sub-result', t.slice(0, 2000)));
+      if (node._kids) node._body.append(el('div', 'sub-result', res.slice(0, 2000)));
       else node._body.append(out);
       if (!node._touched && !node.open) node.open = lines.length <= 12;
       const n = node.querySelector('.count');
       if (n) n.remove();
       if (lines.length > 12) {
         node.querySelector('.head').insertBefore(
-          el('span', 'count', lines.length + ' lines'),
+          el('span', 'count', t('msg.lines', { n: lines.length })),
           node.querySelector('.chev')
         );
       }
@@ -438,7 +440,7 @@
   function questionBody(node, m, send) {
     const answers = {};
     const box = el('div', 'qs');
-    const go = button('ok', 'send', 'Send');
+    const go = button('ok', 'send', t('perm.send'));
     go.disabled = true;
 
     const check = () => {
@@ -489,7 +491,10 @@
 
     const head = el('div', 'head');
     const ic = m.kind === 'plan' ? 'list' : m.kind === 'question' ? 'options' : 'shield-checkmark';
-    head.append(icon(ic, 'perm-ico'), el('span', 'title', m.title || 'Your permission is needed'));
+    // The engine writes its own title when it has something to say; otherwise we
+    // build one here, so it comes out in the language you're reading.
+    const title = m.title || (m.tool ? t('perm.wants', { tool: m.tool }) : t('perm.title'));
+    head.append(icon(ic, 'perm-ico'), el('span', 'title', title));
     node.append(head);
 
     const acts = el('div', 'acts');
@@ -504,9 +509,9 @@
       const body = el('div', 'plan');
       body.replaceChildren(...markdown(m.plan || m.detail || ''));
       node.append(body);
-      const ok = button('ok', 'checkmark', 'Approve and run');
-      const auto = button('always', 'flash', "Approve, don't ask about edits");
-      const no = button('no', 'close', 'Keep planning');
+      const ok = button('ok', 'checkmark', t('perm.approve'));
+      const auto = button('always', 'flash', t('perm.approveAuto'));
+      const no = button('no', 'close', t('perm.keepPlanning'));
       ok.addEventListener('click', () => answered('allow'));
       auto.addEventListener('click', () => answered('always'));
       no.addEventListener('click', () => answered('deny'));
@@ -516,17 +521,17 @@
       acts.append(go);
     } else {
       if (m.detail) node.append(el('div', 'detail', m.detail));
-      const ok = button('ok', 'checkmark', 'Allow');
+      const ok = button('ok', 'checkmark', t('perm.allow'));
       ok.addEventListener('click', () => answered('allow'));
       acts.append(ok);
       if (m.canAlways) {
-        const always = button('always', 'checkmark-circle', 'Always allow');
+        const always = button('always', 'checkmark-circle', t('perm.always'));
         // This isn't a "just this once" promise: the rule stays written on disk.
-        always.title = "The rule stays written in the project's permissions (.claude/settings.local.json).";
+        always.title = t('perm.alwaysHint');
         always.addEventListener('click', () => answered('always'));
         acts.append(always);
       }
-      const no = button('no', 'close', 'Deny');
+      const no = button('no', 'close', t('perm.deny'));
       no.addEventListener('click', () => answered('deny'));
       acts.append(no);
     }
@@ -544,7 +549,13 @@
     node.classList.add('resolved', m.ok ? 'ok' : 'no');
     const acts = node.querySelector('.acts');
     const verdict = el('div', 'verdict');
-    verdict.append(m.ok ? drawnCheck('perm-ico') : icon('close', 'perm-ico'), el('span', null, m.label));
+    // The label is written by the extension. If it's one of the ones it always
+    // words the same way, it gets said in your language; anything else passes
+    // through as it came.
+    verdict.append(
+      m.ok ? drawnCheck('perm-ico') : icon('close', 'perm-ico'),
+      el('span', null, t('label.' + m.label) === 'label.' + m.label ? m.label : t('label.' + m.label))
+    );
     if (acts) acts.replaceWith(verdict);
     else node.append(verdict);
     for (const opts of node.querySelectorAll('.opts')) {
@@ -558,55 +569,43 @@
   // Whatever the engine sends is what you get: sometimes a sentence, often a message
   // written for whoever reads the logs. Here we say what happened and what you can do
   // about it, and the original text stays below for anyone who wants to see it.
+  // The wording lives in i18n.js: here we only say which case it is, so an error
+  // already on screen reads in whatever language you switch to next time it happens.
   const ERRORS = [
     {
       re: /cli\.js|@anthropic-ai\/claude-code|non trovo la cli|command not found|ENOENT|spawn/i,
-      title: "Can't find the Claude Code CLI on this computer.",
-      hint: 'Install it with "npm i -g @anthropic-ai/claude-code", or point to the path of cli.js in Settings → Claude Studio → Cli Path.',
+      key: 'err.cli',
       keep: false,
     },
-    {
-      re: /rate.?limit|\b429\b|too many requests|usage limit/i,
-      title: "You've hit the account's usage limit.",
-      hint: 'The context panel shows how long until the next reset.',
-    },
-    {
-      re: /\b401\b|\b403\b|unauthor|authentic|not logged in|invalid api key|oauth/i,
-      title: 'Claude Code is not authenticated.',
-      hint: 'Open a terminal, run "claude" and sign in again: the chat uses the same authentication.',
-    },
-    {
-      re: /credit|billing|insufficient|payment/i,
-      title: "The account doesn't have the credit to answer.",
-      hint: 'The context panel shows how much has been spent so far.',
-    },
+    { re: /rate.?limit|\b429\b|too many requests|usage limit/i, key: 'err.rate' },
+    { re: /\b401\b|\b403\b|unauthor|authentic|not logged in|invalid api key|oauth/i, key: 'err.auth' },
+    { re: /credit|billing|insufficient|payment/i, key: 'err.credit' },
     {
       re: /prompt is too long|context (window|length|limit)|too many tokens|exceeds? .{0,20}tokens/i,
-      title: 'The conversation has filled up the context window.',
-      hint: "Open a new one (Alt+N) and start again from a summary: nothing else fits in here.",
+      key: 'err.context',
     },
     {
       re: /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|network|offline/i,
-      title: 'The connection dropped.',
-      hint: "Check the network and send the message again: the conversation wasn't lost.",
+      key: 'err.net',
     },
-    {
-      re: /interrupt|interrott|abort|cancell?ed|annullat/i,
-      title: 'Turn interrupted.',
-      hint: 'The next message picks up from here.',
-      calm: true,
-    },
+    { re: /interrupt|interrott|abort|cancell?ed|annullat/i, key: 'err.stopped', calm: true },
     {
       re: /exit(ed)? (with )?code|process (exited|terminated|died)|SIGTERM|SIGKILL|killed/i,
-      title: 'The Claude process shut itself down.',
-      hint: 'Send the message again: the session restarts automatically.',
+      key: 'err.exit',
     },
   ];
 
   function readableError(raw) {
-    const s = String(raw || '').trim() || 'Error with no description.';
+    const s = String(raw || '').trim() || t('err.none');
     for (const e of ERRORS) {
-      if (e.re.test(s)) return { title: e.title, hint: e.hint, calm: !!e.calm, raw: e.keep === false ? '' : s };
+      if (e.re.test(s)) {
+        return {
+          title: t(e.key + '.title'),
+          hint: t(e.key + '.hint'),
+          calm: !!e.calm,
+          raw: e.keep === false ? '' : s,
+        };
+      }
     }
     // A message already written for a person gets shown as it is: rewriting it
     // would mean hiding it.
@@ -614,8 +613,8 @@
       return { title: s, hint: '', calm: false, raw: '' };
     }
     return {
-      title: 'Something went wrong.',
-      hint: 'Usually sending the message again is enough. Below is what the engine said.',
+      title: t('err.generic.title'),
+      hint: t('err.generic.hint'),
       calm: false,
       raw: s,
     };
@@ -630,7 +629,7 @@
     if (e.raw && e.raw !== e.title) {
       const det = document.createElement('details');
       det.className = 'err-raw';
-      det.append(el('summary', null, 'Technical details'), el('pre', null, e.raw.slice(0, 4000)));
+      det.append(el('summary', null, t('err.details')), el('pre', null, e.raw.slice(0, 4000)));
       body.append(det);
     }
     node.append(icon(e.calm ? 'stop-circle' : 'alert-circle'), body);
@@ -646,7 +645,7 @@
     // gradient says "it's still alive". Together they are the wait.
     const orb = el('span', 'orb');
     orb.append(el('span', 'thinking-ring'), el('span', 'dot thinking-halo'));
-    waiting.append(orb, el('span', null, 'Claude is thinking…'));
+    waiting.append(orb, el('span', 'pulse-label', t('msg.thinking')));
     add(waiting);
   }
   function hideWaiting() {
@@ -660,20 +659,20 @@
 
   function fmtAgo(ms) {
     const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-    if (s < 90) return 'just now';
+    if (s < 90) return t('ago.now');
     const m = Math.round(s / 60);
-    if (m < 60) return m + ' min ago';
+    if (m < 60) return t('ago.min', { n: m });
     const h = Math.round(m / 60);
-    if (h < 24) return h === 1 ? 'an hour ago' : h + ' hours ago';
+    if (h < 24) return h === 1 ? t('ago.hour') : t('ago.hours', { n: h });
     const g = Math.round(h / 24);
-    return g === 1 ? 'yesterday' : g + ' days ago';
+    return g === 1 ? t('ago.yesterday') : t('ago.days', { n: g });
   }
 
   function showHistory(items) {
     const list = $('drawerList');
     list.replaceChildren();
     if (!items.length) {
-      list.append(el('div', 'drawer-empty', 'No saved conversations for this project.'));
+      list.append(el('div', 'drawer-empty', t('drawer.empty')));
     }
     for (const it of items) {
       const row = el('div', 'hrow card-hover');
@@ -753,7 +752,7 @@
   function setBusy(v) {
     busy = v;
     sendBtn.classList.toggle('stop', v);
-    sendBtn.title = v ? 'Stop' : 'Send';
+    sendBtn.title = v ? t('composer.stop') : t('composer.send');
     sendBtn.replaceChildren(v ? icon('stop-circle') : sendArrow());
     if (v) showWaiting();
     else hideWaiting();
@@ -771,8 +770,10 @@
         $('btnTab').hidden = m.surface === 'panel';
         // The context alongside only makes sense where there's room: in the tab.
         $('btnCtx').hidden = m.surface !== 'panel';
-        // And a tab can be closed; the sidebar can't.
-        $('btnClose').hidden = m.surface !== 'panel';
+        // And a tab can be closed; the sidebar can't. There's no button for it any
+        // more — the header was crowded and VS Code already draws an X on the tab —
+        // but Alt+W still has to know where it is.
+        isTab = m.surface === 'panel';
         if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
         spent = { usd: 0, tokens: 0 };
@@ -800,6 +801,10 @@
         break;
       case 'prefs':
         prefs = Object.assign({}, prefs, m.value || {});
+        // The extension is the one that remembers which language you chose — this
+        // is where a freshly opened tab finds out, and where a change made in the
+        // other face of the chat lands.
+        window.I18N.set(prefs.lang || 'en');
         paintCfg();
         break;
       case 'models':
@@ -853,7 +858,7 @@
             const t = document.createElement('img');
             t.className = 'uimg';
             t.src = src;
-            t.alt = 'Attached image';
+            t.alt = window.I18N.t('composer.attachedImage');
             t.addEventListener('click', () => openLightbox(src));
             box.append(t);
           }
@@ -925,7 +930,7 @@
     const cats = new Map();
     for (const it of items) {
       const m = it.label.match(/^\/([^:]+):/);
-      const cat = m ? m[1] : 'General';
+      const cat = m ? m[1] : t('menu.general');
       if (!cats.has(cat)) cats.set(cat, []);
       cats.get(cat).push(it);
     }
@@ -947,13 +952,13 @@
     if (isCmd) {
       // Header with search bar
       const head = el('div', 'menu-head');
-      head.append(icon('terminal'), el('span', null, ' Commands'));
+      head.append(icon('terminal'), el('span', null, t('menu.commands')));
       menu.append(head);
 
       const searchBox = el('div', 'menu-search');
       cmdSearchInput = document.createElement('input');
       cmdSearchInput.type = 'text';
-      cmdSearchInput.placeholder = 'Search for a command…';
+      cmdSearchInput.placeholder = t('menu.search');
       searchBox.append(icon('search'), cmdSearchInput);
       menu.append(searchBox);
 
@@ -1010,8 +1015,13 @@
           if (r) r.classList.add('on');
         }
       });
-      // Don't lose focus from the textarea — preventDefault on mousedown is enough
-      cmdSearchInput.addEventListener('mousedown', (e) => e.stopPropagation());
+      // Clicking the search box moves focus here on purpose: the textarea's blur
+      // handler knows not to close the menu when focus lands inside it. Leaving for
+      // anywhere else does close it.
+      cmdSearchInput.addEventListener('blur', (e) => {
+        if (e.relatedTarget === input || (e.relatedTarget && menu.contains(e.relatedTarget))) return;
+        closeMenu();
+      });
       cmdSearchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeMenu(); input.focus(); }
         else if (e.key === 'Enter') { e.preventDefault(); choose(); input.focus(); }
@@ -1061,23 +1071,25 @@
 
   let filesTimer = 0;
   function refreshMenu() {
-    const t = token();
-    if (!t) {
+    // `tok`, not `t`: `t` is the translator, and shadowing it here is how the whole
+    // menu went down with "t is not a function".
+    const tok = token();
+    if (!tok) {
       closeMenu();
       return;
     }
-    picking = { kind: t.kind, start: t.start, end: t.end, items: [], sel: 0 };
-    if (t.kind === '/') {
+    picking = { kind: tok.kind, start: tok.start, end: tok.end, items: [], sel: 0 };
+    if (tok.kind === '/') {
       if (!commands.length) {
         // Without an active session there are no commands: show a message
         menu.replaceChildren();
         const hint = el('div', 'menu-head');
-        hint.append(icon('terminal'), el('span', null, ' Send a message to load the commands'));
+        hint.append(icon('terminal'), el('span', null, t('menu.needSession')));
         menu.append(hint);
         menu.hidden = false;
         return;
       }
-      const q = t.q.toLowerCase();
+      const q = tok.q.toLowerCase();
       paintMenu(
         commands
           .filter((c) => c.name.toLowerCase().includes(q))
@@ -1087,7 +1099,7 @@
       return;
     }
     clearTimeout(filesTimer);
-    filesTimer = setTimeout(() => vscode.postMessage({ cmd: 'files', q: t.q }), 110);
+    filesTimer = setTimeout(() => vscode.postMessage({ cmd: 'files', q: tok.q }), 110);
   }
 
   function showFiles(items) {
@@ -1114,8 +1126,8 @@
     // visible button nobody knows that. Esc does the same thing.
     const x = el('button', 'lbx');
     x.type = 'button';
-    x.title = 'Close (Esc)';
-    x.setAttribute('aria-label', 'Close');
+    x.title = t('lightbox.close');
+    x.setAttribute('aria-label', t('common.close'));
     x.append(icon('close'));
     overlay.appendChild(x);
 
@@ -1153,7 +1165,7 @@
       chip.append(icon('code-slash'), el('span', null, `${selection.file}:${selection.lines}`));
       const x = el('button', 'attx');
       x.type = 'button';
-      x.title = "Don't attach the selection";
+      x.title = t('composer.dropSelection');
       x.append(icon('close'));
       x.addEventListener('click', () => {
         useSelection = false;
@@ -1174,7 +1186,7 @@
       });
       const x = el('button', 'attx');
       x.type = 'button';
-      x.title = 'Remove';
+      x.title = t('composer.removeImage');
       x.append(icon('close'));
       x.addEventListener('click', () => {
         images.splice(i, 1);
@@ -1214,7 +1226,13 @@
     grow();
     refreshMenu();
   });
-  input.addEventListener('blur', closeMenu);
+  // Leaving the textarea closes the menu — unless you're going *into* the menu.
+  // The command search box is a real field: clicking it blurs the textarea, and
+  // closing on that blur is what made the search box impossible to use.
+  input.addEventListener('blur', (e) => {
+    if (e.relatedTarget && menu.contains(e.relatedTarget)) return;
+    closeMenu();
+  });
 
   input.addEventListener('keydown', (e) => {
     // with the menu open the arrows and Enter belong to the menu, not to the message
@@ -1239,12 +1257,20 @@
     }
   });
 
-  composer.addEventListener('submit', (e) => {
-    e.preventDefault();
+  // The button is the only Stop. Enter is never a Stop: while Claude is working it
+  // queues the message for the next turn — the engine already lines them up — and
+  // interrupting on Enter meant a command typed mid-turn killed the turn instead of
+  // running.
+  sendBtn.addEventListener('click', () => {
     if (busy) {
       vscode.postMessage({ cmd: 'interrupt' });
       return;
     }
+    composer.requestSubmit();
+  });
+
+  composer.addEventListener('submit', (e) => {
+    e.preventDefault();
     const text = input.value.trim();
     if (!text && !images.length) return;
     lastText = text;
@@ -1272,22 +1298,39 @@
   const modeSlider = el('div', 'modeseg-slider');
   modeBox.appendChild(modeSlider);
 
+  /**
+   * Puts the slider over the active button.
+   *
+   * Offsets, not bounding rects: they're already relative to the container (which
+   * is `position: relative`), so they don't drift by half a pixel and they don't
+   * lie while something else on the page is still animating. The old version
+   * measured with getBoundingClientRect at load, before the web font had settled,
+   * and the red pill ended up a few pixels off the Yolo button — until you clicked
+   * it and the measurement was taken again on a page that had stopped moving.
+   */
+  function placeMode() {
+    const active = modeBox.querySelector('.modeseg-btn.on');
+    // Nothing to measure while the header is hidden: better to leave the slider
+    // where it is than to pin it to zero and watch it jump later.
+    if (!active || !modeBox.offsetParent) return;
+    modeSlider.style.left = active.offsetLeft + 'px';
+    modeSlider.style.width = active.offsetWidth + 'px';
+  }
+
   function paintMode(value) {
     document.body.dataset.mode = value;
     for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
       btn.classList.toggle('on', btn.dataset.mode === value);
     }
-    // Move the slider onto the active button
-    const active = modeBox.querySelector('.modeseg-btn.on');
-    if (active) {
-      const boxRect = modeBox.getBoundingClientRect();
-      const btnRect = active.getBoundingClientRect();
-      modeSlider.style.left = (btnRect.left - boxRect.left) + 'px';
-      modeSlider.style.width = btnRect.width + 'px';
-    }
-    // Slider colour
     modeSlider.className = 'modeseg-slider mode-' + value;
+    placeMode();
+    requestAnimationFrame(placeMode);
   }
+
+  // The buttons change width when the font arrives and when the sidebar is
+  // dragged: the slider follows on its own instead of waiting for a click.
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(placeMode).observe(modeBox);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(placeMode);
   for (const btn of modeBox.querySelectorAll('.modeseg-btn')) {
     btn.addEventListener('click', () => {
       vscode.postMessage({ cmd: 'setMode', value: btn.dataset.mode });
@@ -1305,6 +1348,8 @@
   // only then does it really close — so the gesture has a beginning and an end
   // instead of being a flicker.
   const shell = document.querySelector('.shell');
+  /** Only a tab can close itself: the sidebar is always there. */
+  let isTab = false;
 
   function playTabIn() {
     if (!shell) return;
@@ -1328,8 +1373,6 @@
     setTimeout(fire, 320);
   }
 
-  $('btnClose').addEventListener('click', closeTab);
-
   // ---------- settings: model, thinking, alerts ----------
   //
   // The extension holds the choices (they survive from one window to the next): here
@@ -1347,23 +1390,19 @@
     onlyWhenAway: false,
     soundOnAsk: true,
     toast: true,
+    lang: 'en',
   };
   let models = [];
 
-  // Every effort level has a name and a plain explanation.
-  const EFFORT_INFO = {
-    '':     { label: 'Auto',          desc: 'Claude decides how hard to work based on the question' },
-    low:    { label: 'Fast',          desc: 'Answers right away — good for simple questions' },
-    medium: { label: 'Balanced',      desc: 'The right mix of speed and precision' },
-    high:   { label: 'Thorough',      desc: 'Takes the time to do things properly' },
-    xhigh:  { label: 'Very thorough', desc: 'Analyses everything in depth before acting' },
-    max:    { label: 'Maximum',       desc: 'Spares nothing, the highest quality' },
-  };
-  const THINK_INFO = {
-    auto: { label: 'Auto', desc: 'Claude decides when to reason in depth' },
-    on:   { label: 'On',   desc: 'Reasons step by step before every answer' },
-    off:  { label: 'Off',  desc: 'Answers directly, with no intermediate reasoning' },
-  };
+  // Every effort level has a name and a plain explanation. The words live in
+  // i18n.js — here we only keep which levels exist, and in what order.
+  const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
+  const effortLabel = (v) => t('effort.' + v);
+  const effortDesc = (v) => t('effort.' + v + '.desc');
+
+  const THINKS = ['auto', 'on', 'off'];
+  const thinkLabel = (v) => t('think.' + v);
+  const thinkDesc = (v) => t('think.' + v + '.desc');
 
   // -- model cards --
   //
@@ -1377,15 +1416,18 @@
     const d = String(m.description || '');
     const parts = d.split('·');
     const tail = (parts[parts.length - 1] || '').trim();
-    return PURPOSE_IT[tail] || tail || String(m.resolved || '');
+    const key = PURPOSE_KEY[tail];
+    return (key && t(key)) || tail || String(m.resolved || '');
   }
 
-  /** The handful of phrases the CLI always words the same way: shortened here. */
-  const PURPOSE_IT = {
-    'Best for everyday, complex tasks': 'For every day, complex ones too',
-    'Most capable for your hardest and longest-running tasks': 'The most capable, for the tough jobs',
-    'Efficient for routine tasks': 'Efficient for routine things',
-    'Fastest for quick answers': 'The fastest, answers on the fly',
+  /** The handful of phrases the CLI always words the same way: shortened, and said
+   *  in whichever language the panel is set to. Anything else it sends comes
+   *  through untouched — we can't translate what we've never seen. */
+  const PURPOSE_KEY = {
+    'Best for everyday, complex tasks': 'model.everyday',
+    'Most capable for your hardest and longest-running tasks': 'model.hardest',
+    'Efficient for routine tasks': 'model.routine',
+    'Fastest for quick answers': 'model.fastest',
   };
 
   /**
@@ -1451,16 +1493,31 @@
     return 'sonnet';
   }
 
+  /**
+   * The order on the two-column grid: Opus and Fable on the top row, Sonnet and
+   * Haiku underneath. The ones you reach for when the job is hard sit where the eye
+   * lands first. Anything the CLI adds that we don't recognise goes at the bottom,
+   * in the order the CLI gave it.
+   */
+  const FAMILY_ORDER = { opus: 0, fable: 1, sonnet: 2, haiku: 3 };
+
+  function byFamily(a, b) {
+    const ra = FAMILY_ORDER[modelFamily(a)] ?? 9;
+    const rb = FAMILY_ORDER[modelFamily(b)] ?? 9;
+    return ra - rb;
+  }
+
   function paintModels() {
     const list = $('cfgModelList');
     list.replaceChildren();
 
     if (!models.length) {
-      list.append(el('p', 'phint', 'The models will appear after the first message'));
+      list.append(el('p', 'phint', t('cfg.models.waiting')));
       return;
     }
 
-    for (const m of models) {
+    // A copy: `models` is what the CLI said, and the order on screen is ours.
+    for (const m of [...models].sort(byFamily)) {
       // No "Automatic": the model is always picked by hand.
       if (m.recommended) continue;
       const value = m.value;
@@ -1561,18 +1618,17 @@
     // it nothing", and saying nothing is always possible — even to a model that
     // doesn't take levels at all. Disabling it left the panel with no choice lit up
     // and the slider hanging in mid-air.
-    const items = [{ value: '', label: 'Auto' }].concat(
+    const items = [{ value: '', label: effortLabel('') }].concat(
       levels.map((l) => ({
         value: l,
-        label: (EFFORT_INFO[l] || {}).label || l,
+        label: EFFORTS.includes(l) ? effortLabel(l) : l,
         disabled: noEffort,
       }))
     );
     paintSeg($('cfgEffort'), items, prefs.effort, (v) => push({ effort: v }));
-    const info = EFFORT_INFO[prefs.effort] || EFFORT_INFO[''];
     $('cfgEffortHint').textContent = noEffort
-      ? "This model doesn't take effort levels: it decides for itself"
-      : info.desc;
+      ? t('effort.none')
+      : effortDesc(EFFORTS.includes(prefs.effort) ? prefs.effort : '');
   }
 
   function paintThinking() {
@@ -1581,19 +1637,32 @@
     // "On" is a fixed token ceiling, not adaptive thinking. Better to say so than to
     // show three buttons that look like they mean the same thing everywhere.
     const adaptive = !chosen || chosen.adaptive !== false;
-    const items = Object.entries(THINK_INFO).map(([v, i]) => ({ value: v, label: i.label }));
+    const items = THINKS.map((v) => ({ value: v, label: thinkLabel(v) }));
     paintSeg($('cfgThink'), items, prefs.thinking, (v) => push({ thinking: v }));
-    const base = (THINK_INFO[prefs.thinking] || {}).desc || '';
+    const base = THINKS.includes(prefs.thinking) ? thinkDesc(prefs.thinking) : '';
     $('cfgThinkHint').textContent =
-      adaptive || prefs.thinking === 'off'
-        ? base
-        : base + ' — on this model it means a fixed token ceiling';
+      adaptive || prefs.thinking === 'off' ? base : base + t('think.capped');
+  }
+
+  /**
+   * The language of the whole interface. It's a preference like the others — it
+   * lives with the extension and follows you from one window to the next — but it's
+   * the only one that redraws the panel you're setting it from, so the switch has
+   * to happen before the redraw. `push` handles that.
+   */
+  function paintLang() {
+    const items = [
+      { value: 'en', label: 'English' },
+      { value: 'it', label: 'Italiano' },
+    ];
+    paintSeg($('cfgLang'), items, prefs.lang || 'en', (v) => push({ lang: v }));
   }
 
   function paintCfg() {
     paintModels();
     paintEffort();
     paintThinking();
+    paintLang();
     $('cfgSound').value = prefs.sound;
     $('cfgVol').value = Math.round((prefs.volume == null ? 0.6 : prefs.volume) * 100);
     $('cfgVol').disabled = prefs.sound === 'off';
@@ -1606,7 +1675,10 @@
   function push(patch) {
     prefs = Object.assign({}, prefs, patch);
     vscode.postMessage({ cmd: 'setPrefs', value: patch });
-    paintCfg();
+    // The language has to be in force before anything redraws, or the panel would
+    // repaint itself once in the old words and only catch up on the next change.
+    if (patch.lang) window.I18N.set(patch.lang);
+    else paintCfg();
   }
 
   /** The sound plays right away: picking one blind makes no sense. */
@@ -1700,8 +1772,10 @@
     if (!e.altKey || e.ctrlKey || e.metaKey) return;
     switch ((e.key || '').toLowerCase()) {
       case 'n':
+        // A new session is a new tab, not this one wiped: whatever is running here
+        // keeps running.
         e.preventDefault();
-        vscode.postMessage({ cmd: 'newSession' });
+        vscode.postMessage({ cmd: 'newTab' });
         return;
       case 'h':
         e.preventDefault();
@@ -1729,7 +1803,7 @@
         return;
       case 'w':
         // same again: from the sidebar there's no tab to close
-        if ($('btnClose').hidden) return;
+        if (!isTab) return;
         e.preventDefault();
         closeTab();
         return;
@@ -1752,6 +1826,28 @@
     showRail(!document.body.classList.contains('rail-on'))
   );
 
+  // ---------- switching language ----------
+  //
+  // i18n.apply() has already rewritten everything the HTML declared. What's left is
+  // the parts this file builds by hand: they get drawn again from the same state.
+  // The conversation itself is deliberately left alone — those are Claude's words
+  // and yours, and translating them would be a lie. Only the chrome moves.
+  window.I18N.onChange(() => {
+    paintCfg();
+    setBusy(busy);
+    // The empty state is ours to redraw; a conversation in progress isn't.
+    if (log.querySelector('.empty')) showEmpty();
+    const label = waiting && waiting.querySelector('.pulse-label');
+    if (label) label.textContent = t('msg.thinking');
+    paintAttach();
+    // An open menu still holds the old words: it's rebuilt against what you typed.
+    if (picking && !menu.hidden) refreshMenu();
+    // The buttons change width in another language: the slider follows.
+    paintMode(document.body.dataset.mode || 'default');
+    placeAllSegs();
+  });
+
+  window.I18N.apply();
   showEmpty();
   setBusy(false);
   paintMode('default');

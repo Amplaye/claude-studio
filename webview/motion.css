@@ -73,6 +73,20 @@
   }
 }
 
+/* Fable's aurora: a wide band of gold that drifts across and comes back, slow
+   enough to read as light rather than as a sweep. Haiku's cs-sheen is the same
+   idea run fast and one way only — that's the difference between a flash and a
+   glow, and it's the whole point of the two cards not looking alike. */
+@keyframes cs-aurora {
+  0%,
+  100% {
+    background-position: 110% 0;
+  }
+  50% {
+    background-position: -10% 0;
+  }
+}
+
 @keyframes cs-float {
   0%,
   100% {

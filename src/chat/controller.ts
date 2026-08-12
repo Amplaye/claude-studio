@@ -13,6 +13,7 @@ import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
+import { announceLang, t } from '../shared/i18n';
 
 export interface Surface {
   readonly kind: 'view' | 'panel';
@@ -139,6 +140,9 @@ export class ChatController {
     }
     this.prefs = next;
     void this.ctx.globalState.update(PREFS_KEY, this.prefs);
+    // The context panel is a webview of its own: it doesn't see this wire, so it
+    // gets told separately.
+    if (next.lang !== before.lang) announceLang(next.lang);
 
     if (this.session) {
       if (this.prefs.model !== before.model) void this.session.setModel(this.prefs.model);
@@ -168,8 +172,12 @@ export class ChatController {
     if (!focused && this.primary) setChatBadge(1);
     if (event === 'done' && p.toast && !focused) {
       const cwd = currentCwd();
+      const open = t(p.lang, 'toast.open');
       void vscode.window
-        .showInformationMessage(`Claude has finished · ${cwd.split(/[\\/]/).pop() || cwd}`, 'Open')
+        .showInformationMessage(
+          t(p.lang, 'toast.done', { project: cwd.split(/[\\/]/).pop() || cwd }),
+          open
+        )
         .then((a) => {
           if (a) void vscode.commands.executeCommand('claudeStudio.openTab');
         });
@@ -308,8 +316,12 @@ export class ChatController {
         k: 'ask',
         id: req.id,
         kind,
-        tool: req.tool,
-        title: req.title || `Claude wants to use ${req.displayName || req.tool}`,
+        // The display name, not the bare tool id: the card shows it, and when the
+        // engine hasn't written a title of its own the page builds one around it —
+        // in whichever language the interface is set to. That's why the default
+        // title isn't composed here any more.
+        tool: req.displayName || req.tool,
+        title: req.title || '',
         // Per il piano e per le domande il corpo lo disegna la scheda: qui dentro
         // ci finirebbe solo il JSON dell'input, che non serve a nessuno.
         detail: req.description || (kind === 'tool' ? summarize(req.input) : ''),
@@ -566,7 +578,9 @@ function questionsOf(input: Record<string, unknown>): AskQuestion[] {
 
 function labelOf(answers?: Record<string, string>): string {
   const v = answers ? Object.values(answers).filter(Boolean) : [];
-  return v.length ? v.join(' · ').slice(0, 80) : 'Risposto';
+  // The bare word goes through the page's dictionary (key `label.Answered`): the
+  // extension writes these labels in English and the page says them in yours.
+  return v.length ? v.join(' · ').slice(0, 80) : 'Answered';
 }
 
 function summarize(input: Record<string, unknown>): string {

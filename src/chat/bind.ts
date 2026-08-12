@@ -27,6 +27,7 @@ export function bindWebview(
     motionCss: 'motion.css',
     contextCss: 'context.css',
     chatCss: 'chat.css',
+    i18nJs: 'i18n.js',
     ctxpanelJs: 'ctxpanel.js',
     chimeJs: 'chime.js',
     chatJs: 'chat.js',
