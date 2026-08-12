@@ -141,6 +141,49 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   display: none;
 }
 
+/* ---------- a header that gives way in a stated order ----------
+   A sidebar is often 300px wide. Everything in this row has a fixed width except
+   the pill, so the pill was the only thing that could give — and it gave
+   everything: at 300px it was a dot with no words beside it, which is the same as
+   not being there at all. Now the row gives way in an order, and what goes first
+   is whatever you're least likely to want while Claude is working.
+
+   The three numbers below aren't taste, they're the widths at which the row stops
+   fitting: measured across 330→560px in steps of five (see the header sweep in
+   scripts/ui-check.mjs, which fails if the state ever gets clipped again). */
+@media (max-width: 456px) {
+  .top {
+    gap: 7px;
+    padding: 10px;
+  }
+  /* the switch goes to icons: three shapes and a coloured slider still say which
+     mode you're in, and the words come back the moment the turn ends */
+  .top.busy .modeseg-btn span {
+    display: none;
+  }
+}
+@media (max-width: 410px) {
+  /* History and "open as tab" step aside. Neither is something you reach for in
+     the middle of a turn, both are a keystroke away (Alt+H, Alt+O), and both are
+     back the moment it's done. */
+  .top.busy #btnHistory,
+  .top.busy #btnTab {
+    display: none;
+  }
+}
+@media (max-width: 340px) {
+  /* Narrower than this and the pill would be a dot again. It takes a line of its
+     own instead — still in the header, still one strip, just wrapped. */
+  .top {
+    flex-wrap: wrap;
+    row-gap: 7px;
+  }
+  .top.busy .activity {
+    order: 1;
+    flex: 1 0 100%;
+  }
+}
+
 .chip {
   display: inline-flex;
   align-items: center;

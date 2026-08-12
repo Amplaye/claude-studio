@@ -826,6 +826,45 @@ for (const surface of ['view', 'panel']) {
   await page.close();
 }
 
+// ---- the header at every sidebar width ----
+//
+// The one check the two fixed viewports above cannot make. A sidebar is whatever
+// width you dragged it to, and everything in that row has a fixed size except the
+// activity pill — so the pill was the only thing that could give, and at 300px it
+// gave everything: a dot with no words next to it, which is the same as not being
+// there. The breakpoints in chat.css are the widths where the row stops fitting;
+// this is what says so. If it fails, the numbers there are the thing to move.
+{
+  const bad = [];
+  for (let w = 260; w <= 560; w += 5) {
+    const page = await browser.newPage({ viewport: { width: w, height: 700 }, colorScheme: 'dark' });
+    await page.goto(url);
+    await page.evaluate(() =>
+      window.postMessage({ k: 'hello', cwd: 'C:/x', project: 'x', cliVersion: '1', surface: 'view' }, '*')
+    );
+    await page.evaluate(() => window.postMessage({ k: 'busy', value: true }, '*'));
+    await page.waitForTimeout(140);
+    const r = await page.evaluate(() => {
+      const top = document.querySelector('.top');
+      const pill = document.getElementById('activity');
+      const what = document.getElementById('actWhat');
+      const time = document.getElementById('actTime');
+      return {
+        pill: Math.round(pill.getBoundingClientRect().width),
+        cut: what.scrollWidth > what.clientWidth + 1,
+        time: Math.round(time.getBoundingClientRect().width),
+        overflow: top.scrollWidth - top.clientWidth,
+      };
+    });
+    if (r.cut) bad.push(`${w}px: the state is clipped (pill ${r.pill}px)`);
+    if (r.time < 20) bad.push(`${w}px: the clock has been squeezed away (${r.time}px)`);
+    if (r.overflow > 1) bad.push(`${w}px: the header overflows by ${r.overflow}px`);
+    await page.close();
+  }
+  for (const b of bad.slice(0, 8)) fails.push('[widths] ' + b);
+  if (bad.length > 8) fails.push(`[widths] …and ${bad.length - 8} more`);
+}
+
 await browser.close();
 
 if (fails.length) {
