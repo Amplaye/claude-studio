@@ -475,7 +475,7 @@ for (const surface of ['view', 'panel']) {
       weekReset: 'in 3d',
       branch: 'master',
       dirty: false,
-      totalCost: '$1.20',
+      totalCostUsd: 1.2,
       cards: [
         {
           id: 'aaaa', shortId: 'aaaaaaaa', name: 'This conversation', own: true,
@@ -496,7 +496,7 @@ for (const surface of ['view', 'panel']) {
       btn: getComputedStyle(document.getElementById('btnCtx')).display !== 'none',
       cards: rail.querySelectorAll('.ctxcard').length,
       name: rail.querySelector('.cname')?.textContent,
-      cost: rail.querySelector('.ctxcard .ccost')?.textContent,
+      ccost: !!rail.querySelector('.ctxcard .ccost'),
       // no overlap: the column sits to the right of the thread
       apart: box.width === 0 || box.left >= log.right - 1,
       // the chat classes must not be repainted by the context stylesheet
@@ -509,7 +509,7 @@ for (const surface of ['view', 'panel']) {
   if (wide) {
     t(railed.cards === 1, 'the context column does not draw the sessions: ' + railed.cards);
     t(railed.name === 'This conversation', 'wrong name in the column: ' + railed.name);
-    t(railed.cost === '$0.42', 'the cost of the conversation does not reach the column: ' + railed.cost);
+    t(railed.ccost === false, 'the dollar figure is back in the context column: it must not be shown');
     t(railed.apart, 'the context column overlaps the thread');
     // and it gets out of the way when you ask
     await page.click('#btnCtx');

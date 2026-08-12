@@ -287,10 +287,6 @@ body {
   min-width: 0;
   font-size: 11.5px;
 }
-.ctx .ccost {
-  opacity: 0.9;
-}
-
 .ctx .bar {
   position: relative;
   height: 6px;

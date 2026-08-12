@@ -732,13 +732,15 @@
     // message down with it.
     const chip = $('spend');
     if (!chip) return;
-    if (!spent.tokens && !spent.usd) {
+    if (!spent.tokens) {
       chip.hidden = true;
       return;
     }
     chip.hidden = false;
     $('spendTokens').textContent = fmtTokens(spent.tokens);
-    $('spendCost').textContent = '$' + spent.usd.toFixed(spent.usd < 1 ? 3 : 2);
+    // La cifra in dollari non si mostra: accanto al contesto non aggiungeva nulla.
+    const c = $('spendCost');
+    if (c) c.hidden = true;
   }
 
   /** Futuristic arrow: the tip of Ionicons' "navigate", jet-like. */

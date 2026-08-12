@@ -45,18 +45,6 @@ export function fmtTokens(n: number): string {
   return String(Math.round(n));
 }
 
-/**
- * 0.0.6 collected the cost and threw it away: it wasn't shown anywhere. Here it is
- * shown, so it needs writing. Below a cent we go to three decimals, otherwise every
- * short conversation would look like it costs "$0.00".
- */
-export function fmtCost(usd: number): string {
-  if (!usd) return '$0';
-  if (usd < 0.01) return '$' + usd.toFixed(3);
-  if (usd < 10) return '$' + usd.toFixed(2);
-  return '$' + Math.round(usd);
-}
-
 /** "1M", "200k": the context window, written short. */
 export function fmtLimit(n: number): string {
   return n >= 1e6 ? n / 1e6 + 'M' : Math.round(n / 1000) + 'k';

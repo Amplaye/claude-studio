@@ -10,7 +10,7 @@ import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
 import * as vscode from 'vscode';
 import { workspaceRoot } from '../chat/editor';
-import { fmtAgo, fmtClock, fmtCost, fmtLimit, fmtReset, fmtTokens } from './format';
+import { fmtAgo, fmtClock, fmtLimit, fmtReset, fmtTokens } from './format';
 import {
   activeClaudeTab,
   claudeTabs,
@@ -170,8 +170,12 @@ export class ContextMonitor {
     // La nostra: niente da indovinare, la conversazione l'ha aperta questa estensione.
     if (mine?.id) {
       const scan = scanTranscript(transcriptPath(mine.cwd || cwd, mine.id));
-      // I numeri del motore arrivano prima di quelli del disco: si preferiscono.
-      const tokens = mine.tokens || scan.usedTokens;
+      // I numeri del motore arrivano prima di quelli del disco: si preferiscono,
+      // ma solo se sono plausibili. Il contesto non puo' superare la finestra: se
+      // succede, quel numero e' una somma di piu' chiamate e non una misura del
+      // contesto, e allora vince il transcript, che si legge per singola chiamata.
+      const fresh = mine.tokens;
+      const tokens = fresh && fresh <= limit ? fresh : scan.usedTokens || fresh || 0;
       const cost = mine.costUsd || scan.costUsd;
       rows.push({
         mtimeMs: mine.updatedAt,
@@ -185,7 +189,7 @@ export class ContextMonitor {
           preview: mine.title,
           pct: tokens ? Math.round((tokens * 100) / limit) : null,
           tokens: fmtTokens(tokens),
-          cost: fmtCost(cost),
+          costUsd: cost,
           lastClock: fmtClock(mine.updatedAt),
           lastAgo: fmtAgo(mine.updatedAt, now),
           busy: mine.busy,
@@ -211,7 +215,7 @@ export class ContextMonitor {
           preview: scan.prompt,
           pct: scan.usedTokens ? Math.round((scan.usedTokens * 100) / limit) : null,
           tokens: fmtTokens(scan.usedTokens),
-          cost: fmtCost(scan.costUsd),
+          costUsd: scan.costUsd,
           lastClock: fmtClock(s.mtimeMs),
           lastAgo: fmtAgo(s.mtimeMs, now),
           busy: idle < BUSY_MS,
@@ -241,7 +245,7 @@ export class ContextMonitor {
       cards: rows.map((r) => r.card),
       branch: g?.branch ?? '',
       dirty: g?.dirty ?? false,
-      totalCost: fmtCost(rows.reduce((sum, r) => sum + r.costUsd, 0)),
+      totalCostUsd: rows.reduce((sum, r) => sum + r.costUsd, 0),
     };
   }
 
@@ -409,7 +413,7 @@ function tooltip(d: CtxData, f: CtxCard | null): vscode.MarkdownString {
     .map(
       (c) =>
         `- ${c.focused ? '**▶**' : '&nbsp;&nbsp;&nbsp;'} **${c.pct === null ? '—' : c.pct + '%'}** ` +
-        `(${c.tokens} · ${c.cost}) — ${c.name.slice(0, 50)}${c.own ? ' _· Studio_' : ''}` +
+        `(${c.tokens}) — ${c.name.slice(0, 50)}${c.own ? ' _· Studio_' : ''}` +
         `${c.busy ? ' _· active now_' : ''}`
     )
     .join('\n');
@@ -425,7 +429,6 @@ function tooltip(d: CtxData, f: CtxCard | null): vscode.MarkdownString {
         : `\n- Account usage: _(${d.usageWait})_\n`) +
       `\n- Project: **${d.project}**\n` +
       (d.branch ? `- Branch: **${d.branch}${d.dirty ? ' (changes)' : ''}**\n` : '') +
-      `- Spent in total: **${d.totalCost}**\n` +
       `\n\nClick to open the context panel.`
   );
 }

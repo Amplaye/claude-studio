@@ -259,9 +259,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   t(c1?.preview === 'Fix the CRM reminders', 'the first prompt was not read: ' + c1?.preview);
   t(c1?.tokens === '250k', 'the context is not the one from the last message: ' + c1?.tokens);
   t(c1?.pct === 25, 'the percentage does not add up: ' + c1?.pct);
-  // the dollar at the top of the file, the one 0.0.6 lost
-  t(c1?.cost === '$3.00', 'the cost is not summed over the whole transcript: ' + c1?.cost);
-  t(d1?.totalCost === '$3.00', 'the total is not shown: ' + d1?.totalCost);
+  // Il costo non si mostra piu', ma va ancora sommato correttamente: si controlla
+  // il dato grezzo invece della stringa formattata.
+  t(c1?.costUsd === 3, 'the cost is not summed over the whole transcript: ' + c1?.costUsd);
+  t(d1?.totalCostUsd === 3, 'the total is not summed: ' + d1?.totalCostUsd);
   t(d1?.project === 'project', 'wrong project: ' + d1?.project);
   t(d1?.limit === '1M', 'the limit is not written in short form: ' + d1?.limit);
   t(d1?.usage === null && /loading|API limit/.test(d1?.usageWait || ''), 'the state of the account numbers is wrong');
@@ -274,7 +275,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   registered.commands.get('claudeStudio.context.refresh')();
   await wait(50);
   const d2 = lastData();
-  t(d2?.cards?.[0]?.cost === '$3.50', 'the new tail is not added to what was already read: ' + d2?.cards?.[0]?.cost);
+  t(d2?.cards?.[0]?.costUsd === 3.5, 'the new tail is not added to what was already read: ' + d2?.cards?.[0]?.costUsd);
   t(d2?.cards?.[0]?.tokens === '300k', 'the context does not follow the last message: ' + d2?.cards?.[0]?.tokens);
   t(fs.statSync(transcript).size > grewFrom, 'the test did not actually grow the file');
 
@@ -287,7 +288,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(50);
   const d3 = lastData();
   t(d3?.cards?.[0]?.tokens === '300k', 'the sub-agent context covered the real one: ' + d3?.cards?.[0]?.tokens);
-  t(d3?.cards?.[0]?.cost === '$3.75', 'the sub-agent cost is not counted: ' + d3?.cards?.[0]?.cost);
+  t(d3?.cards?.[0]?.costUsd === 3.75, 'the sub-agent cost is not counted: ' + d3?.cards?.[0]?.costUsd);
 
   // ---- the status bar ----
   // The project name moved into the tooltip: the bar holds the numbers.

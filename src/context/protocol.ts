@@ -15,7 +15,11 @@ export interface CtxCard {
   /** Percentage of context used, or null if we don't know yet. */
   pct: number | null;
   tokens: string;
-  cost: string;
+  /**
+   * Costo in dollari, tenuto come dato ma non mostrato: nel pannello non serve
+   * e faceva solo rumore accanto alla percentuale di contesto.
+   */
+  costUsd: number;
   lastClock: string;
   lastAgo: string;
   busy: boolean;
@@ -34,8 +38,8 @@ export interface CtxData {
   cards: CtxCard[];
   branch: string;
   dirty: boolean;
-  /** Sum of the costs of the live conversations: the number 0.0.6 threw away. */
-  totalCost: string;
+  /** Somma dei costi delle conversazioni vive. Dato interno, non mostrato. */
+  totalCostUsd: number;
 }
 
 /** Extension -> panel. */

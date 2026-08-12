@@ -126,8 +126,7 @@ window.CtxPanel = (() => {
       const pct = el('span', 'cpct');
       const nums = el('span', 'cnums');
       const tok = el('span', 'ctok');
-      const cost = el('span', 'ccost');
-      nums.append(tok, cost);
+      nums.append(tok);
       row.append(pct, nums);
 
       const bar = makeBar();
@@ -139,7 +138,7 @@ window.CtxPanel = (() => {
       };
       c.onclick = () => post({ cmd: 'focus', id });
 
-      c._p = { dot, kind, name, badge, pill, sub, pct, tok, cost, fill: bar.firstChild };
+      c._p = { dot, kind, name, badge, pill, sub, pct, tok, fill: bar.firstChild };
       return c;
     }
 
@@ -175,7 +174,6 @@ window.CtxPanel = (() => {
 
       p.pct.textContent = s.pct == null ? '—' : s.pct + '%';
       p.tok.textContent = s.tokens + ' / ' + limit;
-      p.cost.textContent = s.cost;
       paintBar(p.fill, s.pct);
     }
 

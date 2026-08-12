@@ -4,7 +4,7 @@
 //    scroll jumps under your finger on every tick);
 //  - the focused card says how sure the match is ("estimated", "last active")
 //    instead of pretending to know;
-//  - the cost shows up — in 0.0.6 it was collected and thrown away;
+//  - the dollar figure is NOT shown: it was taken out on purpose;
 //  - clicks and renames really do travel to the extension.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
@@ -22,7 +22,7 @@ const card = (over = {}) => ({
   preview: 'Carry on with phase 3',
   pct: 18,
   tokens: '182.0k',
-  cost: '$0.42',
+  costUsd: 0.42,
   lastClock: '09:41',
   lastAgo: 'just now',
   busy: true,
@@ -42,7 +42,7 @@ const data = (over = {}) => ({
   cards: [card()],
   branch: 'master',
   dirty: true,
-  totalCost: '$1.20',
+  totalCostUsd: 1.2,
   ...over,
 });
 
@@ -80,7 +80,7 @@ for (const width of [320, 620]) {
       name: document.querySelector('.cname')?.textContent,
       pct: document.querySelector('.cpct')?.textContent,
       tok: document.querySelector('.ctok')?.textContent,
-      cost: document.querySelector('.ccost')?.textContent,
+      ccost: !!document.querySelector('.ccost'),
       pill: document.querySelector('.tabpill')?.textContent,
       sub: document.querySelector('.csub')?.textContent,
       badge: !document.querySelector('.badge')?.hidden,
@@ -97,7 +97,7 @@ for (const width of [320, 620]) {
   t(/Phase 3/.test(first.name || ''), 'the card name is missing: ' + first.name);
   t(first.pct === '18%', 'the percentage is missing: ' + first.pct);
   t(first.tok === '182.0k / 1M', 'the tokens are not written against the limit: ' + first.tok);
-  t(first.cost === '$0.42', 'the cost of the conversation does not show: ' + first.cost);
+  t(first.ccost === false, 'the dollar figure is back in the card: it must not be shown');
   t(first.pill === 'Studio', 'the pill does not say where the session comes from: ' + first.pill);
   t(first.badge && first.focused, 'the focused session is not marked');
   t(first.own, 'the card for our own chat is not recognised as ours');
@@ -110,7 +110,7 @@ for (const width of [320, 620]) {
   // ---- second round: same session, new numbers ----
   await post(
     data({
-      cards: [card({ pct: 64, tokens: '640.0k', cost: '$0.90', busy: false, lastAgo: '2 min ago' })],
+      cards: [card({ pct: 64, tokens: '640.0k', costUsd: 0.9, busy: false, lastAgo: '2 min ago' })],
       focusHow: 'position',
     })
   );
@@ -146,8 +146,8 @@ for (const width of [320, 620]) {
     data({
       focusHow: 'tab',
       cards: [
-        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'CRM — reminder', own: false, tabName: 'crm-e6', pct: 91, tokens: '910.0k', cost: '$3.10', busy: false, focused: true }),
-        card({ focused: false, pct: 64, tokens: '640.0k', cost: '$0.90', busy: false }),
+        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'CRM — reminder', own: false, tabName: 'crm-e6', pct: 91, tokens: '910.0k', costUsd: 3.1, busy: false, focused: true }),
+        card({ focused: false, pct: 64, tokens: '640.0k', costUsd: 0.9, busy: false }),
       ],
     })
   );

@@ -355,7 +355,7 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   t(ctxData?.focusHow === 'studio', 'the match for our own chat goes through the heuristic: ' + ctxData?.focusHow);
   t(!!mine?.focused, 'the conversation the chat opened is not the one you are in');
   t(/\d/.test(mine?.tokens || ''), 'the chat card does not report the context: ' + mine?.tokens);
-  t(/^\$/.test(mine?.cost || ''), 'the chat card does not report the cost: ' + mine?.cost);
+  t(typeof mine?.costUsd === 'number', 'the chat card does not carry the cost as a number: ' + mine?.costUsd);
   t(
     /studio-chat/.test(ctxStatus) && /ctx \d/.test(ctxStatus),
     'the status bar does not tell the story of the chat conversation: ' + ctxStatus

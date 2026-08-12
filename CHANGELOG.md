@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1
+
+- **Fixed the token count on sessions.** The percentage could go past 100% —
+  241% on a 1M window — because the count came from the `result` message, whose
+  usage is cumulative over the whole turn: every API call re-reads the cache, so
+  a turn with ten tool calls added up its cached tokens ten times. The context is
+  now measured on the last API call, which is what actually occupies the window.
+- **Removed the dollar figure** from the context panel, from the chat and from
+  the status bar tooltip: next to the context percentage it was only noise.
+
 ## 0.5.0
 
 First public release.

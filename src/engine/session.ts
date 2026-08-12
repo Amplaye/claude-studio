@@ -83,6 +83,17 @@ export class Session {
   private acc = new Map<string, { id: string; kind: 'text' | 'thinking'; text: string }>();
   /** Messaggi che hanno prodotto almeno un blocco in streaming. */
   private streamed = new Set<string>();
+  /**
+   * Quanto contesto occupa l'ultima chiamata API del filo principale.
+   *
+   * NON si puo' usare l'usage del messaggio 'result': quello e' cumulativo su
+   * tutto il turno, e siccome ogni chiamata API rilegge la cache i
+   * cache_read_input_tokens si sommano ad ogni tool-use. Un turno con dieci
+   * round trip arrivava a dichiarare milioni di token su una finestra da 1M,
+   * da cui le percentuali sopra il 100%. L'usage dei singoli messaggi
+   * assistant, invece, e' per chiamata: e' quello che misura il contesto.
+   */
+  private ctxTokens = 0;
 
   sessionId?: string;
   model = '';
@@ -331,9 +342,21 @@ export class Session {
         this.onStreamEvent(m.event as any, m.parent_tool_use_id ?? null);
         return;
 
-      case 'assistant':
+      case 'assistant': {
+        // Solo il filo principale: un sub-agente ha una finestra sua, e prenderla
+        // per buona farebbe crollare la percentuale del discorso principale.
+        const u: any = (m as any).message?.usage;
+        if (u && !m.parent_tool_use_id) {
+          const n =
+            (u.input_tokens ?? 0) +
+            (u.cache_read_input_tokens ?? 0) +
+            (u.cache_creation_input_tokens ?? 0) +
+            (u.output_tokens ?? 0);
+          if (n > 0) this.ctxTokens = n;
+        }
         this.onAssistant(m.message.id, m.message.content as any[], m.parent_tool_use_id ?? null);
         return;
+      }
 
       case 'user':
         this.onToolResults(m.message.content as any);
@@ -343,17 +366,13 @@ export class Session {
         this.acc.clear();
         this.msgOf.clear();
         const ok = m.subtype === 'success';
-        const u: any = (m as any).usage ?? {};
         this.o.emit({
           k: 'turn_end',
           ok,
           costUsd: (m as any).total_cost_usd ?? 0,
           durationMs: (m as any).duration_ms ?? 0,
-          tokens:
-            (u.input_tokens ?? 0) +
-            (u.cache_read_input_tokens ?? 0) +
-            (u.cache_creation_input_tokens ?? 0) +
-            (u.output_tokens ?? 0),
+          // Contesto occupato dall'ultima chiamata, non la somma del turno.
+          tokens: this.ctxTokens,
         });
         if (!ok && (m as any).subtype !== 'success') {
           const msg = (m as any).result;
