@@ -56,17 +56,28 @@ console.log(`  estensione già presente sul publisher: ${esiste ? 'sì → updat
 const fileInput = () => page.locator('input[type=file]');
 
 if (esiste) {
-  // menu contestuale della riga → Update
-  const more = page
-    .locator('[aria-label*="More" i], [title*="More" i], button:has-text("...")')
-    .or(page.locator('.ms-Button--icon, [data-icon-name=More], [class*=contextMenu]'))
+  // Menu contestuale della riga → Update.
+  //
+  // Il portale e' una DetailsList di Fluent: i tre puntini sono un
+  // `button.vss-ContextualMenuButton` con aria-label "More Actions...", dentro la
+  // prima cella, e hanno tabindex -1 (si raggiungono con le frecce, non col tab).
+  // La versione precedente cercava un generico [aria-label*=More] e non trovava
+  // niente: il menu non si apriva, il dialogo non compariva, e il setInputFiles
+  // finiva su un input file di servizio che non porta da nessuna parte — upload
+  // "avviato" e mai avvenuto.
+  const row = page.locator('[role=row]').filter({ hasText: /Claude Studio/i }).last();
+  const more = row
+    .locator('button.vss-ContextualMenuButton, button[aria-label*="More Actions" i], button[aria-label*="More" i]')
     .first();
-  await more.click({ timeout: 10000 }).catch((e) => console.log('  menu "..." non cliccabile: ' + e.message.split('\n')[0]));
+  await more.click({ timeout: 10000, force: true }).catch((e) =>
+    console.log('  menu "..." non cliccabile: ' + e.message.split('\n')[0])
+  );
   await page.waitForTimeout(2000);
-  await page
-    .locator('[role=menuitem], li, button, div')
-    .filter({ hasText: /^Update$/i })
-    .last()
+  const voce = page
+    .locator('.ms-ContextualMenu-link, [role=menuitem], button.ms-ContextualMenu-link')
+    .filter({ hasText: /^\s*Update\s*$/i })
+    .first();
+  await voce
     .click({ timeout: 8000 })
     .catch((e) => console.log('  voce "Update" non trovata: ' + e.message.split('\n')[0]));
   await page.waitForTimeout(3000);
