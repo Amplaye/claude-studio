@@ -59,6 +59,41 @@
   }
 }
 
+/* A light going round a border.
+   You can't spin a border, and spinning the element that draws one spins its
+   mask along with it — the trick is to leave the box still and turn only the
+   angle the gradient starts from. That needs the angle to be a real animatable
+   value, which is what @property gives us. */
+@property --cs-ang {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes cs-orbit {
+  to {
+    --cs-ang: 360deg;
+  }
+}
+
+/* Sonnet: the ink that swirls. Slower than Opus's ring and going the other way,
+   so the two cards can't be mistaken for one another at a glance. */
+@keyframes cs-orbit-back {
+  to {
+    --cs-ang: -360deg;
+  }
+}
+@keyframes cs-nebula {
+  0%,
+  100% {
+    transform: translate3d(-6%, -4%, 0) scale(1.05);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate3d(6%, 4%, 0) scale(1.25);
+    opacity: 0.75;
+  }
+}
+
 /* ---- the model cards ----
    Three pieces that stack up as the model moves up a tier: the flash that
    sweeps across, the floating, the halo that breathes. */
@@ -233,6 +268,18 @@
   0%,
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+/* The dot on the activity strip: the same heartbeat as the context panel's, in
+   the brand colour instead of green. */
+@keyframes cs-ping-warm {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--claude-1) 55%, transparent);
   }
   60% {
     box-shadow: 0 0 0 5px transparent;
@@ -550,6 +597,7 @@
    pulsing out of sight heat up the laptop for nothing. */
 .offscreen .thinking-halo::before,
 .offscreen .thinking-ring,
+.offscreen .think.live::before,
 .offscreen .tool-bar::after,
 .offscreen .tool-ico,
 .offscreen .perm-ico,

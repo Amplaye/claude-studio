@@ -1,8 +1,8 @@
 {
   "name": "claude-studio",
   "displayName": "Claude Studio",
-  "description": "Claude Code inside VS Code: chat, one-click permissions, and your remaining context always in sight.",
-  "version": "0.5.1",
+  "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions and your context always in sight.",
+  "version": "0.6.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -20,7 +20,11 @@
     "claude code",
     "anthropic",
     "ai",
-    "chat"
+    "chat",
+    "agent",
+    "copilot alternative",
+    "diff",
+    "permissions"
   ],
   "galleryBanner": {
     "color": "#1a1614",

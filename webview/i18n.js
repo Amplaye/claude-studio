@@ -121,6 +121,22 @@
     'msg.item': '1 item',
     'msg.items': '{n} items',
 
+    // ---- what it's doing right now (the strip above the writing field) ----
+    'act.working': 'Working…',
+    'act.thinking': 'Thinking…',
+    'act.reasoning': 'Reasoning…',
+    'act.writing': 'Writing the answer…',
+    'act.tool': '{tool} · {what}',
+    'act.asking': 'Waiting for your answer',
+    'act.step': '1 step',
+    'act.steps': '{n} steps',
+    'act.quiet': 'still on it · {n}s with no news',
+
+    // ---- the line that closes a turn ----
+    'recap.done': 'Done',
+    'recap.stopped': 'Stopped',
+    'recap.context': '{n} context',
+
     // ---- permissions ----
     'perm.title': 'Your permission is needed',
     'perm.wants': 'Claude wants to use {tool}',
@@ -132,6 +148,8 @@
     'perm.alwaysHint': "The rule stays written in the project's permissions (.claude/settings.local.json).",
     'perm.deny': 'Deny',
     'perm.send': 'Send',
+    'perm.orWrite': 'or write your own answer…',
+    'perm.alsoWrite': 'and/or write your own answer…',
 
     // Labels the extension sends back once a card is answered. They arrive already
     // written, and get looked up here so the card reads in your language too.
@@ -296,6 +314,20 @@
     'msg.item': '1 voce',
     'msg.items': '{n} voci',
 
+    'act.working': 'Al lavoro…',
+    'act.thinking': 'Sta pensando…',
+    'act.reasoning': 'Sta ragionando…',
+    'act.writing': 'Sta scrivendo la risposta…',
+    'act.tool': '{tool} · {what}',
+    'act.asking': 'Aspetta la tua risposta',
+    'act.step': '1 passo',
+    'act.steps': '{n} passi',
+    'act.quiet': 'ci sta ancora lavorando · {n}s senza novità',
+
+    'recap.done': 'Fatto',
+    'recap.stopped': 'Interrotto',
+    'recap.context': '{n} di contesto',
+
     'perm.title': 'Serve il tuo permesso',
     'perm.wants': 'Claude vuole usare {tool}',
     'perm.approve': 'Approva ed esegui',
@@ -306,6 +338,8 @@
     'perm.alwaysHint': 'La regola resta scritta nei permessi del progetto (.claude/settings.local.json).',
     'perm.deny': 'Nega',
     'perm.send': 'Manda',
+    'perm.orWrite': 'oppure scrivi la tua risposta…',
+    'perm.alsoWrite': 'e/o scrivi la tua risposta…',
 
     'label.Allowed': 'Consentito',
     'label.Always allowed': 'Consentito sempre',

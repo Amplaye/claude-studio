@@ -125,15 +125,26 @@
 
         <main class="log" id="log"></main>
 
+        <!-- What it's doing right now. It sits above the writing field so it's
+             always in sight, and the clock ticks every second: a chat that stays
+             still for a minute while a tool works looks stuck otherwise. -->
+        <div class="activity" id="activity" hidden>
+          <span class="act-orb"></span>
+          <span class="act-what" id="actWhat"></span>
+          <span class="act-steps" id="actSteps" hidden></span>
+          <span class="act-time" id="actTime">0:00</span>
+        </div>
+
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
           <div class="attach" id="attach" hidden></div>
           <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
           <!-- Not a submit button: while Claude is working this is Stop, and Enter
                must stay Enter — it queues the next message instead of interrupting. -->
-          <button class="send" id="send" type="button" title="Send">
-            <svg class="ico send-arrow"><use href="#ion-navigate" /></svg>
-          </button>
+          <!-- The arrow is drawn by the JS (chat.js, sendArrow): built symmetrical
+               inside its box, so it sits in the middle of the button by
+               construction instead of being nudged there. -->
+          <button class="send" id="send" type="button" title="Send"></button>
         </form>
       </div>
 

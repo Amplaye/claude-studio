@@ -230,10 +230,14 @@
     let b = blocks.get(id);
     if (b) return b;
     const node = document.createElement('details');
-    node.className = 'msg think';
+    // `live` is what makes the light run around the border: it's on while the
+    // reasoning is still arriving and goes off the moment the block is closed.
+    // A dashed border said "this is a draft"; a light going round says "it's
+    // thinking right now", which is the thing you actually want to know.
+    node.className = 'msg think live';
     node.open = false;
     const sum = el('summary');
-    sum.append(icon('bulb'), el('span', null, t('msg.reasoning')));
+    sum.append(icon('bulb'), el('span', 'think-label', t('msg.reasoning')), el('span', 'grow'), icon('chevron-down', 'chev'));
     const body = el('div', 'body');
     const caret = el('span', 'caret');
     body.appendChild(caret);
@@ -260,32 +264,182 @@
     b.raw = text;
     if (kind === 'thinking') {
       b.body.replaceChildren(document.createTextNode(text));
+      b.node.classList.remove('live'); // it has finished thinking: the light stops
     } else {
       b.body.replaceChildren(...markdown(text));
+      b.node.classList.add('done');
     }
     b.caret = null;
     toBottom();
   }
 
-  /** Minimal, safe markdown: ``` blocks and `code`. No innerHTML. */
+  /* ---------- markdown ----------
+     What Claude writes at the end of a turn is a recap: headings, lists, a table
+     now and then. Rendering only the code fences left all the rest on screen as
+     it was typed — "## What I changed" with the hashes still on, bullets as bare
+     hyphens — which reads like a log file, not like an answer.
+     Everything here is built as nodes, never as innerHTML: the same house rule as
+     the rest of the page, so a stray "<" in a diff can't become markup. */
+
+  const RX = {
+    fence: /^\s{0,3}```+\s*([\w+#.-]*)\s*$/,
+    head: /^\s{0,3}(#{1,6})\s+(.*)$/,
+    rule: /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/,
+    quote: /^\s{0,3}>\s?(.*)$/,
+    ul: /^(\s*)[-*+]\s+(.*)$/,
+    ol: /^(\s*)(\d{1,3})[.)]\s+(.*)$/,
+    row: /^\s*\|(.+)\|\s*$/,
+    split: /^\s*\|?[\s:|-]+\|[\s:|-]*$/,
+  };
+
+  /** Bold, italic, code, strike, links. What it doesn't know stays as typed. */
+  const INLINE = /\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|~~([^~\n]+)~~|\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+
+  function inline(text, into) {
+    const box = into || document.createDocumentFragment();
+    let last = 0;
+    for (const m of String(text).matchAll(INLINE)) {
+      if (m.index > last) box.append(document.createTextNode(text.slice(last, m.index)));
+      if (m[1] != null) box.append(el('strong', null, m[1]));
+      else if (m[2] != null) box.append(el('em', null, m[2]));
+      else if (m[3] != null) box.append(el('code', null, m[3]));
+      else if (m[4] != null) box.append(el('s', null, m[4]));
+      else if (/^https?:\/\//i.test(m[6])) {
+        // Only real web links become links: a "(see below)" must not turn into
+        // something clickable that goes nowhere.
+        const a = el('a', 'mdlink', m[5]);
+        a.href = m[6];
+        a.title = m[6];
+        box.append(a);
+      } else {
+        box.append(document.createTextNode(m[0]));
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) box.append(document.createTextNode(text.slice(last)));
+    return box;
+  }
+
+  function codeBlock(lang, body) {
+    const wrap = el('div', 'code-wrap');
+    if (lang) wrap.append(el('span', 'code-lang', lang));
+    const pre = el('pre');
+    pre.appendChild(el('code', null, body.replace(/\n+$/, '')));
+    wrap.append(pre);
+    return wrap;
+  }
+
+  function tableBlock(rows) {
+    const cells = (r) =>
+      r.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
+    const table = el('table', 'md-table');
+    const thead = el('thead');
+    const hrow = el('tr');
+    for (const c of cells(rows[0])) hrow.append(inline(c, el('th')));
+    thead.append(hrow);
+    const body = el('tbody');
+    for (const r of rows.slice(2)) {
+      const tr = el('tr');
+      for (const c of cells(r)) tr.append(inline(c, el('td')));
+      body.append(tr);
+    }
+    table.append(thead, body);
+    return table;
+  }
+
   function markdown(src) {
     const out = [];
-    const parts = String(src).split(/```/);
-    parts.forEach((part, i) => {
-      if (i % 2 === 1) {
-        const nl = part.indexOf('\n');
-        const body = nl >= 0 ? part.slice(nl + 1) : part;
-        const pre = el('pre');
-        pre.appendChild(el('code', null, body.replace(/\n$/, '')));
-        out.push(pre);
-      } else {
-        const seg = part.split(/`([^`\n]+)`/);
-        seg.forEach((s, j) => {
-          if (!s) return;
-          out.push(j % 2 === 1 ? el('code', null, s) : document.createTextNode(s));
-        });
+    const lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // ``` code ```
+      const fence = line.match(RX.fence);
+      if (fence) {
+        const body = [];
+        i++;
+        while (i < lines.length && !RX.fence.test(lines[i])) body.push(lines[i++]);
+        i++; // the closing fence — or the end of the text, same thing
+        out.push(codeBlock(fence[1], body.join('\n')));
+        continue;
       }
-    });
+
+      if (!line.trim()) {
+        i++;
+        continue;
+      }
+
+      // ### heading
+      const head = line.match(RX.head);
+      if (head) {
+        const level = Math.min(4, head[1].length);
+        out.push(inline(head[2].trim(), el('div', 'md-h md-h' + level)));
+        i++;
+        continue;
+      }
+
+      // ---
+      if (RX.rule.test(line)) {
+        out.push(el('div', 'md-rule'));
+        i++;
+        continue;
+      }
+
+      // > quote
+      if (RX.quote.test(line)) {
+        const said = [];
+        while (i < lines.length && RX.quote.test(lines[i])) said.push(lines[i++].match(RX.quote)[1]);
+        out.push(inline(said.join('\n'), el('blockquote', 'md-quote')));
+        continue;
+      }
+
+      // | a | b |
+      if (RX.row.test(line) && RX.split.test(lines[i + 1] || '')) {
+        const rows = [];
+        while (i < lines.length && RX.row.test(lines[i])) rows.push(lines[i++]);
+        out.push(tableBlock(rows));
+        continue;
+      }
+
+      // - list, 1. list
+      if (RX.ul.test(line) || RX.ol.test(line)) {
+        const ordered = RX.ol.test(line);
+        const list = el(ordered ? 'ol' : 'ul', 'md-list');
+        while (i < lines.length) {
+          const m = lines[i].match(ordered ? RX.ol : RX.ul);
+          if (!m) {
+            // An indented line with no bullet belongs to the item above it.
+            if (/^\s{2,}\S/.test(lines[i]) && list.lastChild) {
+              list.lastChild.append(document.createTextNode(' '), inline(lines[i].trim()));
+              i++;
+              continue;
+            }
+            break;
+          }
+          const li = el('li');
+          if (m[1] && m[1].length >= 2) li.className = 'sub'; // one level of nesting is plenty
+          li.append(inline(ordered ? m[3] : m[2]));
+          list.append(li);
+          i++;
+        }
+        out.push(list);
+        continue;
+      }
+
+      // a plain paragraph: up to the empty line, or to the next block
+      const para = [];
+      while (i < lines.length && lines[i].trim()) {
+        const l = lines[i];
+        if (RX.fence.test(l) || RX.head.test(l) || RX.rule.test(l) || RX.quote.test(l)) break;
+        if (RX.ul.test(l) || RX.ol.test(l)) break;
+        para.push(l.trim());
+        i++;
+      }
+      if (para.length) out.push(inline(para.join('\n'), el('p', 'md-p')));
+    }
+
     return out.length ? out : [document.createTextNode('')];
   }
 
@@ -360,20 +514,24 @@
     head.append(ic, el('span', 'name', name), arg, icon('chevron-down', 'chev'));
     sum.append(head, el('div', 'tool-bar'));
 
+    // Nothing opens by itself. A diff that unfolds on its own pushes the message
+    // you were reading off the screen, and three of them in a row turn the
+    // conversation into a wall of code you never asked to see. The card says
+    // what it holds; opening it is your call.
     const body = el('div', 'body');
     const diff = DIFF_TOOLS[name] ? diffBody(name, i) : null;
     if (diff) {
       body.append(diff);
-      node.open = true;
     } else if (name === 'TodoWrite') {
       body.append(todoBody(i));
-      node.open = true;
     } else if (name === 'Task' || name === 'Agent') {
       if (i.prompt) body.append(el('div', 'prompt', String(i.prompt).slice(0, 600)));
       node._kids = el('div', 'kids');
       body.append(node._kids);
-      node.open = true;
     }
+    // Closed isn't empty: a card with a diff inside has to keep its arrow, or the
+    // change becomes something you can't get to.
+    node._full = body.childElementCount > 0;
 
     node.append(sum, body);
     node._ico = ic;
@@ -411,7 +569,6 @@
       // the result is a note at the bottom, not the main content.
       if (node._kids) node._body.append(el('div', 'sub-result', res.slice(0, 2000)));
       else node._body.append(out);
-      if (!node._touched && !node.open) node.open = lines.length <= 12;
       const n = node.querySelector('.count');
       if (n) n.remove();
       if (lines.length > 12) {
@@ -420,7 +577,7 @@
           node.querySelector('.chev')
         );
       }
-    } else if (!node._touched && !node._kids && !node.open) {
+    } else if (!node._full && !node.open) {
       node.classList.add('bare'); // nothing to open: drop the arrow
     }
     toBottom();
@@ -436,7 +593,15 @@
     return b;
   }
 
-  /** Multiple-choice questions: one answer per question, then you send. */
+  /**
+   * Multiple-choice questions: one answer per question, then you send.
+   *
+   * Every question also gets a line to write on. What gets offered is what Claude
+   * imagined the answer might be, and often the answer is something else: without
+   * somewhere to write it you either pick the least wrong option or you cancel the
+   * card and explain yourself in the next message. What you write counts exactly
+   * like an option — on a multiple choice it adds to the ones you ticked.
+   */
   function questionBody(node, m, send) {
     const answers = {};
     const box = el('div', 'qs');
@@ -455,6 +620,25 @@
       group.append(head);
 
       const opts = el('div', 'opts');
+
+      // the line you write on, built first so the buttons can talk to it
+      const own = el('div', 'own');
+      const field = document.createElement('input');
+      field.type = 'text';
+      field.className = 'own-input';
+      field.placeholder = q.multiSelect ? t('perm.alsoWrite') : t('perm.orWrite');
+      own.append(icon('pencil', 'own-ico'), field);
+
+      const collect = () => {
+        const picked = [...opts.querySelectorAll('.opt.on .opt-label')].map((n) => n.textContent);
+        const typed = field.value.trim();
+        if (typed) picked.push(typed);
+        own.classList.toggle('on', !!typed);
+        if (picked.length) answers[q.question] = picked.join(', ');
+        else delete answers[q.question];
+        check();
+      };
+
       for (const o of q.options) {
         const b = el('button', 'opt');
         b.type = 'button';
@@ -463,19 +647,32 @@
         b.addEventListener('click', () => {
           if (q.multiSelect) {
             b.classList.toggle('on');
-            const picked = [...opts.querySelectorAll('.opt.on .opt-label')].map((n) => n.textContent);
-            answers[q.question] = picked.join(', ');
-            if (!picked.length) delete answers[q.question];
           } else {
             for (const other of opts.querySelectorAll('.opt.on')) other.classList.remove('on');
             b.classList.add('on');
-            answers[q.question] = o.label;
+            // One answer means one: choosing a card puts down what you'd written.
+            field.value = '';
           }
-          check();
+          collect();
         });
         opts.append(b);
       }
-      group.append(opts);
+
+      field.addEventListener('input', () => {
+        // Same rule the other way round: on a single choice, writing wins.
+        if (!q.multiSelect && field.value.trim()) {
+          for (const other of opts.querySelectorAll('.opt.on')) other.classList.remove('on');
+        }
+        collect();
+      });
+      // Enter in the field sends, if every question has an answer by then.
+      field.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        if (!go.disabled) go.click();
+      });
+
+      group.append(opts, own);
       box.append(group);
     }
 
@@ -558,8 +755,18 @@
     );
     if (acts) acts.replaceWith(verdict);
     else node.append(verdict);
+    // Once it's answered only what you chose stays: the options you didn't take
+    // and the empty writing line have nothing left to say.
     for (const opts of node.querySelectorAll('.opts')) {
       for (const b of opts.querySelectorAll('.opt:not(.on)')) b.remove();
+    }
+    for (const own of node.querySelectorAll('.own')) {
+      const field = own.querySelector('.own-input');
+      if (own.classList.contains('on') && field) {
+        own.replaceChildren(icon('pencil', 'own-ico'), el('span', 'own-said', field.value.trim()));
+      } else {
+        own.remove();
+      }
     }
     toBottom();
   }
@@ -742,9 +949,129 @@
     if (c) c.hidden = true;
   }
 
-  /** Futuristic arrow: the tip of Ionicons' "navigate", jet-like. */
+  /**
+   * The line that closes a turn: it went well or it didn't, how long it took,
+   * how many steps, how much context it's carrying now. Four facts on one line —
+   * the answer above says what was done, this says what it cost.
+   */
+  function turnRecap(m) {
+    const node = el('div', 'msg recap' + (m.ok === false ? ' bad' : ''));
+    node.append(m.ok === false ? icon('alert-circle', 'recap-ico') : drawnCheck('recap-ico'));
+    const chips = el('div', 'recap-chips');
+    const chip = (text, cls) => chips.append(el('span', 'recap-chip' + (cls ? ' ' + cls : ''), text));
+    chip(t(m.ok === false ? 'recap.stopped' : 'recap.done'), 'strong');
+    if (m.durationMs) chip(clock(m.durationMs));
+    if (stepsN) chip(t(stepsN === 1 ? 'act.step' : 'act.steps', { n: stepsN }));
+    if (m.tokens) chip(t('recap.context', { n: fmtTokens(m.tokens) }));
+    node.append(chips);
+    add(node);
+  }
+
+  /**
+   * The send arrow, drawn here instead of pulled from the sprite.
+   *
+   * The sprite's "navigate" is a jet tip: to make it point the right way it had
+   * to be rotated 45°, and a rotated glyph that isn't symmetrical never sits in
+   * the middle of the square — it hung towards a corner. This one is built
+   * symmetrical around 12,12 in a 24-box, so "centred" is a property of the
+   * drawing and not something to chase with margins.
+   */
   function sendArrow() {
-    return icon('navigate', 'send-arrow');
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', 'ico send-arrow');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    const p = document.createElementNS(SVG, 'path');
+    p.setAttribute('d', 'M5 12h14M12.5 5.5 19 12l-6.5 6.5');
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', 'currentColor');
+    p.setAttribute('stroke-width', '2.4');
+    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(p);
+    return svg;
+  }
+
+  /** Stop: a full square, no ring around it. Same box, so it can't drift. */
+  function stopSquare() {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', 'ico stop-square');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    const r = document.createElementNS(SVG, 'rect');
+    r.setAttribute('x', '6');
+    r.setAttribute('y', '6');
+    r.setAttribute('width', '12');
+    r.setAttribute('height', '12');
+    r.setAttribute('rx', '2.5');
+    r.setAttribute('fill', 'currentColor');
+    svg.appendChild(r);
+    return svg;
+  }
+
+  // ---------- what it's doing, right now ----------
+  //
+  // The chat can stay still for a minute while a tool chews on something, and a
+  // still chat looks like a stuck chat. This strip sits above the writing field
+  // and never lies: what it's on now, how long the turn has been going, how many
+  // steps it has taken. The clock ticks every second — a moving clock is the
+  // cheapest proof that nothing is frozen — and if nothing has happened for a
+  // while it says that too, instead of leaving you to guess.
+  const actBar = $('activity');
+  const actWhat = $('actWhat');
+  const actTime = $('actTime');
+  const actSteps = $('actSteps');
+  let actStart = 0;
+  let actLast = 0;
+  let actKey = 'act.working';
+  let actVars = null;
+  let stepsN = 0;
+  let actTimer = 0;
+
+  const clock = (ms) => {
+    const s = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  };
+
+  function paintActivity() {
+    if (!actBar || actBar.hidden) return;
+    const now = Date.now();
+    const quiet = now - actLast;
+    actWhat.textContent = actVars ? t(actKey, actVars) : t(actKey);
+    actTime.textContent = clock(now - actStart);
+    actSteps.textContent = stepsN ? t(stepsN === 1 ? 'act.step' : 'act.steps', { n: stepsN }) : '';
+    actSteps.hidden = !stepsN;
+    // Twelve seconds with nothing new is where the doubt starts: better to say
+    // "still on it" than to let the silence say "it crashed".
+    actBar.classList.toggle('quiet', quiet > 12000);
+    actBar.dataset.quiet = quiet > 12000 ? t('act.quiet', { n: Math.round(quiet / 1000) }) : '';
+  }
+
+  /** Every event that means "it's alive" passes through here. */
+  function activity(key, vars) {
+    actKey = key;
+    actVars = vars || null;
+    actLast = Date.now();
+    paintActivity();
+  }
+
+  function startActivity() {
+    if (!actBar) return;
+    actStart = Date.now();
+    actLast = actStart;
+    stepsN = 0;
+    actKey = 'act.working';
+    actVars = null;
+    actBar.hidden = false;
+    paintActivity();
+    clearInterval(actTimer);
+    actTimer = setInterval(paintActivity, 1000);
+  }
+
+  function stopActivity() {
+    if (!actBar) return;
+    clearInterval(actTimer);
+    actTimer = 0;
+    actBar.hidden = true;
+    actBar.classList.remove('quiet');
   }
 
   // ---------- busy ----------
@@ -753,9 +1080,14 @@
     busy = v;
     sendBtn.classList.toggle('stop', v);
     sendBtn.title = v ? t('composer.stop') : t('composer.send');
-    sendBtn.replaceChildren(v ? icon('stop-circle') : sendArrow());
-    if (v) showWaiting();
-    else hideWaiting();
+    sendBtn.replaceChildren(v ? stopSquare() : sendArrow());
+    if (v) {
+      showWaiting();
+      if (!actTimer) startActivity();
+    } else {
+      hideWaiting();
+      stopActivity();
+    }
   }
 
   // ---------- messages from the extension ----------
@@ -791,6 +1123,7 @@
         tools.clear();
         asks.clear();
         waiting = null;
+        stepsN = 0;
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         // the previous conversation scrolls out while the new one takes its place
@@ -837,6 +1170,7 @@
       case 'ask':
         hideWaiting();
         askCard(m);
+        activity('act.asking');
         break;
       case 'ask_done':
         askDone(m);
@@ -869,14 +1203,17 @@
       }
       case 'turn_start':
         hideWaiting();
+        activity('act.thinking');
         break;
       case 'block_start':
         hideWaiting();
         m.kind === 'thinking' ? thinkBlock(m.id, m.parent) : textBlock(m.id, m.parent);
+        activity(m.kind === 'thinking' ? 'act.reasoning' : 'act.writing');
         break;
       case 'delta':
         hideWaiting();
         appendDelta(m.id, m.kind || 'text', m.text, m.parent);
+        activity(m.kind === 'thinking' ? 'act.reasoning' : 'act.writing');
         break;
       case 'block_final':
         finalize(m.id, m.kind, m.text, m.parent);
@@ -884,15 +1221,19 @@
       case 'tool_start':
         hideWaiting();
         toolStart(m.id, m.name, m.input, m.parent);
+        stepsN++;
+        activity('act.tool', { tool: m.name, what: toolArg(m.input, m.name).slice(0, 60) });
         break;
       case 'tool_end':
         toolEnd(m.id, m.ok, m.text);
+        activity('act.working');
         break;
       case 'turn_end':
         blocks.clear();
         spent.usd += m.costUsd || 0;
         spent.tokens = m.tokens || spent.tokens;
         paintSpent();
+        turnRecap(m);
         break;
       case 'busy':
         setBusy(m.value);
@@ -1839,6 +2180,7 @@
     if (log.querySelector('.empty')) showEmpty();
     const label = waiting && waiting.querySelector('.pulse-label');
     if (label) label.textContent = t('msg.thinking');
+    paintActivity();
     paintAttach();
     // An open menu still holds the old words: it's rebuilt against what you typed.
     if (picking && !menu.hidden) refreshMenu();

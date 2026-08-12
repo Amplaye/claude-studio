@@ -13,6 +13,7 @@ import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
+import { forgetSession } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
 
 export interface Surface {
@@ -251,8 +252,7 @@ export class ChatController {
 
   private clear() {
     this.closeAllPending('Switching conversation.');
-    this.session?.dispose();
-    this.session = undefined;
+    this.endEngine();
     this.history = [];
     this.busy = false;
     if (this.primary) owned.end(); // la card della barra di contesto non ha piu' niente da mostrare
@@ -281,8 +281,22 @@ export class ChatController {
 
   dispose() {
     this.closeAllPending('Extension closed.');
-    this.session?.dispose();
+    this.endEngine();
     if (this.primary) owned.end();
+  }
+
+  /**
+   * Turns the engine off and takes its announcement out of ~/.claude/sessions.
+   * The CLI writes one file per process and doesn't always get to clear it away;
+   * whatever is left there becomes a card in the context panel — a conversation
+   * nobody has open any more, still saying "here". We opened this one, so we're
+   * the ones who know it's over.
+   */
+  private endEngine() {
+    const id = this.session?.sessionId;
+    this.session?.dispose();
+    this.session = undefined;
+    if (id) forgetSession(id);
   }
 
   // ---- permessi ----------------------------------------------------------

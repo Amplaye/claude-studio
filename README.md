@@ -1,79 +1,106 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/media/icon.png" width="120" alt="Claude Studio" />
+<img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/media/icon.png" width="110" alt="Claude Studio" />
 
 # Claude Studio
 
-**Claude Code, inside VS Code.** Chat, one-click permissions, and how much context you have left — always in sight.
+**The same Claude Code you already use — with a better place to use it.**
 
 </div>
 
 ---
 
-## What it is, in two lines
+## In two lines
 
-Claude Studio brings **Claude Code into VS Code**. You talk to it like you would in the terminal, but the answers, the files it touches and the permissions it asks for become cards you read and buttons you click.
+Claude Code is superb, and its VS Code panel is bare. Claude Studio replaces that
+panel: **same CLI, same account, same `CLAUDE.md`, same skills, same
+permissions** — nothing new to learn, nothing new to pay. What changes is what
+you see while it works.
 
-It's not another AI: it uses the **Claude Code you already have installed**. Same account, same `CLAUDE.md`, same skills, same permissions. The difference is you can see them.
+![Claude Studio](https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/demo.gif)
 
-![Claude Studio](https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/chat-full.png)
+## What you get that you didn't have
 
-## What it does
+**You see it working, second by second.** A strip above the box you type in says
+what it's on right now — *Reading src/store.ts*, *Reasoning…* — with a clock that
+ticks. No more staring at a still screen wondering if it's crashed.
 
-**It asks before it touches anything.** When Claude wants to run a command or change a file, it shows you and waits: *Allow*, *Always allow*, *Deny*. Edits arrive as colored diffs — before they happen, not after.
+**Every change is a card, and cards stay shut.** A file edit arrives as a
+coloured diff you open when you want to. Nothing unfolds by itself and pushes
+your reading off the screen.
 
-**Three modes, one click.** *Plan* thinks without touching anything. *Ask* checks with you before acting. *Yolo* just gets on with it. Switch any time, even mid-conversation.
+**It asks before it touches anything.** *Allow* · *Always allow* · *Deny*. When
+it asks you to choose between options, there's always a line to write your own
+answer on — because the answer often isn't one of the three.
 
-**It tells you how much context is left.** A bar with what this session has spent, your account limit, and how long until the next reset. No more conversations that stop dead without warning.
+**The last message reads like an answer.** Headings, lists, tables, code: the
+recap at the end of a turn is laid out, not dumped as raw text.
 
-**Pick the model you want.** Opus, Sonnet, Haiku — each with its own color, so you can see at a glance which one is working.
+**You know how much room is left.** Context used, account limits, time to the
+next reset — for this conversation and for every other Claude you have open.
+
+## Try it in one minute
+
+```
+npm install -g @anthropic-ai/claude-code   # if you haven't already
+claude                                     # sign in once
+```
+
+Install Claude Studio, click the icon in the left bar, and type:
+
+> `Read @src/settings.tsx and add a dark/light switch that survives a restart.`
+
+You'll watch it read the file, propose the diff, ask before running the tests,
+and close with a recap of what changed.
 
 <table>
 <tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own color</em></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context bar" /><br /><em>How much context you have left</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/streaming.png" alt="Live activity" /><br /><em>What it's doing, right now</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/permessi.png" alt="Permissions and questions" /><br /><em>You decide — and you can write your own answer</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own colour</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context panel" /><br /><em>How much context is left, everywhere</em></td>
 </tr>
 </table>
 
-## Getting started
-
-1. You need the **Claude Code CLI**, installed and already signed in to your account:
-   ```
-   npm install -g @anthropic-ai/claude-code
-   claude
-   ```
-2. Install Claude Studio.
-3. Click the icon in the left bar. Start typing.
-
-That's it — no API keys to paste, nothing to configure. The account is the one you already use from the terminal.
-
-## The handy bits
-
-- **`@` for a file, `/` for a command** — the same ones you have in the terminal, skills and plugins included.
-- **Paste images** straight into the chat.
-- **It tells you when it's done**, with a chime and a notification, if you've wandered off in the meantime.
-- **Pick up earlier conversations**, including ones you started in the terminal.
-- **Sidebar or full tab**, whichever you prefer: same conversation, two faces.
-
-## Shortcuts
+## Three modes, one click
 
 | | |
 |---|---|
-| `Alt+N` | New conversation |
-| `Alt+M` | Switch mode |
-| `Alt+H` | History |
-| `Esc` | Stop |
-| `@` / `/` | File / command |
+| **Plan** | thinks, touches nothing |
+| **Ask** | checks with you before acting |
+| **Yolo** | gets on with it |
+
+Switch any time, even halfway through a conversation.
+
+## The handy bits
+
+- **`@` for a file, `/` for a command** — your skills and plugins included.
+- **Paste an image** straight into the chat.
+- **A chime and a notification** when it's done, if you've wandered off.
+- **24 past conversations** a click away, terminal ones included.
+- **Sidebar or full tab**, same conversation on both.
+- **English or Italian**, switched on the spot.
+
+## Shortcuts
+
+| | | | |
+|---|---|---|---|
+| `Alt+N` new | `Alt+M` mode | `Alt+H` history | `Alt+I` settings |
+| `Alt+C` context | `Esc` stop | `@` file | `/` command |
 
 ## Settings
 
-All under `claudeStudio`: path to the CLI, automatic updates, context limit, and how it opens (sidebar or tab).
+All under `claudeStudio`: path to the CLI, automatic updates, context window
+size, and whether the icon opens the sidebar or a full tab.
 
 ---
 
 <div align="center">
 
 **Requires** the [Claude Code](https://claude.com/claude-code) CLI, installed and signed in.
+It's your account and your usage: Claude Studio adds no service and no key of its own.
 
 MIT · [Report an issue](https://github.com/Amplaye/claude-studio/issues) · [Development notes](https://github.com/Amplaye/claude-studio/blob/main/docs/SVILUPPO.md)
 
