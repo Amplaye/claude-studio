@@ -149,6 +149,142 @@ body.wide .msg.user {
 .iconbtn:active {
   transform: scale(0.94);
 }
+/* un tasto che tiene aperto qualcosa lo dice restando acceso */
+.iconbtn.on {
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: var(--card);
+  color: var(--claude-2);
+}
+
+/* ---------- pannello delle impostazioni ----------
+   Non e' un cassetto come la cronologia: quello sposta il discorso in giu', e per
+   tre menu a tendina sarebbe troppo. Sta sopra, agganciato al tasto che lo apre. */
+.pop {
+  position: absolute;
+  top: 42px;
+  right: 10px;
+  z-index: 6;
+  width: 290px;
+  max-width: calc(100% - 20px);
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: 0 22px 50px -24px #000, 0 0 0 1px color-mix(in srgb, var(--claude-1) 16%, transparent);
+  transform-origin: top right;
+}
+.pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.pop-sec {
+  margin: 10px 0 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--claude-2);
+}
+.pop-sec:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 2px;
+}
+
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.plab {
+  flex: 0 0 76px;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+.prow select,
+.prow input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+.prow select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.prow input[type='range'] {
+  accent-color: var(--claude-1);
+  cursor: pointer;
+}
+/* un menu spento deve sembrarlo: il modello scelto non accetta quella scelta */
+.prow select:disabled,
+.prow input:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* La descrizione del modello scelto: una riga, e solo se dice qualcosa. */
+.phint {
+  margin: -3px 0 8px;
+  font-size: 11px;
+  opacity: 0.65;
+}
+.phint:empty {
+  display: none;
+}
+
+.pcheck {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  opacity: 0.9;
+  cursor: pointer;
+}
+.pcheck input {
+  margin: 2px 0 0;
+  accent-color: var(--claude-1);
+  cursor: pointer;
+}
+
+.pbtn {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.1s ease;
+}
+.pbtn:hover {
+  border-color: color-mix(in srgb, var(--claude-1) 60%, var(--line));
+}
+.pbtn:active {
+  transform: scale(0.97);
+}
 
 /* ---------- cassetto della cronologia ---------- */
 .drawer {

@@ -14,7 +14,7 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { Wire } from './protocol';
+import type { Thinking, Wire } from './protocol';
 
 /**
  * Tutto quello che serve per chiedere il permesso. `id` e' il `tool_use_id`:
@@ -49,7 +49,19 @@ export interface SessionOptions {
   resume?: string;
   /** Riprendi su un ramo nuovo, lasciando intatta quella originale. */
   fork?: boolean;
+  /** '' = il modello predefinito della CLI, quello che useresti da terminale. */
+  model?: string;
+  /** '' = l'impegno lo decide il motore. */
+  effort?: string;
+  /** 'auto' = come farebbe la CLI da sola. */
+  thinking?: Thinking;
 }
+
+/**
+ * "Sempre acceso" su un modello vecchio vuole un tetto di token, non una parola:
+ * si passa un budget largo, che sui modelli nuovi vale comunque come "pensa".
+ */
+const THINK_BUDGET = 31999;
 
 type Outgoing = { text: string; images?: { mime: string; data: string }[] };
 
@@ -103,6 +115,41 @@ export class Session {
       await this.q?.setPermissionMode(mode);
     } catch {
       /* la sessione puo' non essere ancora partita */
+    }
+  }
+
+  /**
+   * Modello, impegno e pensiero si cambiano a sessione accesa: valgono dal turno
+   * dopo, senza buttare via la conversazione. Se il motore non e' ancora partito
+   * non c'e' niente da dire a nessuno — le stesse scelte gli arrivano come opzioni
+   * quando si accende.
+   */
+  async setModel(model: string) {
+    this.o.model = model;
+    try {
+      await this.q?.setModel(model || undefined);
+    } catch {
+      /* CLI vecchia o sessione non ancora partita */
+    }
+  }
+
+  async setEffort(effort: string) {
+    this.o.effort = effort;
+    try {
+      // `null` toglie la scelta dallo strato dei flag e rimette quella di sotto:
+      // e' cosi' che si torna ad "automatico" senza riaccendere il processo.
+      await this.q?.applyFlagSettings({ effortLevel: (effort || null) as any });
+    } catch {
+      /* idem */
+    }
+  }
+
+  async setThinking(v: Thinking) {
+    this.o.thinking = v;
+    try {
+      await this.q?.setMaxThinkingTokens(v === 'off' ? 0 : v === 'on' ? THINK_BUDGET : null);
+    } catch {
+      /* idem */
     }
   }
 
@@ -160,6 +207,15 @@ export class Session {
       forwardSubagentText: true,
       permissionMode: this.o.permissionMode ?? 'default',
       canUseTool: this.canUseTool,
+      // Vuoto vuol dire "non dire niente": la CLI usa quello che useresti da
+      // terminale. Si passa solo cio' che hai scelto apposta.
+      ...(this.o.model ? { model: this.o.model } : {}),
+      ...(this.o.effort ? { effort: this.o.effort as Options['effort'] } : {}),
+      ...(this.o.thinking === 'on'
+        ? { thinking: { type: 'adaptive' as const } }
+        : this.o.thinking === 'off'
+          ? { thinking: { type: 'disabled' as const } }
+          : {}),
       ...(this.o.resume ? { resume: this.o.resume, forkSession: !!this.o.fork } : {}),
       ...(this.o.ide ? { mcpServers: this.o.ide } : {}),
       // Chiamiamo la CLI installata sul PC: senza questo l'SDK cerca il proprio
@@ -203,6 +259,30 @@ export class Session {
     }
   }
 
+  /**
+   * L'elenco dei modelli lo dice la CLI installata, non una lista scritta a mano
+   * qui dentro: cosi' non invecchia, e si porta dietro anche quali livelli di
+   * impegno accetta ciascuno.
+   */
+  private async publishModels() {
+    try {
+      const list = await this.q?.supportedModels();
+      if (!list) return;
+      this.o.emit({
+        k: 'models',
+        items: list.map((m) => ({
+          value: String(m.value ?? ''),
+          label: String(m.displayName || m.value || ''),
+          description: String(m.description ?? '').slice(0, 160),
+          efforts: m.supportsEffort ? [...(m.supportedEffortLevels ?? ['low', 'medium', 'high'])] : [],
+          adaptive: m.supportsAdaptiveThinking !== false,
+        })).filter((m) => m.value),
+      });
+    } catch {
+      /* una CLI piu' vecchia puo' non saperlo dire: resta la scelta predefinita */
+    }
+  }
+
   private canUseTool = async (
     toolName: string,
     input: Record<string, unknown>,
@@ -236,6 +316,7 @@ export class Session {
           this.model = m.model;
           this.o.emit({ k: 'session', id: m.session_id, model: m.model, cwd: this.o.cwd });
           void this.publishCommands();
+          void this.publishModels();
         }
         // La lista degli slash command puo' cambiare a meta' sessione (skill trovate
         // per strada): quando cambia si rilegge, non si tiene quella vecchia.

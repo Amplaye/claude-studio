@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
 import type { ContextMonitor } from '../context/monitor';
+import { useBadgeHost } from './badge';
 import { bindWebview } from './bind';
 import type { ChatController } from './controller';
 import { ChatPanel } from './panel';
@@ -26,6 +27,9 @@ export class ChatView implements vscode.WebviewViewProvider {
 
   resolveWebviewView(view: vscode.WebviewView) {
     const { surface, listener } = bindWebview(view.webview, this.ctx, this.chat, 'view');
+    // Il bollino di "ha finito" si appende qui: e' l'icona nella barra delle
+    // attivita', l'unico posto che si vede anche da un'altra scheda.
+    useBadgeHost(view);
 
     const seen = () => {
       // La barra di contesto vuole sapere se la chat e' sotto gli occhi: e' quello
@@ -40,6 +44,7 @@ export class ChatView implements vscode.WebviewViewProvider {
       vis.dispose();
       listener.dispose();
       owned.setViewVisible(false);
+      useBadgeHost(undefined);
       this.chat.detach(surface);
     });
   }

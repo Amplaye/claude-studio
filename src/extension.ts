@@ -7,7 +7,7 @@ import { ContextMonitor } from './context/monitor';
 import { ContextView } from './context/view';
 
 export function activate(ctx: vscode.ExtensionContext) {
-  const chat = new ChatController();
+  const chat = new ChatController(ctx);
   // La barra di contesto vive nello stesso processo della chat: e' cosi' che vede
   // le conversazioni aperte da qui senza doverle indovinare dal disco.
   const monitor = new ContextMonitor();
@@ -18,6 +18,9 @@ export function activate(ctx: vscode.ExtensionContext) {
     // La chat deve sapere cosa hai selezionato senza chiedertelo.
     vscode.window.onDidChangeTextEditorSelection(() => chat.pushSelection()),
     vscode.window.onDidChangeActiveTextEditor(() => chat.pushSelection()),
+    // Torni sulla finestra: il bollino di "ha finito" ha gia' detto quel che
+    // doveva e si spegne da solo.
+    vscode.window.onDidChangeWindowState((s) => s.focused && chat.onWindowFocus()),
     vscode.window.registerWebviewViewProvider(ChatView.id, new ChatView(ctx, chat, monitor), {
       webviewOptions: { retainContextWhenHidden: true },
     }),

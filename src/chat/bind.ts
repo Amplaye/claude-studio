@@ -28,6 +28,7 @@ export function bindWebview(
     contextCss: 'context.css',
     chatCss: 'chat.css',
     ctxpanelJs: 'ctxpanel.js',
+    chimeJs: 'chime.js',
     chatJs: 'chat.js',
   });
 
@@ -67,6 +68,9 @@ export function bindWebview(
         return;
       case 'setMode':
         chat.setMode(m.value);
+        return;
+      case 'setPrefs':
+        chat.setPrefs(m.value);
         return;
       case 'history':
         void chat.sendHistory(surface);

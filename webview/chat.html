@@ -33,6 +33,9 @@
           <span class="chip" id="model" title="Modello della sessione">
             <svg class="ico"><use href="#ion-hardware-chip" /></svg><span id="modelName">—</span>
           </span>
+          <button class="iconbtn" id="btnCfg" title="Modello, pensiero e avvisi (Alt+I)">
+            <svg class="ico"><use href="#ion-options" /></svg>
+          </button>
           <button class="iconbtn" id="btnHistory" title="Conversazioni di questo progetto (Alt+H)">
             <svg class="ico"><use href="#ion-time" /></svg>
           </button>
@@ -57,6 +60,66 @@
           <div class="drawer-list" id="drawerList"></div>
         </div>
 
+        <!-- Le scelte che valgono per come lavora Claude e per come te lo dice
+             quando ha finito. Restano fra una finestra e l'altra. -->
+        <div class="pop" id="cfg" hidden>
+          <div class="pop-head">
+            <span>Impostazioni</span>
+            <button class="iconbtn" id="cfgClose" title="Chiudi">
+              <svg class="ico"><use href="#ion-close" /></svg>
+            </button>
+          </div>
+
+          <div class="pop-sec">Motore</div>
+          <label class="prow">
+            <span class="plab">Modello</span>
+            <select id="cfgModel"></select>
+          </label>
+          <p class="phint" id="cfgModelHint"></p>
+          <label class="prow">
+            <span class="plab">Impegno</span>
+            <select id="cfgEffort"></select>
+          </label>
+          <label class="prow">
+            <span class="plab">Pensiero</span>
+            <select id="cfgThink">
+              <option value="auto">Come decide lui</option>
+              <option value="on">Sempre acceso</option>
+              <option value="off">Spento</option>
+            </select>
+          </label>
+
+          <div class="pop-sec">Quando ha finito</div>
+          <label class="prow">
+            <span class="plab">Suono</span>
+            <select id="cfgSound">
+              <option value="cozy">Coccola</option>
+              <option value="bell">Campanella</option>
+              <option value="soft">Sottovoce</option>
+              <option value="off">Muto</option>
+            </select>
+          </label>
+          <label class="prow">
+            <span class="plab">Volume</span>
+            <input type="range" id="cfgVol" min="0" max="100" step="5" />
+          </label>
+          <label class="pcheck">
+            <input type="checkbox" id="cfgAway" />
+            <span>Solo se VSCode non e' in primo piano</span>
+          </label>
+          <label class="pcheck">
+            <input type="checkbox" id="cfgAsk" />
+            <span>Suona anche quando serve un permesso</span>
+          </label>
+          <label class="pcheck">
+            <input type="checkbox" id="cfgToast" />
+            <span>Avviso di VSCode se sei altrove</span>
+          </label>
+          <button class="pbtn" id="cfgTest" type="button">
+            <svg class="ico"><use href="#ion-play" /></svg>Prova il suono
+          </button>
+        </div>
+
         <main class="log" id="log"></main>
 
         <form class="composer" id="composer">
@@ -75,6 +138,7 @@
     </div>
 
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
+    <script nonce="{{nonce}}" src="{{chimeJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>
   </body>
 </html>

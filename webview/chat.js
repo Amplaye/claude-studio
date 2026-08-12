@@ -762,6 +762,19 @@
         modeSel.value = m.value;
         document.body.dataset.mode = m.value;
         break;
+      case 'prefs':
+        prefs = Object.assign({}, prefs, m.value || {});
+        paintCfg();
+        break;
+      case 'models':
+        models = m.items || [];
+        paintCfg();
+        break;
+      // Chi decide se e' il momento di suonare e' l'estensione: e' l'unica a
+      // sapere se la finestra e' davanti a te. Qui si suona e basta.
+      case 'chime':
+        if (window.Chime) window.Chime.play(m.sound, m.event, m.volume);
+        break;
       case 'history':
         showHistory(m.items || []);
         break;
@@ -1064,6 +1077,132 @@
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
+  // ---------- impostazioni: modello, pensiero, avvisi ----------
+  //
+  // Le scelte le tiene l'estensione (restano fra una finestra e l'altra): qui si
+  // disegnano e si rimandano indietro un pezzo per volta. L'elenco dei modelli
+  // arriva dalla CLI a sessione accesa, quindi finche' non c'e' resta la voce
+  // "predefinito" — che e' anche la scelta giusta per la maggior parte dei casi.
+  const cfg = $('cfg');
+  const btnCfg = $('btnCfg');
+  let prefs = {
+    model: '',
+    effort: '',
+    thinking: 'auto',
+    sound: 'cozy',
+    volume: 0.6,
+    onlyWhenAway: false,
+    soundOnAsk: true,
+    toast: true,
+  };
+  let models = [];
+
+  const EFFORT_LABELS = {
+    low: 'Basso',
+    medium: 'Medio',
+    high: 'Alto',
+    xhigh: 'Molto alto',
+    max: 'Massimo',
+  };
+  const ALL_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+  function fillSelect(sel, items, value) {
+    sel.replaceChildren();
+    for (const it of items) {
+      const o = el('option', null, it.label);
+      o.value = it.value;
+      sel.appendChild(o);
+    }
+    // Se la scelta di prima non esiste piu' (CLI cambiata, modello ritirato) si
+    // torna alla prima voce invece di restare su un valore che non c'e'.
+    const ok = items.some((i) => i.value === value);
+    sel.value = ok ? value : items.length ? items[0].value : '';
+  }
+
+  function paintCfg() {
+    fillSelect(
+      $('cfgModel'),
+      [{ value: '', label: 'Predefinito della CLI' }].concat(
+        models.map((m) => ({ value: m.value, label: m.label }))
+      ),
+      prefs.model
+    );
+    const chosen = models.find((m) => m.value === prefs.model);
+    $('cfgModelHint').textContent = chosen ? chosen.description : '';
+
+    // I livelli d'impegno li detta il modello: quelli che non accetta non si
+    // mostrano, e se non ne accetta nessuno il menu si spegne.
+    const levels = chosen ? chosen.efforts : ALL_EFFORTS;
+    fillSelect(
+      $('cfgEffort'),
+      [{ value: '', label: 'Come decide lui' }].concat(
+        levels.map((l) => ({ value: l, label: EFFORT_LABELS[l] || l }))
+      ),
+      prefs.effort
+    );
+    $('cfgEffort').disabled = !!chosen && !chosen.efforts.length;
+
+    $('cfgThink').value = prefs.thinking;
+    $('cfgSound').value = prefs.sound;
+    $('cfgVol').value = Math.round((prefs.volume == null ? 0.6 : prefs.volume) * 100);
+    $('cfgVol').disabled = prefs.sound === 'off';
+    $('cfgAway').checked = !!prefs.onlyWhenAway;
+    $('cfgAsk').checked = !!prefs.soundOnAsk;
+    $('cfgToast').checked = !!prefs.toast;
+  }
+
+  /** Si manda solo quello che hai cambiato: il resto lo sa gia' l'estensione. */
+  function push(patch) {
+    prefs = Object.assign({}, prefs, patch);
+    vscode.postMessage({ cmd: 'setPrefs', value: patch });
+    paintCfg();
+  }
+
+  /** Il suono si prova subito: sceglierlo alla cieca non ha senso. */
+  function previewSound() {
+    if (window.Chime) window.Chime.play(prefs.sound, 'done', prefs.volume);
+  }
+
+  function toggleCfg(on) {
+    const show = on == null ? cfg.hidden : on;
+    cfg.hidden = !show;
+    btnCfg.classList.toggle('on', show);
+    // Aprire il pannello e' gia' un gesto: e' il momento buono per svegliare
+    // l'audio, che il browser tiene muto finche' non tocchi la pagina.
+    if (show && window.Chime) window.Chime.unlock();
+  }
+
+  btnCfg.addEventListener('click', () => toggleCfg());
+  $('cfgClose').addEventListener('click', () => toggleCfg(false));
+  document.addEventListener('mousedown', (e) => {
+    if (cfg.hidden || cfg.contains(e.target) || btnCfg.contains(e.target)) return;
+    toggleCfg(false);
+  });
+
+  $('cfgModel').addEventListener('change', (e) => push({ model: e.target.value }));
+  $('cfgEffort').addEventListener('change', (e) => push({ effort: e.target.value }));
+  $('cfgThink').addEventListener('change', (e) => push({ thinking: e.target.value }));
+  $('cfgSound').addEventListener('change', (e) => {
+    push({ sound: e.target.value });
+    previewSound();
+  });
+  // mentre trascini cambia solo il volume di prova; si mette da parte quando molli
+  $('cfgVol').addEventListener('input', (e) => (prefs.volume = Number(e.target.value) / 100));
+  $('cfgVol').addEventListener('change', (e) => {
+    push({ volume: Number(e.target.value) / 100 });
+    previewSound();
+  });
+  $('cfgAway').addEventListener('change', (e) => push({ onlyWhenAway: e.target.checked }));
+  $('cfgAsk').addEventListener('change', (e) => push({ soundOnAsk: e.target.checked }));
+  $('cfgToast').addEventListener('change', (e) => push({ toast: e.target.checked }));
+  $('cfgTest').addEventListener('click', previewSound);
+
+  // Il primo gesto sulla pagina sblocca l'audio: da li' in poi l'avviso di fine
+  // lavoro puo' suonare anche con la finestra dietro a tutte le altre.
+  const wake = () => window.Chime && window.Chime.unlock();
+  document.addEventListener('pointerdown', wake, { once: true });
+  document.addEventListener('keydown', wake, { once: true });
+
   // ---------- scorciatoie ----------
   //
   // Valgono ovunque nella pagina, anche mentre scrivi: sono le stesse cose che
@@ -1082,6 +1221,11 @@
     if (e.defaultPrevented || e.isComposing) return;
 
     if (e.key === 'Escape') {
+      if (!cfg.hidden) {
+        e.preventDefault();
+        toggleCfg(false);
+        return;
+      }
       if (!drawer.hidden) {
         e.preventDefault();
         drawer.hidden = true;
@@ -1105,6 +1249,10 @@
       case 'h':
         e.preventDefault();
         toggleHistory();
+        return;
+      case 'i':
+        e.preventDefault();
+        toggleCfg();
         return;
       case 'm':
         e.preventDefault();
@@ -1138,5 +1286,6 @@
 
   showEmpty();
   setBusy(false);
+  paintCfg();
   vscode.postMessage({ cmd: 'ready' });
 })();

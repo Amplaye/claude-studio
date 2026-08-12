@@ -31,6 +31,15 @@
   display: none !important;
 }
 
+/* Lo sprite delle Ionicons vive incollato in cima al <body>: e' un magazzino di
+   <symbol>, non un disegno. Va nascosto da qui e non con un attributo style,
+   perche' la CSP della webview (senza 'unsafe-inline') gli attributi style del
+   markup li ignora — e un <svg> senza display diventa un blocco alto 150px che
+   spinge giu' tutta la pagina. */
+svg.sprite {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--sans);

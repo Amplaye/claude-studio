@@ -116,6 +116,8 @@ const vscode = {
     activeTextEditor: undefined,
     onDidChangeActiveTextEditor: () => ({ dispose() {} }),
     onDidChangeTextEditorSelection: () => ({ dispose() {} }),
+    /** La finestra e' sempre "in primo piano": qui non c'e' nessuno da avvisare. */
+    state: { focused: true },
     onDidChangeWindowState: () => ({ dispose() {} }),
     get tabGroups() {
       return {
@@ -192,7 +194,22 @@ fs.writeFileSync(
 
 // ---- accensione -------------------------------------------------------------
 const ext = require(path.join(root, 'dist', 'extension.js'));
-const ctx = { extensionUri: uri(root), extensionPath: root, subscriptions: [] };
+/** Le preferenze della chat vivono qui: una mappa in memoria basta. */
+function memento() {
+  const map = new Map();
+  return {
+    get: (k, d) => (map.has(k) ? map.get(k) : d),
+    update: async (k, v) => void map.set(k, v),
+    keys: () => [...map.keys()],
+  };
+}
+const ctx = {
+  extensionUri: uri(root),
+  extensionPath: root,
+  subscriptions: [],
+  globalState: memento(),
+  workspaceState: memento(),
+};
 ext.activate(ctx);
 
 const provider = registered.views.get('claudeStudio.context');

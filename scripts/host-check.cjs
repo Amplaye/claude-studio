@@ -96,6 +96,8 @@ const vscode = {
       return statusBar;
     },
     showInputBox: async () => undefined,
+    /** La finestra e' sempre "in primo piano": qui non c'e' nessuno da avvisare. */
+    state: { focused: true },
     onDidChangeWindowState: () => ({ dispose() {} }),
     registerWebviewViewProvider: (id, p) => {
       registered.views.set(id, p);
@@ -181,10 +183,21 @@ Module._load = function (req, parent, isMain) {
 // ---- accensione ------------------------------------------------------------
 const ext = require(path.join(root, 'dist', 'extension.js'));
 
+/** Le preferenze della chat vivono qui: una mappa in memoria basta. */
+function memento() {
+  const map = new Map();
+  return {
+    get: (k, d) => (map.has(k) ? map.get(k) : d),
+    update: async (k, v) => void map.set(k, v),
+    keys: () => [...map.keys()],
+  };
+}
 const ctx = {
   extensionUri: uri(root),
   extensionPath: root,
   subscriptions: [],
+  globalState: memento(),
+  workspaceState: memento(),
 };
 ext.activate(ctx);
 

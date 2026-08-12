@@ -104,6 +104,8 @@ const vscode = {
     // La barra di stato qui non la vede nessuno, ma l'estensione la crea comunque.
     createStatusBarItem: () => ({ text: '', tooltip: '', show() {}, hide() {}, dispose() {} }),
     showInputBox: async () => undefined,
+    /** La finestra e' sempre "in primo piano": qui non c'e' nessuno da avvisare. */
+    state: { focused: true },
     onDidChangeWindowState: () => ({ dispose() {} }),
     registerWebviewViewProvider: (id, p) => (
       id === 'claudeStudio.chat' && (registered.provider = p), { dispose() {} }

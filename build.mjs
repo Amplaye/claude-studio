@@ -41,8 +41,14 @@ function buildSprite() {
     const id = 'ion-' + name.replace(/-outline$/, '');
     symbols.push(`<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`);
   }
+  // Lo sprite si nasconde con una CLASSE, mai con style="display:none": nella
+  // webview vera gira una CSP senza 'unsafe-inline', che butta via gli attributi
+  // style scritti nel markup. Con quelli buttati via lo sprite tornava un blocco
+  // alto 150px in cima al documento, e spingeva fuori schermo il campo di
+  // scrittura. width/height a zero sono attributi di presentazione (quelli la CSP
+  // non li tocca): reggono anche se il foglio non arrivasse.
   const sprite =
-    `<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" class="sprite" hidden aria-hidden="true" width="0" height="0">` +
     symbols.join('') +
     `</svg>`;
   fs.writeFileSync(path.join(root, 'media', 'ionicons.sprite.svg'), sprite, 'utf8');

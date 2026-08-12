@@ -77,6 +77,29 @@ che vive nel motore, non nell'interfaccia.
     guardi mentre non c'e' ancora niente da leggere.
   - **Icona dell'estensione**: le sparkles di Ionicons sul gradiente argilla →
     pesca (`npm run icon`, poi committata: non pesa sulla build di tutti i giorni).
+- **Fase 5 — fatta**: come lavora Claude, e come te lo dice quando ha finito.
+  - **Lo sprite non si nasconde piu' con uno `style` inline**: sotto la CSP della
+    webview quell'attributo viene buttato via, e il magazzino delle icone tornava
+    un blocco alto 150 px in cima al documento. Spingeva giu' tutta la pagina e il
+    campo di scrittura finiva **fuori dallo schermo**. Adesso lo nasconde una
+    classe, e `ui-check` toglie gli `style` dal markup prima di misurare, cosi' la
+    prova vede quello che vede VSCode.
+  - **Impostazioni nella testata** (`Alt+I`): modello, impegno e pensiero. L'elenco
+    dei modelli lo dice la **CLI installata** (`supportedModels`), quindi non
+    invecchia e si porta dietro quali livelli d'impegno accetta ciascuno — se un
+    modello non li accetta, il menu si spegne. Le scelte valgono **dal turno dopo**
+    senza buttare via la conversazione (`setModel`, `applyFlagSettings`,
+    `setMaxThinkingTokens`) e restano fra una finestra e l'altra.
+  - **Avviso di fine lavoro**: un suono caldo costruito con Web Audio (nessun file
+    audio da spedire) — Coccola, Campanella, Sottovoce o muto, col volume. Suona a
+    turno finito e, se vuoi, anche quando serve un permesso: sono le due volte in
+    cui il lavoro e' fermo e aspetta te. Puoi tenerlo **solo per quando VSCode non
+    e' in primo piano**. Se sei altrove arrivano anche l'avviso di VSCode (con
+    "Apri") e il bollino sull'icona nella barra delle attivita', che si spegne da
+    solo appena torni sulla finestra.
+  - **A suonare e' una faccia sola**: col pannello e la scheda aperti insieme,
+    l'avviso va a una delle due — altrimenti si sentirebbe doppio. A decidere *se*
+    e' il momento e' l'estensione, l'unica che sa se stai guardando.
 
 Il piano completo, con le indagini gia' fatte sul protocollo e i percorsi del
 materiale di riferimento, sta in
@@ -139,6 +162,21 @@ materiale di riferimento, sta in
   solo scala e opacita'), quindi non costa niente.
 - Sulla tastiera italiana `Ctrl+Alt` **e'** AltGr: le lettere da evitare sono quelle
   che ci scrivono un carattere (e, o, a, +, ...). `c` e `n` sono libere.
+- La CSP della webview non ha `'unsafe-inline'` in `style-src`, e questo **non vale
+  solo per i `<style>`**: vengono ignorati anche gli attributi `style="..."` scritti
+  nel markup. Quello che il codice imposta da JavaScript (`n.style.height = ...`)
+  passa invece senza problemi. E' la differenza fra un foglio inline e la CSSOM, e
+  qui e' costata un campo di scrittura fuori schermo. Regola: in una webview un
+  pezzo di interfaccia **non deve mai reggersi su uno `style` nel markup**.
+- L'anteprima del browser toglie la CSP per poter caricare i CSS da `file://`,
+  quindi non vede questa classe di guasti: `ui-check` li fa ricomparire togliendo
+  gli attributi `style` prima di misurare la pagina.
+- L'audio in una webview parte muto finche' non tocchi la pagina — regola del
+  browser, non di VSCode. Per fortuna un avviso di *fine lavoro* arriva sempre dopo
+  che hai scritto qualcosa, quindi il contesto audio si sveglia al primo clic o al
+  primo tasto e da li' in poi suona anche a finestra dietro.
+- Un avviso va mandato a **una faccia sola**: pannello laterale e scheda mostrano la
+  stessa conversazione, e mandarlo a tutte e due lo fa sentire doppio.
 - Nelle prove, `postMessage` arriva **dopo**: se premi il tasto subito dopo aver
   detto alla pagina "sto lavorando", il tasto arriva prima del messaggio e la prova
   fallisce per il motivo sbagliato. Ci vuole un attimo di attesa in mezzo.
@@ -213,6 +251,10 @@ Impostazioni → Claude Studio → Cli Path.
 | `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |
 | `claudeStudio.openAsTab` | Cliccando l'icona si apre la scheda e il pannello laterale si chiude. Spegnilo per restare nel pannello. |
 
+Modello, impegno, pensiero e avvisi non stanno qui: si scelgono dalla testata
+(`Alt+I`) e restano fra una finestra e l'altra. Sono cose che si cambiano mentre
+lavori, non da un pannello di preferenze.
+
 ## Scorciatoie
 
 | Tasti | Cosa fa |
@@ -223,6 +265,7 @@ Impostazioni → Claude Studio → Cli Path.
 | `Alt+N` | Conversazione nuova. |
 | `Alt+H` | Cronologia del progetto. |
 | `Alt+M` | Modalita' dei permessi. |
+| `Alt+I` | Impostazioni: modello, impegno, pensiero, suono di fine lavoro. |
 | `Alt+C` | Colonna del contesto (solo nella scheda a tutto schermo). |
 | `↑` | Sul campo vuoto, ripesca l'ultimo messaggio mandato. |
 | `@` / `/` | File del progetto / slash command veri della CLI. |

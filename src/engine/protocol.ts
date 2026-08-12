@@ -26,6 +26,56 @@ export interface AskQuestion {
   options: AskOption[];
 }
 
+/** Il pensiero: lo decide il motore ("auto"), o lo decidi tu. */
+export type Thinking = 'auto' | 'on' | 'off';
+
+/** I suoni di fine lavoro. `off` = muto. */
+export type SoundName = 'cozy' | 'bell' | 'soft' | 'off';
+
+/**
+ * Le preferenze che si cambiano dalla testata e restano fra una sessione e
+ * l'altra. Model/effort/thinking valgono per il motore, il resto per l'avviso
+ * di fine lavoro.
+ */
+export interface Prefs {
+  /** '' = quello predefinito della CLI. */
+  model: string;
+  /** '' = lo decide il motore. */
+  effort: string;
+  thinking: Thinking;
+  sound: SoundName;
+  /** 0..1 */
+  volume: number;
+  /** Suona solo se la finestra di VSCode non e' in primo piano. */
+  onlyWhenAway: boolean;
+  /** Suona anche quando serve un permesso: anche li' il lavoro e' fermo. */
+  soundOnAsk: boolean;
+  /** Avviso di VSCode quando finisce mentre stai altrove. */
+  toast: boolean;
+}
+
+export const DEFAULT_PREFS: Prefs = {
+  model: '',
+  effort: '',
+  thinking: 'auto',
+  sound: 'cozy',
+  volume: 0.6,
+  onlyWhenAway: false,
+  soundOnAsk: true,
+  toast: true,
+};
+
+/** Un modello fra quelli che la CLI dice di saper usare. */
+export interface ModelChoice {
+  value: string;
+  label: string;
+  description: string;
+  /** Livelli di impegno accettati da questo modello; vuoto = non li accetta. */
+  efforts: string[];
+  /** Sa decidere da solo quanto pensare. */
+  adaptive: boolean;
+}
+
 /** Una conversazione gia' avvenuta, come appare nella cronologia. */
 export interface HistoryItem {
   id: string;
@@ -60,6 +110,12 @@ export type Wire =
     }
   | { k: 'ask_done'; id: string; ok: boolean; label: string }
   | { k: 'mode'; value: Mode }
+  | { k: 'prefs'; value: Prefs }
+  | { k: 'models'; items: ModelChoice[] }
+  // Il "suona adesso" lo decide l'estensione, non la pagina: e' l'unica a sapere
+  // se la finestra e' in primo piano, e va detto a una faccia sola — due facce
+  // aperte suonerebbero due volte.
+  | { k: 'chime'; event: 'done' | 'ask'; sound: SoundName; volume: number }
   | { k: 'history'; items: HistoryItem[] }
   | { k: 'commands'; items: { name: string; description: string }[] }
   | { k: 'files'; items: string[] }
@@ -88,6 +144,7 @@ export type Cmd =
   | { cmd: 'openTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
   | { cmd: 'setMode'; value: Mode }
+  | { cmd: 'setPrefs'; value: Partial<Prefs> }
   | { cmd: 'history' }
   // `fork` = riprendi ma su un ramo nuovo, senza toccare la conversazione originale
   | { cmd: 'open'; id: string; fork?: boolean }

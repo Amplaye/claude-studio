@@ -4,8 +4,10 @@
 import * as vscode from 'vscode';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
-import type { AskKind, AskQuestion, Mode, Pasted, Wire } from '../engine/protocol';
+import type { AskKind, AskQuestion, ModelChoice, Mode, Pasted, Prefs, Wire } from '../engine/protocol';
+import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
+import { setChatBadge } from './badge';
 import { owned } from '../context/owned';
 import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
@@ -19,6 +21,14 @@ export interface Surface {
 
 /** Oltre questo si buttano via gli eventi piu' vecchi: e' solo materiale da ridisegno. */
 const MAX_HISTORY = 4000;
+
+/** Le scelte restano fra una finestra e l'altra: sono tue, non del progetto. */
+const PREFS_KEY = 'claudeStudio.prefs';
+/**
+ * L'elenco dei modelli lo dice la CLI a sessione accesa. Si tiene da parte l'ultimo
+ * che ha detto, cosi' il menu ha gia' qualcosa da mostrare prima del primo messaggio.
+ */
+const MODELS_KEY = 'claudeStudio.models';
 
 interface Pending {
   req: AskRequest;
@@ -36,6 +46,13 @@ export class ChatController {
   private resume?: { id: string; fork: boolean };
   /** Permessi in attesa di risposta, per tool_use_id. */
   private pending = new Map<string, Pending>();
+  private prefs: Prefs;
+  private models: ModelChoice[];
+
+  constructor(private readonly ctx: vscode.ExtensionContext) {
+    this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
+    this.models = ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? [];
+  }
 
   attach(s: Surface) {
     this.surfaces.add(s);
@@ -57,8 +74,64 @@ export class ChatController {
       surface: s.kind,
     });
     s.post({ k: 'mode', value: this.mode });
+    s.post({ k: 'prefs', value: this.prefs });
+    if (this.models.length) s.post({ k: 'models', items: this.models });
     for (const e of this.history) s.post(e);
     s.post({ k: 'busy', value: this.busy });
+  }
+
+  // ---- le scelte della testata (modello, impegno, pensiero, avvisi) --------
+
+  /**
+   * Arriva un pezzo di preferenze per volta: si fondono con quelle che ci sono,
+   * si mettono da parte e si passano al motore gia' acceso, cosi' valgono dal
+   * turno dopo senza buttare via la conversazione.
+   */
+  setPrefs(patch: Partial<Prefs>) {
+    const before = this.prefs;
+    this.prefs = { ...before, ...patch };
+    void this.ctx.globalState.update(PREFS_KEY, this.prefs);
+
+    if (this.session) {
+      if (this.prefs.model !== before.model) void this.session.setModel(this.prefs.model);
+      if (this.prefs.effort !== before.effort) void this.session.setEffort(this.prefs.effort);
+      if (this.prefs.thinking !== before.thinking) void this.session.setThinking(this.prefs.thinking);
+    }
+    this.broadcast({ k: 'prefs', value: this.prefs });
+  }
+
+  // ---- l'avviso di fine lavoro -------------------------------------------
+
+  /** Sei tornato a guardare: il bollino ha finito il suo mestiere. */
+  onWindowFocus() {
+    setChatBadge(0);
+  }
+
+  /**
+   * Il "suona adesso" lo decide qui, non la pagina: solo l'estensione sa se la
+   * finestra e' in primo piano. E si dice a una faccia sola — col pannello e la
+   * scheda aperti insieme, dirlo a tutte suonerebbe due volte.
+   */
+  private alert(event: 'done' | 'ask') {
+    const p = this.prefs;
+    const focused = vscode.window.state.focused;
+
+    if (!focused) setChatBadge(1);
+    if (event === 'done' && p.toast && !focused) {
+      const cwd = currentCwd();
+      void vscode.window
+        .showInformationMessage(`Claude ha finito · ${cwd.split(/[\\/]/).pop() || cwd}`, 'Apri')
+        .then((a) => {
+          if (a) void vscode.commands.executeCommand('claudeStudio.openTab');
+        });
+    }
+
+    if (p.sound === 'off') return;
+    if (event === 'ask' && !p.soundOnAsk) return;
+    if (p.onlyWhenAway && focused) return;
+
+    const s = [...this.surfaces].find((x) => x.kind === 'panel') ?? [...this.surfaces][0];
+    s?.post({ k: 'chime', event, sound: p.sound, volume: p.volume });
   }
 
   /**
@@ -274,6 +347,9 @@ export class ChatController {
       emit: (e) => this.emit(e),
       ask: this.ask,
       permissionMode: this.mode,
+      model: this.prefs.model,
+      effort: this.prefs.effort,
+      thinking: this.prefs.thinking,
       ide: { editor: ideServer() },
       ...(this.resume ? { resume: this.resume.id, fork: this.resume.fork } : {}),
     });
@@ -284,6 +360,17 @@ export class ChatController {
   }
 
   private emit(e: Wire) {
+    // L'elenco dei modelli lo dice la CLI: si tiene da parte, cosi' il menu non e'
+    // vuoto la prossima volta che apri la chat prima di scrivere.
+    if (e.k === 'models') {
+      this.models = e.items;
+      void this.ctx.globalState.update(MODELS_KEY, e.items);
+    }
+    // Le due volte in cui il lavoro si ferma e tocca a te: turno finito, o un
+    // permesso da dare.
+    if (e.k === 'turn_end') this.alert('done');
+    if (e.k === 'ask') this.alert('ask');
+
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
@@ -305,7 +392,11 @@ export class ChatController {
       this.busy = e.value;
       return;
     }
-    if (e.k === 'hello' || e.k === 'turn_start') return;
+    // Roba che si ridice per intero a chi si attacca (hello), o che non ha senso
+    // ripetere: un `chime` rimesso in storia suonerebbe di nuovo ogni volta che
+    // apri una seconda faccia.
+    if (e.k === 'hello' || e.k === 'turn_start' || e.k === 'chime') return;
+    if (e.k === 'prefs' || e.k === 'models') return;
 
     if (e.k === 'block_final') {
       this.history = this.history.filter(

@@ -263,6 +263,11 @@
   animation: cs-breathe 2s ease-in-out infinite;
 }
 
+/* il pannello delle impostazioni scende dal tasto che lo ha aperto */
+.pop {
+  animation: cs-open 0.22s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
 .composer.sending {
   animation: cs-squeeze 0.2s ease-out;
 }

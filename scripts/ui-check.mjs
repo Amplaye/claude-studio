@@ -30,6 +30,39 @@ for (const surface of ['view', 'panel']) {
   /** L'ultimo messaggio che la pagina ha mandato all'estensione. */
   const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 
+  // ---- la pagina sotto la CSP vera ----
+  //
+  // Nella webview la CSP non ha 'unsafe-inline': gli attributi style scritti nel
+  // markup vengono buttati via. Qui si simula togliendoli, perche' un pezzo di
+  // interfaccia che sta in piedi solo grazie a uno style inline in anteprima
+  // sembra a posto e in VSCode e' rotto. E' successo davvero: lo sprite delle
+  // icone si nascondeva con style="display:none", la CSP lo ignorava, e quel
+  // <svg> tornava un blocco alto 150px in cima al documento che spingeva il
+  // campo di scrittura fuori dallo schermo.
+  await page.evaluate(() => {
+    for (const n of document.querySelectorAll('[style]')) n.removeAttribute('style');
+  });
+  const layout = await page.evaluate(() => {
+    const sprite = document.querySelector('svg.sprite');
+    const comp = document.getElementById('composer').getBoundingClientRect();
+    return {
+      topY: Math.round(document.querySelector('.top').getBoundingClientRect().top),
+      compBottom: Math.round(comp.bottom),
+      compH: Math.round(comp.height),
+      winH: window.innerHeight,
+      sprite: sprite ? getComputedStyle(sprite).display : 'manca',
+    };
+  });
+  t(layout.sprite === 'none', 'lo sprite delle icone si vede (e occupa spazio): display=' + layout.sprite);
+  t(layout.topY === 0, 'qualcosa spinge giu’ la testata: comincia a ' + layout.topY + 'px');
+  t(
+    layout.compH > 20 && layout.compBottom <= layout.winH,
+    'il campo di scrittura non ci sta nella finestra: finisce a ' +
+      layout.compBottom +
+      ' su ' +
+      layout.winH
+  );
+
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
 
   // ---- lo stato vuoto: e' li' che si imparano le scorciatoie ----
@@ -257,6 +290,56 @@ for (const surface of ['view', 'panel']) {
     s4?.cmd === 'setMode' && s4.value === 'acceptEdits',
     'il cambio di modalità non arriva all’estensione: ' + JSON.stringify(s4)
   );
+
+  // ---- le impostazioni: modello, impegno, pensiero, avvisi ----
+  await post({
+    k: 'prefs',
+    value: {
+      model: '', effort: '', thinking: 'auto',
+      sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true,
+    },
+  });
+  await post({
+    k: 'models',
+    items: [
+      { value: 'opus', label: 'Opus', description: 'Il più bravo.', efforts: ['low', 'medium', 'high'], adaptive: true },
+      { value: 'haiku', label: 'Haiku', description: 'Il più svelto.', efforts: [], adaptive: false },
+    ],
+  });
+  await page.click('#btnCfg');
+  await page.waitForTimeout(140);
+  t(await page.isVisible('#cfg'), 'il pannello delle impostazioni non si apre');
+  t(
+    (await page.locator('#cfgModel option').count()) === 3,
+    'i modelli della CLI non arrivano nel menu: ' + (await page.locator('#cfgModel option').count())
+  );
+  await page.selectOption('#cfgModel', 'opus');
+  const sm = await lastSent();
+  t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'il modello scelto non arriva all’estensione: ' + JSON.stringify(sm));
+  await page.waitForTimeout(80);
+  t(
+    (await page.locator('#cfgEffort option').count()) === 4,
+    'i livelli d’impegno non seguono il modello: ' + (await page.locator('#cfgEffort option').count())
+  );
+  t((await page.textContent('#cfgModelHint')) === 'Il più bravo.', 'il modello scelto non si racconta');
+  await page.selectOption('#cfgModel', 'haiku');
+  await page.waitForTimeout(80);
+  t(await page.locator('#cfgEffort').isDisabled(), 'l’impegno resta scegliibile su un modello che non lo accetta');
+
+  await page.selectOption('#cfgThink', 'off');
+  const st = await lastSent();
+  t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'il pensiero non si spegne: ' + JSON.stringify(st));
+  await page.selectOption('#cfgSound', 'bell');
+  const ssnd = await lastSent();
+  t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'bell', 'il suono scelto non arriva: ' + JSON.stringify(ssnd));
+  await page.click('#cfgTest');
+  await page.screenshot({ path: path.join(outDir, `preview-${surface}-cfg.png`) });
+  // e l'avviso vero: arriva dall'estensione e la pagina lo suona senza lamentarsi
+  await post({ k: 'chime', event: 'done', sound: 'cozy', volume: 0.4 });
+  await page.waitForTimeout(120);
+  await page.click('#cfgClose');
+  await page.waitForTimeout(80);
+  t(await page.locator('#cfg').isHidden(), 'il pannello delle impostazioni non si chiude');
 
   // ---- gli ingressi: cronologia, "@", "/", selezione dall'editor ----
   // Mentre Claude lavora il tasto e' "ferma", non "manda": per provare l'invio
