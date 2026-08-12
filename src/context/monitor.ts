@@ -291,16 +291,13 @@ export class ContextMonitor {
     }
     const f = d.cards.find((c) => c.focused) ?? null;
     const pct = f?.pct ?? null;
-    // Il nome della sessione va per primo: e' la risposta a "dove sono?".
-    const who = f
-      ? `$(${f.own ? 'studio-chat' : 'studio-layers'}) ${f.name.slice(0, 28)}`
-      : '$(studio-off) nessuna sessione';
-    const ctx = pct === null ? 'ctx —' : `ctx ${pct}%`;
-    const more = d.cards.length > 1 ? ` $(studio-layers) ${d.cards.length}` : '';
     const u = d.usage;
-    const use = u ? ` $(studio-gauge) ${asPct(u.session)}/${asPct(u.week)}` : '';
-    const git = d.branch ? ` $(studio-branch) ${d.branch}${d.dirty ? '*' : ''}` : '';
-    const text = `${who} $(${levelIcon(pct)}) ${ctx}${more}${use}${git}`;
+    const use = u
+      ? `$(studio-gauge) ${asPct(u.session)}/${asPct(u.week)}`
+      : '$(studio-gauge) —';
+    const ctx = pct === null ? '' : ` $(${levelIcon(pct)}) ctx ${pct}%`;
+    const more = d.cards.length > 1 ? ` $(studio-layers) ${d.cards.length}` : '';
+    const text = `$(studio-chat) ${use}${ctx}${more}`;
 
     // Riassegnare .text a ogni tick fa ridisegnare la barra: si scrive solo se cambia.
     if (text !== this.lastText) {

@@ -29,6 +29,7 @@ const PREFS_KEY = 'claudeStudio.prefs';
  * che ha detto, cosi' il menu ha gia' qualcosa da mostrare prima del primo messaggio.
  */
 const MODELS_KEY = 'claudeStudio.models';
+const COMMANDS_KEY = 'claudeStudio.commands';
 
 interface Pending {
   req: AskRequest;
@@ -48,6 +49,7 @@ export class ChatController {
   private pending = new Map<string, Pending>();
   private prefs: Prefs;
   private models: ModelChoice[];
+  private commands: { name: string; description: string }[];
   /**
    * Solo il controller principale interagisce con la barra di contesto
    * (`owned`) e col bollino. Le schede secondarie hanno un controller loro
@@ -63,6 +65,7 @@ export class ChatController {
       this.prefs.sound = 'cozy';
     }
     this.models = ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? [];
+    this.commands = ctx.globalState.get<{ name: string; description: string }[]>(COMMANDS_KEY) ?? [];
   }
 
   attach(s: Surface) {
@@ -87,6 +90,7 @@ export class ChatController {
     s.post({ k: 'mode', value: this.mode });
     s.post({ k: 'prefs', value: this.prefs });
     if (this.models.length) s.post({ k: 'models', items: this.models });
+    if (this.commands.length) s.post({ k: 'commands', items: this.commands });
     for (const e of this.history) s.post(e);
     s.post({ k: 'busy', value: this.busy });
   }
@@ -378,6 +382,10 @@ export class ChatController {
       this.models = e.items;
       void this.ctx.globalState.update(MODELS_KEY, e.items);
     }
+    if (e.k === 'commands') {
+      this.commands = e.items;
+      void this.ctx.globalState.update(COMMANDS_KEY, e.items);
+    }
     // Le due volte in cui il lavoro si ferma e tocca a te: turno finito, o un
     // permesso da dare.
     if (e.k === 'turn_end') this.alert('done');
@@ -408,7 +416,7 @@ export class ChatController {
     // ripetere: un `chime` rimesso in storia suonerebbe di nuovo ogni volta che
     // apri una seconda faccia.
     if (e.k === 'hello' || e.k === 'turn_start' || e.k === 'chime') return;
-    if (e.k === 'prefs' || e.k === 'models') return;
+    if (e.k === 'prefs' || e.k === 'models' || e.k === 'commands') return;
 
     if (e.k === 'block_final') {
       this.history = this.history.filter(

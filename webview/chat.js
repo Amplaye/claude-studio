@@ -725,7 +725,7 @@
     busy = v;
     sendBtn.classList.toggle('stop', v);
     sendBtn.title = v ? 'Ferma' : 'Manda';
-    sendBtn.replaceChildren(icon(v ? 'stop-circle' : 'send'));
+    sendBtn.replaceChildren(icon(v ? 'stop-circle' : 'arrow-up'));
     if (v) showWaiting();
     else hideWaiting();
   }
@@ -1248,7 +1248,7 @@
   // L'ordine e' fisso: prima il veloce, al centro il migliore, poi il bilanciato.
   const MODEL_CATALOG = [
     { key: 'haiku',  label: 'Haiku',  desc: 'Veloce', icon: 'flash' },
-    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond', premium: true },
+    { key: 'opus',   label: 'Opus',   desc: 'Il migliore', icon: 'diamond' },
     { key: 'sonnet', label: 'Sonnet', desc: 'Bilanciato', icon: 'pulse' },
   ];
 

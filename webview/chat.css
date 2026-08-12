@@ -478,50 +478,58 @@ body.wide .msg.user {
 .drawer-list {
   overflow-y: auto;
   padding: 0 9px 9px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 6px;
 }
 .drawer-empty {
+  grid-column: 1 / -1;
   padding: 10px 4px 14px;
   font-size: 12px;
   opacity: 0.9;
 }
 .hrow {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 11px;
   background: var(--card);
-  padding: 2px 4px 2px 2px;
+  padding: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
 }
 .hopen {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  text-align: left;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
   background: transparent;
   border: 0;
   color: var(--fg);
   font: inherit;
   cursor: pointer;
-  padding: 7px 9px;
+  padding: 10px 8px 4px;
 }
 .hsummary {
-  font-size: 12.5px;
+  font-size: 11.5px;
+  font-weight: 600;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
 }
 .hwhen {
-  font-size: 10.5px;
-  opacity: 0.85;
+  font-size: 10px;
+  opacity: 0.7;
 }
 .hfork {
   flex: 0 0 auto;
+  align-self: center;
+  margin-bottom: 6px;
 }
 
 /* ---------- conversazione ---------- */
@@ -1050,7 +1058,7 @@ body.wide .msg.user {
   padding: 3px;
   border-radius: var(--pill);
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.45);
   position: relative;
 }
 .modeseg-btn {
@@ -1341,10 +1349,10 @@ body.wide .msg.user {
   height: 30px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 9px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 16px;
-  color: #2b1409;
+  font-size: 15px;
+  color: #fff;
   background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
   transition: transform 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
 }
