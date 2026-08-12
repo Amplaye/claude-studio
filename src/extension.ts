@@ -1,15 +1,25 @@
 import * as vscode from 'vscode';
+import { ChatController } from './chat/controller';
+import { ChatPanel } from './chat/panel';
 import { ChatView } from './chat/view';
 
 export function activate(ctx: vscode.ExtensionContext) {
-  const chat = new ChatView(ctx);
+  const chat = new ChatController();
 
   ctx.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChatView.id, chat, {
+    vscode.window.registerWebviewViewProvider(ChatView.id, new ChatView(ctx, chat), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.commands.registerCommand('claudeStudio.show', () =>
+    ChatPanel.register(ctx, chat),
+    // "Apri" apre la scheda: e' la faccia principale. Il pannello laterale resta
+    // a portata di mano, ma da comando suo.
+    vscode.commands.registerCommand('claudeStudio.show', () => ChatPanel.open(ctx, chat)),
+    vscode.commands.registerCommand('claudeStudio.openTab', () => ChatPanel.open(ctx, chat)),
+    vscode.commands.registerCommand('claudeStudio.openSidebar', () =>
       vscode.commands.executeCommand('workbench.view.extension.claudeStudio')
+    ),
+    vscode.commands.registerCommand('claudeStudio.openTabBeside', () =>
+      ChatPanel.open(ctx, chat, vscode.ViewColumn.Beside)
     ),
     vscode.commands.registerCommand('claudeStudio.newSession', () => chat.newSession()),
     vscode.commands.registerCommand('claudeStudio.interrupt', () => chat.interrupt()),

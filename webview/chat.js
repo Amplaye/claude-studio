@@ -258,6 +258,10 @@
     if (!m || !m.k) return;
     switch (m.k) {
       case 'hello':
+        // Da scheda la colonna del testo si tiene stretta: righe lunghe due metri
+        // non si leggono. Il "apri come scheda" sparisce quando gia' ci sei.
+        document.body.classList.toggle('wide', m.surface === 'panel');
+        $('btnTab').hidden = m.surface === 'panel';
         showEmpty();
         break;
       case 'reset':
@@ -341,6 +345,7 @@
   });
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newSession' }));
+  $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   showEmpty();
   setBusy(false);

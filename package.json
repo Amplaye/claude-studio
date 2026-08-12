@@ -37,7 +37,20 @@
     "commands": [
       {
         "command": "claudeStudio.show",
-        "title": "Claude Studio: Apri"
+        "title": "Claude Studio: Apri la chat"
+      },
+      {
+        "command": "claudeStudio.openSidebar",
+        "title": "Claude Studio: Apri nel pannello laterale"
+      },
+      {
+        "command": "claudeStudio.openTab",
+        "title": "Claude Studio: Apri come scheda",
+        "icon": "media/open.svg"
+      },
+      {
+        "command": "claudeStudio.openTabBeside",
+        "title": "Claude Studio: Apri come scheda di fianco"
       },
       {
         "command": "claudeStudio.newSession",
@@ -48,6 +61,15 @@
         "title": "Claude Studio: Ferma"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeStudio.openTab",
+          "when": "view == claudeStudio.chat",
+          "group": "navigation@1"
+        }
+      ]
+    },
     "configuration": {
       "title": "Claude Studio",
       "properties": {

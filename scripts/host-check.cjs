@@ -15,10 +15,39 @@ const uri = (p) => ({
   toString: () => 'file:///' + p.replace(/\\/g, '/'),
 });
 
-const registered = { provider: null, commands: new Map() };
+const registered = { provider: null, commands: new Map(), panels: [] };
 const asked = [];
 
+/** Finta webview: raccoglie quello che le viene mandato e lascia rispondere. */
+function fakeWebview() {
+  const got = [];
+  const w = {
+    cspSource: 'vscode-webview://x',
+    options: {},
+    _html: '',
+    _onMsg: () => {},
+    got,
+    asWebviewUri: (u) => u,
+    onDidReceiveMessage: (fn) => {
+      w._onMsg = fn;
+      return { dispose() {} };
+    },
+    postMessage: async (m) => {
+      got.push(m);
+      return true;
+    },
+    set html(v) {
+      w._html = v;
+    },
+    get html() {
+      return w._html;
+    },
+  };
+  return w;
+}
+
 const vscode = {
+  ViewColumn: { Active: -1, Beside: -2, One: 1 },
   Uri: {
     file: uri,
     joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
@@ -27,6 +56,24 @@ const vscode = {
     registerWebviewViewProvider: (id, p) => {
       registered.provider = p;
       return { dispose() {} };
+    },
+    registerWebviewPanelSerializer: () => ({ dispose() {} }),
+    createWebviewPanel: (type, title, column, opts) => {
+      const panel = {
+        type,
+        title,
+        column,
+        opts,
+        webview: fakeWebview(),
+        iconPath: undefined,
+        reveal() {
+          panel.revealed = true;
+        },
+        dispose() {},
+        onDidDispose: () => ({ dispose() {} }),
+      };
+      registered.panels.push(panel);
+      return panel;
     },
     showWarningMessage: async (msg, _opts, ...items) => {
       asked.push(msg);
@@ -68,32 +115,11 @@ if (!registered.provider) {
   process.exit(1);
 }
 
-const got = [];
-let onMsg = () => {};
-const view = {
-  webview: {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      return true;
-    },
-    set html(v) {
-      this._html = v;
-    },
-    get html() {
-      return this._html;
-    },
-  },
-  onDidDispose: () => ({ dispose() {} }),
-};
-
+const view = { webview: fakeWebview(), onDidDispose: () => ({ dispose() {} }) };
 registered.provider.resolveWebviewView(view);
+
+const got = view.webview.got;
+const onMsg = (m) => view.webview._onMsg(m);
 
 // ---- la pagina: CSP, nonce, sprite, percorsi risolti ------------------------
 const html = view.webview.html || '';
@@ -119,6 +145,15 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
     }
   };
   await turns(1);
+
+  // A meta' conversazione si apre la scheda: deve ritrovarsi la stessa storia,
+  // gia' composta (niente frammenti di streaming da ridisegnare).
+  await registered.commands.get('claudeStudio.openTab')();
+  const panel = registered.panels[0];
+  if (panel) panel.webview._onMsg({ cmd: 'ready' });
+  // Tutto quello che la scheda riceve da qui in poi e' roba dal vivo del turno 2:
+  // il replay e' solo questo prefisso.
+  const replay = panel ? panel.webview.got.slice() : [];
 
   // Secondo turno: Read su un file del progetto passa da solo, Bash no. Serve per
   // vedere davvero il giro del permesso — richiesta, risposta, tool eseguito.
@@ -150,6 +185,34 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
     .map((m) => m.text)
     .join(' ');
   t(/claude-studio/.test(text), 'la risposta non contiene il dato letto dal file: ' + text.slice(0, 200));
+
+  // ---- la scheda ----
+  t(!!panel, 'la scheda non si e’ aperta');
+  const pg = panel ? panel.webview.got : [];
+  t(panel?.type === 'claudeStudio.panel', 'tipo di scheda sbagliato: ' + panel?.type);
+  t(panel?.opts?.retainContextWhenHidden === true, 'la scheda perde il contenuto quando la nascondi');
+  t(!!panel?.iconPath, 'la scheda non ha icona');
+  t(replay[0]?.k === 'hello' && replay[0]?.surface === 'panel', 'la scheda non si riconosce come scheda');
+  t(replay.some((m) => m.k === 'user' && /Read su package\.json/.test(m.text)), 'la scheda non ha ripreso la storia');
+  t(
+    replay.some((m) => m.k === 'block_final' && /claude-studio/.test(m.text || '')),
+    'la scheda non ha ripreso la risposta gia’ composta'
+  );
+  t(
+    !replay.some((m) => m.k === 'delta'),
+    'la scheda si e’ ripresa i frammenti di streaming invece del testo composto — id rimasti: ' +
+      JSON.stringify([...new Set(replay.filter((m) => m.k === 'delta').map((m) => m.id))])
+  );
+  const rStart = replay.filter((m) => m.k === 'tool_start');
+  const rEnd = replay.filter((m) => m.k === 'tool_end');
+  t(rStart.length > 0, 'la scheda non ha ripreso nessun tool del turno gia’ passato');
+  t(
+    rEnd.every((e) => rStart.some((s) => s.id === e.id)),
+    'nel replay un esito non corrisponde a nessun tool'
+  );
+  // e da qui in poi le due facce vedono le stesse cose
+  const after = (arr) => arr.filter((m) => m.k === 'tool_start').length;
+  t(after(pg) >= 1, 'la scheda non riceve i nuovi eventi');
 
   for (const d of ctx.subscriptions) d.dispose?.();
 

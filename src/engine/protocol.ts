@@ -5,7 +5,7 @@ export type BlockKind = 'text' | 'thinking';
 
 /** Estensione -> webview. */
 export type Wire =
-  | { k: 'hello'; cwd: string; project: string; cliVersion: string }
+  | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
   | { k: 'session'; id: string; model: string; cwd: string }
   | { k: 'user'; text: string }
   | { k: 'turn_start' }
@@ -24,4 +24,5 @@ export type Cmd =
   | { cmd: 'ready' }
   | { cmd: 'send'; text: string }
   | { cmd: 'interrupt' }
-  | { cmd: 'newSession' };
+  | { cmd: 'newSession' }
+  | { cmd: 'openTab' };

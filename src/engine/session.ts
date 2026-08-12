@@ -36,10 +36,12 @@ export class Session {
   private q?: Query;
   private running?: Promise<void>;
 
-  /** Numero progressivo del messaggio assistant nel turno: entra negli id dei blocchi. */
-  private msgSeq = 0;
-  /** indice del content block -> id assegnato alla webview, per il messaggio in corso. */
-  private live = new Map<number, string>();
+  /** id del messaggio API in corso: entra negli id dei blocchi, che restano unici. */
+  private msgId = '';
+  /** indice del content block -> testo accumulato dallo streaming. */
+  private acc = new Map<number, { id: string; kind: 'text' | 'thinking'; text: string }>();
+  /** Messaggi che hanno prodotto almeno un blocco in streaming. */
+  private streamed = new Set<string>();
 
   sessionId?: string;
   model = '';
@@ -166,7 +168,7 @@ export class Session {
         return;
 
       case 'assistant':
-        this.onAssistant(m.message.content as any[]);
+        this.onAssistant(m.message.id, m.message.content as any[]);
         return;
 
       case 'user':
@@ -174,6 +176,7 @@ export class Session {
         return;
 
       case 'result': {
+        this.acc.clear();
         const ok = m.subtype === 'success';
         const u: any = (m as any).usage ?? {};
         this.o.emit({
@@ -200,51 +203,66 @@ export class Session {
   private onStreamEvent(ev: any) {
     switch (ev?.type) {
       case 'message_start':
-        this.msgSeq++;
-        this.live.clear();
+        this.msgId = ev.message?.id || `m${Date.now()}`;
+        this.acc.clear();
+        if (this.streamed.size > 64) this.streamed.clear();
         this.o.emit({ k: 'turn_start' });
         return;
 
       case 'content_block_start': {
         const kind = blockKind(ev.content_block?.type);
-        if (!kind) return; // tool_use: lo prendiamo dal messaggio completo, con l'input gia' valido
-        const id = `b${this.msgSeq}_${ev.index}`;
-        this.live.set(ev.index, id);
+        if (!kind) return; // tool_use: lo prende il messaggio completo, con l'input gia' valido
+        const id = `${this.msgId}_${ev.index}`;
+        this.acc.set(ev.index, { id, kind, text: '' });
+        this.streamed.add(this.msgId);
         this.o.emit({ k: 'block_start', id, kind });
         return;
       }
 
       case 'content_block_delta': {
-        const id = this.live.get(ev.index);
-        if (!id) return;
+        const b = this.acc.get(ev.index);
+        if (!b) return;
         const d = ev.delta;
         const thinking = d?.type === 'thinking_delta';
         const text = d?.type === 'text_delta' ? d.text : thinking ? d.thinking : '';
-        if (text) this.o.emit({ k: 'delta', id, kind: thinking ? 'thinking' : 'text', text });
+        if (!text) return;
+        b.text += text;
+        this.o.emit({ k: 'delta', id: b.id, kind: b.kind, text });
+        return;
+      }
+
+      // Il confine giusto per chiudere un blocco e' questo, non il messaggio
+      // assistant completo: quello arriva PRIMA che il blocco finisca di scorrere,
+      // e chiudere li' lasciava per strada i frammenti arrivati dopo.
+      case 'content_block_stop': {
+        const b = this.acc.get(ev.index);
+        if (!b) return;
+        this.acc.delete(ev.index);
+        this.o.emit({ k: 'block_final', id: b.id, kind: b.kind, text: b.text });
         return;
       }
     }
   }
 
   /**
-   * Il messaggio assistant completo arriva dopo lo streaming: e' la versione
-   * autorevole. I blocchi gia' mostrati vengono richiusi col testo definitivo
-   * (niente doppioni), quelli mai visti in streaming vengono creati ora.
+   * Del messaggio assistant completo servono i tool: hanno l'input gia' valido,
+   * mentre in streaming arriva a pezzi di JSON. Il testo lo possiede lo streaming;
+   * si prende da qui solo se per quel messaggio lo streaming non ha prodotto niente.
    */
-  private onAssistant(content: any[]) {
+  private onAssistant(msgId: string, content: any[]) {
     if (!Array.isArray(content)) return;
+    const viaStream = this.streamed.has(msgId);
     content.forEach((b, i) => {
       if (b?.type === 'tool_use') {
         this.o.emit({ k: 'tool_start', id: b.id, name: b.name, input: b.input });
         return;
       }
+      if (viaStream) return;
       const kind = blockKind(b?.type);
       if (!kind) return;
       const text = kind === 'text' ? b.text ?? '' : b.thinking ?? '';
-      const id = this.live.get(i) ?? `b${this.msgSeq}_${i}`;
-      this.o.emit({ k: 'block_final', id, kind, text });
+      this.o.emit({ k: 'block_final', id: `${msgId}_${i}`, kind, text });
     });
-    this.live.clear();
   }
 
   /**

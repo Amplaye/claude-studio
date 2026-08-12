@@ -9,6 +9,31 @@ body {
   overflow: hidden;
 }
 
+/* Da scheda a tutto schermo lo spazio in piu' diventa margine, non righe lunghe
+   due metri: la colonna di lettura resta della stessa larghezza del pannello.
+   E' un margine, non un contenitore centrato, cosi' i messaggi tuoi restano
+   allineati a destra come nella faccia stretta. */
+body.wide {
+  --gutter: max(16px, calc((100% - 860px) / 2));
+}
+body.wide .top,
+body.wide .log {
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+body.wide .log {
+  padding-top: 22px;
+  gap: 14px;
+}
+/* stesso margine del log: il campo di scrittura resta incolonnato coi messaggi */
+body.wide .composer {
+  margin-left: var(--gutter);
+  margin-right: var(--gutter);
+}
+body.wide .msg.user {
+  max-width: 640px;
+}
+
 /* ---------- testata ---------- */
 .top {
   flex: 0 0 auto;

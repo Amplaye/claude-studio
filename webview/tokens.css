@@ -25,6 +25,12 @@
   box-sizing: border-box;
 }
 
+/* Un display: dichiarato in una classe batte la regola [hidden] del browser:
+   senza questa riga un elemento con `hidden = true` resta bello visibile. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   font-family: var(--sans);
