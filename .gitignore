@@ -9,3 +9,8 @@ media/ionicons-studio.woff2
 
 # helper temporanei driver browser
 .az-shot.png
+
+# token di pubblicazione - MAI committare
+.publish-tokens.json
+.publish-error.png
+.publish-last.png
