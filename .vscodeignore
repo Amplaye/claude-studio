@@ -1,6 +1,9 @@
 .vscode/**
 .gitignore
 .git/**
+# Roba di sviluppo su questa macchina: nel pacchetto pubblico non ci va.
+.claude/**
+*.vsix
 node_modules/**
 src/**
 webview/**
@@ -11,3 +14,6 @@ tsconfig.json
 icons.json
 package-lock.json
 **/*.map
+# Le immagini del README stanno su GitHub: nel pacchetto peserebbero e basta,
+# perche' il Marketplace le va comunque a prendere dai link assoluti.
+docs/**

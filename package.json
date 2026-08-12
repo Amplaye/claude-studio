@@ -1,17 +1,39 @@
 {
   "name": "claude-studio",
   "displayName": "Claude Studio",
-  "description": "Chat Claude Code e barra di contesto in una sola estensione.",
+  "description": "Claude Code dentro VS Code: chat, permessi da approvare con un clic e quanto contesto ti resta, sempre sott'occhio.",
   "version": "0.5.0",
-  "publisher": "local",
+  "publisher": "mr-wilson",
   "license": "MIT",
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
+    "AI",
+    "Chat",
+    "Programming Languages",
     "Other"
   ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "anthropic",
+    "ai",
+    "chat"
+  ],
+  "galleryBanner": {
+    "color": "#1a1614",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mr-wilson-dev/claude-studio.git"
+  },
+  "homepage": "https://github.com/mr-wilson-dev/claude-studio#readme",
+  "bugs": {
+    "url": "https://github.com/mr-wilson-dev/claude-studio/issues"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -228,7 +250,9 @@
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "package": "node build.mjs && vsce package --no-dependencies --allow-missing-repository --skip-license -o claude-studio.vsix",
+    "package": "node build.mjs && vsce package --no-dependencies -o claude-studio.vsix",
+    "publish": "npm run verify && npm run package && vsce publish --no-dependencies --packagePath claude-studio.vsix",
+    "publish:ovsx": "npm run package && ovsx publish claude-studio.vsix",
     "typecheck": "tsc --noEmit",
     "icon": "node scripts/make-icon.mjs",
     "preview": "node build.mjs && node scripts/preview.mjs",
