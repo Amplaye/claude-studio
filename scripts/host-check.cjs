@@ -38,8 +38,9 @@ const uri = (p) => ({
   toString: () => 'file:///' + p.replace(/\\/g, '/'),
 });
 
-const registered = { provider: null, commands: new Map(), panels: [] };
+const registered = { provider: null, views: new Map(), commands: new Map(), panels: [] };
 const asked = [];
+let statusBar;
 
 /** Finta webview: raccoglie quello che le viene mandato e lascia rispondere. */
 function fakeWebview() {
@@ -71,16 +72,34 @@ function fakeWebview() {
 
 const vscode = {
   ViewColumn: { Active: -1, Beside: -2, One: 1 },
+  StatusBarAlignment: { Left: 1, Right: 2 },
   DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
   TextEditorRevealType: { InCenter: 2 },
+  ThemeColor: class {
+    constructor(id) {
+      this.id = id;
+    }
+  },
+  MarkdownString: class {
+    constructor(v) {
+      this.value = v;
+    }
+  },
   Uri: {
     file: uri,
     joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
     from: (o) => uri(o.path || ''),
   },
   window: {
+    createStatusBarItem: () => {
+      statusBar = { text: '', tooltip: '', show() {}, hide() {}, dispose() {} };
+      return statusBar;
+    },
+    showInputBox: async () => undefined,
+    onDidChangeWindowState: () => ({ dispose() {} }),
     registerWebviewViewProvider: (id, p) => {
-      registered.provider = p;
+      registered.views.set(id, p);
+      if (id === 'claudeStudio.chat') registered.provider = p;
       return { dispose() {} };
     },
     registerWebviewPanelSerializer: () => ({ dispose() {} }),
@@ -92,11 +111,13 @@ const vscode = {
         opts,
         webview: fakeWebview(),
         iconPath: undefined,
+        active: true,
         reveal() {
           panel.revealed = true;
         },
         dispose() {},
         onDidDispose: () => ({ dispose() {} }),
+        onDidChangeViewState: () => ({ dispose() {} }),
       };
       registered.panels.push(panel);
       return panel;
@@ -113,6 +134,8 @@ const vscode = {
     onDidChangeTextEditorSelection: () => ({ dispose() {} }),
     tabGroups: {
       all: [{ tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] }],
+      onDidChangeTabs: () => ({ dispose() {} }),
+      onDidChangeTabGroups: () => ({ dispose() {} }),
     },
   },
   languages: {
@@ -136,6 +159,8 @@ const vscode = {
     findFiles: async () => [uri(path.join(root, 'package.json'))],
     openTextDocument: async () => ({ getText: () => '' }),
     registerTextDocumentContentProvider: () => ({ dispose() {} }),
+    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
+    onDidChangeConfiguration: () => ({ dispose() {} }),
     fs: { stat: async () => ({}) },
     asRelativePath: (p) => {
       const s = String(p?.fsPath ?? p);
@@ -168,7 +193,12 @@ if (!registered.provider) {
   process.exit(1);
 }
 
-const view = { webview: fakeWebview(), onDidDispose: () => ({ dispose() {} }) };
+const view = {
+  webview: fakeWebview(),
+  visible: true,
+  onDidChangeVisibility: () => ({ dispose() {} }),
+  onDidDispose: () => ({ dispose() {} }),
+};
 registered.provider.resolveWebviewView(view);
 
 const got = view.webview.got;
@@ -245,8 +275,28 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   });
   await turns(4);
 
-  // ---- cronologia: elenco, ripescaggio e ripresa ----
   const sessionId = (got.find((m) => m.k === 'session') || {}).id;
+
+  // ---- la barra di contesto vede la conversazione appena fatta ----
+  // E' il motivo per cui chat e barra stanno nella stessa estensione: la sessione
+  // l'ha aperta lei, quindi non c'e' niente da indovinare.
+  const ctxProvider = registered.views.get('claudeStudio.context');
+  const ctxView = {
+    webview: fakeWebview(),
+    visible: true,
+    onDidChangeVisibility: () => ({ dispose() {} }),
+    onDidDispose: () => ({ dispose() {} }),
+  };
+  if (ctxProvider) ctxProvider.resolveWebviewView(ctxView);
+  ctxView.webview._onMsg({ cmd: 'ready' });
+  await new Promise((r) => setTimeout(r, 300));
+  const ctxData = [...ctxView.webview.got].reverse().find((m) => m.k === 'data')?.d;
+  const mine = ctxData?.cards?.find((c) => c.own);
+  // La barra di stato va fotografata adesso: piu' avanti la prova azzera la
+  // conversazione per provare la cronologia, e li' e' giusto che non dica piu' niente.
+  const ctxStatus = statusBar?.text ?? '';
+
+  // ---- cronologia: elenco, ripescaggio e ripresa ----
   // `from` non e' un dettaglio: senza, l'attesa trova subito i messaggi vecchi e
   // non aspetta proprio niente.
   const waitFor = async (pred, from, ms = 20000) => {
@@ -269,6 +319,26 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   const kinds = got.map((m) => m.k);
   const fails = [...pageFails];
   const t = (c, m) => !c && fails.push(m);
+
+  t(!!ctxProvider, 'il pannello del contesto non e’ registrato');
+  t(!!ctxData, 'il pannello del contesto non riceve dati');
+  t(!!mine, 'la conversazione della chat non compare nella barra di contesto');
+  t(
+    mine?.id === sessionId,
+    'la card della chat non e’ agganciata alla sessione vera: ' + mine?.id + ' invece di ' + sessionId
+  );
+  t(ctxData?.focusHow === 'studio', 'l’aggancio della nostra chat passa dall’euristica: ' + ctxData?.focusHow);
+  t(!!mine?.focused, 'la conversazione aperta dalla chat non risulta quella in cui sei');
+  t(/\d/.test(mine?.tokens || ''), 'la card della chat non riporta il contesto: ' + mine?.tokens);
+  t(/^\$/.test(mine?.cost || ''), 'la card della chat non riporta il costo: ' + mine?.cost);
+  t(
+    /studio-chat/.test(ctxStatus) && /ctx \d/.test(ctxStatus),
+    'la barra di stato non racconta la conversazione della chat: ' + ctxStatus
+  );
+  t(
+    !/\$\((pulse|warning|error|comment-discussion|layers|dashboard|git-branch|circle-slash)\)/.test(ctxStatus),
+    'la barra di stato usa le icone native invece delle Ionicons: ' + ctxStatus
+  );
 
   t(kinds.includes('hello'), 'nessun hello');
   t(kinds.includes('session'), 'la sessione non e’ mai partita: ' + JSON.stringify(got.slice(0, 4)));

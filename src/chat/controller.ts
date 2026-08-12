@@ -6,6 +6,7 @@ import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-ag
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
 import type { AskKind, AskQuestion, Mode, Pasted, Wire } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
+import { owned } from '../context/owned';
 import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
@@ -124,6 +125,7 @@ export class ChatController {
     this.session = undefined;
     this.history = [];
     this.busy = false;
+    owned.end(); // la card della barra di contesto non ha piu' niente da mostrare
     this.broadcast({ k: 'reset' });
     this.broadcast({ k: 'mode', value: this.mode });
   }
@@ -138,6 +140,7 @@ export class ChatController {
   dispose() {
     this.closeAllPending('Estensione chiusa.');
     this.session?.dispose();
+    owned.end();
   }
 
   // ---- permessi ----------------------------------------------------------
@@ -282,6 +285,9 @@ export class ChatController {
 
   private emit(e: Wire) {
     this.remember(e);
+    // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
+    // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
+    owned.observe(e, currentCwd());
     this.broadcast(e);
   }
 

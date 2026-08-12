@@ -1,6 +1,7 @@
 # Claude Studio
 
 Chat di Claude Code e barra di contesto, in una sola estensione di VSCode.
+Nella barra laterale ci sono tutte e due: **Chat** sopra, **Contesto** sotto.
 
 La chat non ha un motore proprio: parla con la CLI `claude` gia' installata sul PC
 attraverso l'Agent SDK ufficiale. Da li' arrivano gratis autenticazione, modelli,
@@ -31,7 +32,21 @@ che vive nel motore, non nell'interfaccia.
     l'editor gia' conosce, file aperti e selezione, apertura di un file su una riga.
   - **Testata**: modello, modalita', contesto dell'ultimo turno e costo della
     conversazione.
-- Fase 3: la context bar assorbita.
+- **Fase 3 — fatta**: la context bar assorbita.
+  - **Pannello "Contesto"**: uso dell'account (5h e 7 giorni, con quanto manca al
+    reset), una card per conversazione aperta con contesto, token, **costo** e barra
+    che scivola, e in fondo progetto, ramo git e totale speso.
+  - **Barra di stato**: dove sei, il contesto, quante conversazioni, l'uso
+    dell'account, il ramo — con **Ionicons cotte in un font su misura**, perche' li'
+    VSCode disegna solo icone che arrivano da un font.
+  - **Il legame certo**: la conversazione aperta dalla chat non viene indovinata.
+    Id, titolo, se sta lavorando e se la stai guardando li sa questa stessa
+    estensione. Per le tab dell'ufficiale resta l'euristica, e la card lo dichiara
+    ("stimata", "ultima attiva") invece di far finta di saperlo.
+  - **Difetti della 0.0.6 corretti**: costo sommato su **tutto** il transcript (e
+    finalmente mostrato), gruppi editor oltre il quarto raggiungibili, `~/.claude`
+    creata se manca, codice morto tolto, e i nostri due file in `~/.claude`
+    rinominati per non pestare i piedi alla 0.0.6 finche' resta installata.
 - Fase 4: repertorio completo delle animazioni e rifinitura.
 
 Il piano completo, con le indagini gia' fatte sul protocollo e i percorsi del
@@ -68,6 +83,21 @@ materiale di riferimento, sta in
   ospita un server MCP dentro il nostro stesso processo (`createSdkMcpServer`).
   Quindi e' una funzione, non una porta di rete — e non litiga con quello
   dell'estensione ufficiale, che resta installata.
+- Per la barra di stato servono le Ionicons **piene**, non le outline: un glifo di un
+  font e' una forma riempita, e un'icona fatta di sole linee sparisce. La build se ne
+  accorge da sola (rifiuta gli SVG con `stroke=` e i glifi senza tracciato) invece di
+  lasciarti scoprire i quadratini a estensione installata.
+- Il costo nel transcript sta su **due chiavi diverse**: `costUSD` riga per riga e a
+  volte un `totalCostUsd` che e' gia' il totale. Se c'e' il totale vince lui,
+  altrimenti si somma. E si somma **anche** quello dei sub-agent, che sono soldi veri.
+- Il **contesto** invece no: i messaggi dei sub-agent hanno `isSidechain: true` e una
+  finestra tutta loro. Prendere l'ultimo `usage` senza guardare quel campo fa crollare
+  la percentuale del discorso principale appena parte un Task.
+- Rifare le celle dell'account a ogni giro sembra innocuo e non lo e': con una barra
+  animata, ricostruirla ogni secondo e mezzo rilancia la scia **per sempre**. La regola
+  "costruisci una volta, poi ridipingi" vale anche per le due celle in testa.
+- `os.homedir()` su Windows legge `USERPROFILE`: basta cambiarlo prima di caricare il
+  bundle e le prove scrivono in una cartella usa e getta invece che nella tua.
 
 ## Sviluppo
 
@@ -79,16 +109,26 @@ npm run package     # produce claude-studio.vsix
 npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
 ```
 
-`npm run verify` mette insieme le tre prove:
+`npm run verify` mette insieme le prove:
 
 - `ui-check` fa recitare alla webview un turno intero, in entrambe le facce, con due
   tool in parallelo che finiscono in ordine invertito — e controlla che ogni esito
   stia sotto il tool giusto. Poi clicca davvero le tre schede di permesso e cambia
   modalita' dalla testata, controllando cosa parte verso l'estensione.
-- `host-check` carica `dist/extension.js` con un `vscode` finto e gli fa fare tre
-  turni sulla CLI vera: sessione, streaming, permesso chiesto e concesso *dentro la
-  chat*, "Consenti sempre" che al turno dopo non richiede piu' niente, e la scheda
-  aperta a meta' discorso che si riprende la storia.
+- `context-check` fa lo stesso col pannello del contesto: controlla che le card si
+  **ridipingano** invece di essere ricreate (marchia un nodo e verifica che
+  sopravviva ai giri seguenti), che la barra scivoli e la scia non riparta da sola,
+  che un aggancio incerto sia dichiarato, e che costo e totale si vedano.
+- `data-check` carica `dist/extension.js` con un `vscode` finto **e una cartella
+  utente usa e getta**, e prova i conti: costo sommato su tutto un transcript da
+  400 KB (non solo sulla coda), letture incrementali quando il file cresce, il
+  sub-agent che non deve coprire il contesto vero, il quinto gruppo di editor
+  raggiunto, `~/.claude` creata se manca, i file scritti con i nomi nostri.
+- `host-check` carica lo stesso bundle e gli fa fare quattro turni sulla CLI vera:
+  sessione, streaming, permesso chiesto e concesso *dentro la chat*, "Consenti
+  sempre" che al turno dopo non richiede piu' niente, la scheda aperta a meta'
+  discorso che si riprende la storia — e che la conversazione appena fatta compaia
+  nella barra di contesto **senza euristica** (`focusHow: studio`).
 - `smoke` e `trace-order` sono le prove secche del motore, utili quando si sospetta
   che sia cambiato qualcosa nel protocollo.
 
@@ -112,3 +152,21 @@ Per installarla: `npm run package` e poi
 L'estensione **non** impacchetta una copia di `claude`: usa quella installata
 globalmente. Se sta in un posto insolito, il percorso di `cli.js` si indica in
 Impostazioni → Claude Studio → Cli Path.
+
+## Impostazioni
+
+| Chiave | Cosa fa |
+|---|---|
+| `claudeStudio.cliPath` | Percorso di `cli.js`. Vuoto = lo trova da solo. |
+| `claudeStudio.contextLimit` | La finestra di contesto su cui si calcola la %. |
+| `claudeStudio.refreshSeconds` | Ogni quanto la barra di contesto rifa' i conti (1,5s). |
+| `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |
+
+## Convivenza con la context-bar 0.0.6
+
+Finche' restano installate tutte e due non si pestano i piedi: i due file in
+`~/.claude` hanno nomi diversi (`.claude-studio-usage.json` e
+`claude-studio-session-names.json`), quindi anche i nomi che dai alle sessioni sono
+separati. Le percentuali invece devono coincidere: si leggono dagli stessi
+transcript. Il costo no — quello la 0.0.6 lo sottostima sulle conversazioni lunghe,
+ed e' uno dei difetti corretti qui.

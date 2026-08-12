@@ -132,6 +132,17 @@
   }
 }
 
+/* Il pallino di una sessione che sta scrivendo proprio ora. */
+@keyframes cs-ping {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
 /* ---- applicazione ---- */
 
 .msg {
@@ -236,6 +247,33 @@
   box-shadow: 0 14px 30px -20px var(--claude-1), 0 0 0 1px color-mix(in srgb, var(--claude-1) 30%, transparent);
 }
 
+/* ---- il pannello del contesto ---- */
+
+.ctxcard {
+  animation: cs-enter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+.dot.busy {
+  animation: cs-ping 1.5s ease-in-out infinite;
+}
+
+/* La barra scivola fino al valore nuovo invece di saltarci. */
+.fill {
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+}
+
+/* E mentre scivola si porta dietro una scia: e' l'unico momento in cui una barra
+   ferma da minuti si fa notare. */
+.fill.glide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: var(--pill);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  animation: cs-sweep 0.8s ease-out both;
+}
+
 /* Se il sistema chiede meno movimento restano solo le dissolvenze. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -247,7 +285,9 @@
   }
   .msg,
   .perm,
-  .chunk {
+  .chunk,
+  .ctxcard,
+  .fill.glide::after {
     animation: none !important;
   }
   .caret {
@@ -266,6 +306,7 @@
 .offscreen .tool-bar::after,
 .offscreen .tool-ico,
 .offscreen .perm-ico,
-.offscreen .caret {
+.offscreen .caret,
+.offscreen .dot.busy {
   animation-play-state: paused;
 }

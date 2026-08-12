@@ -1,0 +1,326 @@
+/* Il pannello del contesto. Impianto e proporzioni vengono dalla context-bar 0.0.6:
+   il colore lo portano barre, pallini e gradienti, il testo resta bianco pieno e la
+   gerarchia la fanno dimensione e peso. */
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 0 13px;
+  overflow: hidden;
+}
+
+.grow {
+  flex: 1 1 auto;
+}
+
+.lab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  opacity: 0.75;
+  cursor: pointer;
+  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.iconbtn:hover {
+  opacity: 1;
+  border-color: var(--line);
+}
+.iconbtn:active {
+  transform: scale(0.94);
+}
+
+/* ---------- testata: l'account ---------- */
+
+.hdr {
+  flex: 0 0 auto;
+  margin: 0 -13px 4px;
+  padding: 11px 13px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 6px 14px -12px rgba(0, 0, 0, 0.9);
+}
+
+.hdr-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+/* Due colonne se il pannello e' largo, in colonna se lo stringi. */
+.acct {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 10px 16px;
+}
+
+.acell {
+  min-width: 0;
+}
+.an {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.av {
+  margin-top: 2px;
+  font-size: 27px;
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+.ar {
+  margin-top: 4px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.await {
+  grid-column: 1 / -1;
+  font-size: 13px;
+}
+
+/* ---------- la riga della sezione ---------- */
+
+.secline {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 14px 0 8px;
+}
+
+.count {
+  padding: 1px 7px;
+  border-radius: var(--pill);
+  background: var(--line);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* ---------- le card ---------- */
+
+.cards {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ctxcard {
+  /* Senza `flex: 0 0 auto` la colonna schiaccia le card appena superano
+     l'altezza del pannello, invece di far scorrere. */
+  flex: 0 0 auto;
+  position: relative;
+  padding: 11px 13px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--card);
+  cursor: pointer;
+  overflow: hidden;
+}
+.ctxcard:active {
+  transform: scale(0.995);
+}
+
+/* La sessione in cui sei: gradiente argilla->pesca, niente barrette laterali. */
+.ctxcard.focused {
+  border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--claude-1) 30%, transparent) 0%,
+      color-mix(in srgb, var(--claude-2) 13%, transparent) 48%,
+      transparent 92%
+    ),
+    var(--card);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--claude-2) 22%, transparent),
+    0 8px 22px -14px var(--claude-1);
+}
+
+.chead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.32);
+  transition: background 0.2s ease;
+}
+.dot.recent {
+  background: color-mix(in srgb, var(--ok) 60%, rgba(255, 255, 255, 0.35));
+}
+.dot.busy {
+  background: var(--ok);
+}
+
+.cico {
+  flex: 0 0 auto;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.cname {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.3;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
+  color: #2b1409;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ren {
+  flex: 0 0 auto;
+  opacity: 0;
+}
+.ctxcard:hover .ren {
+  opacity: 0.85;
+}
+
+.cmeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11.5px;
+}
+
+.tabpill {
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+/* La nostra conversazione: la pillola porta l'accento, perche' qui il legame e'
+   certo e non una somiglianza di nomi. */
+.ctxcard.own .tabpill {
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  color: var(--claude-2);
+}
+
+.csub {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.crow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.cpct {
+  font-size: 23px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.cnums {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  min-width: 0;
+}
+.ccost {
+  opacity: 0.9;
+}
+
+.bar {
+  position: relative;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+}
+
+.empty {
+  padding: 12px 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* ---------- il piede ---------- */
+
+.foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -13px;
+  padding: 8px 13px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+}
+.fitem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.foot .ico {
+  opacity: 0.75;
+}

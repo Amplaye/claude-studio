@@ -2,6 +2,7 @@
 // Una sola alla volta — riaprirla la riporta in primo piano invece di duplicarla —
 // e sopravvive al ricaricamento della finestra grazie al serializer.
 import * as vscode from 'vscode';
+import { owned } from '../context/owned';
 import { bindWebview } from './bind';
 import type { ChatController } from './controller';
 
@@ -46,8 +47,14 @@ export class ChatPanel {
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'activity.svg');
 
     const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel');
+    // Scheda in primo piano = so per certo che conversazione stai guardando: e' il
+    // caso in cui la barra di contesto non ha proprio niente da indovinare.
+    owned.setPanelActive(panel.active);
+    const state = panel.onDidChangeViewState(() => owned.setPanelActive(panel.active));
     panel.onDidDispose(() => {
+      state.dispose();
       listener.dispose();
+      owned.setPanelActive(false);
       chat.detach(surface);
       if (ChatPanel.current === this) ChatPanel.current = undefined;
     });

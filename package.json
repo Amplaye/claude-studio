@@ -31,8 +31,71 @@
           "type": "webview",
           "id": "claudeStudio.chat",
           "name": "Chat"
+        },
+        {
+          "type": "webview",
+          "id": "claudeStudio.context",
+          "name": "Contesto"
         }
       ]
+    },
+    "icons": {
+      "studio-chat": {
+        "description": "Ionicons chatbubble-ellipses",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "studio-pulse": {
+        "description": "Ionicons pulse",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E002"
+        }
+      },
+      "studio-warn": {
+        "description": "Ionicons warning",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E003"
+        }
+      },
+      "studio-alert": {
+        "description": "Ionicons alert-circle",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E004"
+        }
+      },
+      "studio-layers": {
+        "description": "Ionicons layers",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E005"
+        }
+      },
+      "studio-gauge": {
+        "description": "Ionicons speedometer",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E006"
+        }
+      },
+      "studio-branch": {
+        "description": "Ionicons git-branch",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E007"
+        }
+      },
+      "studio-off": {
+        "description": "Ionicons remove-circle",
+        "default": {
+          "fontPath": "media/ionicons-studio.woff2",
+          "fontCharacter": "\\E008"
+        }
+      }
     },
     "commands": [
       {
@@ -59,6 +122,19 @@
       {
         "command": "claudeStudio.interrupt",
         "title": "Claude Studio: Ferma"
+      },
+      {
+        "command": "claudeStudio.context.show",
+        "title": "Claude Studio: Apri il pannello del contesto"
+      },
+      {
+        "command": "claudeStudio.context.refresh",
+        "title": "Claude Studio: Aggiorna il contesto",
+        "icon": "$(studio-pulse)"
+      },
+      {
+        "command": "claudeStudio.context.diagnose",
+        "title": "Claude Studio: Cosa vede la barra di contesto"
       }
     ],
     "menus": {
@@ -67,6 +143,16 @@
           "command": "claudeStudio.openTab",
           "when": "view == claudeStudio.chat",
           "group": "navigation@1"
+        },
+        {
+          "command": "claudeStudio.context.refresh",
+          "when": "view == claudeStudio.context",
+          "group": "navigation@1"
+        },
+        {
+          "command": "claudeStudio.context.diagnose",
+          "when": "view == claudeStudio.context",
+          "group": "1_studio"
         }
       ]
     },
@@ -82,6 +168,17 @@
           "type": "number",
           "default": 1000000,
           "description": "Finestra di contesto totale in token (per il calcolo della %)."
+        },
+        "claudeStudio.refreshSeconds": {
+          "type": "number",
+          "default": 1.5,
+          "minimum": 0.5,
+          "description": "Ogni quanto la barra di contesto rifà i conti. Sotto mezzo secondo non si scende."
+        },
+        "claudeStudio.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mostra la sessione, il contesto e l'uso dell'account nella barra di stato."
         }
       }
     }
@@ -92,10 +189,11 @@
     "package": "node build.mjs && vsce package --no-dependencies --allow-missing-repository --skip-license -o claude-studio.vsix",
     "typecheck": "tsc --noEmit",
     "preview": "node build.mjs && node scripts/preview.mjs",
-    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs",
+    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs",
     "smoke": "node scripts/smoke-engine.mjs",
+    "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
-    "verify": "npm run typecheck && npm run ui-check && node scripts/host-check.cjs"
+    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -103,6 +201,9 @@
     "@vscode/vsce": "^3.7.0",
     "esbuild": "^0.28.0",
     "playwright": "^1.60.0",
+    "svg2ttf": "^6.1.0",
+    "svgicons2svgfont": "^15.0.1",
+    "ttf2woff2": "^8.0.1",
     "typescript": "^5.9.3"
   },
   "dependencies": {

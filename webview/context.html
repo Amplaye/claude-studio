@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <link rel="stylesheet" href="{{tokensCss}}" />
+    <link rel="stylesheet" href="{{motionCss}}" />
+    <link rel="stylesheet" href="{{contextCss}}" />
+    <title>Contesto</title>
+  </head>
+  <body>
+    {{sprite}}
+
+    <header class="hdr">
+      <div class="hdr-top">
+        <span class="lab"><svg class="ico"><use href="#ion-speedometer" /></svg>Account</span>
+        <span class="grow"></span>
+        <button class="iconbtn" id="btnDiag" title="Cosa vede l’estensione">
+          <svg class="ico"><use href="#ion-eye" /></svg>
+        </button>
+        <button class="iconbtn" id="btnRefresh" title="Aggiorna adesso">
+          <svg class="ico"><use href="#ion-refresh" /></svg>
+        </button>
+      </div>
+      <div class="acct" id="acct"></div>
+    </header>
+
+    <div class="secline">
+      <span class="lab"><svg class="ico"><use href="#ion-layers" /></svg>Sessioni</span>
+      <span class="count" id="count">0</span>
+    </div>
+
+    <main class="cards" id="cards"></main>
+
+    <footer class="foot">
+      <span class="fitem" id="fproject" title="Progetto">
+        <svg class="ico"><use href="#ion-cube" /></svg><span id="fprojectName">—</span>
+      </span>
+      <span class="fitem" id="fbranch" title="Ramo git" hidden>
+        <svg class="ico"><use href="#ion-git-branch" /></svg><span id="fbranchName"></span>
+      </span>
+      <span class="grow"></span>
+      <span class="fitem" id="fcost" title="Speso in tutto dalle conversazioni aperte">
+        <svg class="ico"><use href="#ion-cash" /></svg><span id="fcostVal">$0</span>
+      </span>
+    </footer>
+
+    <script nonce="{{nonce}}" src="{{contextJs}}"></script>
+  </body>
+</html>

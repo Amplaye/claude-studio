@@ -89,8 +89,25 @@ const vscode = {
     }
     dispose() {}
   },
+  StatusBarAlignment: { Left: 1, Right: 2 },
+  ThemeColor: class {
+    constructor(id) {
+      this.id = id;
+    }
+  },
+  MarkdownString: class {
+    constructor(v) {
+      this.value = v;
+    }
+  },
   window: {
-    registerWebviewViewProvider: (id, p) => ((registered.provider = p), { dispose() {} }),
+    // La barra di stato qui non la vede nessuno, ma l'estensione la crea comunque.
+    createStatusBarItem: () => ({ text: '', tooltip: '', show() {}, hide() {}, dispose() {} }),
+    showInputBox: async () => undefined,
+    onDidChangeWindowState: () => ({ dispose() {} }),
+    registerWebviewViewProvider: (id, p) => (
+      id === 'claudeStudio.chat' && (registered.provider = p), { dispose() {} }
+    ),
     registerWebviewPanelSerializer: () => ({ dispose() {} }),
     createWebviewPanel: (type, title, column, opts) => {
       const panel = {
@@ -99,9 +116,11 @@ const vscode = {
         column,
         opts,
         webview: fakeWebview(),
+        active: false,
         reveal() {},
         dispose() {},
         onDidDispose: () => ({ dispose() {} }),
+        onDidChangeViewState: () => ({ dispose() {} }),
       };
       registered.panels.push(panel);
       return panel;
@@ -116,6 +135,8 @@ const vscode = {
     onDidChangeTextEditorSelection: () => ({ dispose() {} }),
     tabGroups: {
       all: [{ tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] }],
+      onDidChangeTabs: () => ({ dispose() {} }),
+      onDidChangeTabGroups: () => ({ dispose() {} }),
     },
   },
   commands: {
@@ -138,6 +159,8 @@ const vscode = {
     openTextDocument: async () => ({ getText: () => '' }),
     onDidChangeTextDocument: () => ({ dispose() {} }),
     registerTextDocumentContentProvider: () => ({ dispose() {} }),
+    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
+    onDidChangeConfiguration: () => ({ dispose() {} }),
     fs: { stat: async () => ({}) },
     asRelativePath: (p) => {
       const s = String(p?.fsPath ?? p);
@@ -242,7 +265,12 @@ function memento() {
 }
 ext.activate(ctx);
 
-const view = { webview: fakeWebview(), onDidDispose: () => ({ dispose() {} }) };
+const view = {
+  webview: fakeWebview(),
+  visible: true,
+  onDidChangeVisibility: () => ({ dispose() {} }),
+  onDidDispose: () => ({ dispose() {} }),
+};
 registered.provider.resolveWebviewView(view);
 const send = (m) => view.webview._onMsg(m);
 

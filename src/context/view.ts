@@ -1,0 +1,68 @@
+// La seconda faccia: il pannello del contesto, sotto la chat nella barra laterale.
+// Stessa regola della chat — file veri, CSP stretta con nonce, e sul filo passano
+// dati, mai HTML.
+import * as vscode from 'vscode';
+import { renderPage } from '../shared/html';
+import type { ContextMonitor } from './monitor';
+import type { CtxCmd, CtxWire } from './protocol';
+
+export class ContextView implements vscode.WebviewViewProvider {
+  static readonly id = 'claudeStudio.context';
+
+  constructor(
+    private readonly ctx: vscode.ExtensionContext,
+    private readonly monitor: ContextMonitor
+  ) {}
+
+  resolveWebviewView(view: vscode.WebviewView) {
+    const webview = view.webview;
+    webview.options = {
+      enableScripts: true,
+      localResourceRoots: [
+        vscode.Uri.joinPath(this.ctx.extensionUri, 'dist', 'webview'),
+        vscode.Uri.joinPath(this.ctx.extensionUri, 'media'),
+      ],
+    };
+    webview.html = renderPage(webview, this.ctx.extensionUri, 'context.html', {
+      tokensCss: 'tokens.css',
+      motionCss: 'motion.css',
+      contextCss: 'context.css',
+      contextJs: 'context.js',
+    });
+
+    const post = (e: CtxWire) => void webview.postMessage(e);
+    let sub: vscode.Disposable | undefined;
+
+    const listener = webview.onDidReceiveMessage((m: CtxCmd) => {
+      switch (m?.cmd) {
+        case 'ready':
+          // Ci si iscrive solo quando la pagina e' pronta a ricevere: altrimenti la
+          // prima fotografia arriverebbe nel vuoto e resterebbe tutto grigio.
+          sub?.dispose();
+          sub = this.monitor.subscribe((d) => post({ k: 'data', d }));
+          return;
+        case 'refresh':
+          this.monitor.tick();
+          return;
+        case 'rename':
+          void this.monitor.rename(m.id);
+          return;
+        case 'focus':
+          void this.monitor.focus(m.id);
+          return;
+        case 'diagnose':
+          void this.monitor.diagnose();
+          return;
+      }
+    });
+
+    // Tornata visibile dopo essere stata nascosta: i numeri erano fermi da un po'.
+    const vis = view.onDidChangeVisibility(() => view.visible && this.monitor.tickSoon());
+
+    view.onDidDispose(() => {
+      listener.dispose();
+      vis.dispose();
+      sub?.dispose();
+    });
+  }
+}
