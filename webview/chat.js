@@ -1515,7 +1515,7 @@
   }
 
   function paintSeg(container, items, value, onChange) {
-    // Conserva o crea lo slider
+    // Keep the existing slider or make one
     let slider = container.querySelector('.seg-slider');
     container.replaceChildren();
     if (!slider) {
@@ -1537,13 +1537,13 @@
     }
 
     if (!container.querySelector('.seg-btn.on')) slider.style.display = 'none';
-    // Subito e poi dopo un frame: la prima passata prende il caso normale, la
-    // seconda quella in cui i bottoni sono appena andati a capo.
+    // Right away and then after a frame: the first pass handles the normal case, the
+    // second the one where the buttons have just wrapped.
     placeSeg(container);
     requestAnimationFrame(() => placeSeg(container));
   }
 
-  /** Il modello su cui valgono impegno e pensiero: quello scelto, o il consigliato. */
+  /** The model effort and thinking apply to: the chosen one, or the recommended one. */
   function chosenModel() {
     return prefs.model
       ? models.find((m) => m.value === prefs.model)
@@ -1551,14 +1551,14 @@
   }
 
   function paintEffort() {
-    // Senza scelta vale il consigliato: i suoi livelli sono quelli buoni.
+    // With no choice made the recommended one applies: its levels are the good ones.
     const chosen = chosenModel();
     const levels = chosen ? chosen.efforts : ['low', 'medium', 'high'];
     const noEffort = !!chosen && !chosen.efforts.length;
-    // "Auto" non si spegne mai. Non e' un livello come gli altri: vuol dire "non
-    // dirgli niente", e non dire niente si puo' sempre — anche a un modello che i
-    // livelli non li accetta. Spegnerlo lasciava il pannello senza nessuna scelta
-    // accesa e lo slider sospeso nel vuoto.
+    // "Auto" never gets disabled. It isn't a level like the others: it means "tell
+    // it nothing", and saying nothing is always possible — even to a model that
+    // doesn't take levels at all. Disabling it left the panel with no choice lit up
+    // and the slider hanging in mid-air.
     const items = [{ value: '', label: 'Auto' }].concat(
       levels.map((l) => ({
         value: l,
@@ -1569,15 +1569,15 @@
     paintSeg($('cfgEffort'), items, prefs.effort, (v) => push({ effort: v }));
     const info = EFFORT_INFO[prefs.effort] || EFFORT_INFO[''];
     $('cfgEffortHint').textContent = noEffort
-      ? 'Questo modello non accetta livelli di impegno: decide lui'
+      ? "This model doesn't take effort levels: it decides for itself"
       : info.desc;
   }
 
   function paintThinking() {
     const chosen = chosenModel();
-    // Non tutti i modelli sanno decidere da soli quanto pensare: dove non sanno,
-    // "Acceso" e' un tetto fisso di token, non pensiero adattivo. Meglio dirlo che
-    // mostrare tre tasti che sembrano voler dire la stessa cosa ovunque.
+    // Not every model can decide on its own how much to think: where they can't,
+    // "On" is a fixed token ceiling, not adaptive thinking. Better to say so than to
+    // show three buttons that look like they mean the same thing everywhere.
     const adaptive = !chosen || chosen.adaptive !== false;
     const items = Object.entries(THINK_INFO).map(([v, i]) => ({ value: v, label: i.label }));
     paintSeg($('cfgThink'), items, prefs.thinking, (v) => push({ thinking: v }));
@@ -1585,7 +1585,7 @@
     $('cfgThinkHint').textContent =
       adaptive || prefs.thinking === 'off'
         ? base
-        : base + ' — su questo modello vale un tetto fisso di token';
+        : base + ' — on this model it means a fixed token ceiling';
   }
 
   function paintCfg() {
@@ -1600,14 +1600,14 @@
     $('cfgToast').checked = !!prefs.toast;
   }
 
-  /** Si manda solo quello che hai cambiato: il resto lo sa gia' l'estensione. */
+  /** Only what you changed gets sent: the extension already knows the rest. */
   function push(patch) {
     prefs = Object.assign({}, prefs, patch);
     vscode.postMessage({ cmd: 'setPrefs', value: patch });
     paintCfg();
   }
 
-  /** Il suono si prova subito: sceglierlo alla cieca non ha senso. */
+  /** The sound plays right away: picking one blind makes no sense. */
   function previewSound() {
     if (window.Chime) window.Chime.play(prefs.sound, 'done', prefs.volume);
   }
@@ -1618,13 +1618,13 @@
       cfg.hidden = false;
       cfg.classList.remove('closing');
       btnCfg.classList.add('on');
-      // Ora che il pannello e' misurabile, gli slider prendono la posizione buona
-      // senza aspettare il primo clic.
+      // Now that the panel can be measured, the sliders take up the right position
+      // without waiting for the first click.
       placeAllSegs();
       requestAnimationFrame(placeAllSegs);
       if (window.Chime) window.Chime.unlock();
     } else {
-      // Animazione di chiusura: il pannello scivola via, poi si nasconde.
+      // Closing animation: the panel slides away, then hides.
       btnCfg.classList.remove('on');
       hideAfterClosing(cfg);
     }
@@ -1641,7 +1641,7 @@
     push({ sound: e.target.value });
     previewSound();
   });
-  // mentre trascini cambia solo il volume di prova; si mette da parte quando molli
+  // while you drag only the preview volume changes; it gets saved when you let go
   $('cfgVol').addEventListener('input', (e) => (prefs.volume = Number(e.target.value) / 100));
   $('cfgVol').addEventListener('change', (e) => {
     push({ volume: Number(e.target.value) / 100 });
@@ -1652,18 +1652,18 @@
   $('cfgToast').addEventListener('change', (e) => push({ toast: e.target.checked }));
   $('cfgTest').addEventListener('click', previewSound);
 
-  // Il primo gesto sulla pagina sblocca l'audio: da li' in poi l'avviso di fine
-  // lavoro puo' suonare anche con la finestra dietro a tutte le altre.
+  // The first gesture on the page unlocks the audio: from then on the end-of-work
+  // alert can sound even with the window behind all the others.
   const wake = () => window.Chime && window.Chime.unlock();
   document.addEventListener('pointerdown', wake, { once: true });
   document.addEventListener('keydown', wake, { once: true });
 
-  // ---------- scorciatoie ----------
+  // ---------- shortcuts ----------
   //
-  // Valgono ovunque nella pagina, anche mentre scrivi: sono le stesse cose che
-  // fanno i tasti in testata, senza staccare le mani dalla tastiera. Chi le ha
-  // gia' gestite (il menu di "@" e "/") lascia il segno con preventDefault, e qui
-  // non ci si mette sopra.
+  // They work anywhere on the page, even while you're typing: they're the same things
+  // the header buttons do, without taking your hands off the keyboard. Whoever
+  // already handled them (the "@" and "/" menu) leaves a mark with preventDefault,
+  // and here we don't step on it.
   function toggleHistory() {
     if (!drawer.hidden) {
       closeDrawer();
@@ -1686,8 +1686,8 @@
         closeDrawer();
         return;
       }
-      // Ferma solo se c'e' davvero qualcosa da fermare: altrimenti Escape resta
-      // il tasto che non fa niente, ed e' giusto cosi'.
+      // Stop only if there's really something to stop: otherwise Escape stays the
+      // key that does nothing, and that's how it should be.
       if (busy) {
         e.preventDefault();
         vscode.postMessage({ cmd: 'interrupt' });
@@ -1719,14 +1719,14 @@
         return;
       }
       case 'c':
-        // il contesto di fianco esiste solo nella scheda: dove non c'e', il tasto
-        // non deve fare finta di esserci
+        // the context alongside only exists in the tab: where it isn't there, the key
+        // mustn't pretend it is
         if ($('btnCtx').hidden) return;
         e.preventDefault();
         $('btnCtx').click();
         return;
       case 'w':
-        // idem: dalla barra laterale non c'e' nessuna scheda da chiudere
+        // same again: from the sidebar there's no tab to close
         if ($('btnClose').hidden) return;
         e.preventDefault();
         closeTab();
@@ -1734,10 +1734,10 @@
     }
   });
 
-  // ---------- la colonna del contesto (solo nella scheda) ----------
-  // Nella barra laterale il contesto ha un pannello suo, sotto la chat; in una
-  // scheda quel pannello non esiste, quindi lo stesso disegno si monta qui di
-  // fianco. Il codice e' lo stesso, ctxpanel.js: due posti, un pannello solo.
+  // ---------- the context column (tab only) ----------
+  // In the sidebar the context has a panel of its own, below the chat; in a tab that
+  // panel doesn't exist, so the same drawing gets mounted here alongside. The code is
+  // the same, ctxpanel.js: two places, one single panel.
   const rail = window.CtxPanel($('rail'), (m) => vscode.postMessage(m));
 
   function showRail(on) {
@@ -1754,7 +1754,7 @@
   setBusy(false);
   paintMode('default');
   paintCfg();
-  // Lo slider del mode si posiziona dopo il primo render
+  // The mode slider positions itself after the first render
   requestAnimationFrame(() => paintMode(document.body.dataset.mode || 'default'));
   vscode.postMessage({ cmd: 'ready' });
 })();

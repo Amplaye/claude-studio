@@ -1,7 +1,7 @@
-// Genera dist/preview.html e dist/preview-context.html: le stesse pagine delle due
-// webview, ma apribili in un browser normale. Servono a guardare (e a far guardare a
-// Playwright) chat e pannello del contesto senza dover ricaricare VSCode a ogni
-// ritocco di CSS.
+// Generates dist/preview.html and dist/preview-context.html: the same pages as the
+// two webviews, but openable in a normal browser. They are there to look at (and to
+// let Playwright look at) the chat and the context panel without having to reload
+// VS Code on every CSS tweak.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

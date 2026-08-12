@@ -395,7 +395,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const d4 = lastData();
   const focused = d4?.cards?.find((c) => c.focused);
   if (d4?.cards?.length === 2) {
-    t(d4?.focusHow === 'posizione', 'the fallback by position does not kick in: ' + d4?.focusHow);
+    t(d4?.focusHow === 'position', 'the fallback by position does not kick in: ' + d4?.focusHow);
     // second tab active -> second session by startedAt
     t(focused?.id === SID2, 'matching by position latches onto the wrong session: ' + focused?.id);
   } else {

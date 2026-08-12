@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 import type { LiveSession } from './sessions';
 
 /** How we arrived at the focused session, from the surest to the shakiest. */
-export type FocusHow = 'studio' | 'tab' | 'posizione' | 'recenza';
+export type FocusHow = 'studio' | 'tab' | 'position' | 'recency';
 
 export interface ClaudeTab {
   label: string;
@@ -100,7 +100,7 @@ export function matchTabToSession(
     const pos = tabs.findIndex((t) => t.viewColumn === tab.viewColumn && t.index === tab.index);
     if (pos >= 0) {
       const byStart = sessions.slice().sort((a, b) => a.startedAt - b.startedAt);
-      if (byStart[pos]) return { id: byStart[pos].id, how: 'posizione' };
+      if (byStart[pos]) return { id: byStart[pos].id, how: 'position' };
     }
   }
   return null;

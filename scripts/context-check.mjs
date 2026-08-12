@@ -111,7 +111,7 @@ for (const width of [320, 620]) {
   await post(
     data({
       cards: [card({ pct: 64, tokens: '640.0k', cost: '$0.90', busy: false, lastAgo: '2 min ago' })],
-      focusHow: 'posizione',
+      focusHow: 'position',
     })
   );
   await page.waitForTimeout(120);

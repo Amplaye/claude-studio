@@ -169,7 +169,7 @@ export class ChatController {
     if (event === 'done' && p.toast && !focused) {
       const cwd = currentCwd();
       void vscode.window
-        .showInformationMessage(`Claude ha finito · ${cwd.split(/[\\/]/).pop() || cwd}`, 'Apri')
+        .showInformationMessage(`Claude has finished · ${cwd.split(/[\\/]/).pop() || cwd}`, 'Open')
         .then((a) => {
           if (a) void vscode.commands.executeCommand('claudeStudio.openTab');
         });
@@ -193,7 +193,7 @@ export class ChatController {
       const sel = currentSelection();
       if (sel) {
         full =
-          `${text}\n\n<selezione file="${sel.rel}" righe="${sel.lines}">\n${sel.text}\n</selezione>`.trim();
+          `${text}\n\n<selection file="${sel.rel}" lines="${sel.lines}">\n${sel.text}\n</selection>`.trim();
       }
     }
     this.ensureSession().send(full, images, text);
@@ -242,7 +242,7 @@ export class ChatController {
   }
 
   private clear() {
-    this.closeAllPending('Cambio conversazione.');
+    this.closeAllPending('Switching conversation.');
     this.session?.dispose();
     this.session = undefined;
     this.history = [];
@@ -266,13 +266,13 @@ export class ChatController {
   private allowAllPending() {
     for (const [id, p] of [...this.pending]) {
       if (p.kind === 'question') continue; // le domande vanno risposte dall'utente
-      this.emit({ k: 'ask_done', id, ok: true, label: 'Consentito (Yolo)' });
+      this.emit({ k: 'ask_done', id, ok: true, label: 'Allowed (Yolo)' });
       p.settle(allow(p.req.input, {}, 'user_temporary'));
     }
   }
 
   dispose() {
-    this.closeAllPending('Estensione chiusa.');
+    this.closeAllPending('Extension closed.');
     this.session?.dispose();
     if (this.primary) owned.end();
   }
@@ -300,8 +300,8 @@ export class ChatController {
       // mezzo la scheda invece di lasciarla appesa per sempre.
       req.signal.addEventListener('abort', () => {
         if (done) return;
-        this.emit({ k: 'ask_done', id: req.id, ok: false, label: 'Annullato' });
-        settle({ behavior: 'deny', message: 'Turno interrotto.', decisionClassification: 'user_reject' });
+        this.emit({ k: 'ask_done', id: req.id, ok: false, label: 'Cancelled' });
+        settle({ behavior: 'deny', message: 'Turn interrupted.', decisionClassification: 'user_reject' });
       });
 
       this.emit({
@@ -309,7 +309,7 @@ export class ChatController {
         id: req.id,
         kind,
         tool: req.tool,
-        title: req.title || `Claude vuole usare ${req.displayName || req.tool}`,
+        title: req.title || `Claude wants to use ${req.displayName || req.tool}`,
         // Per il piano e per le domande il corpo lo disegna la scheda: qui dentro
         // ci finirebbe solo il JSON dell'input, che non serve a nessuno.
         detail: req.description || (kind === 'tool' ? summarize(req.input) : ''),
@@ -325,13 +325,13 @@ export class ChatController {
     if (!p) return;
 
     if (choice === 'deny') {
-      this.emit({ k: 'ask_done', id, ok: false, label: p.kind === 'plan' ? 'Continua a pianificare' : 'Rifiutato' });
+      this.emit({ k: 'ask_done', id, ok: false, label: p.kind === 'plan' ? 'Keep planning' : 'Rejected' });
       p.settle({
         behavior: 'deny',
         message:
           p.kind === 'plan'
-            ? 'Il piano non e’ approvato: continua a pianificare, non modificare niente.'
-            : 'Permesso negato da chi usa Claude Studio.',
+            ? 'The plan is not approved: keep planning, do not change anything.'
+            : 'Permission denied by whoever is using Claude Studio.',
         decisionClassification: 'user_reject',
       });
       return;
@@ -345,7 +345,7 @@ export class ChatController {
         k: 'ask_done',
         id,
         ok: true,
-        label: choice === 'always' ? 'Approvato, modifiche automatiche' : 'Piano approvato',
+        label: choice === 'always' ? 'Approved, automatic edits' : 'Plan approved',
       });
       p.settle(allow(p.req.input, {}, 'user_temporary'));
       return;
@@ -370,7 +370,7 @@ export class ChatController {
             },
           ]
       : [];
-    this.emit({ k: 'ask_done', id, ok: true, label: always ? 'Consentito sempre' : 'Consentito' });
+    this.emit({ k: 'ask_done', id, ok: true, label: always ? 'Always allowed' : 'Allowed' });
     p.settle(
       allow(
         p.req.input,
@@ -383,7 +383,7 @@ export class ChatController {
   private closeAllPending(why: string) {
     for (const [id, p] of [...this.pending]) {
       this.pending.delete(id);
-      this.broadcast({ k: 'ask_done', id, ok: false, label: 'Annullato' });
+      this.broadcast({ k: 'ask_done', id, ok: false, label: 'Cancelled' });
       p.settle({ behavior: 'deny', message: why, decisionClassification: 'user_reject' });
     }
   }
@@ -398,7 +398,7 @@ export class ChatController {
       this.emit({
         k: 'error',
         message:
-          'Non trovo la CLI di Claude Code su questo computer. Installala con "npm i -g @anthropic-ai/claude-code", oppure indica il percorso del comando claude in Impostazioni > Claude Studio > Cli Path.',
+          'Cannot find the Claude Code CLI on this computer. Install it with "npm i -g @anthropic-ai/claude-code", or point to the claude command path in Settings > Claude Studio > Cli Path.',
       });
     }
 

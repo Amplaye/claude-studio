@@ -1,4 +1,4 @@
-// Prova secca del motore: la CLI installata sul PC risponde in streaming?
+// Bare test of the engine: does the CLI installed on this PC answer in streaming?
 // node scripts/smoke-engine.mjs
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { execFileSync } from 'node:child_process';
@@ -17,7 +17,7 @@ console.log('cli.js:', cli);
 async function* input() {
   yield {
     type: 'user',
-    message: { role: 'user', content: 'Rispondi solo: ciao dal motore.' },
+    message: { role: 'user', content: 'Answer only: hello from the engine.' },
     parent_tool_use_id: null,
     session_id: '',
   };

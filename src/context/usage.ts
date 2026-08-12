@@ -1,10 +1,10 @@
-// Quanto hai consumato dell'account: gli stessi numeri di "Account & Usage".
+// How much of the account you've used: the same numbers as "Account & Usage".
 //
-// L'endpoint /api/oauth/usage ha un limite stretto e ogni finestra di VSCode ha la
-// sua copia dell'estensione: senza coordinamento ognuna interroga per conto suo, e
-// vi becca un 429 a testa. La cache sta quindi su file, condivisa fra le finestre:
-// una sola chiama l'API quando scade, le altre leggono il file. Sopravvive anche ai
-// riavvii, cosi' una finestra appena aperta non resta su "caricamento..." per niente.
+// The /api/oauth/usage endpoint has a tight limit and every VSCode window has its own
+// copy of the extension: with no coordination each one queries on its own, and you
+// collect a 429 apiece. So the cache lives in a file, shared between the windows: one
+// calls the API when it expires, the others read the file. It survives restarts too,
+// so a freshly opened window doesn't sit on "loading..." for nothing.
 import * as cp from 'node:child_process';
 import * as fs from 'node:fs';
 import * as https from 'node:https';
@@ -19,8 +19,8 @@ export interface Usage {
   weekResetAt: string | null;
 }
 
-const TTL_MS = 60000; // i numeri si rinfrescano ogni minuto, una finestra sola
-const COOLDOWN_MS = 600000; // dopo un 429 si sta zitti dieci minuti
+const TTL_MS = 60000; // the numbers refresh every minute, one window only
+const COOLDOWN_MS = 600000; // after a 429 we keep quiet for ten minutes
 
 const state = {
   data: null as Usage | null,
@@ -33,12 +33,12 @@ export function currentUsage(): Usage | null {
   return state.data;
 }
 
-/** Cosa scrivere finche' i numeri non ci sono: "in coda" non e' "sto caricando". */
+/** What to write until the numbers are there: "queued" isn't "loading". */
 export function usageWaitText(now = Date.now()): string {
   if (state.cooldownUntil > now) {
-    return 'limite API — riprovo ' + fmtReset(new Date(state.cooldownUntil).toISOString(), now);
+    return 'API limit — retrying ' + fmtReset(new Date(state.cooldownUntil).toISOString(), now);
   }
-  return 'caricamento…';
+  return 'loading…';
 }
 
 export function loadSharedUsage() {
@@ -50,7 +50,7 @@ export function loadSharedUsage() {
       state.cooldownUntil = j.cooldownUntil || state.cooldownUntil;
     }
   } catch {
-    /* prima accensione, o cache di una versione vecchia: si riparte da zero */
+    /* first run, or an old version's cache: we start from scratch */
   }
 }
 
@@ -63,10 +63,10 @@ function saveSharedUsage() {
 }
 
 /**
- * Il token OAuth. Su macOS sta nel portachiavi (lo stesso della CLI); su Windows e
- * Linux il binario `security` non esiste e la CLI lo tiene in chiaro in
- * ~/.claude/.credentials.json. Senza questa seconda strada il token resta vuoto e
- * i numeri dell'account non arrivano mai.
+ * The OAuth token. On macOS it lives in the keychain (the same one the CLI uses); on
+ * Windows and Linux the `security` binary doesn't exist and the CLI keeps it in the
+ * clear in ~/.claude/.credentials.json. Without this second road the token stays
+ * empty and the account numbers never arrive.
  */
 export function readOauthToken(): string {
   if (process.platform === 'darwin') {
@@ -80,7 +80,7 @@ export function readOauthToken(): string {
       const tok = JSON.parse(raw)?.claudeAiOauth?.accessToken || '';
       if (tok) return tok;
     } catch {
-      /* nessun portachiavi: si prova col file */
+      /* no keychain: try the file */
     }
   }
   try {
@@ -92,13 +92,13 @@ export function readOauthToken(): string {
 }
 
 /**
- * Chiede i numeri all'API, ma solo se tocca a questa finestra. Non aspetta nessuno:
- * quando la risposta arriva chiama `done`, che rifa' il giro di disegno.
+ * Asks the API for the numbers, but only if it's this window's turn. It waits for
+ * nobody: when the answer arrives it calls `done`, which runs the redraw round again.
  */
 export function refreshUsage(done: () => void) {
   const now = Date.now();
   if (state.pending) return;
-  loadSharedUsage(); // prima si guarda cosa hanno gia' fatto le altre finestre
+  loadSharedUsage(); // first look at what the other windows have already done
   if (now < state.cooldownUntil) return;
   if (state.data && now - state.ts < TTL_MS) return;
 
@@ -108,7 +108,7 @@ export function refreshUsage(done: () => void) {
 
   const backoff = () => {
     state.cooldownUntil = Date.now() + COOLDOWN_MS;
-    saveSharedUsage(); // il cooldown vale per tutte, non solo per chi ha preso il no
+    saveSharedUsage(); // the cooldown applies to all, not just whoever got the no
     done();
   };
 
@@ -130,8 +130,8 @@ export function refreshUsage(done: () => void) {
       res.on('end', () => {
         state.pending = false;
         const code = res.statusCode ?? 0;
-        // 429 o guasto del server: si aspetta, e soprattutto NON si sovrascrivono
-        // i numeri buoni gia' in cache con una risposta vuota.
+        // 429 or a server fault: we wait, and above all we do NOT overwrite the good
+        // numbers already cached with an empty answer.
         if (code === 429 || (code >= 500 && code < 600)) return backoff();
         let j: any;
         try {

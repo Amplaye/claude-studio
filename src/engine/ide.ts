@@ -20,40 +20,40 @@ export function ideServer() {
       'which files are open and what is selected.',
     tools: [
       tool(
-        'mostra_diff',
+        'show_diff',
         'Opens the native before/after comparison of a file in the editor.',
         {
           file: z.string().describe('path of the file, relative to the working folder'),
-          prima: z.string().describe('previous content'),
-          dopo: z.string().describe('new content'),
+          before: z.string().describe('previous content'),
+          after: z.string().describe('new content'),
         },
         async (a) => {
-          await showDiff(a.file, a.prima, a.dopo);
+          await showDiff(a.file, a.before, a.after);
           return text(`Diff of ${a.file} opened in the editor.`);
         }
       ),
       tool(
-        'errori_editor',
+        'editor_errors',
         'Errors and warnings the editor already knows about (linter, TypeScript, etc.). Re-runs nothing.',
         { file: z.string().optional().describe('limit to one file; empty = all of them') },
         async (a) => text(diagnostics(a.file))
       ),
       tool(
-        'file_aperti',
+        'open_files',
         'The files open in the editor right now, with the active one and what is selected.',
         {},
         async () => text(openEditors())
       ),
       tool(
-        'apri_file',
+        'open_file',
         'Opens a file in the editor, optionally at a precise line.',
         {
           file: z.string().describe('path of the file'),
-          riga: z.number().optional().describe('line to jump to'),
+          line: z.number().optional().describe('line to jump to'),
         },
         async (a) => {
-          await openFile(a.file, a.riga);
-          return text(`Opened ${a.file}${a.riga ? ':' + a.riga : ''}.`);
+          await openFile(a.file, a.line);
+          return text(`Opened ${a.file}${a.line ? ':' + a.line : ''}.`);
         }
       ),
     ],

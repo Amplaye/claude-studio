@@ -98,7 +98,7 @@ window.CtxPanel = (() => {
 
     function paintCell(c, pct, reset) {
       c._p.val.textContent = pct == null ? '—' : Math.round(pct) + '%';
-      c._p.reset.textContent = reset ? 'resets in ' + reset : ' ';
+      c._p.reset.textContent = reset ? 'resets ' + reset : ' ';
       paintBar(c._p.fill, pct);
     }
 
@@ -168,7 +168,7 @@ window.CtxPanel = (() => {
       const via =
         !s.focused || how === 'studio' || how === 'tab'
           ? ''
-          : how === 'posizione'
+          : how === 'position'
             ? ' · estimated'
             : ' · last active';
       p.sub.textContent = s.lastClock + ' · ' + s.lastAgo + (s.busy ? ' · active now' : '') + via;

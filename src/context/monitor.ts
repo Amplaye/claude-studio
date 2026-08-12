@@ -43,7 +43,7 @@ export class ContextMonitor {
 
   /** Sticky: se sposti lo sguardo su un file, l'ultima sessione nota resta quella. */
   private focusedId: string | null = null;
-  private how: FocusHow = 'recenza';
+  private how: FocusHow = 'recency';
 
   start(ctx: vscode.ExtensionContext) {
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -269,7 +269,7 @@ export class ContextMonitor {
     const alive = (id: string) => id === mineId || official.some((s) => s.id === id);
     if (this.focusedId && alive(this.focusedId)) return this.focusedId;
 
-    this.how = 'recenza';
+    this.how = 'recency';
     this.focusedId = mineId ?? (official.length ? official[0].id : null);
     return this.focusedId;
   }
@@ -319,9 +319,9 @@ export class ContextMonitor {
   async rename(id: string) {
     if (!id) return;
     const val = await vscode.window.showInputBox({
-      prompt: 'Nome della card (vuoto = torna al nome di partenza)',
+      prompt: 'Card name (empty = back to the starting name)',
       value: readSessionNames()[id] || '',
-      placeHolder: 'es. Picnic — sistemare i promemoria',
+      placeHolder: 'e.g. Picnic — fixing the reminders',
     });
     if (val === undefined) return; // annullato
     writeSessionName(id, val.trim());
@@ -348,7 +348,7 @@ export class ContextMonitor {
     );
     if (!target) {
       void vscode.window.showInformationMessage(
-        `Non trovo la tab "${s.tabName || id.slice(0, 8)}" in questa finestra di VSCode.`
+        `Cannot find the tab "${s.tabName || id.slice(0, 8)}" in this VSCode window.`
       );
       return;
     }
@@ -363,21 +363,21 @@ export class ContextMonitor {
     const official = liveSessions(cwd);
     const mine = owned.current();
     const lines = [
-      `Progetto: ${cwd}`,
-      `Cartella dei transcript: ${projectsDirFor(cwd)}`,
+      `Project: ${cwd}`,
+      `Transcripts folder: ${projectsDirFor(cwd)}`,
       ``,
-      `Chat di Studio: ${mine ? `${mine.id || '(in partenza)'} — "${mine.title}"` : 'nessuna'}`,
-      `  sotto gli occhi: ${owned.looking() ?? 'no'}${studioTabActive() ? ' (scheda davanti)' : ''}`,
+      `Studio chat: ${mine ? `${mine.id || '(starting up)'} — "${mine.title}"` : 'none'}`,
+      `  in sight: ${owned.looking() ?? 'no'}${studioTabActive() ? ' (tab in front)' : ''}`,
       ``,
-      `Tab dell'estensione ufficiale in questa finestra: ${tabs.length}`,
+      `Official extension tabs in this window: ${tabs.length}`,
       ...tabs.map(
-        (t) => `  [${t.viewColumn}.${t.index}]${t.isActive ? ' <- ATTIVA' : '        '} "${t.label}"`
+        (t) => `  [${t.viewColumn}.${t.index}]${t.isActive ? ' <- ACTIVE' : '        '} "${t.label}"`
       ),
       ``,
-      `Sessioni vive dell'ufficiale nel progetto: ${official.length}`,
+      `Live official sessions in the project: ${official.length}`,
       ...official.map((s) => `  pid ${s.pid}  "${s.tabName}"  id ${s.id.slice(0, 8)}`),
       ``,
-      `Aggancio corrente: ${this.focusedId?.slice(0, 8) ?? '—'} (via ${this.how})`,
+      `Current hook: ${this.focusedId?.slice(0, 8) ?? '—'} (via ${this.how})`,
     ];
     const doc = await vscode.workspace.openTextDocument({
       content: lines.join('\n'),
@@ -410,23 +410,23 @@ function tooltip(d: CtxData, f: CtxCard | null): vscode.MarkdownString {
       (c) =>
         `- ${c.focused ? '**▶**' : '&nbsp;&nbsp;&nbsp;'} **${c.pct === null ? '—' : c.pct + '%'}** ` +
         `(${c.tokens} · ${c.cost}) — ${c.name.slice(0, 50)}${c.own ? ' _· Studio_' : ''}` +
-        `${c.busy ? ' _· attiva ora_' : ''}`
+        `${c.busy ? ' _· active now_' : ''}`
     )
     .join('\n');
   const u = d.usage;
   return new vscode.MarkdownString(
-    (f ? `### ▶ Sei in: ${f.name}\n\n` : '') +
-      `**Sessioni** — ${d.cards.length}\n\n` +
-      (rows || '_nessuna sessione aperta_') +
+    (f ? `### ▶ You're in: ${f.name}\n\n` : '') +
+      `**Sessions** — ${d.cards.length}\n\n` +
+      (rows || '_no session open_') +
       '\n' +
       (u
-        ? `\n**Account**\n- Sessione (5h): **${asPct(u.session)}**${d.sessionReset ? ` _(reset ${d.sessionReset})_` : ''}\n` +
-          `- Settimana (7g): **${asPct(u.week)}**${d.weekReset ? ` _(reset ${d.weekReset})_` : ''}\n`
-        : `\n- Uso account: _(${d.usageWait})_\n`) +
-      `\n- Progetto: **${d.project}**\n` +
-      (d.branch ? `- Ramo: **${d.branch}${d.dirty ? ' (modifiche)' : ''}**\n` : '') +
-      `- Speso in tutto: **${d.totalCost}**\n` +
-      `\n\nClicca per aprire il pannello del contesto.`
+        ? `\n**Account**\n- Session (5h): **${asPct(u.session)}**${d.sessionReset ? ` _(reset ${d.sessionReset})_` : ''}\n` +
+          `- Week (7d): **${asPct(u.week)}**${d.weekReset ? ` _(reset ${d.weekReset})_` : ''}\n`
+        : `\n- Account usage: _(${d.usageWait})_\n`) +
+      `\n- Project: **${d.project}**\n` +
+      (d.branch ? `- Branch: **${d.branch}${d.dirty ? ' (changes)' : ''}**\n` : '') +
+      `- Spent in total: **${d.totalCost}**\n` +
+      `\n\nClick to open the context panel.`
   );
 }
 

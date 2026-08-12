@@ -1,23 +1,24 @@
-// Prova il bundle vero (dist/extension.js) fuori da VSCode, con un modulo `vscode`
-// finto. Serve a coprire il pezzo piu' rischioso senza dover ricaricare l'editor:
-// l'Agent SDK e' ESM impacchettato in un bundle CJS, e da li' parte davvero la CLI.
-// Se questo passa, dentro VSCode cambia solo chi disegna i pixel.
+// Tests the real bundle (dist/extension.js) outside VS Code, with a fake `vscode`
+// module. It covers the riskiest piece without having to reload the editor: the
+// Agent SDK is ESM packed into a CJS bundle, and that is where the CLI really
+// starts. If this passes, inside VS Code the only thing that changes is who draws
+// the pixels.
 const Module = require('node:module');
 const path = require('node:path');
 const fs = require('node:fs');
 
 const root = path.dirname(__dirname);
 
-// "Consenti sempre" non e' un fatto della sessione: la CLI suggerisce di scrivere la
-// regola in .claude/settings.local.json, e da li' vale anche per le prove successive.
-// Quindi la prova parte pulita e rimette a posto: senza, la seconda esecuzione non
-// vedrebbe piu' chiedere nessun permesso e passerebbe per il motivo sbagliato.
+// "Always allow" is not a fact about the session: the CLI writes the rule into
+// .claude/settings.local.json, and from there it holds for later runs too. So the
+// test starts clean and puts things back: without that, the second run would never
+// see a permission asked and would pass for the wrong reason.
 const localSettings = path.join(root, '.claude', 'settings.local.json');
 const savedSettings = fs.existsSync(localSettings) ? fs.readFileSync(localSettings, 'utf8') : null;
 try {
   fs.rmSync(localSettings, { force: true });
 } catch {
-  /* non c'era */
+  /* it was not there */
 }
 process.on('exit', () => {
   try {
@@ -27,11 +28,11 @@ process.on('exit', () => {
       fs.writeFileSync(localSettings, savedSettings, 'utf8');
     }
   } catch {
-    /* niente da rimettere a posto */
+    /* nothing to put back */
   }
 });
 
-// ---- il finto `vscode` -----------------------------------------------------
+// ---- the fake `vscode` -----------------------------------------------------
 const uri = (p) => ({
   fsPath: p,
   scheme: 'file',
@@ -42,7 +43,7 @@ const registered = { provider: null, views: new Map(), commands: new Map(), pane
 const asked = [];
 let statusBar;
 
-/** Finta webview: raccoglie quello che le viene mandato e lascia rispondere. */
+/** Fake webview: collects whatever gets sent to it and lets you answer. */
 function fakeWebview() {
   const got = [];
   const w = {
@@ -101,7 +102,7 @@ const vscode = {
       return statusBar;
     },
     showInputBox: async () => undefined,
-    /** La finestra e' sempre "in primo piano": qui non c'e' nessuno da avvisare. */
+    /** The window is always "in the foreground": there is nobody to notify here. */
     state: { focused: true },
     onDidChangeWindowState: () => ({ dispose() {} }),
     registerWebviewViewProvider: (id, p) => {
@@ -131,7 +132,7 @@ const vscode = {
     },
     showWarningMessage: async (msg, _opts, ...items) => {
       asked.push(msg);
-      return items[0]; // "Consenti": qui vogliamo vedere il tool girare davvero
+      return items[0]; // "Allow": here we want to see the tool actually run
     },
     showInformationMessage: async () => undefined,
     showErrorMessage: async () => undefined,
@@ -149,7 +150,7 @@ const vscode = {
     getDiagnostics: () => [
       [
         uri(path.join(root, 'src', 'extension.ts')),
-        [{ severity: 0, message: 'errore finto per la prova', range: { start: { line: 3, character: 2 } } }],
+        [{ severity: 0, message: 'fake error for the test', range: { start: { line: 3, character: 2 } } }],
       ],
     ],
   },
@@ -162,8 +163,8 @@ const vscode = {
   },
   workspace: {
     workspaceFolders: [{ uri: uri(root) }],
-    // Le prove non devono andare su npm a cercare aggiornamenti: qui il
-    // controllo automatico e' spento, come se lo avessi spento tu.
+    // The tests must not go to npm looking for updates: the automatic check is off
+    // here, as if you had turned it off yourself.
     getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
     findFiles: async () => [uri(path.join(root, 'package.json'))],
     openTextDocument: async () => ({ getText: () => '' }),
@@ -187,10 +188,10 @@ Module._load = function (req, parent, isMain) {
   return load.call(this, req, parent, isMain);
 };
 
-// ---- accensione ------------------------------------------------------------
+// ---- start-up --------------------------------------------------------------
 const ext = require(path.join(root, 'dist', 'extension.js'));
 
-/** Le preferenze della chat vivono qui: una mappa in memoria basta. */
+/** The chat preferences live here: an in-memory map is enough. */
 function memento() {
   const map = new Map();
   return {
@@ -209,7 +210,7 @@ const ctx = {
 ext.activate(ctx);
 
 if (!registered.provider) {
-  console.error('FALLITO: nessun provider di webview registrato');
+  console.error('FAILED: no webview provider registered');
   process.exit(1);
 }
 
@@ -224,15 +225,15 @@ registered.provider.resolveWebviewView(view);
 const got = view.webview.got;
 const onMsg = (m) => view.webview._onMsg(m);
 
-// Il permesso ora si chiede dentro la chat, non con una finestra di VSCode: qui
-// facciamo la parte di chi clicca "Consenti".
+// The permission is now asked inside the chat, not with a VS Code dialog: here we
+// play the part of whoever clicks "Allow".
 const answered = [];
 const rawPost = view.webview.postMessage;
 view.webview.postMessage = async (m) => {
   const r = await rawPost(m);
   if (m && m.k === 'ask') {
-    // Al primo permesso si clicca "Consenti sempre": cosi' il turno dopo, con lo
-    // stesso comando, non deve chiedere piu' niente.
+    // On the first permission we click "Always allow": that way the next turn, with
+    // the same command, must not ask for anything.
     const choice = answered.length === 0 ? 'always' : 'allow';
     answered.push(m);
     setTimeout(() => onMsg({ cmd: 'answer', id: m.id, choice }), 0);
@@ -240,25 +241,25 @@ view.webview.postMessage = async (m) => {
   return r;
 };
 
-// ---- la pagina: CSP, nonce, sprite, percorsi risolti ------------------------
+// ---- the page: CSP, nonce, sprite, resolved paths --------------------------
 const html = view.webview.html || '';
 const pageFails = [];
-if (!/Content-Security-Policy/.test(html)) pageFails.push('CSP assente');
-if (/unsafe-inline|unsafe-eval/.test(html)) pageFails.push('CSP permissiva');
-if (/\{\{\w+\}\}/.test(html)) pageFails.push('segnaposto non sostituito: ' + (html.match(/\{\{\w+\}\}/) || [])[0]);
-if (!/<symbol id="ion-send"/.test(html)) pageFails.push('sprite Ionicons non incollato');
-if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o corto');
+if (!/Content-Security-Policy/.test(html)) pageFails.push('CSP missing');
+if (/unsafe-inline|unsafe-eval/.test(html)) pageFails.push('permissive CSP');
+if (/\{\{\w+\}\}/.test(html)) pageFails.push('placeholder not substituted: ' + (html.match(/\{\{\w+\}\}/) || [])[0]);
+if (!/<symbol id="ion-send"/.test(html)) pageFails.push('Ionicons sprite not pasted in');
+if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too short');
 
-// ---- un turno vero ---------------------------------------------------------
+// ---- a real turn -----------------------------------------------------------
 (async () => {
   onMsg({ cmd: 'ready' });
-  // La chat parte in "fa tutto da solo": li' i permessi non li chiede nessuno, e
-  // sotto non ci sarebbe niente da provare. Qui si vuole vedere il giro completo,
-  // quindi si torna alla modalita' che chiede.
+  // The chat starts in "does everything by itself": there nobody asks for
+  // permissions, and there would be nothing underneath to test. Here we want to see
+  // the full round trip, so we go back to the mode that asks.
   onMsg({ cmd: 'setMode', value: 'default' });
   onMsg({
     cmd: 'send',
-    text: 'Usa il tool Read su package.json e poi dimmi in una riga il campo "name". Non fare altro.',
+    text: 'Use the Read tool on package.json and then tell me the "name" field in one line. Do nothing else.',
   });
 
   const turns = async (n) => {
@@ -269,41 +270,41 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   };
   await turns(1);
 
-  // A meta' conversazione si apre la scheda: deve ritrovarsi la stessa storia,
-  // gia' composta (niente frammenti di streaming da ridisegnare).
+  // Halfway through the conversation the tab opens: it must find the same history,
+  // already composed (no streaming fragments to redraw).
   await registered.commands.get('claudeStudio.openTab')();
   const panel = registered.panels[0];
   if (panel) panel.webview._onMsg({ cmd: 'ready' });
-  // Tutto quello che la scheda riceve da qui in poi e' roba dal vivo del turno 2:
-  // il replay e' solo questo prefisso.
+  // Everything the tab receives from here on is live material from turn 2: the
+  // replay is only this prefix.
   const replay = panel ? panel.webview.got.slice() : [];
 
-  // Secondo turno: Read su un file del progetto passa da solo, Bash no. Serve per
-  // vedere davvero il giro del permesso — richiesta, risposta, tool eseguito.
-  const bashTurn = 'Esegui `node -e "console.log(40+2)"` con Bash e riportami solo il numero.';
+  // Second turn: Read on a project file goes through on its own, Bash does not. It
+  // is there to really see the permission round trip — request, answer, tool run.
+  const bashTurn = 'Run `node -e "console.log(40+2)"` with Bash and report just the number back to me.';
   onMsg({ cmd: 'send', text: bashTurn });
   await turns(2);
   const asksAfterAlways = answered.length;
 
-  // Terzo turno, stesso comando: "Consenti sempre" deve aver messo la regola in
-  // sessione, quindi nessuna seconda richiesta.
+  // Third turn, same command: "Always allow" must have put the rule in the session,
+  // so there should be no second request.
   onMsg({ cmd: 'send', text: bashTurn });
   await turns(3);
   const asksAfterRepeat = answered.length;
 
-  // Quarto turno: il ponte con l'editor. Vive dentro questo stesso processo, quindi
-  // e' anche la prova che il server MCP sopravvive all'impacchettamento.
+  // Fourth turn: the bridge with the editor. It lives inside this same process, so
+  // it is also the proof that the MCP server survives bundling.
   onMsg({
     cmd: 'send',
-    text: 'Chiama il tool mcp__editor__errori_editor e riportami la riga che ti risponde, senza commenti.',
+    text: 'Call the mcp__editor__errori_editor tool and report back the line it answers with, no comments.',
   });
   await turns(4);
 
   const sessionId = (got.find((m) => m.k === 'session') || {}).id;
 
-  // ---- la barra di contesto vede la conversazione appena fatta ----
-  // E' il motivo per cui chat e barra stanno nella stessa estensione: la sessione
-  // l'ha aperta lei, quindi non c'e' niente da indovinare.
+  // ---- the context bar sees the conversation we just had ----
+  // This is why the chat and the bar live in the same extension: the chat opened the
+  // session, so there is nothing to guess.
   const ctxProvider = registered.views.get('claudeStudio.context');
   const ctxView = {
     webview: fakeWebview(),
@@ -316,13 +317,13 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   await new Promise((r) => setTimeout(r, 300));
   const ctxData = [...ctxView.webview.got].reverse().find((m) => m.k === 'data')?.d;
   const mine = ctxData?.cards?.find((c) => c.own);
-  // La barra di stato va fotografata adesso: piu' avanti la prova azzera la
-  // conversazione per provare la cronologia, e li' e' giusto che non dica piu' niente.
+  // The status bar has to be captured now: further down the test resets the
+  // conversation to test the history, and there it is right that it says nothing.
   const ctxStatus = statusBar?.text ?? '';
 
-  // ---- cronologia: elenco, ripescaggio e ripresa ----
-  // `from` non e' un dettaglio: senza, l'attesa trova subito i messaggi vecchi e
-  // non aspetta proprio niente.
+  // ---- history: listing, fishing back and resuming ----
+  // `from` is not a detail: without it the wait immediately finds the old messages
+  // and does not wait at all.
   const waitFor = async (pred, from, ms = 20000) => {
     const deadline = Date.now() + ms;
     while (Date.now() < deadline) {
@@ -344,162 +345,162 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce mancante o cort
   const fails = [...pageFails];
   const t = (c, m) => !c && fails.push(m);
 
-  t(!!ctxProvider, 'il pannello del contesto non e’ registrato');
-  t(!!ctxData, 'il pannello del contesto non riceve dati');
-  t(!!mine, 'la conversazione della chat non compare nella barra di contesto');
+  t(!!ctxProvider, 'the context panel is not registered');
+  t(!!ctxData, 'the context panel receives no data');
+  t(!!mine, 'the chat conversation does not show up in the context bar');
   t(
     mine?.id === sessionId,
-    'la card della chat non e’ agganciata alla sessione vera: ' + mine?.id + ' invece di ' + sessionId
+    'the chat card is not matched to the real session: ' + mine?.id + ' instead of ' + sessionId
   );
-  t(ctxData?.focusHow === 'studio', 'l’aggancio della nostra chat passa dall’euristica: ' + ctxData?.focusHow);
-  t(!!mine?.focused, 'la conversazione aperta dalla chat non risulta quella in cui sei');
-  t(/\d/.test(mine?.tokens || ''), 'la card della chat non riporta il contesto: ' + mine?.tokens);
-  t(/^\$/.test(mine?.cost || ''), 'la card della chat non riporta il costo: ' + mine?.cost);
+  t(ctxData?.focusHow === 'studio', 'the match for our own chat goes through the heuristic: ' + ctxData?.focusHow);
+  t(!!mine?.focused, 'the conversation the chat opened is not the one you are in');
+  t(/\d/.test(mine?.tokens || ''), 'the chat card does not report the context: ' + mine?.tokens);
+  t(/^\$/.test(mine?.cost || ''), 'the chat card does not report the cost: ' + mine?.cost);
   t(
     /studio-chat/.test(ctxStatus) && /ctx \d/.test(ctxStatus),
-    'la barra di stato non racconta la conversazione della chat: ' + ctxStatus
+    'the status bar does not tell the story of the chat conversation: ' + ctxStatus
   );
   t(
     !/\$\((pulse|warning|error|comment-discussion|layers|dashboard|git-branch|circle-slash)\)/.test(ctxStatus),
-    'la barra di stato usa le icone native invece delle Ionicons: ' + ctxStatus
+    'the status bar uses the native icons instead of the Ionicons: ' + ctxStatus
   );
 
-  t(kinds.includes('hello'), 'nessun hello');
-  t(kinds.includes('session'), 'la sessione non e’ mai partita: ' + JSON.stringify(got.slice(0, 4)));
-  t(kinds.filter((k) => k === 'delta').length >= 2, 'niente streaming: ' + kinds.filter((k) => k === 'delta').length + ' delta');
-  t(kinds.includes('tool_start'), 'nessun tool avviato');
-  t(kinds.includes('tool_end'), 'nessun esito di tool');
-  t(kinds.includes('turn_end'), 'il turno non e’ finito');
-  t(!got.some((m) => m.k === 'error'), 'errori: ' + JSON.stringify(got.filter((m) => m.k === 'error')));
+  t(kinds.includes('hello'), 'no hello');
+  t(kinds.includes('session'), 'the session never started: ' + JSON.stringify(got.slice(0, 4)));
+  t(kinds.filter((k) => k === 'delta').length >= 2, 'no streaming: ' + kinds.filter((k) => k === 'delta').length + ' deltas');
+  t(kinds.includes('tool_start'), 'no tool started');
+  t(kinds.includes('tool_end'), 'no tool result');
+  t(kinds.includes('turn_end'), 'the turn never ended');
+  t(!got.some((m) => m.k === 'error'), 'errors: ' + JSON.stringify(got.filter((m) => m.k === 'error')));
 
   const tools = got.filter((m) => m.k === 'tool_start');
   const ends = got.filter((m) => m.k === 'tool_end');
   t(
     ends.every((e) => tools.some((s) => s.id === e.id)),
-    'un esito non corrisponde a nessun tool_use_id'
+    'a result does not match any tool_use_id'
   );
-  // ---- permessi: dentro la chat, non in una finestra di VSCode ----
-  t(asked.length === 0, 'il permesso e’ passato da una finestra modale: ' + asked.join(' | '));
-  t(answered.length > 0, 'il permesso non e’ stato chiesto');
+  // ---- permissions: inside the chat, not in a VS Code dialog ----
+  t(asked.length === 0, 'the permission went through a modal dialog: ' + asked.join(' | '));
+  t(answered.length > 0, 'the permission was never asked');
   const ask = answered[0] || {};
-  t(!!ask.title, 'la richiesta di permesso non ha un titolo da mostrare');
-  t(ask.kind === 'tool', 'tipo di richiesta inatteso: ' + ask.kind);
+  t(!!ask.title, 'the permission request has no title to show');
+  t(ask.kind === 'tool', 'unexpected request kind: ' + ask.kind);
   t(
     tools.some((s) => s.id === ask.id),
-    'la richiesta di permesso non e’ agganciata a nessun tool_use_id'
+    'the permission request is not matched to any tool_use_id'
   );
   const dones = got.filter((m) => m.k === 'ask_done');
   t(
     answered.every((a) => dones.some((d) => d.id === a.id && d.ok)),
-    'una richiesta e’ rimasta appesa senza esito'
+    'a request was left hanging with no outcome'
   );
   const bash = got.find((m) => m.k === 'tool_end' && m.id === ask.id);
   t(
     !!bash && bash.ok,
-    'il tool non e’ partito dopo il consenso — chiesto ' +
+    'the tool did not run after consent — asked ' +
       JSON.stringify(answered.map((a) => [a.tool, a.id])) +
-      ' esiti ' +
+      ' results ' +
       JSON.stringify(ends.map((e) => [e.id, e.ok, String(e.text).slice(0, 160)]))
   );
-  t(/42/.test((bash && bash.text) || ''), 'il tool consentito non ha dato il risultato atteso');
+  t(/42/.test((bash && bash.text) || ''), 'the allowed tool did not give the expected result');
   t(
     asksAfterRepeat === asksAfterAlways,
-    '"Consenti sempre" non ha retto: lo stesso comando ha chiesto di nuovo il permesso'
+    '"Always allow" did not hold: the same command asked for permission again'
   );
-  // la modalita' viaggia verso tutte le facce
-  t(got.some((m) => m.k === 'mode'), 'la modalita’ permessi non e’ mai arrivata alla webview');
+  // the mode travels to every face
+  t(got.some((m) => m.k === 'mode'), 'the permission mode never reached the webview');
 
-  // ---- ponte con l'editor ----
+  // ---- bridge with the editor ----
   const bridge = got.find((m) => m.k === 'tool_start' && /mcp__editor__/.test(m.name || ''));
-  t(!!bridge, 'il ponte con l’editor non e’ stato usato: nessun tool mcp__editor__*');
+  t(!!bridge, 'the bridge with the editor was never used: no mcp__editor__* tool');
   const bridgeOut = got.find((m) => m.k === 'tool_end' && m.id === bridge?.id);
   t(
-    /errore finto per la prova/.test(bridgeOut?.text || ''),
-    'il ponte non ha riportato la diagnostica dell’editor: ' + (bridgeOut?.text || '').slice(0, 120)
+    /fake error for the test/.test(bridgeOut?.text || ''),
+    'the bridge did not report the editor diagnostics: ' + (bridgeOut?.text || '').slice(0, 120)
   );
   t(
     got.some((m) => m.k === 'commands' && (m.items || []).length > 0),
-    'gli slash command non sono mai arrivati alla webview'
+    'the slash commands never reached the webview'
   );
 
-  // ---- cronologia ----
-  t(!!hist, 'la cronologia non e’ mai arrivata');
+  // ---- history ----
+  t(!!hist, 'the history never arrived');
   t(
     (hist?.items || []).some((i) => i.id === sessionId),
-    'la conversazione appena fatta non compare nella cronologia'
+    'the conversation we just had does not show up in the history'
   );
   t(
     (hist?.items || []).every((i) => i.summary && typeof i.when === 'number'),
-    'una voce di cronologia e’ senza titolo o senza data'
+    'a history entry has no title or no date'
   );
-  t(afterOpen.some((m) => m.k === 'reset'), 'aprire una conversazione non ha ripulito la chat');
+  t(afterOpen.some((m) => m.k === 'reset'), 'opening a conversation did not clear the chat');
   t(
-    afterOpen.some((m) => m.k === 'user' && /Read su package\.json/.test(m.text || '')),
-    'la conversazione ripescata non e’ stata ridipinta: ' +
+    afterOpen.some((m) => m.k === 'user' && /Read tool on package\.json/.test(m.text || '')),
+    'the conversation fished back was not repainted: ' +
       JSON.stringify(afterOpen.filter((m) => m.k === 'user').map((m) => String(m.text).slice(0, 40)))
   );
   t(
     afterOpen.some((m) => m.k === 'tool_start') && afterOpen.some((m) => m.k === 'block_final'),
-    'del ripescaggio mancano i tool o le risposte'
+    'the fished-back conversation is missing the tools or the answers'
   );
 
   const text = got
     .filter((m) => m.k === 'block_final' && m.kind === 'text')
     .map((m) => m.text)
     .join(' ');
-  t(/claude-studio/.test(text), 'la risposta non contiene il dato letto dal file: ' + text.slice(0, 200));
+  t(/claude-studio/.test(text), 'the answer does not contain the value read from the file: ' + text.slice(0, 200));
 
-  // ---- la scheda ----
-  t(!!panel, 'la scheda non si e’ aperta');
+  // ---- the tab ----
+  t(!!panel, 'the tab did not open');
   const pg = panel ? panel.webview.got : [];
-  t(panel?.type === 'claudeStudio.panel', 'tipo di scheda sbagliato: ' + panel?.type);
-  t(panel?.opts?.retainContextWhenHidden === true, 'la scheda perde il contenuto quando la nascondi');
-  t(!!panel?.iconPath, 'la scheda non ha icona');
-  t(replay[0]?.k === 'hello' && replay[0]?.surface === 'panel', 'la scheda non si riconosce come scheda');
-  t(replay.some((m) => m.k === 'user' && /Read su package\.json/.test(m.text)), 'la scheda non ha ripreso la storia');
+  t(panel?.type === 'claudeStudio.panel', 'wrong tab type: ' + panel?.type);
+  t(panel?.opts?.retainContextWhenHidden === true, 'the tab loses its content when you hide it');
+  t(!!panel?.iconPath, 'the tab has no icon');
+  t(replay[0]?.k === 'hello' && replay[0]?.surface === 'panel', 'the tab does not recognise itself as a tab');
+  t(replay.some((m) => m.k === 'user' && /Read tool on package\.json/.test(m.text)), 'the tab did not pick the history back up');
   t(
     replay.some((m) => m.k === 'block_final' && /claude-studio/.test(m.text || '')),
-    'la scheda non ha ripreso la risposta gia’ composta'
+    'the tab did not pick the already-composed answer back up'
   );
   t(
     !replay.some((m) => m.k === 'delta'),
-    'la scheda si e’ ripresa i frammenti di streaming invece del testo composto — id rimasti: ' +
+    'the tab picked the streaming fragments back up instead of the composed text — ids left: ' +
       JSON.stringify([...new Set(replay.filter((m) => m.k === 'delta').map((m) => m.id))])
   );
   const rStart = replay.filter((m) => m.k === 'tool_start');
   const rEnd = replay.filter((m) => m.k === 'tool_end');
-  t(rStart.length > 0, 'la scheda non ha ripreso nessun tool del turno gia’ passato');
+  t(rStart.length > 0, 'the tab did not pick up any tool from the turn already gone by');
   t(
     rEnd.every((e) => rStart.some((s) => s.id === e.id)),
-    'nel replay un esito non corrisponde a nessun tool'
+    'in the replay a result does not match any tool'
   );
-  // e da qui in poi le due facce vedono le stesse cose
+  // and from here on the two faces see the same things
   const after = (arr) => arr.filter((m) => m.k === 'tool_start').length;
-  t(after(pg) >= 1, 'la scheda non riceve i nuovi eventi');
+  t(after(pg) >= 1, 'the tab does not receive the new events');
 
-  // ---- il contesto dentro la scheda ----
-  // Nella barra laterale il contesto ha un pannello suo; in una scheda no, quindi i
-  // dati devono arrivare qui, altrimenti la faccia larga e' l'unica a non vederlo.
+  // ---- the context inside the tab ----
+  // In the sidebar the context has its own panel; in a tab it does not, so the data
+  // has to arrive here, otherwise the wide face is the only one that cannot see it.
   const railFrames = pg.filter((m) => m.k === 'ctx');
-  t(railFrames.length > 0, 'la scheda non riceve i dati del contesto');
+  t(railFrames.length > 0, 'the tab does not receive the context data');
   t(
     railFrames.some((m) => (m.d?.cards || []).some((c) => c.own)),
-    'nella colonna della scheda non arriva la conversazione della chat'
+    'the chat conversation does not reach the column in the tab'
   );
-  // Una scheda sola: chiederla di nuovo la riporta davanti, non ne apre una seconda.
+  // One tab only: asking for it again brings it back to the front, it does not open a second one.
   t(
     registered.panels.length === 1,
-    'e’ stata aperta piu’ di una scheda: ' + registered.panels.length
+    'more than one tab was opened: ' + registered.panels.length
   );
 
   for (const d of ctx.subscriptions) d.dispose?.();
 
   if (fails.length) {
-    console.error('FALLITO:\n- ' + fails.join('\n- '));
+    console.error('FAILED:\n- ' + fails.join('\n- '));
     process.exit(1);
   }
   console.log(
-    'host-check ok — %d eventi, %d delta, %d tool, %d permessi chiesti e concessi dalla chat',
+    'host-check ok — %d events, %d deltas, %d tools, %d permissions asked and granted from the chat',
     got.length,
     kinds.filter((k) => k === 'delta').length,
     tools.length,

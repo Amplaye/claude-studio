@@ -1,28 +1,28 @@
-// L'icona dell'estensione (media/icon.png), disegnata una volta e poi committata.
+// The extension icon (media/icon.png), drawn once and then committed.
 //
-// Non sta nella build di tutti i giorni apposta: e' un PNG che cambia quasi mai, e
-// farlo dipendere da Chromium a ogni salvataggio sarebbe un pedaggio inutile. Si
-// rifa' a mano con `npm run icon` quando il segno cambia.
+// It deliberately sits outside the everyday build: it is a PNG that hardly ever
+// changes, and making it depend on Chromium at every save would be a pointless toll.
+// You remake it by hand with `npm run icon` when the mark changes.
 //
-// Il segno e' lo stesso della barra delle attivita': le sparkles di Ionicons — la
-// stessa famiglia di icone che si vede ovunque dentro l'estensione — sul gradiente
-// argilla → pesca della palette.
+// The mark is the same one as in the activity bar: the Ionicons sparkles — the same
+// icon family you see everywhere inside the extension — on the palette's clay →
+// peach gradient.
 import { chromium } from 'playwright';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-/** 256 basta e avanza: VSCode ne chiede 128, e un gradiente a 512 pesa per niente. */
+/** 256 is plenty: VS Code asks for 128, and a gradient at 512 weighs for nothing. */
 const SIZE = 256;
 
 const svgFile = path.join(root, 'node_modules', 'ionicons', 'dist', 'svg', 'sparkles.svg');
 const raw = fs.readFileSync(svgFile, 'utf8');
-// La variante piena e' una forma riempita: e' l'unica che regge la riduzione a
-// 24 px senza sparire, esattamente come nel font della barra di stato.
+// The filled variant is a solid shape: it is the only one that survives being cut
+// down to 24px without vanishing, exactly like in the status bar font.
 const glyph = raw.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
 if (/stroke=/.test(raw) || !/<path/.test(raw)) {
-  throw new Error('sparkles.svg: serve la variante piena, non quella a tracciato');
+  throw new Error('sparkles.svg: the filled variant is needed, not the outline one');
 }
 
 const html = `<!DOCTYPE html>

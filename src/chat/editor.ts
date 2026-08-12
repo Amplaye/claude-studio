@@ -83,7 +83,7 @@ export async function openFile(rel: string, line?: number) {
 // ---- native diff -----------------------------------------------------------
 // The "before" isn't on disk (the disk already holds the "after"), so it's served
 // from a fake read-only in-memory document.
-const BEFORE = 'claude-studio-prima';
+const BEFORE = 'claude-studio-before';
 const stash = new Map<string, string>();
 let seq = 0;
 
@@ -106,7 +106,7 @@ export async function showDiff(rel: string, before: string, after: string, title
   try {
     await vscode.workspace.fs.stat(abs);
   } catch {
-    const k2 = key + '.dopo';
+    const k2 = key + '.after';
     stash.set(k2, after);
     right = vscode.Uri.from({ scheme: BEFORE, path: k2 });
   }
