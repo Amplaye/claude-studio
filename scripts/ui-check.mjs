@@ -291,6 +291,54 @@ for (const surface of ['view', 'panel']) {
     'the mode change does not reach the extension: ' + JSON.stringify(s4)
   );
 
+  // ---- what it's doing, in the header ----
+  // The pill moved next to the mode switch: state and clock, nothing else. The
+  // header in the narrow face is already tight, so the thing to watch is that it
+  // doesn't push the pills off the edge — and that the step counter, which used to
+  // change every couple of seconds, has really gone (it lives in the recap).
+  // We're still busy here: the pill is on screen.
+  const act = await page.evaluate(() => {
+    const a = document.getElementById('activity');
+    const top = document.querySelector('.top');
+    const mode = document.getElementById('mode');
+    return {
+      inHeader: top.contains(a),
+      shown: !a.hidden && a.getBoundingClientRect().width > 0,
+      leftOfMode: a.getBoundingClientRect().right <= mode.getBoundingClientRect().left + 1,
+      time: document.getElementById('actTime').textContent,
+      steps: !!document.getElementById('actSteps'),
+      overflow: top.scrollWidth > top.clientWidth + 1,
+    };
+  });
+  t(act.inHeader, 'the activity pill is no longer in the header');
+  t(act.shown, 'the activity pill does not show while it is working');
+  t(act.leftOfMode, 'the activity pill is not to the left of the mode switch');
+  t(!act.steps, 'the step counter is back in the pill: it belongs to the recap');
+  t(/^\d+:\d\d$/.test(act.time), 'the pill has lost its clock: ' + act.time);
+  t(!act.overflow, 'with the activity pill on, the header overflows: ' + surface);
+  await page.locator('.top').screenshot({ path: path.join(outDir, `preview-${surface}-act.png`) });
+
+  // ---- one column: every box lines up with the writing field ----
+  // Not just the left edge — the right one too. The scrollbar lives inside the
+  // thread and used to eat ten pixels off every card on that side.
+  const col = await page.evaluate(() => {
+    const box = (n) => {
+      const r = n.getBoundingClientRect();
+      return { l: Math.round(r.left), r: Math.round(r.right) };
+    };
+    const comp = box(document.getElementById('composer'));
+    const rows = [...document.querySelectorAll('#log > .msg, #log > .perm')].map((n) => ({
+      cls: n.className,
+      ...box(n),
+    }));
+    return { comp, rows };
+  });
+  const offL = col.rows.filter((r) => Math.abs(r.l - col.comp.l) > 1);
+  const offR = col.rows.filter((r) => Math.abs(r.r - col.comp.r) > 1);
+  t(col.rows.length > 3, 'no boxes to line up: ' + col.rows.length);
+  t(!offL.length, 'boxes not aligned to the writing field on the left: ' + offL.map((r) => r.cls + '@' + r.l).join(', ') + ' vs ' + col.comp.l);
+  t(!offR.length, 'boxes not aligned to the writing field on the right: ' + offR.map((r) => r.cls + '@' + r.r).join(', ') + ' vs ' + col.comp.r);
+
   // ---- the settings: model, effort, thinking, alerts ----
   await post({
     k: 'prefs',
@@ -607,6 +655,59 @@ for (const surface of ['view', 'panel']) {
       'composer and messages are not aligned in a column: ' + r.composerLeft + ' vs ' + r.msgLeft
     );
   }
+
+  // ---- links you can click, blocks you can copy ----
+  // Claude writes addresses bare, in the middle of a numbered list and inside code
+  // blocks. Copying one out by hand to paste it in a browser is a tax you pay ten
+  // times a day; so is selecting a block of text to copy it.
+  const linky =
+    'Open https://business.facebook.com/settings/apps?business_id=905021967715680 and then read [the docs](https://docs.claude.com/x) (see https://example.com).\n\n' +
+    '```\n1. https://business.facebook.com/settings/apps\n2. Done\n```\n';
+  await post({ k: 'block_start', id: 'b3_0', kind: 'text' });
+  await post({ k: 'block_final', id: 'b3_0', kind: 'text', text: linky });
+  await page.waitForTimeout(160);
+
+  const links = await page.evaluate(() => {
+    const last = [...document.querySelectorAll('.msg.assistant')].at(-1);
+    return {
+      hrefs: [...last.querySelectorAll('a.mdlink')].map((a) => a.getAttribute('href')),
+      inCode: last.querySelectorAll('pre code a.mdlink').length,
+      copyBtns: last.querySelectorAll('.code-wrap .copybtn').length,
+    };
+  });
+  t(
+    links.hrefs.includes('https://business.facebook.com/settings/apps?business_id=905021967715680'),
+    'a bare address does not become a link: ' + links.hrefs.join(' | ')
+  );
+  t(links.hrefs.includes('https://docs.claude.com/x'), 'a markdown link got lost: ' + links.hrefs.join(' | '));
+  t(
+    links.hrefs.includes('https://example.com'),
+    'the full stop and the bracket stayed stuck to the address: ' + links.hrefs.join(' | ')
+  );
+  t(links.inCode === 1, 'an address inside a code block is not clickable: ' + links.inCode);
+  t(links.copyBtns === 1, 'the code block has no copy button: ' + links.copyBtns);
+
+  await page.locator('.msg.assistant').last().locator('a.mdlink').first().click();
+  const sl = await lastSent();
+  t(
+    sl?.cmd === 'openLink' && /business\.facebook\.com/.test(sl.url || ''),
+    'clicking a link does not ask the extension to open it: ' + JSON.stringify(sl)
+  );
+
+  const copyBtn = page.locator('.msg.assistant').last().locator('.copybtn').first();
+  await copyBtn.click();
+  await page.waitForTimeout(80);
+  t(await copyBtn.evaluate((n) => n.classList.contains('ok')), 'the copy button does not confirm');
+  const copied = await page.evaluate(() =>
+    (window.__sent || []).filter((s) => s.cmd === 'copy').at(-1)
+  );
+  const clip = await page
+    .evaluate(() => navigator.clipboard.readText().catch(() => null))
+    .catch(() => null);
+  t(
+    /business\.facebook\.com/.test(copied?.text || clip || ''),
+    'the copied text does not reach anybody: ' + JSON.stringify(copied)
+  );
 
   // ---- errors: whatever the engine sends, said in plain words ----
   await post({

@@ -58,9 +58,8 @@ body.wide {
 }
 body.wide .log {
   padding-left: var(--gutter);
-  padding-right: var(--gutter);
-}
-body.wide .log {
+  /* the scrollbar's width comes off this side, same as in the narrow face */
+  padding-right: calc(var(--gutter) - var(--sbw));
   padding-top: 22px;
   gap: 14px;
 }
@@ -68,9 +67,6 @@ body.wide .log {
 body.wide .composer {
   margin-left: var(--gutter);
   margin-right: var(--gutter);
-}
-body.wide .msg.user {
-  max-width: 640px;
 }
 
 /* ---------- header ---------- */
@@ -102,6 +98,7 @@ body.wide .msg.user {
 .brand {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 7px;
   font-size: 13px;
   font-weight: 800;
@@ -116,8 +113,27 @@ body.wide .msg.user {
 }
 
 .top .grow {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+}
+/* The sidebar is 460px wide with a mode switch and four buttons already in it:
+   there's no room for a name and a state at the same time. While it's working the
+   wordmark folds away — the sparkle stays, so the panel is still recognisably
+   ours — and comes straight back the moment the turn ends. The wide tab has room
+   for both and keeps both. */
+body:not(.wide) .top.busy .brand-t {
+  display: none;
+}
+body:not(.wide) .top.busy .grow {
+  flex: 0 1 auto;
+}
+/* And the two modes you're *not* in keep their icon and drop their word. The mode
+   you're in stays written out, which is the only one you need to read; the other
+   two are still there, still clickable, still in the same order. Between a switch
+   that says everything three times and knowing what Claude is doing right now, in
+   a 460px sidebar, the second one wins. */
+body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
+  display: none;
 }
 
 .chip {
@@ -748,13 +764,21 @@ body.wide .msg.user {
    The side padding is the composer's margin, to the pixel: the thread and the
    writing field are one column, and a card that ends two pixels off the edge of
    the box you type in is the kind of thing you see without being able to say
-   what's wrong. */
+   what's wrong.
+
+   The right edge needs one extra thought: the scrollbar lives *inside* this box
+   and steals its width from the messages, so every card ended 10px short of the
+   writing field — which is exactly what you could see and not name. The gutter
+   is now always reserved (`stable`, so nothing jumps when the thread grows past
+   one screen) and the padding on that side is docked by the same amount: the
+   cards end where the composer ends, scrollbar or no scrollbar. */
 .log {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 14px 11px 8px;
+  scrollbar-gutter: stable;
+  padding: 14px calc(var(--pad) - var(--sbw)) 8px var(--pad);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -768,11 +792,15 @@ body.wide .msg.user {
   flex: 0 0 auto;
 }
 
+/* What you write takes the full column, like everything else. It used to be a
+   bubble hugging the right edge: it read as a different kind of object and it
+   broke the one straight line the eye follows down the thread. It keeps the clay
+   glow — it's still plainly yours — and gives up the offset. Its text sits at the
+   same inset as the composer's caret: 12px of padding past the 1px border. */
 .msg.user {
-  align-self: flex-end;
-  max-width: 88%;
-  padding: 9px 13px;
-  border-radius: var(--r) var(--r) 4px var(--r);
+  align-self: stretch;
+  padding: 9px 12px;
+  border-radius: var(--r);
   border: 1px solid color-mix(in srgb, var(--claude-1) 45%, transparent);
   background: linear-gradient(
       135deg,
@@ -787,13 +815,18 @@ body.wide .msg.user {
 }
 
 /* Sent images stay in the message: you can see at a glance that they went out,
-   and they reopen big with a click. */
+   and they reopen big with a click. They sit *above* the words, the way they sat
+   above the caret while you were writing — the message reads the same after
+   sending as it looked before. */
 .uimgs {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 7px;
+  margin-bottom: 8px;
   white-space: normal;
+}
+.uimgs:last-child {
+  margin-bottom: 0;
 }
 .msg.user .utext:empty {
   display: none;
@@ -814,10 +847,12 @@ body.wide .msg.user {
 }
 
 /* The answer flows in the same column as the text you write: same left edge as
-   the composer's caret (its 12px of padding), so reading and writing line up. */
+   the composer's caret. That's 13px here, not 12: the composer has a 1px border
+   before its padding and a bare block of text doesn't — the pixel the eye reads
+   is the sum, not the padding. */
 .msg.assistant {
   align-self: stretch;
-  padding: 0 12px;
+  padding: 0 13px;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -952,14 +987,23 @@ body.wide .msg.user {
 .mdlink:hover {
   border-bottom-color: var(--claude-2);
 }
-/* the language of a code block, written where it doesn't get in the way */
+/* A code block is written to end up somewhere else — a terminal, a message to a
+   colleague. The language and the copy button share one strip in the corner: it
+   stays faint until the pointer is on the block, so a page of them doesn't turn
+   into a wall of buttons, and it's always there the moment you go looking. */
 .code-wrap {
   position: relative;
 }
-.code-lang {
+.code-bar {
   position: absolute;
   top: 6px;
-  right: 10px;
+  right: 8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.code-lang {
   font-family: var(--mono);
   font-size: 9.5px;
   font-weight: 700;
@@ -968,13 +1012,59 @@ body.wide .msg.user {
   opacity: 0.55;
   pointer-events: none;
 }
+.copybtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--fg);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  opacity: 0.42;
+  transition: opacity 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.code-wrap:hover .copybtn,
+.copybtn:focus-visible {
+  opacity: 1;
+}
+.copybtn:hover {
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 14%, var(--surface));
+}
+.copybtn .ico {
+  font-size: 12px;
+}
+/* copied: it says so itself, on the spot, and then goes quiet again */
+.copybtn.ok {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: color-mix(in srgb, var(--ok) 14%, var(--surface));
+}
+.copybtn.ok .ico {
+  color: var(--ok);
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation: cs-draw 0.4s ease forwards;
+}
+/* room for the strip: without it the first line of code runs under the button */
+.code-wrap pre {
+  padding-top: 26px;
+}
 
 /* ---------- the line that closes a turn ---------- */
 .recap {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 0 12px;
+  /* borderless, like the assistant's text: 13px to land on the same line */
+  padding: 0 13px;
 }
 .recap .recap-ico {
   flex: 0 0 auto;
@@ -1020,7 +1110,8 @@ body.wide .msg.user {
   position: relative;
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 8px 11px;
+  /* 12 past the border: the same inset as the tool cards and the composer */
+  padding: 8px 12px;
   background: color-mix(in srgb, var(--claude-1) 4%, transparent);
 }
 .think.live::before {
@@ -1305,7 +1396,7 @@ body.wide .msg.user {
       transparent 60%
     ),
     var(--card);
-  padding: 11px 13px 12px;
+  padding: 11px 12px 12px;
   box-shadow: 0 18px 40px -30px var(--claude-1);
 }
 .perm .head {
@@ -1820,53 +1911,45 @@ body.wide .msg.user {
 }
 
 /* ---------- what it's doing, right now ----------
-   Above the writing field, same margins, so it belongs to the box you type in
-   and not to the thread. It's the answer to "is it stuck?": the clock ticks
-   every second, and if nothing has happened for a while it says so itself. */
+   In the header, right beside the mode switch. It used to be a full-width strip
+   above the writing field, repeating the command it was running: a second line
+   of log, in the one place the eye should find the thread instead. Here it says
+   only what state it's in and for how long — the two things you actually check
+   — and it takes the width of those two words and no more. */
 .activity {
   position: relative;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin: 0 11px 7px;
-  padding: 6px 12px;
+  gap: 7px;
+  min-width: 0;
+  padding: 3px 9px;
   border: 1px solid color-mix(in srgb, var(--claude-1) 34%, var(--line));
   border-radius: var(--pill);
   background: color-mix(in srgb, var(--claude-1) 9%, var(--card));
-  font-size: 11.5px;
+  font-size: 11px;
   overflow: hidden;
   animation: cs-open 0.3s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
-body.wide .activity {
-  margin-left: var(--gutter);
-  margin-right: var(--gutter);
-}
 .act-orb {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: var(--pill);
   background: var(--claude-1);
   animation: cs-ping-warm 1.6s ease-in-out infinite;
 }
 .act-what {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.act-steps,
 .act-time {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
-  opacity: 0.85;
-  white-space: nowrap;
-}
-.act-time {
   font-weight: 750;
-  opacity: 1;
+  white-space: nowrap;
 }
 /* the thread of light along the bottom edge: it moves even when nothing else is */
 .activity::after {
@@ -1895,7 +1978,7 @@ body.wide .activity {
 .composer {
   position: relative;
   flex: 0 0 auto;
-  margin: 0 11px 11px;
+  margin: 0 var(--pad) var(--pad);
   border: 1px solid var(--line);
   border-radius: var(--r);
   background: var(--card);
@@ -1969,7 +2052,10 @@ body.wide .activity {
 .send.stop .stop-square {
   width: 26px;
   height: 26px;
-  color: #fff;
+  /* Same ink as the arrow it replaces. White on the red read as a second,
+     brighter shape and the button seemed to change into a different control;
+     black keeps it the same button, only now it means stop. */
+  color: #14100c;
 }
 .send:active {
   transform: scale(0.92);

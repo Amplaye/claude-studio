@@ -292,8 +292,61 @@
     split: /^\s*\|?[\s:|-]+\|[\s:|-]*$/,
   };
 
+  /* ---------- links ----------
+     An address written out in full is a link whether or not somebody wrapped it
+     in brackets — and Claude writes them bare most of the time, inside numbered
+     steps and inside code blocks. Copying one out by hand to paste it in a
+     browser is the sort of small tax you pay ten times a day without noticing.
+     Here they become clickable wherever they turn up. */
+  const URL_RX = /https?:\/\/[^\s<>"'`\\]+/g;
+
+  /**
+   * One anchor. The trailing punctuation is trimmed off first: "…see https://x.com."
+     ends a sentence, the full stop isn't part of the address. Closing brackets go
+   * too, unless the address itself opened one (wiki-style URLs do).
+   */
+  function linkNode(raw) {
+    let url = raw;
+    let tail = '';
+    for (;;) {
+      const last = url[url.length - 1];
+      if ('.,;:!?'.includes(last)) {
+        tail = last + tail;
+        url = url.slice(0, -1);
+        continue;
+      }
+      const pair = { ')': '(', ']': '[', '}': '{' }[last];
+      if (pair && url.split(pair).length < url.split(last).length) {
+        tail = last + tail;
+        url = url.slice(0, -1);
+        continue;
+      }
+      break;
+    }
+    const a = el('a', 'mdlink', url);
+    a.href = url;
+    a.title = url;
+    return [a, tail];
+  }
+
+  /** Text where every bare address becomes a link. Everything else stays text. */
+  function autolink(text, into) {
+    const box = into || document.createDocumentFragment();
+    let last = 0;
+    for (const m of String(text).matchAll(URL_RX)) {
+      if (m.index > last) box.append(document.createTextNode(text.slice(last, m.index)));
+      const [a, tail] = linkNode(m[0]);
+      box.append(a);
+      if (tail) box.append(document.createTextNode(tail));
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) box.append(document.createTextNode(text.slice(last)));
+    return box;
+  }
+
   /** Bold, italic, code, strike, links. What it doesn't know stays as typed. */
-  const INLINE = /\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|~~([^~\n]+)~~|\[([^\]\n]+)\]\(([^)\s]+)\)/g;
+  const INLINE =
+    /\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`|~~([^~\n]+)~~|\[([^\]\n]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>"'`\\]+)/g;
 
   function inline(text, into) {
     const box = into || document.createDocumentFragment();
@@ -304,7 +357,12 @@
       else if (m[2] != null) box.append(el('em', null, m[2]));
       else if (m[3] != null) box.append(el('code', null, m[3]));
       else if (m[4] != null) box.append(el('s', null, m[4]));
-      else if (/^https?:\/\//i.test(m[6])) {
+      else if (m[7] != null) {
+        // written bare, no brackets around it
+        const [a, tail] = linkNode(m[7]);
+        box.append(a);
+        if (tail) box.append(document.createTextNode(tail));
+      } else if (/^https?:\/\//i.test(m[6])) {
         // Only real web links become links: a "(see below)" must not turn into
         // something clickable that goes nowhere.
         const a = el('a', 'mdlink', m[5]);
@@ -320,11 +378,64 @@
     return box;
   }
 
+  /* ---------- copy ----------
+     A block of code, a command, a message to forward to someone: what it's for is
+     to end up somewhere else. The clipboard API is the quick road; inside a
+     webview it can be refused, so the extension holds the door open behind it —
+     it has a clipboard of its own and no such doubts. */
+  function copyText(text) {
+    const ask = () => vscode.postMessage({ cmd: 'copy', text });
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(null, ask);
+        return;
+      }
+    } catch (_) {
+      /* falls through to the extension */
+    }
+    ask();
+  }
+
+  /**
+   * The button that lives in the corner of a copyable block. It answers: the icon
+   * becomes a tick and the word changes for a second and a half, then it goes back
+   * — the confirmation you want after pressing it, without a toast covering the page.
+   */
+  function copyButton(getText, cls) {
+    const b = el('button', 'copybtn' + (cls ? ' ' + cls : ''));
+    b.type = 'button';
+    b.title = t('code.copy');
+    const paint = (label, ico) => {
+      b.replaceChildren(ico, el('span', 'copybtn-t', label));
+    };
+    paint(t('code.copy'), icon('copy'));
+    let back = 0;
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      copyText(getText());
+      b.classList.add('ok');
+      paint(t('code.copied'), drawnCheck());
+      clearTimeout(back);
+      back = setTimeout(() => {
+        b.classList.remove('ok');
+        paint(t('code.copy'), icon('copy'));
+      }, 1500);
+    });
+    return b;
+  }
+
   function codeBlock(lang, body) {
+    const text = body.replace(/\n+$/, '');
     const wrap = el('div', 'code-wrap');
-    if (lang) wrap.append(el('span', 'code-lang', lang));
+    const bar = el('div', 'code-bar');
+    if (lang) bar.append(el('span', 'code-lang', lang));
+    bar.append(copyButton(() => text));
+    wrap.append(bar);
     const pre = el('pre');
-    pre.appendChild(el('code', null, body.replace(/\n+$/, '')));
+    // Addresses inside a fenced block are links too: half of what Claude writes
+    // in one is a URL to open, and a block you can't click is a block you retype.
+    pre.appendChild(autolink(text, el('code')));
     wrap.append(pre);
     return wrap;
   }
@@ -442,6 +553,17 @@
 
     return out.length ? out : [document.createTextNode('')];
   }
+
+  // A link opens in the browser, and it's the extension that opens it. Left to
+  // itself a webview either swallows the navigation or goes there wholesale —
+  // and a panel that has navigated away from the chat has no way back.
+  document.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a.mdlink');
+    if (!a) return;
+    e.preventDefault();
+    const url = a.getAttribute('href');
+    if (url) vscode.postMessage({ cmd: 'openLink', url });
+  });
 
   // ---------- tool ----------
 
@@ -968,24 +1090,28 @@
   }
 
   /**
-   * The send arrow, drawn here instead of pulled from the sprite.
+   * The send arrow: a paper plane, the one everybody already knows from every
+   * chat they've used.
    *
-   * The sprite's "navigate" is a jet tip: to make it point the right way it had
-   * to be rotated 45°, and a rotated glyph that isn't symmetrical never sits in
-   * the middle of the square — it hung towards a corner. This one is built
-   * symmetrical around 12,12 in a 24-box, so "centred" is a property of the
-   * drawing and not something to chase with margins.
+   * It's drawn here rather than pulled from the sprite for the same reason as
+   * before — the sprite's "navigate" is a jet tip that has to be rotated 45° to
+   * point the right way, and a rotated asymmetric glyph never sits in the middle
+   * of its square. This plane is built flat inside the 24-box, its body centred
+   * on y=12, with the notch cut into the tail: it flies to the right without
+   * being turned, so "centred" stays a property of the drawing.
    */
   function sendArrow() {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('class', 'ico send-arrow');
     svg.setAttribute('viewBox', '0 0 24 24');
     const p = document.createElementNS(SVG, 'path');
-    p.setAttribute('d', 'M5 12h14M12.5 5.5 19 12l-6.5 6.5');
-    p.setAttribute('fill', 'none');
+    p.setAttribute(
+      'd',
+      'M21.4 11.13 4.07 3.5a1 1 0 0 0-1.4 1.15l1.6 6.05a1 1 0 0 0 .8.72L12.3 12.5l-7.23 1.08a1 1 0 0 0-.8.72l-1.6 6.05a1 1 0 0 0 1.4 1.15l17.33-7.63a1 1 0 0 0 0-1.74z'
+    );
+    p.setAttribute('fill', 'currentColor');
     p.setAttribute('stroke', 'currentColor');
-    p.setAttribute('stroke-width', '2.4');
-    p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-width', '0.7');
     p.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(p);
     return svg;
@@ -1010,15 +1136,18 @@
   // ---------- what it's doing, right now ----------
   //
   // The chat can stay still for a minute while a tool chews on something, and a
-  // still chat looks like a stuck chat. This strip sits above the writing field
-  // and never lies: what it's on now, how long the turn has been going, how many
-  // steps it has taken. The clock ticks every second — a moving clock is the
-  // cheapest proof that nothing is frozen — and if nothing has happened for a
-  // while it says that too, instead of leaving you to guess.
+  // still chat looks like a stuck chat. This pill lives in the header, beside the
+  // mode switch, and says two things: what state it's in and how long the turn has
+  // been going. The clock ticks every second — a moving clock is the cheapest
+  // proof that nothing is frozen — and if nothing has happened for a while it
+  // says that too, instead of leaving you to guess.
+  //
+  // The step count still gets kept (`stepsN`) — it's worth reading once, at the
+  // end, in the recap. It's not worth a chip that changes every two seconds up
+  // here, and neither was the command line it used to repeat from the thread.
   const actBar = $('activity');
   const actWhat = $('actWhat');
   const actTime = $('actTime');
-  const actSteps = $('actSteps');
   let actStart = 0;
   let actLast = 0;
   let actKey = 'act.working';
@@ -1037,8 +1166,6 @@
     const quiet = now - actLast;
     actWhat.textContent = actVars ? t(actKey, actVars) : t(actKey);
     actTime.textContent = clock(now - actStart);
-    actSteps.textContent = stepsN ? t(stepsN === 1 ? 'act.step' : 'act.steps', { n: stepsN }) : '';
-    actSteps.hidden = !stepsN;
     // Twelve seconds with nothing new is where the doubt starts: better to say
     // "still on it" than to let the silence say "it crashed".
     actBar.classList.toggle('quiet', quiet > 12000);
@@ -1061,6 +1188,9 @@
     actKey = 'act.working';
     actVars = null;
     actBar.hidden = false;
+    // The header rearranges itself around the pill: in the narrow face the
+    // wordmark steps aside to make room for it (see chat.css).
+    actBar.parentElement.classList.add('busy');
     paintActivity();
     clearInterval(actTimer);
     actTimer = setInterval(paintActivity, 1000);
@@ -1071,6 +1201,7 @@
     clearInterval(actTimer);
     actTimer = 0;
     actBar.hidden = true;
+    actBar.parentElement.classList.remove('busy');
     actBar.classList.remove('quiet');
   }
 
@@ -1182,9 +1313,9 @@
         break;
       case 'user': {
         const n = el('div', 'msg user');
-        if (m.text) n.append(el('div', 'utext', m.text));
-        // The attached images stay down here: they're the proof that they went out,
-        // and one click opens them big again, just like before sending.
+        // The attached images go on top, above the words — exactly where they sat
+        // in the composer while you were writing. Sent, the message keeps the shape
+        // you'd built: they're the proof they went out, and one click opens them big.
         if (m.images && m.images.length) {
           const box = el('div', 'uimgs');
           for (const im of m.images) {
@@ -1198,6 +1329,7 @@
           }
           n.append(box);
         }
+        if (m.text) n.append(el('div', 'utext', m.text));
         add(n);
         break;
       }
@@ -1222,7 +1354,9 @@
         hideWaiting();
         toolStart(m.id, m.name, m.input, m.parent);
         stepsN++;
-        activity('act.tool', { tool: m.name, what: toolArg(m.input, m.name).slice(0, 60) });
+        // The name of the tool and nothing else: what it's running is already
+        // written in full in the card that just opened in the thread.
+        activity('act.tool', { tool: m.name });
         break;
       case 'tool_end':
         toolEnd(m.id, m.ok, m.text);
@@ -2037,7 +2171,7 @@
       // without waiting for the first click.
       placeAllSegs();
       requestAnimationFrame(placeAllSegs);
-      if (window.Chime) window.Chime.unlock();
+      wake();
     } else {
       // Closing animation: the panel slides away, then hides.
       btnCfg.classList.remove('on');
@@ -2069,9 +2203,28 @@
 
   // The first gesture on the page unlocks the audio: from then on the end-of-work
   // alert can sound even with the window behind all the others.
-  const wake = () => window.Chime && window.Chime.unlock();
-  document.addEventListener('pointerdown', wake, { once: true });
-  document.addEventListener('keydown', wake, { once: true });
+  //
+  // And the extension is told: with two or three sessions open the conversation
+  // that finishes is often one whose page you've never touched, and a page that
+  // has never been touched isn't allowed to make a sound. Knowing who can, it
+  // sends the chime there instead of into the void (chat/sound.ts).
+  let audioSaid = null;
+  const tellAudio = (ok) => {
+    // Only when it changes: this hangs off every keystroke, and repeating "still
+    // awake" a hundred times a minute is noise on the wire for nothing.
+    if (audioSaid === !!ok) return;
+    audioSaid = !!ok;
+    vscode.postMessage({ cmd: 'audio', ok: audioSaid });
+  };
+  const wake = () => {
+    if (audioSaid === true) return; // already awake: nothing left to unlock
+    if (window.Chime) window.Chime.unlock(tellAudio);
+  };
+  document.addEventListener('pointerdown', wake);
+  document.addEventListener('keydown', wake);
+  // Worth a try straight away: some hosts allow it, and the ones that don't just
+  // say no — the first gesture then puts it right.
+  wake();
 
   // ---------- shortcuts ----------
   //

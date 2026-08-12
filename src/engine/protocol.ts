@@ -172,4 +172,13 @@ export type Cmd =
   // `fork` = resume but on a new branch, without touching the original conversation
   | { cmd: 'open'; id: string; fork?: boolean }
   | { cmd: 'files'; q: string }
-  | { cmd: 'openFile'; path: string; line?: number };
+  | { cmd: 'openFile'; path: string; line?: number }
+  // "My audio is awake": a page can only make a sound once you've touched it, and
+  // the chime has to go to one that can actually be heard. See chat/sound.ts.
+  | { cmd: 'audio'; ok: boolean }
+  // A webview's clipboard can be refused; VS Code's never is. The page tries its
+  // own first and falls back to here.
+  | { cmd: 'copy'; text: string }
+  // Links open in the browser: a webview that navigates away from the chat has
+  // no way back to it.
+  | { cmd: 'openLink'; url: string };

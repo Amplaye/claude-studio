@@ -26,7 +26,14 @@ export class ChatView implements vscode.WebviewViewProvider {
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView) {
-    const { surface, listener } = bindWebview(view.webview, this.ctx, this.chat, 'view');
+    const { surface, listener } = bindWebview(
+      view.webview,
+      this.ctx,
+      this.chat,
+      'view',
+      undefined,
+      () => view.visible
+    );
     // The "it's done" badge hangs here: it's the activity bar icon, the only place
     // you can see even from another tab.
     useBadgeHost(view);

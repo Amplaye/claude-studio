@@ -15,8 +15,19 @@
     <div class="shell">
       <div class="chatcol">
         <header class="top">
-          <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg>Studio</span>
+          <!-- The wordmark is in a span of its own so it can step aside: in the
+               narrow face, while Claude works, the room it takes is worth more to
+               the activity pill than to a name you've already read. -->
+          <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg><span class="brand-t">Studio</span></span>
           <span class="grow"></span>
+          <!-- What it's doing right now, next to the mode switch: short on purpose —
+               the state and the clock, nothing else. A chat that stays still for a
+               minute while a tool works looks stuck otherwise. -->
+          <div class="activity" id="activity" hidden>
+            <span class="act-orb"></span>
+            <span class="act-what" id="actWhat"></span>
+            <span class="act-time" id="actTime">0:00</span>
+          </div>
           <div class="modeseg" id="mode" data-i18n-title="top.mode" title="How it handles permissions (Alt+M)">
             <button class="modeseg-btn" data-mode="plan" data-i18n-title="top.mode.plan" title="Plan only: it thinks but touches nothing">
               <svg class="ico"><use href="#ion-list" /></svg><span data-i18n="top.mode.plan.label">Plan</span>
@@ -124,16 +135,6 @@
         </div>
 
         <main class="log" id="log"></main>
-
-        <!-- What it's doing right now. It sits above the writing field so it's
-             always in sight, and the clock ticks every second: a chat that stays
-             still for a minute while a tool works looks stuck otherwise. -->
-        <div class="activity" id="activity" hidden>
-          <span class="act-orb"></span>
-          <span class="act-what" id="actWhat"></span>
-          <span class="act-steps" id="actSteps" hidden></span>
-          <span class="act-time" id="actTime">0:00</span>
-        </div>
 
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>

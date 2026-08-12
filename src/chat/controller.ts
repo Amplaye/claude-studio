@@ -13,6 +13,7 @@ import { currentSelection, findFiles, workspaceRoot } from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
+import { sound } from './sound';
 import { forgetSession } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
 
@@ -188,8 +189,11 @@ export class ChatController {
     if (event === 'ask' && !p.soundOnAsk) return;
     if (p.onlyWhenAway && focused) return;
 
-    const s = [...this.surfaces].find((x) => x.kind === 'panel') ?? [...this.surfaces][0];
-    s?.post({ k: 'chime', event, sound: p.sound, volume: p.volume });
+    // Non piu' "una faccia di questa conversazione": una pagina che si senta
+    // davvero, in tutta la finestra. Con piu' sessioni aperte la faccia di questa
+    // conversazione e' spesso una scheda che non hai mai toccato, e una pagina
+    // mai toccata non ha il permesso di suonare (vedi sound.ts).
+    sound.play({ k: 'chime', event, sound: p.sound, volume: p.volume });
   }
 
   /**
@@ -247,6 +251,11 @@ export class ChatController {
   async open(id: string, fork = false) {
     this.clear();
     this.resume = { id, fork };
+    // La barra di contesto lo sa subito, non al prossimo messaggio: il motore
+    // parte solo quando scrivi, e fino ad allora il pannello indicherebbe ancora
+    // la conversazione di prima. Un fork non ha ancora un id suo: quello arriva
+    // dal motore, e la card compare allora.
+    if (this.primary && !fork) owned.adopt(id, currentCwd());
     for (const e of await replaySession(id, currentCwd())) this.emit(e);
   }
 

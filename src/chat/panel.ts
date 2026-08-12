@@ -55,6 +55,12 @@ export class ChatPanel {
     return new ChatPanel(panel, ctx, chat, monitor, false);
   }
 
+  /** Is the primary tab on screen? Asked before opening another face onto the same
+      conversation: one is enough, and the second is a window you have to close. */
+  static isVisible(): boolean {
+    return !!ChatPanel.primary?.panel.visible;
+  }
+
   /** You reload the window and the tab is still there. */
   static register(
     ctx: vscode.ExtensionContext,
@@ -90,7 +96,14 @@ export class ChatPanel {
     ChatPanel.all.add(this);
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
-    const { surface, listener } = bindWebview(panel.webview, ctx, chat, 'panel', monitor);
+    const { surface, listener } = bindWebview(
+      panel.webview,
+      ctx,
+      chat,
+      'panel',
+      monitor,
+      () => panel.visible
+    );
     // Only the primary governs the bar's badge: the secondary ones are conversations
     // of their own, and the context bar ignores them.
     if (isPrimary) {

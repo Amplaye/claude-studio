@@ -6,6 +6,7 @@ import type { ContextMonitor } from '../context/monitor';
 import type { CtxCmd, CtxToChat } from '../context/protocol';
 import { renderPage } from '../shared/html';
 import { openFile } from './editor';
+import { sound } from './sound';
 import type { ChatController, Surface } from './controller';
 
 export function bindWebview(
@@ -13,7 +14,9 @@ export function bindWebview(
   ctx: vscode.ExtensionContext,
   chat: ChatController,
   kind: Surface['kind'],
-  monitor?: ContextMonitor
+  monitor?: ContextMonitor,
+  /** Is this face on screen? The chime needs to know: see sound.ts. */
+  visible: () => boolean = () => true
 ): { surface: Surface; listener: vscode.Disposable } {
   webview.options = {
     enableScripts: true,
@@ -42,6 +45,15 @@ export function bindWebview(
   // panel already exists on its own, here it doesn't. We subscribe only for the tab,
   // so we don't ship things to someone who doesn't draw them.
   let ctxSub: vscode.Disposable | undefined;
+
+  // This page joins the chorus: the chime goes to whoever can be heard, no matter
+  // which conversation finished. The page itself says when its audio woke up.
+  let audioReady = false;
+  const speaker = sound.add({
+    post: (e) => void webview.postMessage(e),
+    ready: () => audioReady,
+    visible,
+  });
 
   const msgs = webview.onDidReceiveMessage((m: Cmd | CtxCmd) => {
     switch (m?.cmd) {
@@ -93,6 +105,17 @@ export function bindWebview(
       case 'openFile':
         void openFile(m.path, m.line);
         return;
+      case 'audio':
+        audioReady = !!m.ok;
+        return;
+      case 'copy':
+        void vscode.env.clipboard.writeText(m.text);
+        return;
+      case 'openLink':
+        // http(s) only: the page hands over a string, and a string that turns into
+        // a command:// URI would be the page running commands in the editor.
+        if (/^https?:\/\//i.test(m.url)) void vscode.env.openExternal(vscode.Uri.parse(m.url));
+        return;
       // ---- what the context column sends ----
       case 'refresh':
         monitor?.tick();
@@ -114,6 +137,7 @@ export function bindWebview(
     listener: {
       dispose() {
         ctxSub?.dispose();
+        speaker.dispose();
         msgs.dispose();
       },
     },

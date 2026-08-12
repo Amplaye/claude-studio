@@ -114,6 +114,32 @@ class OwnedSessions {
     this.changed();
   }
 
+  /**
+   * A past conversation reopened from the history.
+   *
+   * The engine doesn't start until you send the next message, so without this the
+   * id would stay empty for as long as you sat there reading — and a card with no
+   * id isn't drawn at all. You'd have switched conversation and the context panel
+   * would still be pointing at the one before, or at somebody else's tab. The id
+   * is known the moment you click: there's nothing to wait for.
+   */
+  adopt(id: string, cwd: string, title = '') {
+    if (!id) return;
+    const now = Date.now();
+    this.cur = {
+      id,
+      cwd,
+      model: this.cur?.model ?? '',
+      startedAt: now,
+      updatedAt: now,
+      title,
+      tokens: 0,
+      costUsd: 0,
+      busy: false,
+    };
+    this.changed();
+  }
+
   /** Conversation cleared or extension closed: the card has no reason to exist. */
   end() {
     if (!this.cur) return;

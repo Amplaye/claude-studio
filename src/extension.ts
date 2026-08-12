@@ -48,6 +48,20 @@ export function activate(ctx: vscode.ExtensionContext) {
       ChatPanel.openNew(ctx, monitor)
     ),
     vscode.commands.registerCommand('claudeStudio.newSession', () => chat.newSession()),
+    // Click a card in the context panel and you land in that conversation. If it
+    // belongs to a tab of the official extension we go to the tab; if that tab
+    // isn't in this window the conversation is still on disk, and we reopen it
+    // here — the click keeps its promise either way.
+    vscode.commands.registerCommand('claudeStudio.openConversation', async (id: string) => {
+      if (!id) return;
+      // Whichever face is already in sight: opening a second one to read the same
+      // conversation is a window you then have to close.
+      if (!ChatPanel.isVisible()) {
+        stayInSidebar();
+        await vscode.commands.executeCommand('workbench.view.extension.claudeStudio');
+      }
+      await chat.open(id);
+    }),
     vscode.commands.registerCommand('claudeStudio.interrupt', () => chat.interrupt()),
     vscode.commands.registerCommand('claudeStudio.context.show', () =>
       vscode.commands.executeCommand('claudeStudio.context.focus')

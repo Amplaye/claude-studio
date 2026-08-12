@@ -44,6 +44,8 @@ export class ContextMonitor {
   /** Sticky: se sposti lo sguardo su un file, l'ultima sessione nota resta quella. */
   private focusedId: string | null = null;
   private how: FocusHow = 'recency';
+  /** L'ultima conversazione nostra vista: serve ad accorgersi che e' cambiata. */
+  private mineId: string | null = null;
 
   start(ctx: vscode.ExtensionContext) {
     this.status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -259,6 +261,16 @@ export class ContextMonitor {
     names: Record<string, string>,
     mineId?: string
   ): string | null {
+    // Hai cambiato conversazione nella chat: l'appunto di prima parla di una
+    // sessione in cui non sei piu'. Si sposta subito, poi la cascata qui sotto
+    // resta libera di correggere se stai davvero guardando un'altra tab.
+    if (mineId && mineId !== this.mineId) {
+      this.mineId = mineId;
+      this.settle(mineId, 'studio');
+    } else if (!mineId) {
+      this.mineId = null;
+    }
+
     if (mineId && studioTabActive()) return this.settle(mineId, 'studio');
 
     const tabs = claudeTabs();
@@ -351,9 +363,11 @@ export class ContextMonitor {
         normLabel(t.label).includes(id.slice(0, 8))
     );
     if (!target) {
-      void vscode.window.showInformationMessage(
-        `Cannot find the tab "${s.tabName || id.slice(0, 8)}" in this VSCode window.`
-      );
+      // Nessuna tab dell'ufficiale a cui portarti: la conversazione pero' esiste,
+      // e' sul disco, e possiamo aprirla noi. Un clic che finiva in un avviso ora
+      // finisce dentro la sessione, che e' quello che volevi facendolo.
+      await vscode.commands.executeCommand('claudeStudio.openConversation', id);
+      this.tickSoon();
       return;
     }
     await revealTab(target);

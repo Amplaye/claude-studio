@@ -17,6 +17,13 @@
   --r: 11px;
   --pill: 999px;
 
+  /* The one column the thread and the writing field share: `--pad` is the side
+     margin of every box in the chat, `--sbw` the width of the scrollbar that
+     lives inside the thread (see ::-webkit-scrollbar below). They're written
+     here, once, because "aligned" is arithmetic between the two. */
+  --pad: 11px;
+  --sbw: 10px;
+
   --mono: var(--vscode-editor-font-family, ui-monospace, "Cascadia Mono", Consolas, monospace);
   --sans: var(--vscode-font-family, ui-sans-serif, system-ui, "Segoe UI", sans-serif);
 }
@@ -75,8 +82,8 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: var(--sbw);
+  height: var(--sbw);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--line);

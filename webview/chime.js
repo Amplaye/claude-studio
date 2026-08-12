@@ -198,10 +198,24 @@
    * The audio context is born muted until you've touched the page: that's a
    * browser rule, not a whim. It wakes up on the first click or the first
    * keystroke, which come before any answer worth waiting for anyway.
+   *
+   * `then` is called with true once it's really awake. The extension keeps track:
+   * with several sessions open, the chime has to go to a page that can be heard,
+   * not to the one whose conversation happened to finish (see chat/sound.ts).
    */
-  function unlock() {
+  function unlock(then) {
     const c = boot();
-    if (c && c.state === 'suspended') c.resume().catch(() => {});
+    const say = () => {
+      if (then) then(!!c && c.state === 'running');
+    };
+    if (!c) return say();
+    if (c.state === 'suspended') c.resume().then(say, say);
+    else say();
+  }
+
+  /** Awake right now? */
+  function ready() {
+    return !!ctx && ctx.state === 'running';
   }
 
   function play(name, ev, volume) {
@@ -221,5 +235,5 @@
     make(t, ev === 'ask' ? 'ask' : 'done');
   }
 
-  window.Chime = { play, unlock, names: Object.keys(SOUNDS) };
+  window.Chime = { play, unlock, ready, names: Object.keys(SOUNDS) };
 })();
