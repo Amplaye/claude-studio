@@ -102,17 +102,14 @@
           <p class="phint" data-i18n="cfg.language.hint">Changes the whole interface straight away</p>
 
           <div class="pop-sec" data-i18n="cfg.done">When it's done</div>
-          <label class="prow">
+          <!-- The list of sounds isn't a <select> any more: that one opens a menu
+               drawn by the operating system, in the middle of a panel where
+               everything else slides. The button and the list are built by the JS
+               (makeSelect) — one option per sound, each with its own icon. -->
+          <div class="prow">
             <span class="plab" data-i18n="cfg.sound">Sound</span>
-            <select id="cfgSound">
-              <option value="cozy" data-i18n="sound.cozy">Cozy</option>
-              <option value="harvest" data-i18n="sound.harvest">Harvest</option>
-              <option value="levelup" data-i18n="sound.levelup">Level up</option>
-              <option value="starlit" data-i18n="sound.starlit">Starlit</option>
-              <option value="chest" data-i18n="sound.chest">Chest</option>
-              <option value="off" data-i18n="sound.off">Mute</option>
-            </select>
-          </label>
+            <div class="sel" id="cfgSound"></div>
+          </div>
           <label class="prow">
             <span class="plab" data-i18n="cfg.volume">Volume</span>
             <input type="range" id="cfgVol" min="0" max="100" step="5" />
@@ -140,6 +137,13 @@
           <div class="menu" id="menu" hidden></div>
           <div class="attach" id="attach" hidden></div>
           <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
+          <!-- Attachments. The picker is VS Code's own and it filters nothing:
+               a PDF, a spreadsheet, a zip, a video — whatever is on the disk can
+               come into the message. Images travel as images; everything else
+               travels as a path Claude opens with its own tools. -->
+          <button class="clip" id="btnAttach" type="button" data-i18n-title="composer.attach" title="Attach files (any kind)">
+            <svg class="ico"><use href="#ion-attach" /></svg>
+          </button>
           <!-- Not a submit button: while Claude is working this is Stop, and Enter
                must stay Enter — it queues the next message instead of interrupting. -->
           <!-- The arrow is drawn by the JS (chat.js, sendArrow): built symmetrical

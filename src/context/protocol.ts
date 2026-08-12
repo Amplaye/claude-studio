@@ -23,6 +23,11 @@ export interface CtxCard {
   lastClock: string;
   lastAgo: string;
   busy: boolean;
+  /**
+   * Ha finito e non l'hai ancora vista. Il suono dice che qualcosa e' pronto: questo
+   * dice quale. Si spegne appena guardi quella conversazione.
+   */
+  done: boolean;
   recent: boolean;
   focused: boolean;
 }

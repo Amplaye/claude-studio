@@ -65,7 +65,13 @@ export function bindWebview(
         }
         return;
       case 'send':
-        chat.send(m.text, m.images, m.withSelection);
+        chat.send(m.text, m.images, m.withSelection, m.files);
+        return;
+      case 'pickFiles':
+        void chat.pickAttachments(surface);
+        return;
+      case 'stashFile':
+        void chat.stashAttachment(surface, m.name, m.data);
         return;
       case 'interrupt':
         chat.interrupt();

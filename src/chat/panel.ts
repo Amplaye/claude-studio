@@ -140,14 +140,19 @@ export class ChatPanel {
     owned.setFace(chat.key, 'panel', panel.active);
     // The tab is named after its conversation, and follows it: the first thing you
     // write becomes the label, and renaming the card renames the tab.
+    //
+    // E se ha finito mentre guardavi altrove, il nome se lo porta scritto davanti:
+    // un pallino, sulla linguetta, esattamente dove stai gia' guardando per capire
+    // quale scheda aprire. Sparisce appena quella scheda torna davanti.
     this.followName = () => {
-      const name = chat.name();
+      const name = (owned.isDone(chat.key) ? '● ' : '') + chat.name();
       if (panel.title !== name) panel.title = name;
     };
     this.followName();
     const named = chat.onTitle(this.followName);
     const state = panel.onDidChangeViewState(() => {
       owned.setFace(chat.key, 'panel', panel.active);
+      if (panel.active) this.followName();
       // Back in front after being behind: the numbers had been frozen for a while,
       // and the "refresh" button is gone because this does it by itself.
       if (panel.visible) monitor?.tickSoon();

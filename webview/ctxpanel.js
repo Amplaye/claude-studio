@@ -118,8 +118,14 @@ window.CtxPanel = (() => {
       const kind = icon('sparkles', 'cico');
       const name = el('span', 'cname');
       const badge = el('span', 'badge', t('ctx.here'));
+      // "Ha finito." Il suono dice che qualcosa e' pronto, non quale: con tre
+      // conversazioni aperte le apri a una a una per scoprirlo. Questo e' il
+      // segnalino che risponde — e si spegne appena guardi quella conversazione.
+      const done = el('span', 'donebadge');
+      done.append(icon('checkmark', 'dico'), el('span', null, t('ctx.done')));
+      done.hidden = true;
       const ren = iconButton('pencil', t('ctx.rename'), 'ren');
-      chead.append(dot, kind, name, badge, ren);
+      chead.append(dot, kind, name, badge, done, ren);
 
       const meta = el('div', 'cmeta');
       const pill = el('span', 'tabpill');
@@ -142,7 +148,7 @@ window.CtxPanel = (() => {
       };
       c.onclick = () => post({ cmd: 'focus', id });
 
-      c._p = { dot, kind, name, badge, ren, pill, sub, pct, tok, fill: bar.firstChild };
+      c._p = { dot, kind, name, badge, done, ren, pill, sub, pct, tok, fill: bar.firstChild };
       return c;
     }
 
@@ -150,6 +156,10 @@ window.CtxPanel = (() => {
       const p = c._p;
       c.classList.toggle('focused', !!s.focused);
       c.classList.toggle('own', !!s.own);
+      c.classList.toggle('done', !!s.done);
+      p.done.hidden = !s.done;
+      p.done.lastChild.textContent = t('ctx.done');
+      p.done.title = t('ctx.doneHint');
 
       p.dot.classList.toggle('busy', !!s.busy);
       p.dot.classList.toggle('recent', !s.busy && !!s.recent);

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.8.0
+
+- **Attach any file at all — this is the big one.** There's a paperclip in the
+  box you type in, and behind it VS Code's own picker with no filter on it
+  whatsoever: a PDF, a spreadsheet, a log, a zip, a video, a font. You can drop
+  them on the message too — from the explorer beside you, or from a browser
+  window. Images travel as images, the way a pasted screenshot always has;
+  everything else travels as a path Claude opens with its own tools, which is
+  both the only thing that works for every format and the only thing that
+  doesn't put a forty-megabyte file through the chat. Each attachment is a chip
+  with the icon for its kind, its name and its size — because "18.0 MB" is worth
+  reading before you send it.
+- **You can see which conversation finished.** With three open, the chime said
+  *something* was ready and left you to work out which: you went through the tabs
+  one at a time. Now the one that finished says so — a dot in front of its name on
+  the tab, a green *done* on its card in the context panel — and it goes out the
+  moment you look at that conversation. If you were already looking at it when it
+  finished, nothing lights up: you watched it happen. The number on the activity
+  bar icon is now how many are waiting, not a permanent 1.
+- **Every switch in the settings answers back.** The three checkboxes are real
+  switches now: the knob slides across on a spring, stretches while you hold it
+  down and throws a halo the moment it comes on. The list of sounds isn't a
+  `<select>` any more — that one opened a menu drawn by the operating system, in
+  the middle of a panel where everything else slides — but a list of ours that
+  unrolls from its button, one option at a time, each with its own icon and a tick
+  on the one in force. The volume bar fills up to the handle as you drag it, and
+  the handle grows under the mouse. The model you pick takes a tick in its corner,
+  drawn on the spot. And the panel deals itself out when it opens, a row at a time,
+  top to bottom.
+- **The pill in the header has its light all the way round.** It used to run along
+  the bottom edge only, which read as an underline that had come loose rather than
+  as something working. Now the whole border is the light, and it goes round —
+  slower and warmer when a long silence sets in.
+- Everything above is off when the system asks for less motion: what's left is the
+  knob sliding, because that's the part that says the click landed.
+
 ## 0.7.0
 
 - **What it's doing is now in the header**, next to the mode switch: the state and

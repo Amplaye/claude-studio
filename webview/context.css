@@ -260,6 +260,54 @@ body {
   text-transform: uppercase;
 }
 
+/* ---------- "ha finito" ----------
+   Il suono dice che qualcosa e' pronto, non quale: con tre conversazioni aperte
+   le apri a una a una per scoprirlo. Questo e' il segnalino che risponde, e resta
+   acceso finche' non la guardi. Verde, non color creta: e' l'unica cosa buona da
+   sapere in un pannello che per il resto misura consumi. */
+.ctx .donebadge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 4px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ok) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 62%, transparent);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  animation: cs-ping-done 2.2s ease-in-out infinite;
+}
+.ctx .donebadge .dico {
+  width: 10px;
+  height: 10px;
+  color: var(--ok);
+  stroke-width: 3;
+}
+/* Anche il bordo della carta lo dice, per chi guarda il pannello di sfuggita e
+   non legge le paroline. */
+.ctx .ctxcard.done {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+@keyframes cs-ping-done {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ctx .donebadge {
+    animation: none;
+  }
+}
+
 .ctx .ren {
   flex: 0 0 auto;
   opacity: 0;

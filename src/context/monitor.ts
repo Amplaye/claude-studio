@@ -200,6 +200,10 @@ export class ContextMonitor {
           lastClock: fmtClock(mine.updatedAt),
           lastAgo: fmtAgo(mine.updatedAt, now),
           busy: mine.busy,
+          // Ha finito mentre guardavi altrove. Solo le nostre lo sanno dire: di una
+          // scheda dell'estensione ufficiale non sappiamo nemmeno se qualcuno la
+          // stesse guardando.
+          done: mine.done,
           recent: now - mine.updatedAt < RECENT_MS,
           focused: false,
         },
@@ -226,6 +230,7 @@ export class ContextMonitor {
           lastClock: fmtClock(s.mtimeMs),
           lastAgo: fmtAgo(s.mtimeMs, now),
           busy: idle < BUSY_MS,
+          done: false,
           recent: idle < RECENT_MS,
           focused: false,
         },

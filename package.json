@@ -1,8 +1,8 @@
 {
   "name": "claude-studio",
   "displayName": "Claude Studio",
-  "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions and your context always in sight.",
-  "version": "0.7.0",
+  "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions, attachments of any kind — not just images — and your context always in sight.",
+  "version": "0.8.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -24,7 +24,9 @@
     "agent",
     "copilot alternative",
     "diff",
-    "permissions"
+    "permissions",
+    "attachments",
+    "pdf"
   ],
   "galleryBanner": {
     "color": "#1a1614",

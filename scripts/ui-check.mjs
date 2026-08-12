@@ -435,9 +435,54 @@ for (const surface of ['view', 'panel']) {
   await page.locator('#cfgThink .seg-btn').nth(2).click();
   const st = await lastSent();
   t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'thinking does not turn off: ' + JSON.stringify(st));
-  await page.selectOption('#cfgSound', 'harvest');
+  // The sound list is ours, not the operating system's: a button that opens a
+  // listbox, so it can unroll and tick the one in force like everything else in
+  // this panel. Which means it has to be driven like one.
+  await page.click('#cfgSound .sel-btn');
+  await page.waitForTimeout(160);
+  t(await page.isVisible('#cfgSound .sel-list'), 'the sound list does not open');
+  const soundOpts = await page.locator('#cfgSound .sel-opt').count();
+  t(soundOpts === 6, 'the sounds are not all there: ' + soundOpts);
+  t(
+    (await page.locator('#cfgSound .sel-opt.on .opt-check').count()) === 1,
+    'the sound in force does not carry its tick'
+  );
+  await page.locator('#cfgSound .sel-opt').nth(1).click();
   const ssnd = await lastSent();
   t(ssnd?.cmd === 'setPrefs' && ssnd.value?.sound === 'harvest', 'the chosen sound does not arrive: ' + JSON.stringify(ssnd));
+  // It leaves in two beats: the option finishes its punch (160ms), then the list
+  // plays its own way out (150ms) before it stops existing.
+  await page.waitForTimeout(600);
+  t(await page.locator('#cfgSound .sel-list').count() === 0, 'the sound list does not close after a choice');
+  t(
+    (await page.locator('#cfgSound .sel-val').textContent()) === 'Harvest',
+    'the button does not show the sound that was chosen'
+  );
+
+  // ---- every switch in the panel is a switch, and it moves ----
+  // The knob has to be somewhere else when the thing is on than when it is off:
+  // that displacement is the whole answer to the click.
+  const knob = async () =>
+    page.evaluate(() => {
+      const box = document.getElementById('cfgAway');
+      return getComputedStyle(box, '::before').transform;
+    });
+  const knobOff = await knob();
+  await page.click('#cfgAway');
+  const saway = await lastSent();
+  t(saway?.cmd === 'setPrefs' && saway.value?.onlyWhenAway === true, 'the switch does not arrive: ' + JSON.stringify(saway));
+  await page.waitForTimeout(420);
+  const knobOn = await knob();
+  t(knobOff !== knobOn, 'the switch does not move when it comes on: ' + knobOn);
+  t(
+    await page.evaluate(() => getComputedStyle(document.getElementById('cfgAway')).appearance === 'none'),
+    'the switch is still the browser default'
+  );
+  // The volume track fills up to the handle: the JS writes where that is.
+  t(
+    await page.evaluate(() => (document.getElementById('cfgVol').style.getPropertyValue('--v') || '').endsWith('%')),
+    'the volume bar does not say how full it is'
+  );
   await page.click('#cfgTest');
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-cfg.png`) });
   // a real alert: it comes from the extension and the page plays it without complaining
@@ -513,6 +558,59 @@ for (const surface of ['view', 'panel']) {
   await page.locator('#send').click();
   const ss2 = await lastSent();
   t(!ss2?.withSelection, 'the selection travels even after you removed it');
+
+  // ---- the paperclip: files of any kind ----
+  // The whole point is that nothing is filtered out. A PDF and a zip are not
+  // pictures, and the original extension will not take them: here they attach as
+  // paths, and it is the path that goes into the message.
+  await page.click('#btnAttach');
+  const sp = await lastSent();
+  t(sp?.cmd === 'pickFiles', 'the paperclip does not open the picker: ' + JSON.stringify(sp));
+  await post({
+    k: 'attached',
+    items: [
+      { kind: 'file', path: 'C:/work/shop/docs/contract.pdf', name: 'contract.pdf', size: 421_000 },
+      { kind: 'file', path: 'C:/work/shop/data/sales.xlsx', name: 'sales.xlsx', size: 2_400_000 },
+      { kind: 'file', path: 'C:/work/shop/dump.zip', name: 'dump.zip', size: 48_000_000 },
+    ],
+  });
+  await page.waitForTimeout(200);
+  const chips = await page.locator('.attach .att-file').count();
+  t(chips === 3, 'the attached files do not show up: ' + chips);
+  t(
+    (await page.locator('.attach .att-file .att-name').first().textContent()) === 'contract.pdf',
+    'the chip does not carry the file name'
+  );
+  t(
+    (await page.locator('.attach .att-file .att-size').first().textContent()) === '411 KB',
+    'the chip does not say how big the file is: ' +
+      (await page.locator('.attach .att-file .att-size').first().textContent())
+  );
+  // A file with nothing written: attaching one and pressing send has to work — it
+  // is a perfectly good message on its own ("look at this").
+  await page.fill('#input', '');
+  await page.locator('#send').click();
+  const sfile = await lastSent();
+  t(
+    sfile?.cmd === 'send' && sfile.files?.length === 3 && /contract\.pdf$/.test(sfile.files[0].path),
+    'the attached files do not travel with the message: ' + JSON.stringify(sfile?.files)
+  );
+  t(await page.locator('.attach').isHidden(), 'the attachments hang around after sending');
+  // An attached image still travels as an image, not as a path: it is the one kind
+  // the model looks at directly.
+  await post({
+    k: 'attached',
+    items: [{ kind: 'image', path: 'C:/work/shop/shot.png', name: 'shot.png', size: 900, mime: 'image/png', data: 'iVBORw0KGgo=' }],
+  });
+  await page.waitForTimeout(160);
+  t((await page.locator('.attach .att .thumb').count()) === 1, 'the attached image has no thumbnail');
+  await page.fill('#input', 'what is this');
+  await page.locator('#send').click();
+  const simg = await lastSent();
+  t(
+    simg?.images?.length === 1 && !simg.files,
+    'an attached image should travel as an image: ' + JSON.stringify(simg)
+  );
 
   // click a tool path -> open the file in the editor
   await page.click('.tool[data-tool="Edit"] .arg.link');
@@ -772,11 +870,11 @@ for (const surface of ['view', 'panel']) {
   // whatever is running in it is not interrupted.
   t(sAlt?.cmd === 'newTab', 'Alt+N does not open a new session in a new tab: ' + JSON.stringify(sAlt));
 
-  // the up arrow fishes back the last message sent ("without", just above)
+  // the up arrow fishes back the last message sent ("what is this", just above)
   await page.fill('#input', '');
   await page.keyboard.press('ArrowUp');
   t(
-    (await page.inputValue('#input')) === 'without',
+    (await page.inputValue('#input')) === 'what is this',
     'the up arrow does not fish back the last message: ' + (await page.inputValue('#input'))
   );
   await page.fill('#input', '');

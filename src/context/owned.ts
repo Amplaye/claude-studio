@@ -27,6 +27,17 @@ export interface OwnSession {
   /** Cost the engine declares for the conversation. */
   costUsd: number;
   busy: boolean;
+  /**
+   * Ha finito, e tu non stavi guardando.
+   *
+   * Con tre schede aperte il suono dice che *qualcosa* ha finito, non quale: te le
+   * apri a una a una per scoprirlo. Questo e' il segnalino che risponde alla
+   * domanda — resta acceso finche' non guardi quella conversazione, e allora si
+   * spegne da solo.
+   */
+  done: boolean;
+  /** Quando ha finito: serve solo a ordinare "chi ha finito per ultimo". */
+  doneAt: number;
   /** Which chat this belongs to: the key that reveals its face again. */
   key: string;
 }
@@ -82,7 +93,13 @@ class OwnedSessions {
   setFace(key: string, face: Face, on: boolean) {
     const had = this.faces.get(key);
     if (on) {
-      if (had === face && this.front === key) return;
+      // Guardare e' la risposta: il segnalino ha finito il suo mestiere nel
+      // momento in cui la conversazione ti torna davanti agli occhi.
+      const cleared = this.clearDone(key);
+      if (had === face && this.front === key) {
+        if (cleared) this.changed();
+        return;
+      }
       this.faces.set(key, face);
       this.front = key;
     } else {
@@ -91,6 +108,37 @@ class OwnedSessions {
       if (this.front === key) this.front = null;
     }
     this.changed();
+  }
+
+  /**
+   * Ha finito. Il segnalino si accende solo se non la stavi guardando: se eri li'
+   * l'hai vista finire, e un bollino su quello che hai appena letto e' rumore.
+   */
+  markDone(key: string, looking: boolean) {
+    const s = this.byKey.get(key);
+    if (!s || looking) return;
+    s.done = true;
+    s.doneAt = Date.now();
+    this.changed();
+  }
+
+  /** Spegne il segnalino. Torna true se c'era davvero qualcosa da spegnere. */
+  clearDone(key: string): boolean {
+    const s = this.byKey.get(key);
+    if (!s?.done) return false;
+    s.done = false;
+    s.doneAt = 0;
+    return true;
+  }
+
+  /** Questa conversazione ha finito mentre guardavi altrove? */
+  isDone(key: string): boolean {
+    return !!this.byKey.get(key)?.done;
+  }
+
+  /** Quante hanno finito e non le hai ancora viste: e' il numero sul bollino. */
+  doneCount(): number {
+    return [...this.byKey.values()].filter((s) => s.done).length;
   }
 
   /**
@@ -115,6 +163,8 @@ class OwnedSessions {
       tokens: 0,
       costUsd: 0,
       busy: false,
+      done: false,
+      doneAt: 0,
       key,
     });
     this.changed();
@@ -145,6 +195,8 @@ class OwnedSessions {
           tokens: 0,
           costUsd: 0,
           busy: false,
+          done: false,
+          doneAt: 0,
           key,
         });
         break;
@@ -210,6 +262,8 @@ function blank(cwd: string, key: string): OwnSession {
     tokens: 0,
     costUsd: 0,
     busy: false,
+    done: false,
+    doneAt: 0,
     key,
   };
 }

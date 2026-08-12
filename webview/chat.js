@@ -1292,6 +1292,10 @@
       case 'files':
         showFiles(m.items || []);
         break;
+      case 'attached':
+        for (const a of m.items || []) addAttachment(a);
+        paintAttach();
+        break;
       case 'selection':
         selection = m.file ? { file: m.file, lines: m.lines } : null;
         // every new selection starts out attached: that's what you'd expect
@@ -1627,14 +1631,46 @@
     document.body.appendChild(overlay);
   }
 
-  // ---------- attachments: editor selection and pasted images ----------
+  // ---------- attachments: editor selection, images and files of any kind ----------
   const attach = $('attach');
+  const btnAttach = $('btnAttach');
   let selection = null; // {file, lines}
   let useSelection = true;
   let images = [];
+  /** Everything that isn't an image: {path, name, size}. It travels as a path. */
+  let files = [];
+
+  /** "482 KB", "3.1 MB" — enough to think twice before sending a whole database. */
+  function humanSize(n) {
+    if (!n && n !== 0) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return Math.round(n / 1024) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+    return (n / 1024 / 1024 / 1024).toFixed(1) + ' GB';
+  }
+
+  /** The icon says what kind of file it is before you've read its name. */
+  const FILE_ICONS = [
+    [/\.(png|jpe?g|gif|webp|bmp|svg|ico|avif|heic)$/i, 'image'],
+    [/\.(mp4|mov|mkv|avi|webm|m4v|wmv)$/i, 'film'],
+    [/\.(mp3|wav|flac|ogg|m4a|aac|wma)$/i, 'musical-notes'],
+    [/\.(zip|rar|7z|tar|gz|bz2|xz)$/i, 'archive'],
+    [/\.(csv|tsv|xlsx?|ods|numbers|parquet)$/i, 'grid'],
+    [/\.(js|ts|tsx|jsx|py|rb|go|rs|java|cs|cpp|c|h|php|swift|kt|sh|ps1|sql|json|ya?ml|toml|xml|html?|css|scss)$/i, 'code-slash'],
+    [/\.(txt|md|log|pdf|docx?|rtf|odt|pages|epub)$/i, 'document-text'],
+  ];
+  function fileIcon(name) {
+    for (const [re, ico] of FILE_ICONS) if (re.test(name)) return ico;
+    return 'document';
+  }
 
   function paintAttach() {
     attach.replaceChildren();
+    let i = 0;
+    const stagger = (chip) => {
+      chip.style.setProperty('--i', i++);
+      attach.append(chip);
+    };
     if (selection && useSelection) {
       const chip = el('span', 'att');
       chip.append(icon('code-slash'), el('span', null, `${selection.file}:${selection.lines}`));
@@ -1647,9 +1683,9 @@
         paintAttach();
       });
       chip.append(x);
-      attach.append(chip);
+      stagger(chip);
     }
-    images.forEach((im, i) => {
+    images.forEach((im, n) => {
       const chip = el('span', 'att');
       const thumb = document.createElement('img');
       thumb.className = 'thumb';
@@ -1664,14 +1700,44 @@
       x.title = t('composer.removeImage');
       x.append(icon('close'));
       x.addEventListener('click', () => {
-        images.splice(i, 1);
+        images.splice(n, 1);
         paintAttach();
       });
       chip.append(thumb, x);
-      attach.append(chip);
+      stagger(chip);
+    });
+    files.forEach((f, n) => {
+      const chip = el('span', 'att att-file');
+      chip.title = f.path;
+      const info = el('span', 'att-info');
+      info.append(el('span', 'att-name', f.name));
+      if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
+      const x = el('button', 'attx');
+      x.type = 'button';
+      x.title = t('composer.removeFile');
+      x.append(icon('close'));
+      x.addEventListener('click', () => {
+        files.splice(n, 1);
+        paintAttach();
+      });
+      chip.append(icon(fileIcon(f.name)), info, x);
+      stagger(chip);
     });
     attach.hidden = !attach.childElementCount;
   }
+
+  /** One attachment as the extension found it, into the right pile. */
+  function addAttachment(a) {
+    if (!a) return;
+    if (a.kind === 'image' && a.data) images.push({ mime: a.mime, data: a.data });
+    else if (a.path) files.push({ path: a.path, name: a.name, size: a.size });
+  }
+
+  // The paperclip. The picker is VS Code's own, and it filters nothing.
+  btnAttach.addEventListener('click', () => {
+    vscode.postMessage({ cmd: 'pickFiles' });
+    input.focus();
+  });
 
   input.addEventListener('paste', (e) => {
     const list = [...(e.clipboardData?.items || [])].filter((i) => i.type.startsWith('image/'));
@@ -1687,6 +1753,73 @@
       };
       r.readAsDataURL(file);
     }
+  });
+
+  // ---------- dropping files on the composer ----------
+  //
+  // Two ways a file can arrive, and they need different handling. Dragged out of
+  // the VS Code explorer it comes as a list of URIs: it's already on disk, and
+  // the path is all we need. Dragged out of a browser or a mail client the page
+  // holds the only copy of the bytes — those go to the extension, which writes
+  // them into a file of its own and hands back a real path.
+  const MAX_DROP = 12 * 1024 * 1024;
+
+  const dragOver = (e) => {
+    if (!e.dataTransfer?.types?.length) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    composer.classList.add('dropping');
+  };
+  composer.addEventListener('dragover', dragOver);
+  composer.addEventListener('dragenter', dragOver);
+  composer.addEventListener('dragleave', (e) => {
+    if (composer.contains(e.relatedTarget)) return;
+    composer.classList.remove('dropping');
+  });
+  composer.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    if (!dt) return;
+    composer.classList.remove('dropping');
+
+    const uris = (dt.getData('text/uri-list') || '')
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter((s) => s && !s.startsWith('#') && /^file:/i.test(s));
+    const dropped = [...(dt.files || [])];
+    if (!uris.length && !dropped.length) return;
+    e.preventDefault();
+
+    for (const u of uris) {
+      let p = '';
+      try {
+        p = decodeURIComponent(u.replace(/^file:\/{2,}/i, ''));
+      } catch (_) {
+        continue;
+      }
+      // "/c:/work/x.pdf" is what a file: URI looks like on Windows
+      if (/^\/[a-z]:/i.test(p)) p = p.slice(1);
+      const name = p.split(/[\\/]/).pop() || p;
+      if (!files.some((f) => f.path === p)) files.push({ path: p, name, size: 0 });
+    }
+    // A file that came in as a URI is already on the list: no need to copy its
+    // bytes anywhere.
+    for (const f of dropped) {
+      if (uris.length) break;
+      if (f.size > MAX_DROP) continue;
+      const r = new FileReader();
+      r.onload = () => {
+        const data = String(r.result).split(',')[1] || '';
+        if (f.type.startsWith('image/')) {
+          images.push({ mime: f.type, data });
+          paintAttach();
+        } else {
+          // No path here: the extension makes one.
+          vscode.postMessage({ cmd: 'stashFile', name: f.name, data });
+        }
+      };
+      r.readAsDataURL(f);
+    }
+    paintAttach();
   });
 
   // ---------- sending ----------
@@ -1747,16 +1880,18 @@
   composer.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text && !images.length) return;
+    if (!text && !images.length && !files.length) return;
     lastText = text;
     vscode.postMessage({
       cmd: 'send',
       text,
       images: images.length ? images : undefined,
+      files: files.length ? files.map((f) => ({ path: f.path, name: f.name })) : undefined,
       withSelection: !!(selection && useSelection),
     });
     input.value = '';
     images = [];
+    files = [];
     // The selection gets attached only once: it stays selected in the editor, but it
     // shouldn't sneak into the messages after it too. It re-arms if you change it.
     useSelection = false;
@@ -2023,9 +2158,163 @@
       if (nm.note) info.append(el('span', 'mc-note', nm.note));
       info.append(el('span', 'mc-desc', modelPurpose(m)));
       card.append(info);
-      card.addEventListener('click', () => push({ model: value }));
+      // The tick on the one in force. It's built only for that card, so it draws
+      // itself the moment the panel is repainted after a choice — which is the
+      // moment it means something.
+      if (isOn) {
+        const badge = el('span', 'mc-check');
+        badge.append(icon('checkmark'));
+        card.append(badge);
+      }
+      card.addEventListener('click', () => {
+        pulse(card);
+        push({ model: value });
+      });
       list.append(card);
     }
+  }
+
+  /**
+   * The receipt for a click, on anything that gets picked.
+   *
+   * The class is taken off and put back with a reflow in between, so two clicks in
+   * a row both land: an animation that is already running does not restart just
+   * because the class it hangs off was added again.
+   */
+  function pulse(node, cls = 'picked') {
+    if (!node) return;
+    node.classList.remove(cls);
+    void node.offsetWidth;
+    node.classList.add(cls);
+    setTimeout(() => node.classList.remove(cls), 420);
+  }
+
+  /**
+   * A dropdown that belongs to this panel.
+   *
+   * A <select> opens a menu drawn by the operating system: the wrong colours, the
+   * wrong corners, and nothing that can be animated — in the middle of a panel
+   * where every other choice slides, glows or ticks. This is a button and a list:
+   * the list unrolls from the button, its options arrive one behind the other, the
+   * one in force carries a tick, and the keyboard does what a <select>'s does
+   * (arrows, Home/End, Enter, Escape, and typing a letter jumps to it).
+   *
+   * @param box       the container (.sel)
+   * @param items     [{value, label, icon}]
+   * @param value     the one in force
+   * @param onChange  called with the chosen value
+   */
+  function makeSelect(box, items, value, onChange) {
+    box.replaceChildren();
+    box.classList.remove('open');
+
+    const btn = el('button', 'sel-btn');
+    btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    const cur = items.find((i) => i.value === value) || items[0];
+    const val = el('span', 'sel-val', cur ? cur.label : '');
+    btn.append(val, icon('chevron-down', 'sel-caret'));
+    box.append(btn);
+    box.dataset.value = cur ? cur.value : '';
+
+    let list = null;
+
+    const close = (focus) => {
+      if (!list) return;
+      const dying = list;
+      list = null;
+      box.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      dying.classList.add('closing');
+      // The list leaves with its animation and only then stops existing: taken out
+      // on the spot it would vanish, and a menu that vanishes reads as a menu that
+      // never opened.
+      setTimeout(() => dying.remove(), 160);
+      if (focus) btn.focus();
+    };
+
+    const open = () => {
+      if (list) return close(true);
+      list = el('div', 'sel-list');
+      list.setAttribute('role', 'listbox');
+      items.forEach((it, i) => {
+        const opt = el('button', 'sel-opt' + (it.value === box.dataset.value ? ' on' : ''));
+        opt.type = 'button';
+        opt.setAttribute('role', 'option');
+        opt.style.setProperty('--i', i);
+        if (it.icon) opt.append(icon(it.icon));
+        opt.append(el('span', 'opt-label', it.label));
+        if (it.value === box.dataset.value) opt.append(drawnCheck('opt-check'));
+        opt.addEventListener('click', () => {
+          pulse(opt);
+          box.dataset.value = it.value;
+          val.textContent = it.label;
+          // Long enough for the option to finish its little punch: choosing is the
+          // one gesture in the panel that also closes what you chose it from.
+          setTimeout(() => close(true), 160);
+          onChange(it.value);
+        });
+        list.append(opt);
+      });
+      box.append(list);
+      box.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      const on = list.querySelector('.sel-opt.on') || list.firstElementChild;
+      if (on) on.classList.add('hot');
+    };
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      open();
+    });
+
+    /** Arrows, Home/End, Enter, Escape and the first letter: what a <select> does. */
+    const move = (d) => {
+      if (!list) return open();
+      const opts = [...list.querySelectorAll('.sel-opt')];
+      const at = opts.findIndex((o) => o.classList.contains('hot'));
+      const next = opts[Math.max(0, Math.min(opts.length - 1, (at < 0 ? 0 : at) + d))];
+      if (!next) return;
+      opts.forEach((o) => o.classList.remove('hot'));
+      next.classList.add('hot');
+      next.scrollIntoView({ block: 'nearest' });
+    };
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') return e.preventDefault(), move(1);
+      if (e.key === 'ArrowUp') return e.preventDefault(), move(-1);
+      if (e.key === 'Home') return e.preventDefault(), move(-999);
+      if (e.key === 'End') return e.preventDefault(), move(999);
+      if (e.key === 'Escape' && list) return e.preventDefault(), close(true);
+      if ((e.key === 'Enter' || e.key === ' ') && list) {
+        e.preventDefault();
+        list.querySelector('.sel-opt.hot')?.click();
+        return;
+      }
+      if (/^[a-z0-9]$/i.test(e.key) && list) {
+        const opts = [...list.querySelectorAll('.sel-opt')];
+        const hit = opts.find((o) => o.textContent.toLowerCase().startsWith(e.key.toLowerCase()));
+        if (hit) {
+          opts.forEach((o) => o.classList.remove('hot'));
+          hit.classList.add('hot');
+          hit.scrollIntoView({ block: 'nearest' });
+        }
+      }
+    });
+
+    // A click anywhere else closes it — including on the panel it lives in.
+    document.addEventListener('mousedown', (e) => {
+      if (list && !box.contains(e.target)) close(false);
+    });
+
+    return {
+      set(v) {
+        const it = items.find((i) => i.value === v);
+        if (!it) return;
+        box.dataset.value = v;
+        val.textContent = it.label;
+      },
+    };
   }
 
   // -- generic segmented control with slider --
@@ -2080,6 +2369,7 @@
       if (it.disabled) btn.disabled = true;
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
+        pulse(btn);
         onChange(it.value);
       });
       container.append(btn);
@@ -2148,14 +2438,52 @@
     paintSeg($('cfgLang'), items, prefs.lang || 'en', (v) => push({ lang: v }));
   }
 
+  /** The sounds, each with the icon that says what kind of thing it is. */
+  const SOUNDS = [
+    { value: 'cozy', key: 'sound.cozy', icon: 'musical-notes' },
+    { value: 'harvest', key: 'sound.harvest', icon: 'musical-notes' },
+    { value: 'levelup', key: 'sound.levelup', icon: 'flash' },
+    { value: 'starlit', key: 'sound.starlit', icon: 'sparkles' },
+    { value: 'chest', key: 'sound.chest', icon: 'cube' },
+    { value: 'off', key: 'sound.off', icon: 'close' },
+  ];
+
+  /** The dropdown, built once and then only told what the value is. */
+  let soundSel = null;
+
+  function paintSound() {
+    const items = SOUNDS.map((s) => ({ value: s.value, label: t(s.key), icon: s.icon }));
+    // Rebuilt when the language changes (the labels are different words), told the
+    // value when only the value changed — otherwise choosing a sound would tear
+    // down the very list you chose it from, mid-animation.
+    if (!soundSel || $('cfgSound').dataset.lang !== window.I18N.lang) {
+      $('cfgSound').dataset.lang = window.I18N.lang;
+      soundSel = makeSelect($('cfgSound'), items, prefs.sound, (v) => {
+        push({ sound: v });
+        previewSound();
+      });
+    } else {
+      soundSel.set(prefs.sound);
+    }
+    $('cfgSound').classList.toggle('off', false);
+  }
+
+  /** The track fills up to the handle: `--v` is what the CSS paints it with. */
+  function paintVol() {
+    const vol = $('cfgVol');
+    const pct = Math.round((prefs.volume == null ? 0.6 : prefs.volume) * 100);
+    vol.value = pct;
+    vol.style.setProperty('--v', pct + '%');
+    vol.disabled = prefs.sound === 'off';
+  }
+
   function paintCfg() {
     paintModels();
     paintEffort();
     paintThinking();
     paintLang();
-    $('cfgSound').value = prefs.sound;
-    $('cfgVol').value = Math.round((prefs.volume == null ? 0.6 : prefs.volume) * 100);
-    $('cfgVol').disabled = prefs.sound === 'off';
+    paintSound();
+    paintVol();
     $('cfgAway').checked = !!prefs.onlyWhenAway;
     $('cfgAsk').checked = !!prefs.soundOnAsk;
     $('cfgToast').checked = !!prefs.toast;
@@ -2176,6 +2504,24 @@
     if (window.Chime) window.Chime.play(prefs.sound, 'done', prefs.volume);
   }
 
+  /**
+   * The panel deals itself out: each row a beat after the one above it.
+   *
+   * The delay is a number written onto the row (`--i`), not a rule per row in the
+   * stylesheet: the panel's sections change with the model — five effort levels or
+   * three, a hint that's there or isn't — so what's on screen is only known here.
+   */
+  function dealCfg() {
+    const rows = cfg.querySelectorAll('.pop-sec, .model-list, .seg, .phint, .prow, .pcheck, .pbtn');
+    rows.forEach((r, i) => r.style.setProperty('--i', i));
+    cfg.classList.remove('dealing');
+    void cfg.offsetWidth;
+    cfg.classList.add('dealing');
+    // Once dealt, the class goes: with it left on, every repaint (a model chosen, a
+    // level changed) would deal the whole panel out again under your hand.
+    setTimeout(() => cfg.classList.remove('dealing'), 900);
+  }
+
   function toggleCfg(on) {
     const show = on == null ? cfg.hidden : on;
     if (show) {
@@ -2186,6 +2532,7 @@
       // without waiting for the first click.
       placeAllSegs();
       requestAnimationFrame(placeAllSegs);
+      dealCfg();
       wake();
     } else {
       // Closing animation: the panel slides away, then hides.
@@ -2201,12 +2548,13 @@
     toggleCfg(false);
   });
 
-  $('cfgSound').addEventListener('change', (e) => {
-    push({ sound: e.target.value });
-    previewSound();
+  // While you drag only the preview volume changes; it gets saved when you let go.
+  // The track is repainted on every step, though: a bar that only catches up when
+  // you release is a bar that isn't telling you what you're setting.
+  $('cfgVol').addEventListener('input', (e) => {
+    prefs.volume = Number(e.target.value) / 100;
+    e.target.style.setProperty('--v', e.target.value + '%');
   });
-  // while you drag only the preview volume changes; it gets saved when you let go
-  $('cfgVol').addEventListener('input', (e) => (prefs.volume = Number(e.target.value) / 100));
   $('cfgVol').addEventListener('change', (e) => {
     push({ volume: Number(e.target.value) / 100 });
     previewSound();

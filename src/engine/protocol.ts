@@ -139,6 +139,10 @@ export type Wire =
   | { k: 'history'; items: HistoryItem[] }
   | { k: 'commands'; items: { name: string; description: string }[] }
   | { k: 'files'; items: string[] }
+  // The files you picked with the paperclip (or dropped on the composer), as the
+  // extension found them on disk: images come back with their bytes so the chip can
+  // show a thumbnail, everything else with a path Claude opens itself.
+  | { k: 'attached'; items: Attachment[] }
   // empty `file` = there's nothing selected in the editor any more
   | { k: 'selection'; file: string; lines: string }
   | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
@@ -154,11 +158,46 @@ export interface Pasted {
   data: string;
 }
 
+/**
+ * A file attached to the message.
+ *
+ * Two kinds, because there are two ways a file can be looked at. An image is
+ * *seen*: it travels as bytes and goes into the message as an image block, the
+ * same road a pasted screenshot takes. Anything else — a PDF, a spreadsheet, a
+ * log, a zip, a video — travels as a path: Claude opens it with its own tools,
+ * which is both the only way that works for every format and the only way that
+ * doesn't put a 40MB file through a JSON pipe.
+ */
+export interface Attachment {
+  kind: 'image' | 'file';
+  /** absolute path on disk; empty only for something pasted, which has no file */
+  path: string;
+  name: string;
+  /** bytes, as the disk reports them */
+  size: number;
+  /** images only */
+  mime?: string;
+  /** images only: base64 without the data: prefix */
+  data?: string;
+}
+
+/** A file that goes along with the message as a path. */
+export interface SentFile {
+  path: string;
+  name: string;
+}
+
 export type Cmd =
   | { cmd: 'ready' }
   // `withSelection` = attach the code selected in the editor; the extension takes the
   // text from the editor itself, it doesn't travel the wire twice.
-  | { cmd: 'send'; text: string; images?: Pasted[]; withSelection?: boolean }
+  | { cmd: 'send'; text: string; images?: Pasted[]; files?: SentFile[]; withSelection?: boolean }
+  // The paperclip: VS Code's own picker, with no filter on it at all.
+  | { cmd: 'pickFiles' }
+  // Something dropped on the composer that isn't on disk anywhere the extension can
+  // reach (dragged out of a browser, out of an email). The bytes are put into a file
+  // in the extension's own storage and it's that path that gets attached.
+  | { cmd: 'stashFile'; name: string; data: string }
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }

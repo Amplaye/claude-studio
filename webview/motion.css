@@ -561,6 +561,146 @@
   animation: cs-sweep 0.8s ease-out both;
 }
 
+/* ---- the settings panel: every choice you make answers back ----
+   A panel of switches that change silently reads as a panel that didn't hear you.
+   Nothing here is decoration: each animation is the receipt for one gesture.
+
+     cs-row-in     the sections deal themselves out when the panel opens
+     cs-knob-on    the halo a switch throws off the moment it comes on
+     cs-pick       the small punch a card or an option takes when chosen
+     cs-check-in   the tick that draws itself on what you just chose
+     cs-list-in    the dropdown unrolling from the button that opened it
+     cs-opt-in     its options arriving one after the other, not all at once */
+
+@keyframes cs-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cs-knob-on {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
+}
+
+@keyframes cs-pick {
+  0% {
+    transform: scale(1);
+  }
+  38% {
+    transform: scale(0.955);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cs-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-25deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.18) rotate(4deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cs-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cs-list-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-5px) scaleY(0.9);
+  }
+}
+
+@keyframes cs-opt-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The sections of the settings panel arrive one after the other, top to bottom:
+   the delay is set by the JS (--i), so a section added tomorrow queues up on its
+   own instead of having to be written in here. */
+.pop.dealing .pop-sec,
+.pop.dealing .model-list,
+.pop.dealing .seg,
+.pop.dealing .phint,
+.pop.dealing .prow,
+.pop.dealing .pcheck,
+.pop.dealing .pbtn {
+  animation: cs-row-in 0.34s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+/* The switch coming on throws a halo, once. It's the difference between a state
+   that changed and a state that was always like that. It hangs off `:checked`
+   rather than off a class the JS adds and takes away: the rule starts matching
+   at the moment the switch comes on, which is the moment the halo is for, and
+   stops matching when it goes off — so it can't replay on a repaint that changed
+   nothing. */
+.pcheck input[type='checkbox']:checked::after {
+  animation: cs-knob-on 0.5s ease-out;
+}
+
+.model-card.picked,
+.sel-opt.picked,
+.seg-btn.picked {
+  animation: cs-pick 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mc-check,
+.sel-opt.on .opt-check {
+  animation: cs-check-in 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.sel-list {
+  animation: cs-list-in 0.2s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  transform-origin: top center;
+}
+.sel-list.closing {
+  animation: cs-list-out 0.15s ease-in both;
+}
+.sel-list .sel-opt {
+  animation: cs-opt-in 0.22s ease-out both;
+  animation-delay: calc(var(--i, 0) * 26ms);
+}
+
 /* If the system asks for less motion, only the fades are left. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -576,8 +716,29 @@
   .ctxcard,
   .log.swap-in,
   .empty .ico,
-  .fill.glide::after {
+  .fill.glide::after,
+  .pop.dealing .pop-sec,
+  .pop.dealing .model-list,
+  .pop.dealing .seg,
+  .pop.dealing .phint,
+  .pop.dealing .prow,
+  .pop.dealing .pcheck,
+  .pop.dealing .pbtn,
+  .pcheck input[type='checkbox']:checked::after,
+  .model-card.picked,
+  .sel-opt.picked,
+  .seg-btn.picked,
+  .sel-list .sel-opt,
+  .activity::before {
     animation: none !important;
+  }
+  /* The switches still move, they just move less: the knob slides instead of
+     springing, and that's the one thing that has to stay — it's what tells you
+     the click landed. */
+  .pcheck input[type='checkbox']::before,
+  .seg-slider,
+  .modeseg-slider {
+    transition-duration: 0.14s !important;
   }
   /* The conversation-switch ghost isn't needed any more: without motion it would
      just be a still duplicate sitting on top of the new thread. */

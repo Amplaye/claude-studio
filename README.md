@@ -33,6 +33,18 @@ your reading off the screen.
 it asks you to choose between options, there's always a line to write your own
 answer on — because the answer often isn't one of the three.
 
+**Attach any file, not just pictures.** A paperclip in the box you type in, and
+VS Code's own picker with no filter on it: a PDF, a spreadsheet, a log, a zip,
+a video. Drop them on the message and they attach too. Images travel as images;
+everything else travels as a path Claude opens with its own tools — which is
+both the only thing that works for every format and the only thing that doesn't
+push a forty-megabyte file through the chat.
+
+**You know which conversation finished.** With three of them open, a chime tells
+you *something* is ready, not *which* — and you go through the tabs one by one to
+find out. Now the one that finished says so: a dot on its tab, a green mark on
+its card. It goes out the moment you look at it.
+
 **The last message reads like an answer.** Headings, lists, tables, code: the
 recap at the end of a turn is laid out, not dumped as raw text.
 
@@ -59,8 +71,12 @@ and close with a recap of what changed.
 <td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/permessi.png" alt="Permissions and questions" /><br /><em>You decide — and you can write your own answer</em></td>
 </tr>
 <tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own colour</em></td>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context panel" /><br /><em>How much context is left, everywhere</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Every model its own colour — and every switch moves</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context panel" /><br /><em>Context left, everywhere — and which one finished</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>Any file at all, not just pictures</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/suoni.png" alt="Sounds" /><br /><em>Even the lists are ours, and they open</em></td>
 </tr>
 </table>
 
@@ -77,8 +93,9 @@ Switch any time, even halfway through a conversation.
 ## The handy bits
 
 - **`@` for a file, `/` for a command** — your skills and plugins included.
-- **Paste an image** straight into the chat.
-- **A chime and a notification** when it's done, if you've wandered off.
+- **Paste an image**, **drop a file**, or use the paperclip — any format.
+- **A chime and a notification** when it's done, if you've wandered off — and a
+  mark on the conversation that finished, so you know which one.
 - **24 past conversations** a click away, terminal ones included.
 - **Sidebar or full tab**, same conversation on both.
 - **English or Italian**, switched on the spot.

@@ -26,6 +26,7 @@ const card = (over = {}) => ({
   lastClock: '09:41',
   lastAgo: 'just now',
   busy: true,
+  done: false,
   recent: true,
   focused: true,
   ...over,
@@ -177,6 +178,37 @@ for (const width of [320, 620]) {
   t(third.badges === 1, 'the "you are here" badge is on more than one card: ' + third.badges);
   t(!third.hOverflow, 'the panel overflows sideways');
   t(!third.squashed.length, 'cards squashed by the flex: ' + third.squashed.join(' | '));
+
+  // ---- "ha finito": quale conversazione ti aspetta ----
+  // Il suono dice che qualcosa e' pronto, non quale. Con due carte sullo schermo
+  // il segnalino deve stare su una sola: quella che ha finito mentre guardavi
+  // altrove — e mai su quella che stai guardando.
+  await post(
+    data({
+      cards: [
+        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'CRM — reminder', own: true, busy: false, focused: true, done: false }),
+        card({ name: 'Fattura, arrotondamenti', busy: false, focused: false, done: true }),
+      ],
+    })
+  );
+  await page.waitForTimeout(160);
+  const done = await page.evaluate(() => {
+    const cs = [...document.querySelectorAll('.ctxcard')];
+    return {
+      shown: cs.filter((c) => !c.querySelector('.donebadge').hidden).length,
+      onTheDoneOne: !cs
+        .find((c) => c.querySelector('.cname').textContent.startsWith('Fattura'))
+        .querySelector('.donebadge').hidden,
+      onTheOneYouAreIn: !cs
+        .find((c) => c.querySelector('.cname').textContent.startsWith('CRM'))
+        .querySelector('.donebadge').hidden,
+      ring: cs.filter((c) => c.classList.contains('done')).length,
+    };
+  });
+  t(done.shown === 1, 'the "done" mark is on ' + done.shown + ' cards, it should be on one');
+  t(done.onTheDoneOne, 'the conversation that finished carries no mark');
+  t(!done.onTheOneYouAreIn, 'the one you are looking at is marked as "you missed this"');
+  t(done.ring === 1, 'the card that finished is not marked out from the others');
 
   // ---- clicks, rename, header buttons ----
   await page.locator('.ctxcard').nth(1).locator('.ren').click();

@@ -39,6 +39,8 @@ const STRINGS = {
     'rename.prompt': 'Name for this conversation (empty = back to the starting name)',
     'rename.placeholder': 'e.g. Picnic — fixing the reminders',
     'rename.none': "This conversation hasn't started yet: write something first.",
+    'attach.open': 'Attach',
+    'attach.title': 'Attach files to the message — any kind',
   },
   it: {
     'toast.done': 'Claude ha finito · {project}',
@@ -46,6 +48,8 @@ const STRINGS = {
     'rename.prompt': 'Nome di questa conversazione (vuoto = torna al nome di partenza)',
     'rename.placeholder': 'es. Picnic — sistemo i promemoria',
     'rename.none': 'Questa conversazione non e’ ancora cominciata: scrivi qualcosa prima.',
+    'attach.open': 'Allega',
+    'attach.title': 'Allega file al messaggio — di qualunque tipo',
   },
 } satisfies Record<Lang, Record<string, string>>;
 

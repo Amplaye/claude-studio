@@ -117,6 +117,9 @@ t(it.langBtn === 'Italiano', 'the language control does not show the choice: ' +
 t(it.purpose !== en.purpose, 'the model descriptions did not switch: ' + it.purpose);
 
 // The slider has to follow the buttons, which changed width in the other language.
+// It arrives on a spring that takes 320ms: measured any earlier than that you are
+// measuring the journey, not the destination, and the check fails at random.
+await page.waitForTimeout(500);
 const slider = await page.evaluate(() => {
   const box = document.getElementById('mode');
   const on = box.querySelector('.modeseg-btn.on');

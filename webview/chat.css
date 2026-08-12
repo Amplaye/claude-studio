@@ -527,6 +527,31 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .mc-dot {
   display: none;
 }
+/* The tick on the model in force. It draws itself in the corner of the card the
+   moment you pick it — the border and the colour already say which one is on,
+   but they say it the same way whether you just chose it or chose it a week ago.
+   The tick is the part that only happens once. */
+.mc-check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--fam, var(--claude-1));
+  color: #16110e;
+  z-index: 2;
+}
+.mc-check .ico {
+  width: 9px;
+  height: 9px;
+  stroke-width: 3;
+}
+.model-card:active {
+  transform: scale(0.98);
+}
 .mc-info {
   min-width: 0;
   text-align: center;
@@ -594,7 +619,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   cursor: pointer;
   opacity: 0.75;
   transition: opacity 0.22s ease, color 0.22s ease, background 0.22s ease,
-    border-color 0.22s ease;
+    border-color 0.22s ease, transform 0.12s ease;
   white-space: nowrap;
   text-align: center;
   position: relative;
@@ -620,6 +645,11 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   opacity: 1;
   color: #fff;
   font-weight: 700;
+}
+/* Pressed: the button gives way a little. The slider takes a third of a second to
+   arrive, and without this the click has no answer at all for the first frames. */
+.seg-btn:active:not(:disabled) {
+  transform: scale(0.945);
 }
 .seg-btn:disabled {
   opacity: 0.25;
@@ -653,7 +683,12 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   display: none;
 }
 
-/* ---------- sound section (label + select / range / check) ---------- */
+/* ---------- sound section (label + dropdown / volume / switches) ----------
+   Everything you can choose in here answers back. The native controls couldn't:
+   a checkbox flicks, a <select> opens a menu drawn by the operating system, and
+   both of them land in the middle of a panel that has spent the rows above it
+   sliding and glowing. They're all built here now, from a real input each time —
+   the input keeps the state and the keyboard, the animation is what you see. */
 .prow {
   display: flex;
   align-items: center;
@@ -666,45 +701,255 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   color: #fff;
   opacity: 0.85;
 }
-.prow select,
-.prow input[type='range'] {
+
+/* ---- the dropdown ----
+   A button that opens a list. The list unrolls from the button, its options
+   arrive one behind the other, and the one in force carries a tick. */
+.sel {
+  position: relative;
   flex: 1;
   min-width: 0;
 }
-.prow select {
+.sel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   background: var(--card);
   color: #fff;
   font: inherit;
   font-size: 12px;
-  padding: 4px 6px;
   cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.12s ease;
 }
+.sel-btn:hover {
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 10%, var(--card));
+}
+.sel-btn:active {
+  transform: scale(0.985);
+}
+.sel.open .sel-btn {
+  border-color: var(--claude-1);
+  background: color-mix(in srgb, var(--claude-1) 14%, var(--card));
+}
+.sel-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The arrow turns over while the list is open: the button says which way it is
+   without any words. */
+.sel-caret {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+}
+.sel.open .sel-caret {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.sel-list {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--claude-1) 30%, var(--line));
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -22px #000, 0 0 0 1px color-mix(in srgb, var(--claude-1) 14%, transparent);
+}
+.sel-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.12s ease;
+}
+.sel-opt:hover,
+.sel-opt.hot {
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+.sel-opt.on {
+  background: color-mix(in srgb, var(--claude-1) 18%, transparent);
+  font-weight: 650;
+}
+.sel-opt .ico {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+.opt-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.opt-check {
+  flex: 0 0 auto;
+  color: var(--claude-2);
+}
+.sel.off .sel-btn {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ---- the volume ----
+   The track fills up to where the handle is (`--v`, written by the JS), so the
+   bar itself says how loud it is — and when you let go it springs back to size
+   with the sound you're setting playing over it. */
 .prow input[type='range'] {
-  accent-color: var(--claude-1);
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 18px;
+  background: transparent;
   cursor: pointer;
 }
-.prow select:disabled,
+.prow input[type='range']::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: var(--pill);
+  background: linear-gradient(
+    90deg,
+    var(--claude-1) 0%,
+    var(--claude-2) calc(var(--v, 60%) - 0.01%),
+    color-mix(in srgb, var(--fg) 14%, transparent) var(--v, 60%)
+  );
+  transition: background 0.18s ease;
+}
+.prow input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--claude-1);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--claude-1) 45%, transparent);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.24s ease,
+    border-color 0.2s ease;
+}
+.prow input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.14);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--claude-1) 22%, transparent);
+}
+.prow input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--claude-1) 26%, transparent);
+}
+.prow input[type='range']:focus-visible {
+  outline: none;
+}
+.prow input[type='range']:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--claude-1) 30%, transparent);
+}
 .prow input:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
+/* ---- the switches ----
+   A real checkbox with its own drawing on top: `appearance: none` empties the
+   box and leaves the input — so the label, the keyboard and `:checked` all keep
+   working — while the track is the box itself, the knob is ::before and the halo
+   it throws when it comes on is ::after. */
 .pcheck {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
-  margin-bottom: 6px;
+  gap: 9px;
+  margin-bottom: 7px;
   font-size: 11.5px;
   color: #fff;
   opacity: 0.9;
   cursor: pointer;
+  transition: opacity 0.2s ease;
 }
-.pcheck input {
-  margin: 2px 0 0;
-  accent-color: var(--claude-1);
+.pcheck:hover {
+  opacity: 1;
+}
+.pcheck input[type='checkbox'] {
+  position: relative;
+  flex: 0 0 auto;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 17px;
+  margin: 1px 0 0;
+  border: 1.5px solid var(--line);
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
   cursor: pointer;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+/* the knob */
+.pcheck input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1.5px;
+  width: 11px;
+  height: 11px;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--fg) 55%, transparent);
+  transform: translate(0, -50%);
+  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease,
+    width 0.16s ease;
+}
+/* pressed and held: the knob stretches towards where it's about to go */
+.pcheck input[type='checkbox']:active::before {
+  width: 15px;
+}
+.pcheck input[type='checkbox']:checked:active::before {
+  transform: translate(-4px, -50%);
+}
+/* the halo, thrown once at the moment it comes on */
+.pcheck input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 21px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--claude-1) 60%, transparent);
+  transform: translate(-50%, -50%) scale(0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+.pcheck input[type='checkbox']:checked {
+  background: color-mix(in srgb, var(--claude-1) 62%, transparent);
+  border-color: var(--claude-1);
+}
+.pcheck input[type='checkbox']:checked::before {
+  transform: translate(13px, -50%);
+  background: #fff;
+}
+.pcheck input[type='checkbox']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--claude-1) 30%, transparent);
+}
+.pcheck input:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .pbtn {
@@ -1982,7 +2227,10 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border-radius: var(--pill);
   background: color-mix(in srgb, var(--claude-1) 9%, var(--card));
   font-size: 11px;
-  overflow: hidden;
+  /* Not hidden any more: the light that goes round sits on the border itself, and
+     `overflow: hidden` clips to the padding box — it would have cut off exactly
+     the ring it's there to show. Nothing inside needs the clipping; `.act-what`
+     does its own. */
   animation: cs-open 0.3s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 .act-orb {
@@ -2005,18 +2253,42 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-weight: 750;
   white-space: nowrap;
 }
-/* the thread of light along the bottom edge: it moves even when nothing else is */
-.activity::after {
+/* ---- the light that goes round the pill ----
+   It used to be a thread running along the bottom edge only: a pill with one lit
+   side, which read as an underline that had come loose rather than as something
+   working. Now it goes all the way round, on the border itself.
+   You can't spin a border, and spinning the element that draws one spins its mask
+   with it. The trick is the same one the Opus card uses: the box stays still and
+   only the angle the conic gradient starts from turns (`--cs-ang`, a real
+   animatable value thanks to @property in motion.css). The ring is cut out of a
+   filled box by masking away everything but its padding — that's the whole
+   border, drawn in one element, at any radius. */
+.activity::before {
   content: '';
   position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 2px;
-  width: 30%;
-  background: linear-gradient(90deg, transparent, var(--claude-2), transparent);
-  animation: cs-sweep 1.9s ease-in-out infinite;
+  inset: -1px;
+  border-radius: var(--pill);
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--cs-ang),
+    transparent 0deg,
+    color-mix(in srgb, var(--claude-1) 35%, transparent) 46deg,
+    var(--claude-2) 84deg,
+    #fff 100deg,
+    var(--claude-2) 116deg,
+    color-mix(in srgb, var(--claude-1) 35%, transparent) 154deg,
+    transparent 205deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: cs-orbit 2.2s linear infinite;
+  pointer-events: none;
+  z-index: 1;
 }
-/* a long silence: same strip, warmer colour, and it says how long it's been */
+/* a long silence: the same ring, warmer colour and slower, and it says how long
+   it's been */
 .activity.quiet {
   border-color: color-mix(in srgb, var(--warn) 50%, var(--line));
   background: color-mix(in srgb, var(--warn) 9%, var(--card));
@@ -2024,8 +2296,18 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .activity.quiet .act-orb {
   background: var(--warn);
 }
-.activity.quiet::after {
-  background: linear-gradient(90deg, transparent, var(--warn), transparent);
+.activity.quiet::before {
+  background: conic-gradient(
+    from var(--cs-ang),
+    transparent 0deg,
+    color-mix(in srgb, var(--warn) 35%, transparent) 46deg,
+    var(--warn) 92deg,
+    #fff 108deg,
+    var(--warn) 124deg,
+    color-mix(in srgb, var(--warn) 35%, transparent) 158deg,
+    transparent 208deg
+  );
+  animation-duration: 3.6s;
 }
 
 /* ---------- composer ---------- */
@@ -2336,6 +2618,86 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 /* clickable thumbnail: the cursor invites you */
 .att .thumb {
   cursor: pointer;
+}
+/* A chip for a file that isn't an image: the icon says what kind it is, the name
+   is the file's, and underneath, small, how big it is — the one thing you want to
+   know before sending a whole spreadsheet into a conversation. */
+.att.att-file {
+  padding: 3px 4px 3px 7px;
+  align-items: center;
+}
+.att-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.att-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+.att-size {
+  font-size: 9px;
+  opacity: 0.7;
+  letter-spacing: 0.03em;
+}
+/* Every chip arrives instead of appearing: with several files picked at once you
+   see them land one after another, so you can count them. */
+.att {
+  animation: cs-enter 0.3s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+  transition: border-color 0.2s ease, transform 0.18s ease;
+}
+.att:hover {
+  border-color: color-mix(in srgb, var(--claude-1) 70%, var(--line));
+}
+
+/* ---------- the paperclip ----------
+   Same size as the send button and sitting right beside it, but quiet: this one
+   opens a picker, the other one commits the message. */
+.clip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease,
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.clip .ico {
+  width: 17px;
+  height: 17px;
+}
+.clip:hover {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 10%, transparent);
+  /* the clip tilts, the way one does when you hook it on */
+  transform: rotate(-14deg);
+}
+.clip:active {
+  transform: rotate(-14deg) scale(0.92);
+}
+/* While a file is being dragged over the composer the whole box says so, and the
+   clip lights up: the drop target is the message, not the little button. */
+.composer.dropping {
+  border-color: var(--claude-1);
+  background: color-mix(in srgb, var(--claude-1) 8%, var(--card));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--claude-1) 18%, transparent);
+}
+.composer.dropping .clip {
+  opacity: 1;
+  transform: rotate(-14deg) scale(1.1);
+  color: var(--claude-2);
 }
 
 /* ---------- lightbox for attached images ---------- */

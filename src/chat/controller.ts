@@ -4,7 +4,17 @@
 import * as vscode from 'vscode';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
-import type { AskKind, AskQuestion, ModelChoice, Mode, Pasted, Prefs, Wire } from '../engine/protocol';
+import type {
+  AskKind,
+  AskQuestion,
+  ModelChoice,
+  Mode,
+  Pasted,
+  Prefs,
+  SentFile,
+  Wire,
+} from '../engine/protocol';
+import { pickFiles, stashFile } from './attach';
 import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
 import { setChatBadge } from './badge';
@@ -213,8 +223,24 @@ export class ChatController {
 
   // ---- l'avviso di fine lavoro -------------------------------------------
 
+  /**
+   * Questa conversazione ce l'hai davanti adesso? Serve per decidere se accendere
+   * il segnalino di "ha finito": la finestra dev'essere in primo piano *e* questa
+   * dev'essere la faccia davanti. Con la scheda dietro a un file aperto, o con VS
+   * Code minimizzato, non stai guardando.
+   */
+  private inFront(): boolean {
+    if (!vscode.window.state.focused) return false;
+    const cur = owned.current();
+    return !!cur && cur.key === this.key && !!owned.looking();
+  }
+
   /** Sei tornato a guardare: il bollino ha finito il suo mestiere. */
   onWindowFocus() {
+    // Il segnalino della conversazione che hai davanti si spegne: sei tornato, e
+    // quella l'hai vista. Le altre restano accese — non le hai ancora guardate.
+    const cur = owned.current();
+    if (cur?.key === this.key && owned.clearDone(this.key)) this.titleChanged();
     if (!this.primary) return;
     setChatBadge(0);
   }
@@ -228,7 +254,9 @@ export class ChatController {
     const p = this.prefs;
     const focused = vscode.window.state.focused;
 
-    if (!focused && this.primary) setChatBadge(1);
+    // Il numero sul bollino e' quante hanno finito e non le hai ancora viste, non
+    // un "1" fisso: con tre conversazioni in corso dice anche quante ti aspettano.
+    if (!focused && this.primary) setChatBadge(Math.max(1, owned.doneCount()));
     if (event === 'done' && p.toast && !focused) {
       const cwd = currentCwd();
       const open = t(p.lang, 'toast.open');
@@ -257,7 +285,7 @@ export class ChatController {
    * Il codice selezionato nell'editor si attacca al messaggio vero, non a quello
    * che si legge nella chat: nella chat resta la frase, il muro di codice no.
    */
-  send(text: string, images?: Pasted[], withSelection?: boolean) {
+  send(text: string, images?: Pasted[], withSelection?: boolean, files?: SentFile[]) {
     let full = text;
     if (withSelection) {
       const sel = currentSelection();
@@ -266,7 +294,31 @@ export class ChatController {
           `${text}\n\n<selection file="${sel.rel}" lines="${sel.lines}">\n${sel.text}\n</selection>`.trim();
       }
     }
+    // Gli allegati che non sono immagini si attaccano al messaggio vero come
+    // percorsi: e' Claude ad aprirli, con gli strumenti che ha gia'. Un PDF, un
+    // CSV, un log da duecento megabyte — nessuno di questi passa di qui dentro,
+    // passa solo dove trovarlo. Nella chat resta la frase, come per la selezione.
+    if (files?.length) {
+      const list = files.map((f) => `- ${f.path}`).join('\n');
+      full =
+        `${full}\n\n<attachments>\n${list}\n</attachments>\n` +
+        `The files above are attached to this message: open them with your tools ` +
+        `(Read for text, PDFs and notebooks) before answering.`;
+      full = full.trim();
+    }
     this.ensureSession().send(full, images, text);
+  }
+
+  /** Il fermaglio: il selettore di VS Code, senza filtri. */
+  async pickAttachments(s: Surface) {
+    const items = await pickFiles(this.prefs.lang);
+    if (items.length) s.post({ k: 'attached', items });
+  }
+
+  /** Un file arrivato dalla pagina e non dal disco: prima diventa un file vero. */
+  async stashAttachment(s: Surface, name: string, data: string) {
+    const one = await stashFile(this.ctx, name, data);
+    if (one) s.post({ k: 'attached', items: [one] });
   }
 
   /** L'elenco per il menu che si apre scrivendo "@". */
@@ -526,17 +578,28 @@ export class ChatController {
       this.commands = e.items;
       void this.ctx.globalState.update(COMMANDS_KEY, e.items);
     }
-    // Le due volte in cui il lavoro si ferma e tocca a te: turno finito, o un
-    // permesso da dare.
-    if (e.k === 'turn_end') this.alert('done');
-    if (e.k === 'ask') this.alert('ask');
-
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
     // Tutte le chat, non solo la principale: ogni scheda e' una conversazione vera
     // e i suoi token sono tuoi quanto quelli della prima.
     owned.observe(this.key, e, currentCwd());
+    // Quale ha finito. Il suono e il bollino dicono che *qualcosa* e' pronto; con
+    // tre schede aperte, quale sia lo scopri aprendole a una a una. Il segnalino si
+    // accende su questa conversazione — sulla sua scheda e sulla sua carta — e resta
+    // acceso finche' non la guardi. Se la stavi guardando non si accende affatto:
+    // l'hai vista finire.
+    //
+    // Prima dell'avviso, non dopo: il numero sul bollino dell'icona e' quante hanno
+    // finito, e questa deve essere gia' contata.
+    if (e.k === 'turn_end') {
+      owned.markDone(this.key, this.inFront());
+      this.titleChanged();
+    }
+    // Le due volte in cui il lavoro si ferma e tocca a te: turno finito, o un
+    // permesso da dare.
+    if (e.k === 'turn_end') this.alert('done');
+    if (e.k === 'ask') this.alert('ask');
     // Il nome della scheda e' la prima cosa che hai scritto: si sa da qui.
     if (e.k === 'user' || e.k === 'session') this.titleChanged();
     this.broadcast(e);

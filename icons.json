@@ -44,7 +44,14 @@
     "cash-outline",
     "code-slash-outline",
     "image-outline",
-    "navigate-outline"
+    "navigate-outline",
+    "attach-outline",
+    "document-outline",
+    "film-outline",
+    "musical-notes-outline",
+    "archive-outline",
+    "grid-outline",
+    "volume-medium-outline"
   ],
   "bar": {
     "studio-chat": "chatbubble-ellipses",
