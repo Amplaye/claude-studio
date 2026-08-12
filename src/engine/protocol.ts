@@ -96,7 +96,9 @@ export interface HistoryItem {
 export type Wire =
   | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
   | { k: 'session'; id: string; model: string; cwd: string }
-  | { k: 'user'; text: string }
+  // Le immagini tornano indietro insieme al messaggio: nella chat restano
+  // attaccate a quello che hai mandato, cosi' si vede che sono partite davvero.
+  | { k: 'user'; text: string; images?: Pasted[] }
   | { k: 'turn_start' }
   // `parent` c'e' quando il pezzo arriva da un sub-agent: e' il tool_use_id del
   // Task che lo ha lanciato, ed e' li' sotto che va disegnato.

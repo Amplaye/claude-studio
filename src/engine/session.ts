@@ -96,7 +96,7 @@ export class Session {
     this.pending.push({ text, images });
     // `echo` e' quello che si vede nella chat: il messaggio vero puo' portarsi
     // dietro anche il codice selezionato, che nella chat sarebbe un muro.
-    this.o.emit({ k: 'user', text: echo ?? text });
+    this.o.emit({ k: 'user', text: echo ?? text, images });
     this.setBusy(true);
     if (!this.running) this.running = this.run();
     this.wake?.();

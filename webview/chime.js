@@ -11,6 +11,12 @@
   let wet; // quanto ne va nella stanza (il riverbero)
   let last = 0;
 
+  /* Quanto si spinge il cursore al massimo. Le note nascono piano (0.25 scarso)
+     per non impastarsi fra loro: senza questa spinta il cursore a fondo corsa
+     resta comunque un sussurro. A valle c'e' un limitatore, quindi si puo'
+     alzare senza che gli accordi gracchino. */
+  const BOOST = 4.2;
+
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   /**
@@ -43,8 +49,18 @@
       return null;
     }
     master = ctx.createGain();
-    master.gain.value = 0.6;
-    master.connect(ctx.destination);
+    master.gain.value = 0.6 * BOOST;
+
+    /* Il limitatore: tiene i picchi sotto lo zero quando piu' note si sommano.
+       E' quello che permette di alzare il volume senza sentire il "crack". */
+    const lim = ctx.createDynamicsCompressor();
+    lim.threshold.value = -3;
+    lim.knee.value = 0;
+    lim.ratio.value = 20;
+    lim.attack.value = 0.002;
+    lim.release.value = 0.18;
+    master.connect(lim);
+    lim.connect(ctx.destination);
 
     const conv = ctx.createConvolver();
     conv.buffer = room(1.1);
@@ -201,7 +217,7 @@
     if (!make) return;
 
     const t = c.currentTime + 0.02;
-    master.gain.setValueAtTime(clamp(volume == null ? 0.6 : volume, 0, 1), t);
+    master.gain.setValueAtTime(clamp(volume == null ? 0.6 : volume, 0, 1) * BOOST, t);
     make(t, ev === 'ask' ? 'ask' : 'done');
   }
 

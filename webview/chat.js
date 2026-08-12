@@ -848,7 +848,23 @@
         // il modello si sceglie nelle impostazioni.
         break;
       case 'user': {
-        const n = el('div', 'msg user', m.text);
+        const n = el('div', 'msg user');
+        if (m.text) n.append(el('div', 'utext', m.text));
+        // Le immagini allegate restano qui sotto: e' la prova che sono partite,
+        // e si riaprono grandi con un clic come prima dell'invio.
+        if (m.images && m.images.length) {
+          const box = el('div', 'uimgs');
+          for (const im of m.images) {
+            const src = `data:${im.mime};base64,${im.data}`;
+            const t = document.createElement('img');
+            t.className = 'uimg';
+            t.src = src;
+            t.alt = 'Immagine allegata';
+            t.addEventListener('click', () => openLightbox(src));
+            box.append(t);
+          }
+          n.append(box);
+        }
         add(n);
         break;
       }
@@ -1099,7 +1115,34 @@
     const img = document.createElement('img');
     img.src = src;
     overlay.appendChild(img);
-    overlay.addEventListener('click', () => overlay.remove());
+
+    // La X in alto a destra: il clic sul fondo chiude gia', ma senza un bottone
+    // visibile non si sa. Esc fa la stessa cosa.
+    const x = el('button', 'lbx');
+    x.type = 'button';
+    x.title = 'Chiudi (Esc)';
+    x.setAttribute('aria-label', 'Chiudi');
+    x.append(icon('close'));
+    overlay.appendChild(x);
+
+    const close = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+    };
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    }
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+    });
+    // Il clic sull'immagine non chiude: capita di volerla solo guardare
+    img.addEventListener('click', (e) => e.stopPropagation());
+    overlay.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
     document.body.appendChild(overlay);
   }
 
@@ -1319,10 +1362,21 @@
     'Fastest for quick answers': 'Il più veloce, risposte al volo',
   };
 
-  /** Il nome sulla carta: "Default (recommended)" qui e' semplicemente "Automatico". */
+  /**
+   * Il nome sulla carta, spezzato in due righe.
+   *
+   * La CLI attacca al nome la finestra di contesto — "Opus 5 (1M context)" — e su
+   * una riga sola la carta diventa illeggibile. Il nome resta grosso sopra, la
+   * precisazione va a capo piu' piccola sotto. "Default (recommended)" invece
+   * qui e' semplicemente "Automatico".
+   */
   function modelName(m) {
-    if (m.recommended) return 'Automatico';
-    return String(m.label || m.value);
+    if (m.recommended) return { name: 'Automatico', note: '' };
+    const raw = String(m.label || m.value).trim();
+    // Coda fra parentesi tonde o quadre: "(1M context)", "[1m]", ...
+    const cut = raw.match(/^(.*?)[\s]*[([]([^)\]]+)[)\]]\s*$/);
+    if (cut) return { name: cut[1].trim(), note: cut[2].trim() };
+    return { name: raw, note: '' };
   }
 
   function paintModels() {
@@ -1344,7 +1398,9 @@
       card.type = 'button';
       card.title = String(m.description || m.resolved || m.value);
       const info = el('span', 'mc-info');
-      info.append(el('span', 'mc-name', modelName(m)));
+      const nm = modelName(m);
+      info.append(el('span', 'mc-name', nm.name));
+      if (nm.note) info.append(el('span', 'mc-note', nm.note));
       info.append(el('span', 'mc-desc', modelPurpose(m)));
       card.append(info);
       card.addEventListener('click', () => push({ model: value }));
@@ -1353,6 +1409,40 @@
   }
 
   // -- segmented control generico con slider --
+
+  /**
+   * Mette lo slider sopra al bottone acceso. Si usano gli offset (non i rect):
+   * sono gia' relativi al contenitore — che e' `position: relative` — quindi non
+   * sbagliano di mezzo pixel e, soprattutto, valgono anche mentre il pannello sta
+   * ancora scivolando dentro con la sua animazione.
+   */
+  function placeSeg(container) {
+    const slider = container.querySelector('.seg-slider');
+    if (!slider) return;
+    const active = container.querySelector('.seg-btn.on');
+    // A pannello chiuso non c'e' niente da misurare: meglio non muoverlo affatto
+    // che incollarlo a zero e vederlo poi saltare al primo clic.
+    if (!active || !container.offsetParent) return;
+    slider.style.left = active.offsetLeft + 'px';
+    slider.style.top = active.offsetTop + 'px';
+    slider.style.width = active.offsetWidth + 'px';
+    slider.style.height = active.offsetHeight + 'px';
+    slider.style.display = '';
+  }
+
+  /** Ogni volta che il contenitore cambia misura (i bottoni vanno a capo, il
+   *  pannello si apre) lo slider si rimette a posto da solo. */
+  function watchSeg(container) {
+    if (container.dataset.watched || typeof ResizeObserver === 'undefined') return;
+    container.dataset.watched = '1';
+    new ResizeObserver(() => placeSeg(container)).observe(container);
+  }
+
+  /** Rimette a posto tutti gli slider: serve all'apertura del pannello. */
+  function placeAllSegs() {
+    for (const c of document.querySelectorAll('.seg')) placeSeg(c);
+  }
+
   function paintSeg(container, items, value, onChange) {
     // Conserva o crea lo slider
     let slider = container.querySelector('.seg-slider');
@@ -1361,6 +1451,7 @@
       slider = el('div', 'seg-slider');
     }
     container.appendChild(slider);
+    watchSeg(container);
 
     for (const it of items) {
       const btn = el('button', 'seg-btn' + (it.value === value ? ' on' : ''));
@@ -1374,21 +1465,11 @@
       container.append(btn);
     }
 
-    // Posiziona lo slider dopo un frame per avere le dimensioni giuste
-    requestAnimationFrame(() => {
-      const active = container.querySelector('.seg-btn.on');
-      if (active) {
-        const boxRect = container.getBoundingClientRect();
-        const btnRect = active.getBoundingClientRect();
-        slider.style.left = (btnRect.left - boxRect.left) + 'px';
-        slider.style.top = (btnRect.top - boxRect.top) + 'px';
-        slider.style.width = btnRect.width + 'px';
-        slider.style.height = btnRect.height + 'px';
-        slider.style.display = '';
-      } else {
-        slider.style.display = 'none';
-      }
-    });
+    if (!container.querySelector('.seg-btn.on')) slider.style.display = 'none';
+    // Subito e poi dopo un frame: la prima passata prende il caso normale, la
+    // seconda quella in cui i bottoni sono appena andati a capo.
+    placeSeg(container);
+    requestAnimationFrame(() => placeSeg(container));
   }
 
   function paintEffort() {
@@ -1448,6 +1529,10 @@
       cfg.hidden = false;
       cfg.classList.remove('closing');
       btnCfg.classList.add('on');
+      // Ora che il pannello e' misurabile, gli slider prendono la posizione buona
+      // senza aspettare il primo clic.
+      placeAllSegs();
+      requestAnimationFrame(placeAllSegs);
       if (window.Chime) window.Chime.unlock();
     } else {
       // Animazione di chiusura: il pannello scivola via, poi si nasconde.
