@@ -28,6 +28,43 @@ export interface ClaudeCli {
   npmRoot?: string;
 }
 
+/**
+ * `<prefix>/Cellar/node*​/<version>/lib/node_modules` for every Homebrew node on
+ * disk. Reading beats guessing here: the version is part of the path and changes
+ * with every upgrade. Newest last-installed first, so a leftover old Cellar does
+ * not win over the node actually in use.
+ */
+function cellarRoots(): string[] {
+  const out: { dir: string; mtime: number }[] = [];
+  for (const prefix of ['/opt/homebrew', '/usr/local']) {
+    const cellar = path.join(prefix, 'Cellar');
+    let formulas: string[];
+    try {
+      formulas = fs.readdirSync(cellar).filter((f) => f === 'node' || f.startsWith('node@'));
+    } catch {
+      continue; // no Homebrew here
+    }
+    for (const formula of formulas) {
+      const base = path.join(cellar, formula);
+      let versions: string[];
+      try {
+        versions = fs.readdirSync(base);
+      } catch {
+        continue;
+      }
+      for (const v of versions) {
+        const dir = path.join(base, v, 'lib', 'node_modules');
+        try {
+          out.push({ dir, mtime: fs.statSync(dir).mtimeMs });
+        } catch {
+          /* not a version directory */
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => b.mtime - a.mtime).map((e) => e.dir);
+}
+
 /** The roots where npm puts global modules on this system. */
 function npmRoots(): string[] {
   const home = os.homedir();
@@ -39,6 +76,11 @@ function npmRoots(): string[] {
     out.push('/usr/local/lib/node_modules');
     out.push('/opt/homebrew/lib/node_modules');
     out.push(path.join(home, '.npm-global', 'lib', 'node_modules'));
+    // Homebrew's node keeps the globals inside the versioned Cellar, and
+    // /opt/homebrew/lib/node_modules is left as an empty shell: the cheap list
+    // above walks right past the only copy on the machine. The version is in the
+    // path, so we read the directory instead of guessing it.
+    out.push(...cellarRoots());
   }
   out.push(path.join(home, '.claude', 'local', 'node_modules'));
   return out;
@@ -60,10 +102,21 @@ function npmRootGlobal(): string | undefined {
   }
 }
 
-/** The two files inside the package that can act as the CLI: the new one first. */
+/**
+ * The files inside the package that can act as the CLI: the new one first.
+ *
+ * The name of the binary is not a given. Some npm builds land a `bin/claude.exe`
+ * even on macOS and Linux — the file is a perfectly good Mach-O/ELF, only the name
+ * comes from the Windows artifact. Looking solely at `claude` there means finding
+ * nothing, falling back to no path at all, and letting the SDK hunt for a native
+ * binary the packaged extension does not carry. So we try both names everywhere.
+ */
 function insidePackage(pkgDir: string): string | undefined {
-  const bin = path.join(pkgDir, 'bin', EXE);
-  if (fs.existsSync(bin)) return bin;
+  const names = EXE === 'claude.exe' ? ['claude.exe'] : ['claude', 'claude.exe'];
+  for (const name of names) {
+    const bin = path.join(pkgDir, 'bin', name);
+    if (fs.existsSync(bin)) return bin;
+  }
   const legacy = path.join(pkgDir, 'cli.js');
   if (fs.existsSync(legacy)) return legacy;
   return undefined;
