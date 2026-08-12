@@ -6,3 +6,6 @@ media/ionicons-studio.woff2
 *.vsix
 # "Consenti sempre" scrive qui: sono permessi di questa macchina, non del progetto
 .claude/settings.local.json
+
+# helper temporanei driver browser
+.az-shot.png
