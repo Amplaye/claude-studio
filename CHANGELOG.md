@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.15.0
+
+- **Opening Studio opens something new.** It used to read the last conversation of the
+  project back off the disk the moment the extension woke up, so every session you
+  "started" was already full of one you had not asked for — and the shortcut, the
+  command and the icon all landed you back in yesterday. Now they open a new
+  conversation, every time. Nothing is lost: the old ones are all in the context bar,
+  a click away. Reloading the window is the one case that still restores, because there
+  you are not opening a conversation, you are finding the one you were already in — and
+  each tab comes back on its own, which is what that has always meant.
+
+- **Clicking the Claude Studio icon with a session already open no longer flickers.**
+  It brought the tab forward and closed the sidebar in the same breath, and from the
+  outside that was a conversation opening and shutting again for no reason. Now the
+  click does nothing, which is what there was to do.
+
+- **Clicking a card opens that conversation in a tab.** It used to load it into the
+  sidebar chat, or into the main tab on top of whatever you were reading — in one case
+  you could not see it, in the other you lost the one you had. A conversation you open
+  is a tab. If it already has one, that tab comes forward instead: one face per
+  conversation, never two.
+
+- **A long list of steps no longer pushes the other cards out of the panel.** With two
+  or three conversations working at once the steps are the part that grows, and to
+  reach the third card you had to scroll past dozens of lines you were not looking for.
+  Each list keeps its own height and scrolls inside itself; the step being worked on
+  still brings itself into view.
+
+- **The task list is tested against the real CLI, and now the test can fail.** The
+  offline check wrote its transcripts under `/var` and the SDK looked under
+  `/private/var` — the same folder by two names, on every Mac — so it found nothing and
+  reported the panel broken when it was fine. The live check asked Claude to "write
+  yourself a list", which it did, in prose, in the message: a passing thought and an
+  empty panel. It now names `TaskCreate` and `TaskUpdate`, and what it proves is the
+  wire.
+
 ## 0.14.1
 
 - **Each conversation's steps now live inside its own card.** With three tabs open the
