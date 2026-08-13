@@ -35,6 +35,15 @@ window.CtxPanel = (() => {
     return b;
   }
 
+  /** "2h" reads faster than "7412 seconds" in a line you only glance at. */
+  function fmtAge(sec) {
+    if (sec == null) return '';
+    if (sec < 60) return Math.max(1, Math.round(sec)) + 's';
+    if (sec < 3600) return Math.round(sec / 60) + 'm';
+    if (sec < 86400) return Math.round(sec / 3600) + 'h';
+    return Math.round(sec / 86400) + 'd';
+  }
+
   /** Colour lives in the bars, not in the text. */
   const barColor = (p) =>
     p == null ? 'rgba(255,255,255,.3)' : p >= 80 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
@@ -98,6 +107,10 @@ window.CtxPanel = (() => {
 
     const cells = [buildCell('ctx.session'), buildCell('ctx.week')];
     const waiting = el('div', 'await');
+    // Shown only once the numbers stop being current. Sharing an account across
+    // machines is exactly when a cached percentage quietly stops being true, so when
+    // it can't be vouched for the panel says how old it is instead of implying "now".
+    const aged = el('div', 'aged');
 
     function paintCell(c, pct, reset) {
       c._p.name.textContent = t(c._p.key);
@@ -213,10 +226,17 @@ window.CtxPanel = (() => {
       if (!d.usage) {
         waiting.textContent = d.usageWait;
         if (acct.firstChild !== waiting) acct.replaceChildren(waiting);
+        aged.remove();
       } else {
         paintCell(cells[0], d.usage.session, d.sessionReset);
         paintCell(cells[1], d.usage.week, d.weekReset);
         if (acct.firstChild !== cells[0]) acct.replaceChildren(cells[0], cells[1]);
+        if (d.usageStale) {
+          aged.textContent = t('ctx.stale', { age: fmtAge(d.usageAgeSec) });
+          if (aged.parentNode !== head) head.append(aged);
+        } else {
+          aged.remove();
+        }
       }
 
       // The cards for the active sessions with their token usage

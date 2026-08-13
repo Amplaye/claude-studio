@@ -38,6 +38,10 @@ export interface CtxData {
   focusHow: FocusHow;
   usage: { session: number | null; week: number | null } | null;
   usageWait: string;
+  /** Da quanti secondi sono fermi i consumi: la cache sopravvive ai riavvii. */
+  usageAgeSec: number | null;
+  /** I numeri restano a schermo, ma smettono di spacciarsi per attuali. */
+  usageStale: boolean;
   sessionReset: string;
   weekReset: string;
   cards: CtxCard[];

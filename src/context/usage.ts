@@ -19,8 +19,10 @@ export interface Usage {
   weekResetAt: string | null;
 }
 
-const TTL_MS = 60000; // the numbers refresh every minute, one window only
+const TTL_MS = 30000; // the numbers refresh twice a minute, one window only
 const COOLDOWN_MS = 600000; // after a 429 we keep quiet for ten minutes
+/** Past this the cached numbers are shown, but no longer presented as current. */
+const STALE_MS = 90000;
 
 const state = {
   data: null as Usage | null,
@@ -31,6 +33,21 @@ const state = {
 
 export function currentUsage(): Usage | null {
   return state.data;
+}
+
+/**
+ * How old the numbers on screen are. The file cache survives restarts, so a window
+ * opened tomorrow morning paints yesterday's percentages instantly and they look
+ * live. Sharing the same account across machines and people is exactly when that
+ * lies, so the age travels with the data and the panel can say so.
+ */
+export function usageAgeMs(now = Date.now()): number | null {
+  return state.data && state.ts ? Math.max(0, now - state.ts) : null;
+}
+
+export function usageIsStale(now = Date.now()): boolean {
+  const age = usageAgeMs(now);
+  return age !== null && age > STALE_MS;
 }
 
 /** What to write until the numbers are there: "queued" isn't "loading". */
@@ -94,13 +111,20 @@ export function readOauthToken(): string {
 /**
  * Asks the API for the numbers, but only if it's this window's turn. It waits for
  * nobody: when the answer arrives it calls `done`, which runs the redraw round again.
+ *
+ * `force` skips the TTL, and only the TTL. Opening the panel used to schedule a tick
+ * that this gate then threw away, so the first thing you saw was whatever the cache
+ * held — sometimes hours old — and it stayed that way until the minute lapsed, which
+ * in practice meant "it updates a while after I send a prompt". The two guards that
+ * protect the endpoint stay in force: a request already in flight is never doubled,
+ * and a 429 cooldown is never overridden.
  */
-export function refreshUsage(done: () => void) {
+export function refreshUsage(done: () => void, force = false) {
   const now = Date.now();
   if (state.pending) return;
   loadSharedUsage(); // first look at what the other windows have already done
   if (now < state.cooldownUntil) return;
-  if (state.data && now - state.ts < TTL_MS) return;
+  if (!force && state.data && now - state.ts < TTL_MS) return;
 
   const token = readOauthToken();
   if (!token) return;

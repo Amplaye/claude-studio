@@ -34,8 +34,12 @@
 
     const head = el('div', 'tk-head');
     const count = el('span', 'tk-count');
+    // "4 of 9 done" answers how far along it is; it does not answer how much is still
+    // coming, which is the thing you actually want to know before walking away. The
+    // subtraction is easy and you should not have to do it.
+    const left = el('span', 'tk-left');
     const state = el('span', 'tk-state');
-    head.append(count, state);
+    head.append(count, left, state);
 
     const barWrap = el('div', 'tk-bar');
     const fill = el('i', 'tk-fill');
@@ -48,6 +52,8 @@
 
     /** The rows currently on screen, so a repaint can reuse them. */
     let rows = [];
+    /** Which step was in progress last time, so the panel only scrolls when it moves. */
+    let lastActive = -1;
 
     function render(d) {
       const items = (d && d.items) || [];
@@ -61,6 +67,9 @@
 
       if (total) {
         count.textContent = t('tasks.count', { done, total });
+        const remaining = Math.max(0, total - done);
+        left.textContent = remaining ? t('tasks.left', { n: remaining }) : '';
+        left.hidden = remaining === 0;
         state.textContent =
           done >= total ? t('tasks.finished') : d.busy ? t('tasks.working') : t('tasks.paused');
         state.className = 'tk-state' + (done >= total ? ' ok' : d.busy ? ' live' : '');
@@ -107,6 +116,18 @@
         // The class is dropped once it has played, or the next repaint would replay it.
         if (justDone) setTimeout(() => r.row.classList.remove('justdone'), 600);
       });
+
+      // Follow the step being worked on. A dozen tasks in a sidebar this narrow is
+      // taller than the panel, so the one that matters is exactly the one that scrolls
+      // off — and the whole point of this panel is seeing it without hunting for it.
+      // Only on a change: scrolling on every repaint would fight the mouse wheel.
+      const active = d && typeof d.active === 'number' ? d.active : -1;
+      if (active >= 0 && active !== lastActive && rows[active]) {
+        // `nearest` moves the list only when the row is actually out of sight, and
+        // never drags the surrounding page around with it.
+        rows[active].row.scrollIntoView({ block: 'nearest' });
+      }
+      lastActive = active;
     }
 
     // Redrawn on a language switch: the counts and the labels are ours, not the HTML's.

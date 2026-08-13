@@ -8,15 +8,34 @@
 .tk-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  /* The count and what is left of it read as one phrase, so they sit together at the
+     start; the state word is pushed to the far end by the margin on .tk-state. */
+  justify-content: flex-start;
+  gap: 0;
   margin-bottom: 6px;
 }
 .tk-count {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+/* "5 to go" — quieter than the count it follows, because it is the same fact read
+   from the other side, and two bold numbers side by side compete. */
+.tk-left {
+  font-size: 11px;
+  opacity: 0.62;
+  white-space: nowrap;
+}
+.tk-left[hidden] {
+  display: none;
+}
+.tk-left::before {
+  content: '·';
+  margin: 0 5px;
+  opacity: 0.6;
+}
 .tk-state {
+  margin-left: auto;
+  padding-left: 8px;
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;

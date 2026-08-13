@@ -26,7 +26,14 @@ import { projectsDirFor, sessionsDir, transcriptPath } from './paths';
 import type { CtxCard, CtxData } from './protocol';
 import { liveSessions, readSessionNames, writeSessionName } from './sessions';
 import { scanTranscript } from './transcript';
-import { currentUsage, loadSharedUsage, refreshUsage, usageWaitText } from './usage';
+import {
+  currentUsage,
+  loadSharedUsage,
+  refreshUsage,
+  usageAgeMs,
+  usageIsStale,
+  usageWaitText,
+} from './usage';
 
 /** Ha scritto entro venti secondi: sta lavorando adesso. */
 const BUSY_MS = 20000;
@@ -88,12 +95,30 @@ export class ContextMonitor {
     this.tick();
   }
 
+  /** Quando il prossimo giro deve chiedere i consumi anche se il TTL non e' scaduto. */
+  private forceUsage = false;
+  /** Le conversazioni gia' viste: serve a riconoscere quella appena nata. */
+  private seenIds = new Set<string>();
+
   /** Il pannello si iscrive e riceve subito l'ultima fotografia. */
   subscribe(fn: (d: CtxData) => void): vscode.Disposable {
     this.sinks.add(fn);
     if (this.last) fn(this.last);
-    else this.tickSoon();
+    // La fotografia in cache si vede all'istante, ma puo' essere di ieri: la cache
+    // dei consumi sopravvive ai riavvii. Aprire il pannello chiede comunque il numero
+    // vero, altrimenti il primo sguardo e' su percentuali vecchie che sembrano fresche.
+    this.refreshNow();
     return { dispose: () => this.sinks.delete(fn) };
+  }
+
+  /**
+   * Ridisegna scavalcando il TTL dei consumi. Serve dove aspettare il minuto pieno
+   * vuol dire guardare numeri vecchi: pannello aperto, pannello tornato visibile,
+   * sessione nuova. Il cooldown dopo un 429 resta valido: quello non si scavalca.
+   */
+  refreshNow() {
+    this.forceUsage = true;
+    this.tickSoon();
   }
 
   dispose() {
@@ -242,9 +267,24 @@ export class ContextMonitor {
     // La sessione in cui sei sta sempre in cima, poi si va per recenza.
     rows.sort((a, b) => Number(b.card.focused) - Number(a.card.focused) || b.mtimeMs - a.mtimeMs);
 
+    // Una conversazione che prima non c'era e' il momento in cui i consumi contano di
+    // piu': si parte sapendo quanto resta. Legare la forzatura alla nascita di una
+    // sessione, e non a ogni evento della chat, tiene le chiamate rare — un turno che
+    // finisce ridisegna, ma non interroga l'API.
+    const ids = new Set(rows.map((r) => r.card.id));
+    for (const id of ids) {
+      if (!this.seenIds.has(id)) {
+        this.forceUsage = true;
+        break;
+      }
+    }
+    this.seenIds = ids;
+
     const g = gitInfo(cwd);
     const usage = currentUsage();
-    refreshUsage(() => this.tick()); // asincrono: quando torna, si ridisegna
+    const force = this.forceUsage;
+    this.forceUsage = false;
+    refreshUsage(() => this.tick(), force); // asincrono: quando torna, si ridisegna
 
     return {
       project: cwd.split(/[\\/]/).pop() || cwd,
@@ -252,6 +292,11 @@ export class ContextMonitor {
       focusHow: this.how,
       usage: usage ? { session: usage.session, week: usage.week } : null,
       usageWait: usageWaitText(now),
+      usageAgeSec: (() => {
+        const ms = usageAgeMs(now);
+        return ms === null ? null : Math.round(ms / 1000);
+      })(),
+      usageStale: usageIsStale(now),
       sessionReset: fmtReset(usage?.sessionResetAt, now),
       weekReset: fmtReset(usage?.weekResetAt, now),
       cards: rows.map((r) => r.card),

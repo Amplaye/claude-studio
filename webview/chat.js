@@ -1164,13 +1164,45 @@
   function turnRecap(m) {
     const node = el('div', 'msg recap' + (m.ok === false ? ' bad' : ''));
     node.append(m.ok === false ? icon('alert-circle', 'recap-ico') : drawnCheck('recap-ico'));
+    const body = el('div', 'recap-body');
+    const paths = [...filesTouched.keys()];
+
+    // Line one — the outcome, the size of the change, the time. Three facts, in the
+    // order you want them: whether it worked, what it moved, how long you waited.
     const chips = el('div', 'recap-chips');
     const chip = (text, cls) => chips.append(el('span', 'recap-chip' + (cls ? ' ' + cls : ''), text));
     chip(t(m.ok === false ? 'recap.stopped' : 'recap.done'), 'strong');
+    if (paths.length) {
+      chip(t(paths.length === 1 ? 'recap.file' : 'recap.files', { n: paths.length }), 'files');
+    }
     if (m.durationMs) chip(clock(m.durationMs));
-    if (stepsN) chip(t(stepsN === 1 ? 'act.step' : 'act.steps', { n: stepsN }));
-    if (m.tokens) chip(t('recap.context', { n: fmtTokens(m.tokens) }));
-    node.append(chips);
+    body.append(chips);
+
+    // Line two — which files, by name, each one click from the editor. "3 files
+    // changed" is a number; "auth.ts, login.tsx" is something you can go and check.
+    if (paths.length) {
+      const files = el('div', 'recap-files');
+      for (const p of paths.slice(0, RECAP_FILES)) {
+        const b = el('button', 'recap-file', p.split(/[\\/]/).pop() || p);
+        b.type = 'button';
+        b.title = p; // the full path, for when two folders hold the same name
+        b.addEventListener('click', () => vscode.postMessage({ cmd: 'openFile', path: p }));
+        files.append(b);
+      }
+      if (paths.length > RECAP_FILES) {
+        files.append(el('span', 'recap-more', t('recap.more', { n: paths.length - RECAP_FILES })));
+      }
+      body.append(files);
+    }
+
+    // Line three — what it cost. Worth having, never the headline, so it is dimmer
+    // and last instead of sitting in the same row as the result.
+    const meta = [];
+    if (stepsN) meta.push(t(stepsN === 1 ? 'act.step' : 'act.steps', { n: stepsN }));
+    if (m.tokens) meta.push(t('recap.context', { n: fmtTokens(m.tokens) }));
+    if (meta.length) body.append(el('div', 'recap-meta', meta.join(' · ')));
+
+    node.append(body);
     add(node);
   }
 
@@ -1238,6 +1270,15 @@
   let actKey = 'act.working';
   let actVars = null;
   let stepsN = 0;
+  /**
+   * The files this turn wrote to, in the order it first touched them. A recap that
+   * only counts steps and tokens tells you what the turn cost and not what it did;
+   * after ten minutes away the question is "what did it change", and the answer was
+   * scattered across a dozen collapsed cards you had to scroll back through.
+   */
+  const filesTouched = new Map();
+  /** Past this many names the line stops being a summary and becomes a list. */
+  const RECAP_FILES = 5;
   let actTimer = 0;
 
   const clock = (ms) => {
@@ -1270,6 +1311,7 @@
     actStart = Date.now();
     actLast = actStart;
     stepsN = 0;
+    filesTouched.clear();
     actKey = 'act.working';
     actVars = null;
     actBar.hidden = false;
@@ -1340,6 +1382,7 @@
         asks.clear();
         waiting = null;
         stepsN = 0;
+        filesTouched.clear();
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         // the previous conversation scrolls out while the new one takes its place
@@ -1464,6 +1507,14 @@
         hideWaiting();
         toolStart(m.id, m.name, m.input, m.parent);
         stepsN++;
+        // Only the tools that actually write. A Read of the same path is not a change,
+        // and counting it would make the recap claim edits that never happened.
+        if (DIFF_TOOLS[m.name] && m.input && typeof m.input === 'object') {
+          const wrote = m.input.file_path || m.input.path;
+          if (typeof wrote === 'string' && wrote) {
+            filesTouched.set(wrote, (filesTouched.get(wrote) || 0) + 1);
+          }
+        }
         // The name of the tool and nothing else: what it's running is already
         // written in full in the card that just opened in the thread.
         activity('act.tool', { tool: m.name });

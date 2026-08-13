@@ -142,6 +142,15 @@ body {
   padding: 4px 0 2px;
 }
 
+/* Only present when the numbers have gone stale, so it needs no attention-getting
+   of its own: being there at all is the signal. */
+.ctx .aged {
+  font-size: 11px;
+  opacity: 0.55;
+  padding: 2px 0 0;
+  letter-spacing: 0.01em;
+}
+
 /* ---------- the section row ---------- */
 
 .ctx .secline {

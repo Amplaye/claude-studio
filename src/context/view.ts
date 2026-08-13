@@ -50,7 +50,7 @@ export class ContextView implements vscode.WebviewViewProvider {
           sub = this.monitor.subscribe((d) => post({ k: 'data', d }));
           return;
         case 'refresh':
-          this.monitor.tick();
+          this.monitor.refreshNow();
           return;
         case 'rename':
           void this.monitor.rename(m.id);
@@ -64,8 +64,9 @@ export class ContextView implements vscode.WebviewViewProvider {
       }
     });
 
-    // Visible again after being hidden: the numbers had been frozen for a while.
-    const vis = view.onDidChangeVisibility(() => view.visible && this.monitor.tickSoon());
+    // Visible again after being hidden: the numbers had been frozen for a while, so
+    // this asks the API outright instead of settling for whatever the cache holds.
+    const vis = view.onDidChangeVisibility(() => view.visible && this.monitor.refreshNow());
     const lang = onDidChangeLang((value) => post({ k: 'lang', value }));
 
     view.onDidDispose(() => {

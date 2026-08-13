@@ -33,6 +33,42 @@ if (/url\(#/.test(raw) || !/<line/.test(raw)) {
   throw new Error('media/logo.svg: expected the ray starburst with literal stroke colours');
 }
 
+/**
+ * The tile is square and the mark has to fill it, because the neighbours on the
+ * Marketplace shelf do: Claude Code is a circle that touches all four edges, and
+ * beside it a starburst floating in its own margin reads as the smaller product.
+ *
+ * Two paddings were stacked here. The rays stop short of the 512 viewBox — they span
+ * about 481 of it — and the tile then drew that at 78%, so the mark ended up at ~73%
+ * of the square. The box is measured off the rays themselves rather than typed in, so
+ * redrawing logo.svg cannot silently reintroduce a margin.
+ */
+function artBox(svg) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const m of svg.matchAll(/<line\b[^>]*>/g)) {
+    const at = (n) => {
+      const v = m[0].match(new RegExp(`\\b${n}="([-\\d.]+)"`));
+      return v ? parseFloat(v[1]) : NaN;
+    };
+    const w = at('stroke-width');
+    // A round linecap is a half-disc past each endpoint: it is part of the drawing.
+    const cap = Number.isFinite(w) ? w / 2 : 0;
+    for (const [px, py] of [[at('x1'), at('y1')], [at('x2'), at('y2')]]) {
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue;
+      x0 = Math.min(x0, px - cap); y0 = Math.min(y0, py - cap);
+      x1 = Math.max(x1, px + cap); y1 = Math.max(y1, py + cap);
+    }
+  }
+  if (!Number.isFinite(x0)) throw new Error('media/logo.svg: could not measure the rays');
+  // Keep it square and concentric, so the burst stays radially centred.
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const half = Math.max(x1 - x0, y1 - y0) / 2;
+  return { x: cx - half, y: cy - half, size: half * 2 };
+}
+
+const box = artBox(raw);
+const viewBox = `${box.x.toFixed(2)} ${box.y.toFixed(2)} ${box.size.toFixed(2)} ${box.size.toFixed(2)}`;
+
 const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
   html,body { margin:0; padding:0; background:transparent; }
@@ -43,11 +79,11 @@ const html = `<!DOCTYPE html>
     display:flex; align-items:center; justify-content:center;
     box-sizing:border-box;
   }
-  /* Bigger than the old glyph: the starburst is mostly empty space between rays,
-     so at 0.56 it read as a small speck in the middle of the tile. */
-  svg { width:${Math.round(SIZE * 0.78)}px; height:${Math.round(SIZE * 0.78)}px; }
+  /* Full-bleed: the viewBox below is already cropped to the rays, so the only margin
+     left is the hair that keeps a round cap from being clipped by antialiasing. */
+  svg { width:${Math.round(SIZE * 0.98)}px; height:${Math.round(SIZE * 0.98)}px; }
 </style></head>
-<body><div class="icon"><svg viewBox="0 0 512 512">${glyph}</svg></div></body></html>`;
+<body><div class="icon"><svg viewBox="${viewBox}">${glyph}</svg></div></body></html>`;
 
 const browser = await chromium.launch();
 const page = await browser.newPage({

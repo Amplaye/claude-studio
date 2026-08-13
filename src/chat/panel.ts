@@ -155,7 +155,7 @@ export class ChatPanel {
       if (panel.active) this.followName();
       // Back in front after being behind: the numbers had been frozen for a while,
       // and the "refresh" button is gone because this does it by itself.
-      if (panel.visible) monitor?.tickSoon();
+      if (panel.visible) monitor?.refreshNow();
     });
     panel.onDidDispose(() => {
       state.dispose();
