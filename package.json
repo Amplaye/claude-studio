@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "The same Claude Code, in a panel you can actually watch. It keeps the Claude Code CLI updated on its own, so you're never behind on models or features. Live progress, diffs you open when you want, one-click permissions, and attach any file, not just images.",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
