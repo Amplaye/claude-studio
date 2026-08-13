@@ -390,6 +390,64 @@ for (const width of [320, 620]) {
   t(left[0] === 0, 'i passi della conversazione azzerata sono rimasti: ' + left[0]);
   t(left[1] === 1, 'azzerare una conversazione ha portato via i passi dell\'altra: ' + left[1]);
 
+  // Tre conversazioni al lavoro, ognuna con la sua lista lunga. I passi sono la parte
+  // che cresce: senza un tetto, tre liste da dodici righe spingono la terza card fuori
+  // dal pannello e per arrivarci devi scorrere oltre decine di righe che non stavi
+  // cercando. Ogni lista si tiene la sua altezza e scorre per conto suo.
+  const many = (n, from) => ({
+    items: Array.from({ length: n }, (_, i) => ({
+      content: `${from} step ${i + 1}`,
+      status: i === 0 ? 'completed' : i === 1 ? 'in_progress' : 'pending',
+    })),
+    done: 1,
+    total: n,
+    active: 1,
+    busy: true,
+  });
+  await post(
+    data({
+      cards: [
+        card({ name: 'Uno' }),
+        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'Due', focused: false }),
+        card({ id: 'cccc', shortId: 'cccccccc', name: 'Tre', focused: false }),
+      ],
+    })
+  );
+  await page.evaluate((x) => window.postMessage({ k: 'tasks', d: x }, '*'), {
+    [ID]: many(12, 'A'),
+    bbbb: many(12, 'B'),
+    cccc: many(12, 'C'),
+  });
+  await page.waitForTimeout(200);
+  const capped = await page.evaluate(() =>
+    [...document.querySelectorAll('.csteps .tk-list')].map((n) => ({
+      shown: n.clientHeight,
+      real: n.scrollHeight,
+    }))
+  );
+  t(capped.length === 3, 'le tre liste non sono tutte a schermo: ' + capped.length);
+  t(
+    capped.every((c) => c.shown <= 170),
+    'una lista lunga non ha un tetto e spinge fuori le card sotto: ' +
+      capped.map((c) => c.shown).join(' | ')
+  );
+  t(
+    capped.every((c) => c.real > c.shown),
+    'la lista e\' tagliata invece che scorrevole: ' + capped.map((c) => `${c.shown}/${c.real}`).join(' | ')
+  );
+  // E la terza card deve restare raggiungibile: dentro l'altezza scorribile del
+  // pannello, non oltre.
+  const reach = await page.evaluate(() => {
+    const sc = document.querySelector('.ctx .scroll');
+    const last = [...document.querySelectorAll('.ctxcard')].pop();
+    return { room: sc.scrollHeight, top: last.offsetTop };
+  });
+  t(reach.top < reach.room, 'la terza card sta oltre la fine del pannello: ' + JSON.stringify(reach));
+  await page.screenshot({
+    path: path.join(root, 'dist', `preview-context-steps3-${width}.png`),
+    fullPage: true,
+  });
+
   // Rimessa a una sola card per quello che viene dopo.
   await post(data({ cards: [card()] }));
   await steps(list());
