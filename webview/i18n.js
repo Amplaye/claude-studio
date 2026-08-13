@@ -114,6 +114,8 @@
     'menu.search': 'Search for a command…',
     'menu.needSession': ' Send a message to load the commands',
     'menu.general': 'General',
+    'menu.claude': 'Claude commands',
+    'menu.skills': 'Skills',
 
     // ---- empty state ----
     'empty.title': 'Ready.',
@@ -131,7 +133,7 @@
       'Every file change arrives as a diff that stays shut until you open it — nothing gets past you, and nothing takes over the screen.',
       'Skills, MCP servers and permissions are the ones from your terminal: whatever you set up there already works here.',
       'Ask it to explain a stack trace by pasting it in whole — including the lines you think are irrelevant.',
-      'Your conversations stay on disk: ⌥H reopens them, even after closing VS Code.',
+      'Your conversations stay on disk: {alt}H reopens them, even after closing VS Code.',
     ],
     'empty.key.file': 'a file',
     'empty.key.command': 'a command',
@@ -346,6 +348,8 @@
     'menu.search': 'Cerca un comando…',
     'menu.needSession': ' Manda un messaggio per caricare i comandi',
     'menu.general': 'Generali',
+    'menu.claude': 'Comandi di Claude',
+    'menu.skills': 'Skill',
 
     'empty.title': 'Pronto.',
     'empty.didyouknow': 'Lo sapevi?',
@@ -359,7 +363,7 @@
       'Ogni modifica arriva come un diff che resta chiuso finché non lo apri: non ti sfugge niente e niente ti invade lo schermo.',
       'Skill, server MCP e permessi sono quelli del tuo terminale: quello che hai già configurato lì funziona qui.',
       'Fatti spiegare uno stack trace incollandolo per intero, comprese le righe che credi inutili.',
-      'Le conversazioni restano su disco: ⌥H le riapre, anche dopo aver chiuso VS Code.',
+      'Le conversazioni restano su disco: {alt}H le riapre, anche dopo aver chiuso VS Code.',
     ],
     'empty.key.file': 'un file',
     'empty.key.command': 'un comando',

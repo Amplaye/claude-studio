@@ -171,6 +171,12 @@
   let emptyTimers = [];
   /** Which tip was shown last, so the next draw picks a different one. */
   let lastTip = -1;
+  /**
+   * The tip the extension picked for this session, as {en, it}. Kept rather than
+   * drawn once, so switching language redraws the same fact in the other language
+   * instead of silently changing the subject.
+   */
+  let currentTip = null;
   function emptyRun(fn, ms) {
     emptyTimers.push(setTimeout(fn, ms));
   }
@@ -225,18 +231,30 @@
     log.replaceChildren();
     const box = el('div', 'empty');
     const title = typed('h2', t('empty.title'));
-    // A different tip every time the screen is drawn, never the same one twice in a
-    // row: the whole point is that you read it, and a line you've already seen is a
-    // line you skip.
-    const tips = I18N.list('empty.tips');
-    let pick = 0;
-    if (tips.length) {
-      do {
-        pick = Math.floor(Math.random() * tips.length);
-      } while (tips.length > 1 && pick === lastTip);
-      lastTip = pick;
+    // The tip belongs to the session, not to the repaint: it is chosen once by the
+    // extension and redrawn as-is, so scrolling away and back does not swap the line
+    // out from under you mid-sentence. Which one you get, and the promise that you
+    // will not see it again until the library runs dry, is src/chat/tips.ts.
+    //
+    // The short built-in list is the fallback for a missing library — a screen with no
+    // tip at all would look broken rather than plain.
+    let text = '';
+    if (currentTip) {
+      text = currentTip[I18N.lang] || currentTip.en || '';
+    } else {
+      const builtin = I18N.list('empty.tips');
+      if (builtin.length) {
+        let pick = 0;
+        do {
+          pick = Math.floor(Math.random() * builtin.length);
+        } while (builtin.length > 1 && pick === lastTip);
+        lastTip = pick;
+        text = builtin[pick];
+      }
     }
-    const body = typed('p', tips[pick] || '');
+    // "{alt}H" is Alt+H on a PC and ⌥H on a Mac. The library stores the placeholder so
+    // one sentence can be right on both.
+    const body = typed('p', String(text).split('{alt}').join(I18N.alt));
     const lead = el('span', 'tiplead', t('empty.didyouknow'));
     box.append(icon('studio-logo', 'brandmark'), title.node, lead, body.node);
 
@@ -1368,6 +1386,7 @@
         cwd = m.cwd || '';
         spent = { usd: 0, tokens: 0 };
         paintSpent();
+        if (m.tip) currentTip = m.tip;
         showEmpty();
         // Opening animation: the tab comes in whole, while the side panel
         // (which is always there) sticks to its own conversation.
@@ -1383,6 +1402,8 @@
         waiting = null;
         stepsN = 0;
         filesTouched.clear();
+        // A new conversation is a new empty screen, so it earns a new tip.
+        if (m.tip) currentTip = m.tip;
         spent = { usd: 0, tokens: 0 };
         paintSpent();
         // the previous conversation scrolls out while the new one takes its place
@@ -1560,16 +1581,47 @@
     menu.replaceChildren();
   }
 
-  /** Groups the commands by category (the part before ':' or 'General'). */
+  /**
+   * Two sections: the commands Claude has always understood — /clear, /rewind,
+   * /resume — and the skills this project happens to bring. They come from different
+   * places (the built-in list here, supportedCommands() from the CLI) and you look
+   * for them for different reasons, so the menu stops pretending they are one pile.
+   *
+   * The grouping used to key off a "namespace:" prefix, which put every built-in and
+   * every unprefixed skill together under "General" and told you nothing.
+   *
+   * Insertion order decides which section is drawn first, and the engine sends the
+   * classics first — the two most-reached-for commands should not be below a scroll.
+   */
   function categorize(items) {
     const cats = new Map();
     for (const it of items) {
-      const m = it.label.match(/^\/([^:]+):/);
-      const cat = m ? m[1] : t('menu.general');
+      const cat = it.group === 'skill' ? t('menu.skills') : t('menu.claude');
       if (!cats.has(cat)) cats.set(cat, []);
       cats.get(cat).push(it);
     }
     return cats;
+  }
+
+  /** /stats has to find /usage, so the aliases are searched alongside the name. */
+  function matchCmd(c, q) {
+    if (!q) return true;
+    if (String(c.name).toLowerCase().includes(q)) return true;
+    return (c.aliases || []).some((a) => String(a).toLowerCase().includes(q));
+  }
+
+  /** One wire command as the menu wants it. */
+  function toMenuItem(c) {
+    return {
+      label: '/' + c.name,
+      hint: c.description,
+      insert: '/' + c.name,
+      group: c.group,
+      arg: c.argumentHint || '',
+      // Searched by the box in the menu header, never drawn: "/cost" finding "/usage"
+      // is helpful, a row listing all its other names is just noise.
+      aliases: (c.aliases || []).join(' '),
+    };
   }
 
   let cmdSearchInput = null;
@@ -1608,9 +1660,17 @@
           row.dataset.idx = idx;
           row.append(el('span', 'mico', '/'));
           const info = el('span', 'minfo');
-          info.append(el('span', 'mlabel', it.label));
+          const lab = el('span', 'mlabel', it.label);
+          // "<file>" — a command that wants an argument says so before you pick it,
+          // rather than after, when it has already landed in the composer. It goes
+          // inside the label so it sits on that line: .minfo is a column, and as a
+          // sibling it became a third row that made the card taller than its neighbours.
+          if (it.arg) lab.append(el('span', 'marg', it.arg));
+          info.append(lab);
           if (it.hint) info.append(el('span', 'mdesc', it.hint));
           row.append(info);
+          // Not drawn, only searched: see toMenuItem.
+          if (it.aliases) row.dataset.alias = it.aliases;
           const ci = idx;
           row.addEventListener('mousedown', (e) => {
             e.preventDefault();
@@ -1629,7 +1689,8 @@
         for (const row of grid.querySelectorAll('.mitem-cmd')) {
           const label = row.querySelector('.mlabel')?.textContent?.toLowerCase() || '';
           const desc = row.querySelector('.mdesc')?.textContent?.toLowerCase() || '';
-          const show = !q || label.includes(q) || desc.includes(q);
+          const alias = (row.dataset.alias || '').toLowerCase();
+          const show = !q || label.includes(q) || desc.includes(q) || alias.includes(q);
           row.hidden = !show;
           row.classList.remove('on');
           if (show && first < 0) first = Number(row.dataset.idx);
@@ -1725,11 +1786,12 @@
         return;
       }
       const q = tok.q.toLowerCase();
+      // No cap. There used to be one at forty, and because the built-ins were appended
+      // after the CLI's list, a project with enough skills pushed /clear and /rewind
+      // off the end — present in the data, absent from the menu. The list has its own
+      // search box and scrolls at 420px, which is what should be bounding it.
       paintMenu(
-        commands
-          .filter((c) => c.name.toLowerCase().includes(q))
-          .slice(0, 40)
-          .map((c) => ({ label: '/' + c.name, hint: c.description, insert: '/' + c.name }))
+        commands.filter((c) => matchCmd(c, q)).map(toMenuItem)
       );
       return;
     }

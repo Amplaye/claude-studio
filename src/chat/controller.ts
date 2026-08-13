@@ -26,6 +26,7 @@ import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
 import { sound } from './sound';
+import { tips } from './tips';
 import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
 import type { TaskStore } from '../tasks/store';
@@ -45,7 +46,10 @@ const PREFS_KEY = 'claudeStudio.prefs';
  * che ha detto, cosi' il menu ha gia' qualcosa da mostrare prima del primo messaggio.
  */
 const MODELS_KEY = 'claudeStudio.models';
-const COMMANDS_KEY = 'claudeStudio.commands';
+// v2: i comandi salvati dalle versioni precedenti non hanno il campo `group`, e senza
+// quello finirebbero tutti sotto "Comandi di Claude" — skill comprese — fino al primo
+// messaggio della sessione. Cambiare chiave li ignora invece di mostrarli mal divisi.
+const COMMANDS_KEY = 'claudeStudio.commands.v2';
 /**
  * L'ultima conversazione di *questo* progetto. Ricaricando la finestra il processo
  * muore e la cronologia in memoria se ne va con lui, ma la trascrizione resta sul
@@ -200,6 +204,7 @@ export class ChatController {
       project: cwd.split(/[\\/]/).pop() || cwd,
       cliVersion: cli ? claudeCliVersion(cli) : '',
       surface: s.kind,
+      tip: tips.next(),
     });
     s.post({ k: 'mode', value: this.mode });
     s.post({ k: 'prefs', value: this.prefs });
@@ -597,7 +602,7 @@ export class ChatController {
     this.checkpoints.clear(); // i punti di prima appartenevano alla conversazione andata
     owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
     if (this.primary) this.tasks?.clear(); // le task erano di quella conversazione
-    this.broadcast({ k: 'reset' });
+    this.broadcast({ k: 'reset', tip: tips.next() });
     this.broadcast({ k: 'mode', value: this.mode });
     this.titleChanged();
   }

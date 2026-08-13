@@ -17,6 +17,9 @@ package-lock.json
 # Le immagini del README stanno su GitHub: nel pacchetto peserebbero e basta,
 # perche' il Marketplace le va comunque a prendere dai link assoluti.
 docs/**
+# I pezzi da cui si costruisce media/tips.json. Stanno in git perche' la libreria
+# vada ricostruita anche dall'altra macchina, ma nel pacchetto ci va solo il JSON.
+.tips-work/**
 # Artefatti di publishing. La prima riga e' critica: contiene il token Open VSX
 # e senza questa regola verrebbe distribuito dentro il .vsix.
 .publish-tokens.json

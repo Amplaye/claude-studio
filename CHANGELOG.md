@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.12.0
+
+- **Two thousand things worth knowing.** The new-session screen used to draw one of
+  ten tips, all of them about this panel — useful once, then wallpaper. There are now
+  2030, in fifty subjects: what the tilt of Uranus does to its poles, why honey found
+  in a tomb was still edible, what Rembrandt lost when the Night Watch was trimmed to
+  fit a wall. Both languages, written rather than translated. They are drawn from a
+  shuffled bag kept between sessions, so you get a new one every time until you have
+  seen them all — not a coin flip that shows you the same line twice in an evening.
+  The library is picked from in the extension and only the chosen line is sent to the
+  panel, so half a megabyte of facts never has to be parsed to read one sentence.
+
+- **/clear and /rewind are in the menu again.** They had never actually been missing
+  from the data: the menu cut the list at forty entries, and the built-in commands
+  were added after the ones the CLI reports. Install enough skills and the two you
+  reach for most fell off the end, present and invisible. The cap is gone — the list
+  has a search box and scrolls — and the menu is now in two sections, Claude's own
+  commands first and the project's skills below, because they come from different
+  places and you go looking for them for different reasons. A command that wants an
+  argument shows it, and searching an alias finds the command it belongs to.
+
+- **The mark is the size of its neighbours.** On the Marketplace shelf Claude Studio
+  sat visibly smaller than Claude Code next to it. Two paddings were stacked: the rays
+  reach 481 of the 512 they are drawn in, and the tile then shrank that to 78%, so the
+  mark filled 73% of a square that a circle icon fills entirely. It is now measured
+  from the rays themselves and drawn edge to edge. Same file the editor tab uses, so
+  the tab grew with it.
+
+- **The account numbers are true the moment you look.** Opening the context panel
+  scheduled a redraw that a sixty-second cache then discarded, so what you saw first
+  was whatever was left over — and that cache outlives a restart, so it could be hours
+  old with nothing saying so. Opening the panel, bringing it back to the front and
+  starting a conversation now ask outright. One request at a time and the ten-minute
+  cooldown after a refusal both still hold. When the figures cannot be vouched for
+  they say how old they are, which is what matters when an account is shared between
+  machines and people.
+
+- **The step being worked on stops hiding.** The task panel was told which row was
+  active and never used it: a dozen tasks in a sidebar that narrow is taller than the
+  panel, so the one row you wanted was the one off screen. It follows the work now,
+  and only when the work moves, so it never fights the wheel. Beside "3 of 7 done" it
+  also says "4 to go" — the subtraction was yours to do, and it should not have been.
+
+- **The recap says what it did, not just what it cost.** It listed time, steps and
+  context: a receipt. Now the result, the number of files changed and the time come
+  first, the filenames follow as buttons that open them, and steps and context drop to
+  a quiet last line. After ten minutes away the question is what moved, and the answer
+  was scattered across a dozen collapsed cards.
+
+## 0.11.1
+
+- The updater pulled in a newer agent SDK, and the lockfile went with it.
+
+## 0.11.0
+
+- **The steps Claude is working through, in the sidebar.** A third panel that holds
+  the task list and ticks it off as the work happens, instead of leaving it folded
+  inside a card in the middle of the thread. A new prompt clears it, so you are never
+  reading the previous turn's plan next to the current question.
+- **A PDF you attached no longer vanishes when you press Enter.** The attachment was
+  being cleared before it had been read.
+- **The five pills are back, and the new tab types itself in.**
+- **The mark is pink and azure**, and it has no background to sit on.
+- The screenshots were being taken of a screen that had not finished drawing.
+
 ## 0.10.0
 
 - **The new tab shows the commands.** The empty screen used to explain the

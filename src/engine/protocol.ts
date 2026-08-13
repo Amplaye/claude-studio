@@ -104,7 +104,15 @@ export interface HistoryItem {
 
 /** Extension -> webview. */
 export type Wire =
-  | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
+  | {
+      k: 'hello';
+      cwd: string;
+      project: string;
+      cliVersion: string;
+      surface: 'view' | 'panel';
+      /** The line for the empty screen, already chosen: see src/chat/tips.ts. */
+      tip?: { en: string; it: string } | null;
+    }
   | { k: 'session'; id: string; model: string; cwd: string }
   // The images come back together with the message: in the chat they stay attached
   // to what you sent, so you can see they really went out. The other files do the
@@ -140,7 +148,23 @@ export type Wire =
   // two open faces would play twice.
   | { k: 'chime'; event: 'done' | 'ask'; sound: SoundName; volume: number }
   | { k: 'history'; items: HistoryItem[] }
-  | { k: 'commands'; items: { name: string; description: string }[] }
+  | {
+      k: 'commands';
+      items: {
+        name: string;
+        description: string;
+        /**
+         * Which half of the menu it belongs in. `claude` is the built-in vocabulary —
+         * /clear, /rewind, /resume — and `skill` is everything the CLI reports, which
+         * is what the SDK's supportedCommands() actually returns.
+         */
+        group?: 'claude' | 'skill';
+        /** e.g. "<file>": shown after the name so you know it wants an argument. */
+        argumentHint?: string;
+        /** /cost and /stats both reach /usage; typing either should find it. */
+        aliases?: string[];
+      }[];
+    }
   | { k: 'files'; items: string[] }
   // The files you picked with the paperclip (or dropped on the composer), as the
   // extension found them on disk: images come back with their bytes so the chip can
@@ -151,7 +175,8 @@ export type Wire =
   | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
-  | { k: 'reset' };
+  // A new conversation draws the empty screen again, so it gets a new tip with it.
+  | { k: 'reset'; tip?: { en: string; it: string } | null };
 
 /** Webview -> extension. */
 /** An image pasted into the composer. */

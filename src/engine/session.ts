@@ -270,17 +270,29 @@ export class Session {
   private async publishCommands() {
     try {
       const list = (await this.q?.supportedCommands()) ?? [];
+      // Quello che risponde la CLI sono le skill: il tipo del SDK lo dice a chiare
+      // lettere ("Information about an available skill"). I comandi classici non
+      // stanno in quell'elenco, e per questo vanno aggiunti qui sotto.
       const fromCli = list
         .map((c: any) => ({
           name: String(c.name ?? ''),
           description: String(c.description ?? '').slice(0, 200),
+          group: 'skill' as const,
+          argumentHint: c.argumentHint ? String(c.argumentHint).slice(0, 60) : undefined,
+          aliases: Array.isArray(c.aliases) ? c.aliases.map(String).slice(0, 8) : undefined,
         }))
         .filter((c) => c.name);
       // Il motore vince sui doppioni: "clear" e' suo di nome, ma a eseguirlo e'
       // l'interfaccia — il menu pero' deve mostrarne uno solo.
       const seen = new Set(fromCli.map((c) => c.name));
-      const mine = LOCAL_COMMANDS.filter((c) => !seen.has(c.name));
-      const items = [...fromCli, ...mine];
+      const mine = LOCAL_COMMANDS.filter((c) => !seen.has(c.name)).map((c) => ({
+        ...c,
+        group: 'claude' as const,
+      }));
+      // I classici per primi. Prima venivano in coda e il menu ne mostrava solo i
+      // primi quaranta: con abbastanza skill installate, /clear e /rewind cadevano
+      // fuori dall'elenco pur essendo i due che si cercano piu' spesso.
+      const items = [...mine, ...fromCli];
       if (!items.length) return;
       this.o.emit({ k: 'commands', items });
     } catch {
