@@ -198,10 +198,16 @@ async function nelPortale() {
 // L'esito NON si deduce dal modal: si pretende di ritrovare la versione appena
 // caricata. Prima si accettava qualunque stato non-errore, cosi' un upload mai
 // avvenuto passava per riuscito.
+//
+// Cinque minuti, non uno. Il portale tiene in riga la versione vecchia per un pezzo
+// dopo che il file e' arrivato, e con un minuto di pazienza si smetteva di guardare
+// proprio mentre la nuova stava per comparire: la pubblicazione era andata a buon
+// fine e veniva annunciata come fallita — che e' il modo peggiore di sbagliare,
+// perche' porta a ricaricare un file che c'e' gia'.
 let confermato = false;
 let stato = 'sconosciuto';
-for (let tentativo = 0; tentativo < 8 && !confermato; tentativo++) {
-  await new Promise((r) => setTimeout(r, 7000));
+for (let tentativo = 0; tentativo < 30 && !confermato; tentativo++) {
+  await new Promise((r) => setTimeout(r, 10000));
   if (await inGalleria()) {
     confermato = true;
     stato = 'in galleria';
