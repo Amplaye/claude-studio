@@ -29,6 +29,7 @@ function build(page, out) {
   console.log('dist/' + out);
 }
 
+// Due pagine, non tre: l'elenco dei passi non ha piu' una pagina sua. Sta sotto
+// l'ultima card del pannello del contesto, e si guarda in preview-context.html.
 build('chat.html', 'preview.html');
 build('context.html', 'preview-context.html');
-build('tasks.html', 'preview-tasks.html');

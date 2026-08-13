@@ -171,15 +171,22 @@ body {
 
 /* ---------- the cards ---------- */
 
-.ctx .cards {
+/* Le card e i passi scorrono insieme, in un contenitore solo: erano le card a
+   scorrere per conto loro, e mettendo i passi accanto a loro come secondo blocco
+   scorrevole il pannello si sarebbe diviso in due meta' che si contendono l'altezza
+   — con la lista dei passi schiacciata a tre righe mentre sopra avanzava vuoto. */
+.ctx .scroll {
   flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap);
   min-height: 0;
   padding-bottom: var(--pad);
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+.ctx .cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
 }
 
 .ctx .ctxcard {
@@ -317,12 +324,23 @@ body {
   }
 }
 
-.ctx .ren {
+/* La matita e la × si vedono passandoci sopra. Sempre visibili sarebbero due bottoni
+   su ogni card, cioe' sei con tre conversazioni aperte, in un pannello il cui lavoro
+   e' far leggere dei numeri. La × in piu' e' rossa al tocco: e' l'unica cosa qui
+   dentro che butta via qualcosa, e deve dirlo prima di essere premuta. */
+.ctx .ren,
+.ctx .shut {
   flex: 0 0 auto;
   opacity: 0;
 }
-.ctx .ctxcard:hover .ren {
+.ctx .ctxcard:hover .ren,
+.ctx .ctxcard:hover .shut {
   opacity: 0.85;
+}
+.ctx .shut:hover {
+  border-color: color-mix(in srgb, var(--bad) 70%, transparent);
+  color: var(--bad);
+  opacity: 1;
 }
 
 .ctx .cmeta {
@@ -423,6 +441,33 @@ body {
 }
 .ctx .foot .ico {
   opacity: 0.75;
+}
+
+/* ---------- i passi, sotto l'ultima card ----------
+   Una sezione, non un pannello: stessa colonna, stessa gutter, e sparisce del tutto
+   quando non c'e' niente da spuntare. Il filo sopra la separa dall'ultima card senza
+   costruirle intorno un altro riquadro — di riquadri il pannello ne ha gia' abbastanza. */
+
+.ctx .steps {
+  margin-top: var(--gap);
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+.ctx .steps[hidden] {
+  display: none;
+}
+.ctx .steps > .lab {
+  margin-bottom: 9px;
+  opacity: 0.8;
+}
+.ctx .steps > .lab .ico {
+  width: 13px;
+  height: 13px;
+}
+/* La gutter la mette gia' .ctx: il pannello dei passi qui non deve rimetterla,
+   o le sue righe partirebbero dodici pixel piu' in dentro delle card. */
+.ctx .steps .taskroot {
+  padding: 0;
 }
 
 /* ---------- the column inside the full-screen tab ---------- */

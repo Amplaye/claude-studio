@@ -29,7 +29,7 @@ import { sound } from './sound';
 import { tips } from './tips';
 import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
-import type { TaskStore } from '../tasks/store';
+import { tasks } from '../tasks/store';
 
 export interface Surface {
   readonly kind: 'view' | 'panel';
@@ -87,6 +87,16 @@ interface Pending {
 /** Un contatore per dare a ogni chat un nome interno che non si ripete. */
 let keySeq = 0;
 
+/**
+ * Ogni chat viva, sotto la sua chiave.
+ *
+ * La barra di contesto sa da `owned` quale conversazione sta in quale chat, ma sapere
+ * chi la tiene non basta per farci qualcosa: chiudere una card vuol dire azzerare
+ * *quella* conversazione, e per farlo serve il controller in mano. Le schede le trova
+ * ChatPanel.byKey; la chat della sidebar non e' una scheda e li' non c'e'.
+ */
+export const chats = new Map<string, ChatController>();
+
 export class ChatController {
   private session?: Session;
   private history: Wire[] = [];
@@ -112,16 +122,13 @@ export class ChatController {
   readonly key: string;
   private titleFns = new Set<() => void>();
 
-  /** Dove finisce l'elenco delle task, se qualcuno lo sta guardando. */
-  private readonly tasks?: TaskStore;
-
   constructor(
     private readonly ctx: vscode.ExtensionContext,
-    opts?: { primary?: boolean; tasks?: TaskStore }
+    opts?: { primary?: boolean }
   ) {
     this.primary = opts?.primary !== false;
-    this.tasks = opts?.tasks;
     this.key = 'chat' + ++keySeq;
+    chats.set(this.key, this);
     this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
     // Migrazione: suoni rimossi → si torna a coccola
     if ((this.prefs.sound as string) === 'bell' || (this.prefs.sound as string) === 'soft') {
@@ -138,10 +145,34 @@ export class ChatController {
 
   attach(s: Surface) {
     this.surfaces.add(s);
+    this.readopt();
   }
 
   detach(s: Surface) {
     this.surfaces.delete(s);
+  }
+
+  /** Questa conversazione ha ancora una faccia a schermo? */
+  hasFaces(): boolean {
+    return this.surfaces.size > 0;
+  }
+
+  /**
+   * Rimette la card di questa conversazione se era stata tolta.
+   *
+   * Chiudendo la scheda principale la card sparisce (vedi ChatPanel): la
+   * conversazione non era piu' da nessuna parte, e una card che dice "sei qui" mentre
+   * non c'e' nessun "qui" e' una bugia. Ma la conversazione in memoria c'e' ancora, e
+   * riaprendo la scheda si torna dentro — quindi la card deve tornare con lei. Senza
+   * questo tornerebbe solo al messaggio successivo, e nel frattempo il pannello
+   * direbbe che non hai niente aperto mentre stai leggendo la conversazione.
+   */
+  private readopt() {
+    if (owned.all().some((s) => s.key === this.key)) return;
+    const id = this.session?.sessionId ?? this.resume?.id ?? '';
+    if (!id) return;
+    const first = this.history.find((e) => e.k === 'user') as { text?: string } | undefined;
+    owned.adopt(this.key, id, currentCwd(), (first?.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 80));
   }
 
   // ---- come si chiama questa conversazione --------------------------------
@@ -601,7 +632,7 @@ export class ChatController {
     this.busy = false;
     this.checkpoints.clear(); // i punti di prima appartenevano alla conversazione andata
     owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
-    if (this.primary) this.tasks?.clear(); // le task erano di quella conversazione
+    tasks.clear(this.key); // le task erano di quella conversazione
     this.broadcast({ k: 'reset', tip: tips.next() });
     this.broadcast({ k: 'mode', value: this.mode });
     this.titleChanged();
@@ -630,6 +661,8 @@ export class ChatController {
     this.closeAllPending('Extension closed.');
     this.endEngine();
     owned.end(this.key);
+    tasks.drop(this.key);
+    chats.delete(this.key);
   }
 
   /**
@@ -640,7 +673,11 @@ export class ChatController {
    * the ones who know it's over.
    */
   private endEngine() {
-    const id = this.session?.sessionId;
+    // Il motore sa il suo id solo se e' acceso. Riaprendo una conversazione dalla
+    // cronologia non lo e' — riparte al primo messaggio — e senza il ripiego su
+    // `owned` l'annuncio su disco restava li' a farsi disegnare come una card di
+    // qualcun altro, con l'aggravante che la nostra non c'era piu' per assorbirla.
+    const id = this.session?.sessionId ?? owned.all().find((s) => s.key === this.key)?.id;
     this.session?.dispose();
     this.session = undefined;
     if (id) forgetSession(id);
@@ -835,17 +872,18 @@ export class ChatController {
     if (e.k === 'ask') this.alert('ask');
     // Il nome della scheda e' la prima cosa che hai scritto: si sa da qui.
     if (e.k === 'user' || e.k === 'session') this.titleChanged();
-    // L'elenco delle task del pannello. Solo la chat principale lo alimenta: con tre
-    // schede aperte, un pannello solo non puo' raccontarne tre insieme, e quella
-    // davanti e' quella che stai guardando.
-    if (this.tasks && this.primary) {
-      // Un messaggio nuovo azzera: l'elenco appartiene al prompt che lo ha prodotto.
-      if (e.k === 'user') this.tasks.clear();
-      if (e.k === 'busy') this.tasks.setBusy(e.value);
-      if (e.k === 'tool_start' && e.name === 'TodoWrite') {
-        const todos = (e.input as { todos?: unknown })?.todos;
-        if (Array.isArray(todos)) this.tasks.set(todos as never);
-      }
+    // L'elenco delle task del pannello. Ogni conversazione alimenta il suo, sotto la
+    // propria chiave: prima poteva farlo solo la chat principale, e in una scheda
+    // aperta col "+" — cioe' nel modo normale di aprire una conversazione nuova — il
+    // pannello restava vuoto per sempre. Quale delle liste si vede lo decide lo store,
+    // ed e' quella della conversazione che hai davanti (vedi tasks/store.ts).
+    //
+    // Un messaggio nuovo azzera: l'elenco appartiene al prompt che lo ha prodotto.
+    if (e.k === 'user') tasks.clear(this.key);
+    if (e.k === 'busy') tasks.setBusy(this.key, e.value);
+    if (e.k === 'tool_start' && e.name === 'TodoWrite') {
+      const todos = (e.input as { todos?: unknown })?.todos;
+      if (Array.isArray(todos)) tasks.set(this.key, todos as never);
     }
     this.broadcast(e);
   }

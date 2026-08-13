@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{tokensCss}}" />
     <link rel="stylesheet" href="{{motionCss}}" />
     <link rel="stylesheet" href="{{contextCss}}" />
+    <link rel="stylesheet" href="{{tasksCss}}" />
     <link rel="stylesheet" href="{{chatCss}}" />
     <title>Claude Studio</title>
   </head>
@@ -161,6 +162,8 @@
     <!-- i18n first: everything after it draws in the chosen language from the
          very first frame, instead of flashing English and then correcting itself. -->
     <script nonce="{{nonce}}" src="{{i18nJs}}"></script>
+    <!-- Prima di ctxpanel: la colonna monta la lista dei passi sotto l'ultima card. -->
+    <script nonce="{{nonce}}" src="{{taskspanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{chimeJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>

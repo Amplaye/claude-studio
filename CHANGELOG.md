@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.13.0
+
+- **The steps Claude is working through now sit under the last card.** They had a
+  panel of their own in the sidebar, which was a third box to open in order to read
+  something about a conversation whose card you already had in front of you — and
+  that panel could never say *which* conversation it was showing. They are now a
+  section of the account panel, below the cards, in the same scroll: ticked-off steps
+  strike themselves through, the one in progress pulses, and the section disappears
+  entirely when there is nothing to tick, rather than sitting there saying "no tasks
+  yet" for most of the day. The full-screen tab draws them in its column too.
+
+- **Tasks in a tab opened with "+" were never recorded at all.** Only the primary
+  chat was allowed to fill the list, and every conversation started from "+" — which
+  is the normal way to start one — wrote its steps into nothing. The panel stayed
+  empty for the whole life of that tab. Each conversation now keeps its own list and
+  the panel shows the one you are looking at, so switching tab switches the steps.
+
+- **A card you are done with can be closed.** There was no way to say so: a card left
+  only when its conversation died of its own accord, so closing the primary tab left
+  its card in the list saying "here" about a conversation that was nowhere, and a CLI
+  session abandoned half-way could not be got rid of at all. Every card now has a ×.
+  On a tab from "+" it closes the tab; on the sidebar chat it clears the conversation,
+  card included; on somebody else's session it removes the announcement it left in
+  ~/.claude/sessions. Closing the last face of a conversation also takes its card
+  down on its own, and reopening the tab brings it back.
+
+- **The mark carries more ink.** In the extensions list VS Code draws the icon at
+  24px, where a stroke of 15.36/512 is two thirds of a pixel and antialiasing eats
+  most of it: beside Claude Code — a solid disc that inks every pixel of its box —
+  the starburst read as the smaller product although both filled the same square.
+  The rays are drawn 45% thicker for the store tile, which is as much weight as the
+  drawing can carry before the 24 of them close up into a blob.
+
+- **Four checks that had been failing for months.** The panel's own test suite claimed
+  a session belonged to a process born a minute ago while lending it the pid of a node
+  started three seconds earlier; the guard against recycled pids did exactly its job,
+  declared the file stale and threw it away, and the assertions further down found no
+  cards. It failed depending on how long PowerShell took to answer, which is not a
+  test. The fixtures now say when their processes really started, and the
+  match-by-position case — which had been quietly skipping itself — runs.
+
 ## 0.12.0
 
 - **Two thousand things worth knowing.** The new-session screen used to draw one of

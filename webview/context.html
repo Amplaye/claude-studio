@@ -6,11 +6,15 @@
     <link rel="stylesheet" href="{{tokensCss}}" />
     <link rel="stylesheet" href="{{motionCss}}" />
     <link rel="stylesheet" href="{{contextCss}}" />
+    <link rel="stylesheet" href="{{tasksCss}}" />
     <title>Context</title>
   </head>
   <body>
     {{sprite}}
     <script nonce="{{nonce}}" src="{{i18nJs}}"></script>
+    <!-- Prima di ctxpanel: il pannello monta la lista dei passi sotto l'ultima card,
+         e per montarla window.TaskPanel deve gia' esistere. -->
+    <script nonce="{{nonce}}" src="{{taskspanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{contextJs}}"></script>
   </body>

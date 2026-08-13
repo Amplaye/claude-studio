@@ -10,6 +10,7 @@
     // The language is chosen in the chat's settings; here we're only told about it.
     if (e.data.k === 'lang') window.I18N.set(e.data.value);
     if (e.data.k === 'data') panel.render(e.data.d);
+    if (e.data.k === 'tasks') panel.renderTasks(e.data.d);
   });
 
   vscode.postMessage({ cmd: 'ready' });

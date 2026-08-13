@@ -138,7 +138,12 @@ window.CtxPanel = (() => {
       done.append(icon('checkmark', 'dico'), el('span', null, t('ctx.done')));
       done.hidden = true;
       const ren = iconButton('pencil', t('ctx.rename'), 'ren');
-      chead.append(dot, kind, name, badge, done, ren);
+      // La × non e' "nascondi la card": e' "questa conversazione ho finito di
+      // guardarla". Chiude la scheda che la tiene, o la azzera se e' la chat della
+      // sidebar — vedi ContextMonitor.close. Senza, una card se ne andava solo
+      // quando la sua conversazione moriva da sola, e non c'era modo di dirglielo.
+      const shut = iconButton('close', t('ctx.close'), 'shut');
+      chead.append(dot, kind, name, badge, done, ren, shut);
 
       const meta = el('div', 'cmeta');
       const pill = el('span', 'tabpill');
@@ -159,9 +164,13 @@ window.CtxPanel = (() => {
         ev.stopPropagation();
         post({ cmd: 'rename', id });
       };
+      shut.onclick = (ev) => {
+        ev.stopPropagation();
+        post({ cmd: 'close', id });
+      };
       c.onclick = () => post({ cmd: 'focus', id });
 
-      c._p = { dot, kind, name, badge, done, ren, pill, sub, pct, tok, fill: bar.firstChild };
+      c._p = { dot, kind, name, badge, done, ren, shut, pill, sub, pct, tok, fill: bar.firstChild };
       return c;
     }
 
@@ -186,6 +195,7 @@ window.CtxPanel = (() => {
       p.badge.textContent = t('ctx.here');
       p.badge.hidden = !s.focused;
       p.ren.title = t('ctx.rename');
+      p.shut.title = t('ctx.close');
       p.pill.textContent = s.own ? 'Studio' : s.tabName || s.shortId;
       p.pill.title = s.own
         ? t('ctx.ownPill', { id: s.shortId })
@@ -206,7 +216,28 @@ window.CtxPanel = (() => {
       paintBar(p.fill, s.pct);
     }
 
-    root.append(head, host);
+    // ---------- i passi, sotto l'ultima card ----------
+    //
+    // Stavano in un riquadro loro nella sidebar, ed era un riquadro di troppo: i passi
+    // che Claude sta spuntando riguardano una conversazione precisa, e quella
+    // conversazione ce l'hai gia' sotto gli occhi qui, con la sua card. Metterli
+    // altrove voleva dire aprire due pannelli per leggere una cosa sola — e nel
+    // pannello a se' stante non c'era modo di sapere di quale delle conversazioni
+    // aperte stessi leggendo i passi.
+    const steps = el('section', 'steps');
+    const stepsLab = el('div', 'lab');
+    const stepsLabText = document.createTextNode(t('ctx.steps'));
+    stepsLab.append(icon('list'), stepsLabText);
+    const stepsBody = el('div');
+    steps.append(stepsLab, stepsBody);
+    steps.hidden = true;
+    const stepsPanel = window.TaskPanel ? window.TaskPanel(stepsBody) : null;
+
+    // Le card e i passi scorrono insieme: i passi stanno sotto l'ultima card, non in
+    // un riquadro fisso in fondo che le mangerebbe l'altezza anche da vuoto.
+    const scroll = el('div', 'scroll');
+    scroll.append(host, steps);
+    root.append(head, scroll);
 
     // ---------- drawing ----------
     // The last thing we were told, kept so the panel can be drawn again in another
@@ -217,6 +248,7 @@ window.CtxPanel = (() => {
 
     window.I18N.onChange(() => {
       labText.nodeValue = t('ctx.account');
+      stepsLabText.nodeValue = t('ctx.steps');
       if (last) render(last);
     });
 
@@ -266,6 +298,22 @@ window.CtxPanel = (() => {
       }
     }
 
-    return { render };
+    /**
+     * I passi arrivano per conto loro: cambiano al ritmo di Claude, non a quello dei
+     * consumi, e legarli allo stesso messaggio avrebbe voluto dire ridisegnare le
+     * barre a ogni spunta.
+     *
+     * La sezione sparisce del tutto quando non c'e' niente da spuntare. Un "ancora
+     * nessuna task" fisso sotto le card sarebbe una riga che non dice niente per il
+     * 90% del tempo, e proprio sotto la card che invece dice sempre qualcosa.
+     */
+    function renderTasks(d) {
+      if (!stepsPanel) return;
+      const total = (d && d.total) || 0;
+      steps.hidden = !(total > 0 || (d && d.busy));
+      stepsPanel.render(d);
+    }
+
+    return { render, renderTasks };
   };
 })();

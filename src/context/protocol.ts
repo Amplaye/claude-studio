@@ -2,6 +2,7 @@
 // single place for the types, and what travels the wire is already formatted — the
 // webview draws, it doesn't do the math.
 import type { FocusHow } from './focus';
+import type { TaskData } from '../tasks/protocol';
 
 export interface CtxCard {
   id: string;
@@ -54,6 +55,10 @@ export interface CtxData {
 /** Extension -> panel. */
 export type CtxWire =
   | { k: 'data'; d: CtxData }
+  // I passi che Claude sta spuntando, sotto l'ultima card. Stavano in un pannello
+  // loro, che era un terzo riquadro da aprire per vedere una cosa che riguarda la
+  // conversazione di cui hai gia' la card sotto gli occhi.
+  | { k: 'tasks'; d: TaskData }
   // The panel has no settings of its own: the language is picked in the chat, and
   // this is how it gets here.
   | { k: 'lang'; value: 'en' | 'it' };
@@ -63,7 +68,7 @@ export type CtxWire =
  * tab keeps beside itself: over there the sidebar panel doesn't exist, and without
  * this the tab would be the only face that sees nothing.
  */
-export type CtxToChat = { k: 'ctx'; d: CtxData };
+export type CtxToChat = { k: 'ctx'; d: CtxData } | { k: 'tasks'; d: TaskData };
 
 /** Panel -> extension. */
 export type CtxCmd =
@@ -71,4 +76,7 @@ export type CtxCmd =
   | { cmd: 'refresh' }
   | { cmd: 'rename'; id: string }
   | { cmd: 'focus'; id: string }
+  // Questa conversazione hai finito di guardarla: via la card, e con lei quello che
+  // la teneva viva. Vedi ContextMonitor.close.
+  | { cmd: 'close'; id: string }
   | { cmd: 'diagnose' };

@@ -5,20 +5,15 @@ import { ChatPanel } from './chat/panel';
 import { ChatView, stayInSidebar } from './chat/view';
 import { ContextMonitor } from './context/monitor';
 import { ContextView } from './context/view';
-import { TaskStore } from './tasks/store';
+import { tasks } from './tasks/store';
 import { tips } from './chat/tips';
-import { TaskView } from './tasks/view';
 import { checkForUpdates, startAutoUpdate } from './update/updater';
 
 export function activate(ctx: vscode.ExtensionContext) {
   // Before the chat: the greeting carries the first tip, and the bag of unseen ones
   // lives in globalState, which only exists once the context is in hand.
   tips.init(ctx);
-  // The task list is filled by the chat and read by the panel, so it is made here and
-  // handed to both — the same object, or the panel would be watching a different list
-  // from the one being worked through.
-  const tasks = new TaskStore();
-  const chat = new ChatController(ctx, { tasks });
+  const chat = new ChatController(ctx);
   // The context bar lives in the same process as the chat: that's how it sees the
   // conversations opened from here without having to guess them off the disk.
   const monitor = new ContextMonitor();
@@ -42,9 +37,6 @@ export function activate(ctx: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     vscode.window.registerWebviewViewProvider(ContextView.id, new ContextView(ctx, monitor), {
-      webviewOptions: { retainContextWhenHidden: true },
-    }),
-    vscode.window.registerWebviewViewProvider(TaskView.id, new TaskView(ctx, tasks), {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     ChatPanel.register(ctx, chat, monitor),
@@ -102,7 +94,8 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('claudeStudio.update', () => checkForUpdates(ctx, { manual: true })),
     startAutoUpdate(ctx),
     { dispose: () => chat.dispose() },
-    { dispose: () => monitor.dispose() }
+    { dispose: () => monitor.dispose() },
+    { dispose: () => tasks.dispose() }
   );
 }
 

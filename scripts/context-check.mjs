@@ -219,6 +219,18 @@ for (const width of [320, 620]) {
   const go = await lastSent();
   t(go?.cmd === 'focus' && go.id === 'bbbb', 'clicking the card does not take you to the session: ' + JSON.stringify(go));
 
+  // ---- la × chiude quella conversazione, e solo quella ----
+  // Chiudere e' un'intenzione, e prima non c'era modo di dirla: una card se ne andava
+  // solo quando la sua conversazione moriva per conto suo. La × deve mandare `close`
+  // con l'id della card su cui hai premuto, e non deve far scattare il `focus` della
+  // card che le sta sotto.
+  await page.locator('.ctxcard').nth(1).locator('.shut').click();
+  const shut = await lastSent();
+  t(
+    shut?.cmd === 'close' && shut.id.startsWith('aaaaaaaa'),
+    'la × non chiude la conversazione: ' + JSON.stringify(shut)
+  );
+
   // There are no buttons in the header any more: the refresh runs continuously on
   // its own, and the diagnostics live in the command palette. If they show up here
   // again, that's a step backwards and it needs to be seen right away.
@@ -241,6 +253,63 @@ for (const width of [320, 620]) {
   await post(data());
   await page.waitForTimeout(120);
   t((await page.locator('.ctxcard').count()) === 1, 'after the empty state the card does not come back');
+
+  // ---- i passi, sotto l'ultima card ----
+  // Stavano in un pannello loro, che era un riquadro in piu' da aprire per leggere
+  // una cosa che riguarda la conversazione di cui hai gia' la card sotto gli occhi.
+  // Da vuoti non devono occupare niente: una riga fissa che dice "ancora nessuna
+  // task" e' rumore per il 90% del tempo.
+  const steps = (d) => page.evaluate((x) => window.postMessage({ k: 'tasks', d: x }, '*'), d);
+  const list = (over = {}) => ({
+    items: [
+      { content: 'Read the transcript', activeForm: 'Reading the transcript', status: 'completed' },
+      { content: 'Fix the counter', activeForm: 'Fixing the counter', status: 'in_progress' },
+      { content: 'Run the checks', activeForm: 'Running the checks', status: 'pending' },
+    ],
+    done: 1,
+    total: 3,
+    active: 1,
+    busy: true,
+    ...over,
+  });
+
+  await steps({ items: [], done: 0, total: 0, active: -1, busy: false });
+  await page.waitForTimeout(80);
+  t(await page.locator('.steps').isHidden(), 'la sezione dei passi occupa spazio da vuota');
+
+  await steps(list());
+  await page.waitForTimeout(500);
+  const tk = await page.evaluate(() => {
+    const sec = document.querySelector('.steps');
+    const cards = document.querySelector('.cards');
+    return {
+      shown: !sec.hidden,
+      // Sotto l'ultima card, non da qualche altra parte: e' il posto che le da' un
+      // senso — i passi sono di quella conversazione li' sopra.
+      belowCards: !!(cards.compareDocumentPosition(sec) & Node.DOCUMENT_POSITION_FOLLOWING),
+      sameScroller: cards.parentElement === sec.parentElement,
+      rows: sec.querySelectorAll('.tk-row').length,
+      running: sec.querySelectorAll('.tk-row.in_progress').length,
+      ticked: sec.querySelectorAll('.tk-row.completed').length,
+      count: sec.querySelector('.tk-count')?.textContent,
+      // L'animazione della riga in corso e' l'unica cosa viva del pannello: se
+      // sparisce, la lista diventa una tabella e non si vede piu' dove sei.
+      beat: getComputedStyle(sec.querySelector('.tk-row.in_progress .ico')).animationName,
+    };
+  });
+  t(tk.shown, 'i passi non compaiono quando ci sono');
+  t(tk.belowCards, 'i passi non stanno sotto le card');
+  t(tk.sameScroller, 'i passi scorrono in un riquadro separato dalle card');
+  t(tk.rows === 3, 'i passi disegnati sono ' + tk.rows + ' invece di 3');
+  t(tk.running === 1, 'il passo in corso non e\' segnato: ' + tk.running);
+  t(tk.ticked === 1, 'il passo finito non e\' spuntato: ' + tk.ticked);
+  t(/1 of 3/.test(tk.count || ''), 'il conteggio dei passi e\' sbagliato: ' + tk.count);
+  t(tk.beat === 'tk-beat', 'il passo in corso non pulsa: ' + tk.beat);
+
+  // Finita la conversazione la sezione si ritira: le task erano di quel prompt.
+  await steps({ items: [], done: 0, total: 0, active: -1, busy: false });
+  await page.waitForTimeout(80);
+  t(await page.locator('.steps').isHidden(), 'i passi restano a schermo dopo essere stati azzerati');
 
   t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
 

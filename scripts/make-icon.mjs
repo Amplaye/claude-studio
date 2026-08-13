@@ -22,7 +22,7 @@ const raw = fs.readFileSync(svgFile, 'utf8');
 // The tile has no background, so the star at the centre cannot stay white: on the
 // Marketplace's light theme it would simply be a hole. It takes the same deep plum as
 // media/mark.png, which holds against both themes.
-const glyph = raw
+const base = raw
   .replace(/^[\s\S]*?<svg[^>]*>/, '')
   .replace(/<\/svg>\s*$/, '')
   .replace('fill="#ffffff"', 'fill="#6d28d9"');
@@ -32,6 +32,27 @@ const glyph = raw
 if (/url\(#/.test(raw) || !/<line/.test(raw)) {
   throw new Error('media/logo.svg: expected the ray starburst with literal stroke colours');
 }
+
+/**
+ * The rays are drawn thicker here than in media/logo.svg, and that difference is the
+ * point rather than a drift.
+ *
+ * In the extensions list VS Code draws the icon at 24px (36px until the sidebar has
+ * been measured — see `.extensions-viewlet.narrow`). At 24px a 15.36/512 stroke is
+ * about two thirds of a pixel: antialiasing eats most of it, and beside Claude Code —
+ * a solid disc that inks every pixel of its box — our starburst reads as the smaller
+ * product even though both fill the same square. Same box, less ink.
+ *
+ * The ceiling is set by the inner ends of the rays: 24 of them land on a circle of
+ * radius ~94.7, which leaves 24.8 units between neighbours. Past that the burst closes
+ * up into a blob. 1.45 takes the stroke to ~22.3 and keeps a 2.5-unit gap: the most
+ * weight the drawing can carry while still being a starburst.
+ */
+const RAY_BOOST = 1.45;
+const glyph = base.replace(
+  /stroke-width="([\d.]+)"/g,
+  (_, w) => `stroke-width="${(parseFloat(w) * RAY_BOOST).toFixed(2)}"`
+);
 
 /**
  * The tile is square and the mark has to fill it, because the neighbours on the
@@ -66,7 +87,9 @@ function artBox(svg) {
   return { x: cx - half, y: cy - half, size: half * 2 };
 }
 
-const box = artBox(raw);
+// Measured on the thickened rays, not on logo.svg: a fatter round cap reaches further
+// past its endpoint, and measuring the thin version would crop it.
+const box = artBox(glyph);
 const viewBox = `${box.x.toFixed(2)} ${box.y.toFixed(2)} ${box.size.toFixed(2)} ${box.size.toFixed(2)}`;
 
 const html = `<!DOCTYPE html>

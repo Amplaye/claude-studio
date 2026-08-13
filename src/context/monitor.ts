@@ -21,10 +21,11 @@ import {
   type FocusHow,
 } from './focus';
 import { ChatPanel } from '../chat/panel';
+import { chats } from '../chat/controller';
 import { owned } from './owned';
 import { projectsDirFor, sessionsDir, transcriptPath } from './paths';
 import type { CtxCard, CtxData } from './protocol';
-import { liveSessions, readSessionNames, writeSessionName } from './sessions';
+import { forgetSession, liveSessions, readSessionNames, writeSessionName } from './sessions';
 import { scanTranscript } from './transcript';
 import {
   currentUsage,
@@ -436,6 +437,42 @@ export class ContextMonitor {
       return;
     }
     await revealTab(target);
+    this.tickSoon();
+  }
+
+  /**
+   * La × sulla card: questa conversazione hai finito di guardarla.
+   *
+   * Fino a ieri una card se ne andava solo quando la sua conversazione moriva per
+   * conto suo, e non c'era modo di dirlo: chiusa la scheda principale la card restava
+   * (la conversazione era ancora in memoria), e di una sessione della CLI lasciata a
+   * meta' non ci si liberava affatto. Chiudere e' un'intenzione, e l'intenzione ha
+   * bisogno di un bottone.
+   *
+   * Cosa vuol dire "chiudere" dipende da dove sta la conversazione:
+   *  - in una scheda aperta col "+": si chiude la scheda, e il controller muore con lei;
+   *  - nella chat della sidebar o nella scheda principale: la scheda non si butta via
+   *    (e' la tua chat), quindi si azzera la conversazione — che e' esattamente cio'
+   *    che fa "nuova conversazione", card compresa;
+   *  - una sessione della CLI: si cancella il suo annuncio in ~/.claude/sessions.
+   */
+  async close(id: string) {
+    if (!id) return;
+    const host = owned.hosting(id);
+    if (host) {
+      // La scheda secondaria se ne va tutta intera: dispose() toglie la card, spegne
+      // il motore e cancella l'annuncio, in quest'ordine.
+      if (!ChatPanel.closeKey(host.key)) {
+        const chat = chats.get(host.key);
+        // newSession, non owned.end: togliere la card e lasciare la conversazione
+        // accesa la farebbe ricomparire al primo evento successivo — e nel frattempo
+        // avresti una chat piena davanti e un pannello che dice che non c'e' niente.
+        if (chat) chat.newSession();
+        else owned.end(host.key);
+      }
+    } else {
+      forgetSession(id);
+    }
     this.tickSoon();
   }
 

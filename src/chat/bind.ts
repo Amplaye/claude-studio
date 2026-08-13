@@ -7,6 +7,7 @@ import type { CtxCmd, CtxToChat } from '../context/protocol';
 import { renderPage } from '../shared/html';
 import { openFile } from './editor';
 import { sound } from './sound';
+import { tasks } from '../tasks/store';
 import type { ChatController, Surface } from './controller';
 
 export function bindWebview(
@@ -29,9 +30,11 @@ export function bindWebview(
     tokensCss: 'tokens.css',
     motionCss: 'motion.css',
     contextCss: 'context.css',
+    tasksCss: 'tasks.css',
     chatCss: 'chat.css',
     i18nJs: 'i18n.js',
     ctxpanelJs: 'ctxpanel.js',
+    taskspanelJs: 'taskspanel.js',
     chimeJs: 'chime.js',
     chatJs: 'chat.js',
   });
@@ -45,6 +48,8 @@ export function bindWebview(
   // panel already exists on its own, here it doesn't. We subscribe only for the tab,
   // so we don't ship things to someone who doesn't draw them.
   let ctxSub: vscode.Disposable | undefined;
+  /** Le task vivono nella stessa colonna delle card: stessa regola, stessa faccia. */
+  let taskSub: vscode.Disposable | undefined;
 
   // This page joins the chorus: the chime goes to whoever can be heard, no matter
   // which conversation finished. The page itself says when its audio woke up.
@@ -62,6 +67,9 @@ export function bindWebview(
         chat.hello(surface);
         if (kind === 'panel' && monitor && !ctxSub) {
           ctxSub = monitor.subscribe((d) => void webview.postMessage({ k: 'ctx', d } as CtxToChat));
+        }
+        if (kind === 'panel' && !taskSub) {
+          taskSub = tasks.subscribe((d) => void webview.postMessage({ k: 'tasks', d } as CtxToChat));
         }
         return;
       case 'send':
@@ -132,6 +140,9 @@ export function bindWebview(
       case 'focus':
         void monitor?.focus(m.id);
         return;
+      case 'close':
+        void monitor?.close(m.id);
+        return;
       case 'diagnose':
         void monitor?.diagnose();
         return;
@@ -143,6 +154,7 @@ export function bindWebview(
     listener: {
       dispose() {
         ctxSub?.dispose();
+        taskSub?.dispose();
         speaker.dispose();
         msgs.dispose();
       },

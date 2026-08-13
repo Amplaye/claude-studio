@@ -73,6 +73,18 @@ export class ChatPanel {
     return true;
   }
 
+  /**
+   * Chiude la scheda di una conversazione. Torna false se quella conversazione non
+   * sta in una scheda: e' il caso della chat nella sidebar, che non si chiude — si
+   * azzera (vedi ContextMonitor.close).
+   */
+  static closeKey(key: string): boolean {
+    const p = ChatPanel.byKey(key);
+    if (!p || p.isPrimary) return false;
+    p.panel.dispose();
+    return true;
+  }
+
   /** Is the primary tab open at all — in front, or behind other editors? */
   static exists(): boolean {
     return !!ChatPanel.primary;
@@ -165,6 +177,13 @@ export class ChatPanel {
       chat.detach(surface);
       // Secondary tabs carry their controller with them: when they die, it dies too.
       if (!isPrimary) chat.dispose();
+      // La principale no: la sua conversazione vive anche nella chat della sidebar, e
+      // chiudere la scheda non e' chiudere la conversazione. Ma se la sidebar non c'e'
+      // — ed e' il caso normale, visto che aprendo la scheda la sidebar si chiude da
+      // sola — quella conversazione non e' piu' da nessuna parte, e la sua card resta
+      // in elenco a dire "sei qui" mentre non c'e' nessun qui. Niente facce, niente
+      // card. Riaprendo la scheda torna: la riattacca `readopt`.
+      else if (!chat.hasFaces()) owned.end(chat.key);
       ChatPanel.all.delete(this);
       if (ChatPanel.primary === this) ChatPanel.primary = undefined;
     });

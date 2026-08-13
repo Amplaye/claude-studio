@@ -8,6 +8,7 @@ import { DEFAULT_PREFS } from '../engine/protocol';
 import type { Prefs } from '../engine/protocol';
 import type { ContextMonitor } from './monitor';
 import type { CtxCmd, CtxWire } from './protocol';
+import { tasks } from '../tasks/store';
 
 export class ContextView implements vscode.WebviewViewProvider {
   static readonly id = 'claudeStudio.context';
@@ -30,13 +31,16 @@ export class ContextView implements vscode.WebviewViewProvider {
       tokensCss: 'tokens.css',
       motionCss: 'motion.css',
       contextCss: 'context.css',
+      tasksCss: 'tasks.css',
       i18nJs: 'i18n.js',
       ctxpanelJs: 'ctxpanel.js',
+      taskspanelJs: 'taskspanel.js',
       contextJs: 'context.js',
     });
 
     const post = (e: CtxWire) => void webview.postMessage(e);
     let sub: vscode.Disposable | undefined;
+    let steps: vscode.Disposable | undefined;
 
     const listener = webview.onDidReceiveMessage((m: CtxCmd) => {
       switch (m?.cmd) {
@@ -44,10 +48,12 @@ export class ContextView implements vscode.WebviewViewProvider {
           // We only subscribe once the page is ready to receive: otherwise the first
           // snapshot would land in the void and everything would stay grey.
           sub?.dispose();
+          steps?.dispose();
           // The language before the data: the first paint should already be in the
           // right words rather than correcting itself a moment later.
           post({ k: 'lang', value: this.lang() });
           sub = this.monitor.subscribe((d) => post({ k: 'data', d }));
+          steps = tasks.subscribe((d) => post({ k: 'tasks', d }));
           return;
         case 'refresh':
           this.monitor.refreshNow();
@@ -57,6 +63,9 @@ export class ContextView implements vscode.WebviewViewProvider {
           return;
         case 'focus':
           void this.monitor.focus(m.id);
+          return;
+        case 'close':
+          void this.monitor.close(m.id);
           return;
         case 'diagnose':
           void this.monitor.diagnose();
@@ -74,6 +83,7 @@ export class ContextView implements vscode.WebviewViewProvider {
       vis.dispose();
       lang.dispose();
       sub?.dispose();
+      steps?.dispose();
     });
   }
 

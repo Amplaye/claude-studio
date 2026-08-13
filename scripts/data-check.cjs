@@ -192,10 +192,33 @@ big += row({ type: 'assistant', costUSD: 2, message: { role: 'assistant', usage:
 fs.writeFileSync(transcript, big, 'utf8');
 const grewFrom = Buffer.byteLength(big);
 
+/**
+ * Quando e' nato davvero il processo che presta il suo pid alle sessioni finte, come
+ * FILETIME di Windows — cioe' nella stessa forma in cui lo scrive la CLI.
+ *
+ * Senza, la fixture si contraddice: dice "questa sessione e' di un processo partito un
+ * minuto fa" mentre presta il pid di un node acceso tre secondi fa, e il guardiano dei
+ * pid riciclati (context/procs.ts) fa esattamente il suo mestiere — vede un numero che
+ * appartiene a qualcuno nato dopo, lo dichiara riciclato e butta via il file. Poi il
+ * test si domanda perche' le card siano sparite. Il ripulitore, pero', entra in scena
+ * solo quando la fotografia dei processi e' arrivata: e' asincrona e ci mette un paio
+ * di secondi, quindi i primi controlli passavano e quelli in fondo no. Un test che
+ * fallisce a seconda di quanto ci ha messo PowerShell non e' un test.
+ */
+const procStart = String(
+  Math.round((Date.now() - process.uptime() * 1000 + 11644473600000) * 10000)
+);
+
 // A live session from the official extension: the pid is ours, so it is alive.
 fs.writeFileSync(
   path.join(sessionsDir, process.pid + '.json'),
-  JSON.stringify({ sessionId: SID, cwd: work, name: 'crm-e6', startedAt: Date.now() - 60000 }),
+  JSON.stringify({
+    sessionId: SID,
+    cwd: work,
+    name: 'crm-e6',
+    startedAt: Date.now() - 60000,
+    procStart,
+  }),
   'utf8'
 );
 
@@ -373,13 +396,31 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // Two tabs with the same name and no name saved by the CLI: the name is no help
   // any more, what is left is the order the tabs were born in.
   const SID2 = '99999999-8888-7777-6666-555555555555';
+  // startedAt 1000 e 2000 servono solo a dare un ordine di nascita alle due sessioni:
+  // e' quello che l'abbinamento per posizione guarda. Ma un `startedAt` del 1970 senza
+  // `procStart` accanto fa dichiarare riciclati due pid vivissimi, e le due sessioni
+  // sparivano prima di poter essere confrontate — che e' il motivo per cui questo
+  // pezzo di test si e' auto-saltato per mesi.
+  // Un secondo processo vivo, acceso da noi: del padre non si sa quando sia nato — e
+  // su Windows spesso non e' nemmeno raggiungibile — quindi la seconda sessione non
+  // reggeva in piedi e il confronto non avveniva mai.
+  const kid = require('node:child_process').spawn(
+    process.execPath,
+    ['-e', 'setTimeout(() => {}, 120000)'],
+    { stdio: 'ignore' }
+  );
+  // Nato adesso, cioe' dopo la fotografia dei processi: procs.ts si rifiuta di
+  // giudicare chi e' nato dopo l'ultima occhiata, che e' esattamente la garanzia che
+  // serve a una conversazione appena aperta.
+  const kidStart = String(Math.round((Date.now() + 11644473600000) * 10000));
+
   fs.writeFileSync(
     path.join(sessionsDir, process.pid + '.json'),
-    JSON.stringify({ sessionId: SID, cwd: work, name: '', startedAt: 1000 })
+    JSON.stringify({ sessionId: SID, cwd: work, name: '', startedAt: 1000, procStart })
   );
   fs.writeFileSync(
-    path.join(sessionsDir, process.ppid + '.json'),
-    JSON.stringify({ sessionId: SID2, cwd: work, name: '', startedAt: 2000 })
+    path.join(sessionsDir, kid.pid + '.json'),
+    JSON.stringify({ sessionId: SID2, cwd: work, name: '', startedAt: 2000, procStart: kidStart })
   );
   fs.writeFileSync(path.join(projects, SID2 + '.jsonl'), row({ type: 'user', message: { role: 'user', content: 'second' } }));
   tabGroups = {
@@ -395,15 +436,16 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   await wait(50);
   const d4 = lastData();
   const focused = d4?.cards?.find((c) => c.focused);
-  if (d4?.cards?.length === 2) {
-    t(d4?.focusHow === 'position', 'the fallback by position does not kick in: ' + d4?.focusHow);
-    // second tab active -> second session by startedAt
-    t(focused?.id === SID2, 'matching by position latches onto the wrong session: ' + focused?.id);
-  } else {
-    // process.ppid may not be a reachable process: in that case the second session
-    // does not count as alive and the test has nothing to work with.
-    console.log('  (skipped the fallback-by-position test: two live sessions not available)');
-  }
+  // Non si salta piu': le due sessioni sono vive per costruzione, e un test che si
+  // auto-salta e' un test che non c'e'.
+  t(
+    d4?.cards?.length === 2,
+    'le due sessioni vive non arrivano al pannello: ' + JSON.stringify(d4?.cards?.map((c) => c.id))
+  );
+  t(d4?.focusHow === 'position', 'the fallback by position does not kick in: ' + d4?.focusHow);
+  // second tab active -> second session by startedAt
+  t(focused?.id === SID2, 'matching by position latches onto the wrong session: ' + focused?.id);
+  kid.kill();
 
   for (const s of ctx.subscriptions) s.dispose?.();
 

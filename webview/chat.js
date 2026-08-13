@@ -1435,6 +1435,11 @@
       case 'ctx':
         rail.render(m.d);
         break;
+      // I passi stanno nella stessa colonna, sotto l'ultima card: arrivano a parte
+      // perche' cambiano al ritmo di Claude, non a quello dei consumi.
+      case 'tasks':
+        rail.renderTasks(m.d);
+        break;
       case 'commands':
         commands = m.items || [];
         // The empty screen *is* the command list, so it has to be repainted when the
