@@ -13,10 +13,10 @@
 // come back, each with its own text.
 //
 // Real bundle (dist/extension.js), fake `vscode`, fake home folder: no CLI, no network.
-const Module = require('node:module');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { uri, newRegistry, fakeWebview, fakePanel, makeVscode, install, memento } = require('./lib/fake-vscode.cjs');
 
 const root = path.dirname(__dirname);
 // Through realpath: su macOS la cartella temporanea sta sotto /var, che e' un
@@ -95,172 +95,26 @@ writeTranscript(ID_A, SAID_A, 'Moved the total under the table.');
 writeTranscript(ID_B, SAID_B, 'It re-reads the whole archive every night.');
 
 // ---- the fake `vscode` -------------------------------------------------------
-const uri = (p) => ({ fsPath: p, scheme: 'file', toString: () => 'file:///' + p.replace(/\\/g, '/') });
-
-let registered = { views: new Map(), commands: new Map(), panels: [], serializer: null };
+// The shared surface lives in lib/fake-vscode.cjs. The window is reloaded for real
+// in the middle of this check, so the registry is emptied in place rather than
+// replaced: the vscode object handed to the bundle keeps pointing at it.
+const registered = newRegistry();
 const reset = () => {
-  registered = { views: new Map(), commands: new Map(), panels: [], serializer: null };
+  registered.views.clear();
+  registered.commands.clear();
+  registered.panels.length = 0;
+  registered.provider = null;
+  registered.serializer = null;
 };
+const vscode = makeVscode({ workspaceRoot: work, registered });
+install(vscode);
 
-/**
- * A page that behaves like ours: it keeps aside what the extension tells it to keep
- * aside (the `sid` wire, see webview/chat.js), and that is the state VS Code hands
- * back to the deserializer after a reload.
- */
-function fakeWebview(state) {
-  const got = [];
-  const w = {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    _html: '',
-    _onMsg: () => {},
-    got,
-    state: state ? { ...state } : {},
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      w._onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      if (m && m.k === 'sid') w.state = { ...w.state, sid: m.id || '' };
-      return true;
-    },
-    set html(v) {
-      w._html = v;
-    },
-    get html() {
-      return w._html;
-    },
-  };
-  return w;
-}
-
-function fakePanel(type, title, state) {
-  const dying = [];
-  const viewState = [];
-  const panel = {
-    type,
-    title,
-    webview: fakeWebview(state),
-    iconPath: undefined,
-    active: true,
-    visible: true,
-    disposed: false,
-    revealed: 0,
-    reveal() {
-      panel.revealed++;
-    },
-    setActive(v) {
-      panel.active = v;
-      for (const fn of viewState) fn();
-    },
-    dispose() {
-      panel.disposed = true;
-      for (const fn of dying) fn();
-    },
-    onDidDispose: (fn) => {
-      dying.push(fn);
-      return { dispose() {} };
-    },
-    onDidChangeViewState: (fn) => {
-      viewState.push(fn);
-      return { dispose() {} };
-    },
-  };
-  registered.panels.push(panel);
-  return panel;
-}
-
-const vscode = {
-  ViewColumn: { Active: -1, Beside: -2, One: 1 },
-  StatusBarAlignment: { Left: 1, Right: 2 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-  TextEditorRevealType: { InCenter: 2 },
-  ThemeColor: class {
-    constructor(id) {
-      this.id = id;
-    }
-  },
-  MarkdownString: class {
-    constructor(v) {
-      this.value = v;
-    }
-  },
-  Uri: {
-    file: uri,
-    joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
-    from: (o) => uri(o.path || ''),
-  },
-  env: { clipboard: { writeText: async () => {} }, openExternal: async () => true },
-  window: {
-    createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
-    createStatusBarItem: () => ({ text: '', tooltip: '', show() {}, hide() {}, dispose() {} }),
-    showInputBox: async () => undefined,
-    state: { focused: true },
-    onDidChangeWindowState: () => ({ dispose() {} }),
-    registerWebviewViewProvider: (id, p) => {
-      registered.views.set(id, p);
-      return { dispose() {} };
-    },
-    registerWebviewPanelSerializer: (type, ser) => {
-      registered.serializer = { type, ser };
-      return { dispose() {} };
-    },
-    createWebviewPanel: (type, title) => fakePanel(type, title),
-    showWarningMessage: async () => undefined,
-    showInformationMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
-    showTextDocument: async () => ({}),
-    activeTextEditor: undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
-    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
-    tabGroups: {
-      all: [],
-      onDidChangeTabs: () => ({ dispose() {} }),
-      onDidChangeTabGroups: () => ({ dispose() {} }),
-    },
-  },
-  languages: { getDiagnostics: () => [] },
-  commands: {
-    registerCommand: (id, fn) => {
-      registered.commands.set(id, fn);
-      return { dispose() {} };
-    },
-    executeCommand: async (id, ...args) => registered.commands.get(id)?.(...args),
-  },
-  workspace: {
-    workspaceFolders: [{ uri: uri(work) }],
-    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
-    findFiles: async () => [],
-    openTextDocument: async () => ({ getText: () => '' }),
-    registerTextDocumentContentProvider: () => ({ dispose() {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    fs: { stat: async () => ({}) },
-    asRelativePath: (p) => String(p?.fsPath ?? p),
-  },
-  Position: class {},
-  Range: class {},
-  Selection: class {},
-};
-
-const load = Module._load;
-Module._load = function (req, parent, isMain) {
-  if (req === 'vscode') return vscode;
-  return load.call(this, req, parent, isMain);
-};
+/** The tabs VS Code hands back after a reload are built here, not by the extension. */
+const newPanel = (type, title, state) => fakePanel(registered, type, title, state);
 
 const bundle = path.join(root, 'dist', 'extension.js');
 
 /** The state VS Code keeps between two windows: it does not die with the host. */
-function memento(map) {
-  return {
-    get: (k, d) => (map.has(k) ? map.get(k) : d),
-    update: async (k, v) => void (v === undefined ? map.delete(k) : map.set(k, v)),
-    keys: () => [...map.keys()],
-  };
-}
 const globalMap = new Map();
 const workspaceMap = new Map();
 const context = () => ({
@@ -336,8 +190,8 @@ const said = (panel) =>
 
   // VS Code hands back one panel per tab that was open, each with the state its page
   // had put aside.
-  const backA = fakePanel('claudeStudio.panel', 'Claude Studio', stateA);
-  const backB = fakePanel('claudeStudio.panel', 'Claude Studio', stateB);
+  const backA = newPanel('claudeStudio.panel', 'Claude Studio', stateA);
+  const backB = newPanel('claudeStudio.panel', 'Claude Studio', stateB);
   await registered.serializer.ser.deserializeWebviewPanel(backA, stateA);
   await registered.serializer.ser.deserializeWebviewPanel(backB, stateB);
   backA.webview._onMsg({ cmd: 'ready' });
@@ -418,9 +272,9 @@ const said = (panel) =>
   ctx = startHost();
   // La vuota e' quella che stavi guardando: torna per prima, e prende in mano la chat
   // che il segnaposto del progetto vorrebbe riempire.
-  const rE = fakePanel('claudeStudio.panel', 'Claude Studio', sE);
-  const rB = fakePanel('claudeStudio.panel', 'Claude Studio', sB);
-  const rA = fakePanel('claudeStudio.panel', 'Claude Studio', sA);
+  const rE = newPanel('claudeStudio.panel', 'Claude Studio', sE);
+  const rB = newPanel('claudeStudio.panel', 'Claude Studio', sB);
+  const rA = newPanel('claudeStudio.panel', 'Claude Studio', sA);
   await registered.serializer.ser.deserializeWebviewPanel(rE, sE);
   await registered.serializer.ser.deserializeWebviewPanel(rB, sB);
   await registered.serializer.ser.deserializeWebviewPanel(rA, sA);

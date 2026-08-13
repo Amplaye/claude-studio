@@ -11,10 +11,10 @@
 // be the list — in order, with the right one in progress and the right ones ticked off.
 //
 // Real bundle (dist/extension.js), fake `vscode`, fake home folder: no CLI, no network.
-const Module = require('node:module');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { uri, newRegistry, fakeWebview, fakePanel, makeVscode, install, memento } = require('./lib/fake-vscode.cjs');
 
 // `--live` runs the same check against the real CLI instead of a written transcript:
 // a prompt goes out, Claude writes its own list, and the panel has to receive it. It
@@ -158,148 +158,11 @@ writeTranscript(ID_TODO, [
 ]);
 
 // ---- the fake `vscode` -------------------------------------------------------
-const uri = (p) => ({ fsPath: p, scheme: 'file', toString: () => 'file:///' + p.replace(/\\/g, '/') });
+// The shared surface lives in lib/fake-vscode.cjs; nothing here needs bending.
+const registered = newRegistry();
+const vscode = makeVscode({ workspaceRoot: work, registered });
+install(vscode);
 
-const registered = { views: new Map(), commands: new Map(), panels: [] };
-
-function fakeWebview() {
-  const got = [];
-  const w = {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    _html: '',
-    _onMsg: () => {},
-    got,
-    state: {},
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      w._onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      return true;
-    },
-    set html(v) {
-      w._html = v;
-    },
-    get html() {
-      return w._html;
-    },
-  };
-  return w;
-}
-
-function fakePanel(type, title) {
-  const dying = [];
-  const viewState = [];
-  const panel = {
-    type,
-    title,
-    webview: fakeWebview(),
-    iconPath: undefined,
-    active: true,
-    visible: true,
-    disposed: false,
-    reveal() {},
-    dispose() {
-      panel.disposed = true;
-      for (const fn of dying) fn();
-    },
-    onDidDispose: (fn) => {
-      dying.push(fn);
-      return { dispose() {} };
-    },
-    onDidChangeViewState: (fn) => {
-      viewState.push(fn);
-      return { dispose() {} };
-    },
-  };
-  registered.panels.push(panel);
-  return panel;
-}
-
-const vscode = {
-  ViewColumn: { Active: -1, Beside: -2, One: 1 },
-  StatusBarAlignment: { Left: 1, Right: 2 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-  TextEditorRevealType: { InCenter: 2 },
-  ThemeColor: class {
-    constructor(id) {
-      this.id = id;
-    }
-  },
-  MarkdownString: class {
-    constructor(v) {
-      this.value = v;
-    }
-  },
-  Uri: {
-    file: uri,
-    joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
-    from: (o) => uri(o.path || ''),
-  },
-  env: { clipboard: { writeText: async () => {} }, openExternal: async () => true },
-  window: {
-    createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
-    createStatusBarItem: () => ({ text: '', tooltip: '', show() {}, hide() {}, dispose() {} }),
-    showInputBox: async () => undefined,
-    state: { focused: true },
-    onDidChangeWindowState: () => ({ dispose() {} }),
-    registerWebviewViewProvider: (id, p) => {
-      registered.views.set(id, p);
-      return { dispose() {} };
-    },
-    registerWebviewPanelSerializer: () => ({ dispose() {} }),
-    createWebviewPanel: (type, title) => fakePanel(type, title),
-    showWarningMessage: async () => undefined,
-    showInformationMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
-    showTextDocument: async () => ({}),
-    activeTextEditor: undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
-    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
-    tabGroups: {
-      all: [],
-      onDidChangeTabs: () => ({ dispose() {} }),
-      onDidChangeTabGroups: () => ({ dispose() {} }),
-    },
-  },
-  languages: { getDiagnostics: () => [] },
-  commands: {
-    registerCommand: (id, fn) => {
-      registered.commands.set(id, fn);
-      return { dispose() {} };
-    },
-    executeCommand: async (id, ...args) => registered.commands.get(id)?.(...args),
-  },
-  workspace: {
-    workspaceFolders: [{ uri: uri(work) }],
-    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
-    findFiles: async () => [],
-    openTextDocument: async () => ({ getText: () => '' }),
-    registerTextDocumentContentProvider: () => ({ dispose() {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    fs: { stat: async () => ({}) },
-    asRelativePath: (p) => String(p?.fsPath ?? p),
-  },
-  Position: class {},
-  Range: class {},
-  Selection: class {},
-};
-
-const load = Module._load;
-Module._load = function (req, parent, isMain) {
-  if (req === 'vscode') return vscode;
-  return load.call(this, req, parent, isMain);
-};
-
-const memento = (map) => ({
-  get: (k, d) => (map.has(k) ? map.get(k) : d),
-  update: async (k, v) => void (v === undefined ? map.delete(k) : map.set(k, v)),
-  keys: () => [...map.keys()],
-});
 const ctx = {
   extensionUri: uri(root),
   extensionPath: root,

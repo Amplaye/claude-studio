@@ -543,9 +543,6 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border-color: var(--fam-2);
 }
 
-.mc-dot {
-  display: none;
-}
 /* The tick on the model in force. It draws itself in the corner of the card the
    moment you pick it — the border and the colour already say which one is on,
    but they say it the same way whether you just chose it or chose it a week ago.

@@ -11,167 +11,43 @@
 // `vscode` and a fake engine: the conversations are simulated by sending the
 // chat's own wire events back through the webview, which is exactly what the
 // context bar listens to.
-const Module = require('node:module');
 const path = require('node:path');
+const { uri, newRegistry, fakeWebview, fakePanel, makeVscode, install, memento } = require('./lib/fake-vscode.cjs');
 
 const root = path.dirname(__dirname);
 const fails = [];
 const t = (cond, msg) => !cond && fails.push(msg);
 
-const uri = (p) => ({
-  fsPath: p,
-  scheme: 'file',
-  toString: () => 'file:///' + p.replace(/\\/g, '/'),
-});
+// ---- the fake `vscode` -------------------------------------------------------
+// The shared surface lives in lib/fake-vscode.cjs; here only the rename dialog,
+// whose question and answer this check reads back.
+const registered = newRegistry();
+const vscode = makeVscode({ workspaceRoot: root, registered });
 
-const registered = { views: new Map(), commands: new Map(), panels: [] };
 const inputs = []; // what showInputBox was asked, and what it answers
 let inputAnswer;
 
-function fakeWebview() {
-  const got = [];
-  const w = {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    _html: '',
-    _onMsg: () => {},
-    got,
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      w._onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      return true;
-    },
-    set html(v) {
-      w._html = v;
-    },
-    get html() {
-      return w._html;
-    },
+vscode.window.showInputBox = async (opts) => {
+  inputs.push(opts);
+  return inputAnswer;
+};
+// Revealing a tab is also what brings it to the front here.
+const rawPanel = vscode.window.createWebviewPanel;
+vscode.window.createWebviewPanel = (type, title) => {
+  const panel = rawPanel(type, title);
+  panel.active = false;
+  const reveal = panel.reveal;
+  panel.reveal = () => {
+    reveal();
+    panel.setActive(true);
   };
-  return w;
-}
-
-const vscode = {
-  ViewColumn: { Active: -1, Beside: -2, One: 1 },
-  StatusBarAlignment: { Left: 1, Right: 2 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-  TextEditorRevealType: { InCenter: 2 },
-  ThemeColor: class {
-    constructor(id) {
-      this.id = id;
-    }
-  },
-  MarkdownString: class {
-    constructor(v) {
-      this.value = v;
-    }
-  },
-  Uri: {
-    file: uri,
-    joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
-    from: (o) => uri(o.path || ''),
-  },
-  env: { clipboard: { writeText: async () => {} }, openExternal: async () => true },
-  window: {
-    createOutputChannel: () => ({ appendLine() {}, show() {}, dispose() {} }),
-    createStatusBarItem: () => ({ text: '', tooltip: '', show() {}, hide() {}, dispose() {} }),
-    showInputBox: async (opts) => {
-      inputs.push(opts);
-      return inputAnswer;
-    },
-    state: { focused: true },
-    onDidChangeWindowState: () => ({ dispose() {} }),
-    registerWebviewViewProvider: (id, p) => {
-      registered.views.set(id, p);
-      return { dispose() {} };
-    },
-    registerWebviewPanelSerializer: () => ({ dispose() {} }),
-    createWebviewPanel: (type, title) => {
-      const listeners = [];
-      const panel = {
-        type,
-        title,
-        webview: fakeWebview(),
-        iconPath: undefined,
-        active: false,
-        visible: true,
-        revealed: 0,
-        reveal() {
-          panel.revealed++;
-          panel.setActive(true);
-        },
-        /** Bringing a tab to the front: the same event VS Code fires. */
-        setActive(v) {
-          panel.active = v;
-          for (const fn of listeners) fn();
-        },
-        dispose() {},
-        onDidDispose: () => ({ dispose() {} }),
-        onDidChangeViewState: (fn) => {
-          listeners.push(fn);
-          return { dispose() {} };
-        },
-      };
-      registered.panels.push(panel);
-      return panel;
-    },
-    showWarningMessage: async () => undefined,
-    showInformationMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
-    showTextDocument: async () => ({}),
-    activeTextEditor: undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
-    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
-    tabGroups: {
-      all: [],
-      onDidChangeTabs: () => ({ dispose() {} }),
-      onDidChangeTabGroups: () => ({ dispose() {} }),
-    },
-  },
-  languages: { getDiagnostics: () => [] },
-  commands: {
-    registerCommand: (id, fn) => {
-      registered.commands.set(id, fn);
-      return { dispose() {} };
-    },
-    executeCommand: async (id, ...args) => registered.commands.get(id)?.(...args),
-  },
-  workspace: {
-    workspaceFolders: [{ uri: uri(root) }],
-    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
-    findFiles: async () => [],
-    openTextDocument: async () => ({ getText: () => '' }),
-    registerTextDocumentContentProvider: () => ({ dispose() {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    fs: { stat: async () => ({}) },
-    asRelativePath: (p) => String(p?.fsPath ?? p),
-  },
-  Position: class {},
-  Range: class {},
-  Selection: class {},
+  return panel;
 };
 
-const load = Module._load;
-Module._load = function (req, parent, isMain) {
-  if (req === 'vscode') return vscode;
-  return load.call(this, req, parent, isMain);
-};
+install(vscode);
 
 const ext = require(path.join(root, 'dist', 'extension.js'));
 
-function memento() {
-  const map = new Map();
-  return {
-    get: (k, d) => (map.has(k) ? map.get(k) : d),
-    update: async (k, v) => void map.set(k, v),
-    keys: () => [...map.keys()],
-  };
-}
 const ctx = {
   extensionUri: uri(root),
   extensionPath: root,

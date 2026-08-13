@@ -5,10 +5,10 @@
 //
 // On Windows os.homedir() reads USERPROFILE: change it before loading the bundle and
 // everything the extension writes ends up in a throwaway folder.
-const Module = require('node:module');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { uri, newRegistry, fakeWebview, makeVscode, install, memento } = require('./lib/fake-vscode.cjs');
 
 const root = path.dirname(__dirname);
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-data-'));
@@ -32,132 +32,28 @@ const fails = [];
 const t = (cond, msg) => !cond && fails.push(msg);
 
 // ---- the fake `vscode` -----------------------------------------------------
-const uri = (p) => ({ fsPath: p, scheme: 'file', toString: () => 'file:///' + p.replace(/\\/g, '/') });
+// The shared surface lives in lib/fake-vscode.cjs; here only what this check reads
+// back: the commands are written down instead of run (we want to see *which* group
+// the extension reaches for), and the open tabs move during the test.
+const registered = newRegistry();
+const vscode = makeVscode({ workspaceRoot: work, registered });
 
 const executed = [];
-const registered = { views: new Map(), commands: new Map() };
+const shown = [];
 let tabGroups = { all: [] };
 let inputBoxAnswer;
-const shown = [];
-let statusBar;
 
-function fakeWebview() {
-  const got = [];
-  const w = {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    _html: '',
-    _onMsg: () => {},
-    got,
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      w._onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      return true;
-    },
-    set html(v) {
-      w._html = v;
-    },
-    get html() {
-      return w._html;
-    },
-  };
-  return w;
-}
-
-const vscode = {
-  ViewColumn: { Active: -1, Beside: -2, One: 1 },
-  StatusBarAlignment: { Left: 1, Right: 2 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-  TextEditorRevealType: { InCenter: 2 },
-  ThemeColor: class {
-    constructor(id) {
-      this.id = id;
-    }
-  },
-  MarkdownString: class {
-    constructor(v) {
-      this.value = v;
-    }
-  },
-  Uri: {
-    file: uri,
-    joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
-    from: (o) => uri(o.path || ''),
-  },
-  window: {
-    createOutputChannel: () => ({
-      appendLine() {},
-      show() {},
-      dispose() {},
-    }),
-    createStatusBarItem: () => {
-      statusBar = { text: '', tooltip: '', show() {}, hide() {}, dispose() {} };
-      return statusBar;
-    },
-    registerWebviewViewProvider: (id, p) => {
-      registered.views.set(id, p);
-      return { dispose() {} };
-    },
-    registerWebviewPanelSerializer: () => ({ dispose() {} }),
-    createWebviewPanel: () => ({
-      webview: fakeWebview(),
-      active: false,
-      reveal() {},
-      dispose() {},
-      onDidDispose: () => ({ dispose() {} }),
-      onDidChangeViewState: () => ({ dispose() {} }),
-    }),
-    showInputBox: async () => inputBoxAnswer,
-    showInformationMessage: async (m) => {
-      shown.push(m);
-    },
-    showWarningMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
-    showTextDocument: async () => ({}),
-    activeTextEditor: undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
-    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
-    /** The window is always "in the foreground": there is nobody to notify here. */
-    state: { focused: true },
-    onDidChangeWindowState: () => ({ dispose() {} }),
-    get tabGroups() {
-      return {
-        all: tabGroups.all,
-        onDidChangeTabs: () => ({ dispose() {} }),
-        onDidChangeTabGroups: () => ({ dispose() {} }),
-      };
-    },
-  },
-  languages: { getDiagnostics: () => [] },
-  commands: {
-    registerCommand: (id, fn) => {
-      registered.commands.set(id, fn);
-      return { dispose() {} };
-    },
-    executeCommand: async (id, ...args) => {
-      executed.push(args.length ? `${id}(${args.join(',')})` : id);
-    },
-  },
-  workspace: {
-    workspaceFolders: [{ uri: uri(work) }],
-    // The tests must not go to npm looking for updates: the automatic check is off
-    // here, as if you had turned it off yourself.
-    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
-    findFiles: async () => [],
-    openTextDocument: async (o) => ({ getText: () => o?.content ?? '' }),
-    registerTextDocumentContentProvider: () => ({ dispose() {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    fs: { stat: async () => ({}) },
-    asRelativePath: (p) => String(p?.fsPath ?? p),
-  },
-  Position: class {},
-  Range: class {},
-  Selection: class {},
+vscode.window.showInputBox = async () => inputBoxAnswer;
+vscode.window.showInformationMessage = async (m) => void shown.push(m);
+Object.defineProperty(vscode.window, 'tabGroups', {
+  get: () => ({
+    all: tabGroups.all,
+    onDidChangeTabs: () => ({ dispose() {} }),
+    onDidChangeTabGroups: () => ({ dispose() {} }),
+  }),
+});
+vscode.commands.executeCommand = async (id, ...args) => {
+  executed.push(args.length ? `${id}(${args.join(',')})` : id);
 };
 
 // ---- the fake network, only for the account numbers -------------------------
@@ -183,12 +79,7 @@ const fakeHttps = {
   },
 };
 
-const load = Module._load;
-Module._load = function (req, parent, isMain) {
-  if (req === 'vscode') return vscode;
-  if (req === 'node:https') return fakeHttps;
-  return load.call(this, req, parent, isMain);
-};
+install(vscode, { 'node:https': fakeHttps });
 
 // ---- the fake material on disk ---------------------------------------------
 
@@ -248,15 +139,6 @@ fs.writeFileSync(
 
 // ---- start-up ---------------------------------------------------------------
 const ext = require(path.join(root, 'dist', 'extension.js'));
-/** The chat preferences live here: an in-memory map is enough. */
-function memento() {
-  const map = new Map();
-  return {
-    get: (k, d) => (map.has(k) ? map.get(k) : d),
-    update: async (k, v) => void map.set(k, v),
-    keys: () => [...map.keys()],
-  };
-}
 const ctx = {
   extensionUri: uri(root),
   extensionPath: root,
@@ -340,17 +222,17 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   // ---- the status bar ----
   // The project name moved into the tooltip: the bar holds the numbers.
   t(
-    /crm-e6/.test(String(statusBar?.tooltip?.value || statusBar?.tooltip || '')),
-    'the status bar does not say where you are: ' + (statusBar?.tooltip?.value || statusBar?.tooltip)
+    /crm-e6/.test(String(registered.statusBar?.tooltip?.value || registered.statusBar?.tooltip || '')),
+    'the status bar does not say where you are: ' + (registered.statusBar?.tooltip?.value || registered.statusBar?.tooltip)
   );
-  t(/ctx 30%/.test(statusBar?.text || ''), 'the status bar does not show the context: ' + statusBar?.text);
+  t(/ctx 30%/.test(registered.statusBar?.text || ''), 'the status bar does not show the context: ' + registered.statusBar?.text);
   t(
-    /\$\(studio-(chat|layers|pulse|warn|alert|gauge|branch|off)\)/.test(statusBar?.text || ''),
-    'the status bar does not use the Ionicons from the font: ' + statusBar?.text
+    /\$\(studio-(chat|layers|pulse|warn|alert|gauge|branch|off)\)/.test(registered.statusBar?.text || ''),
+    'the status bar does not use the Ionicons from the font: ' + registered.statusBar?.text
   );
   t(
-    !/\$\((pulse|warning|error|circle-outline|comment-discussion|layers|dashboard|git-branch)\)/.test(statusBar?.text || ''),
-    'the status bar still uses the native icons instead of the Ionicons: ' + statusBar?.text
+    !/\$\((pulse|warning|error|circle-outline|comment-discussion|layers|dashboard|git-branch)\)/.test(registered.statusBar?.text || ''),
+    'the status bar still uses the native icons instead of the Ionicons: ' + registered.statusBar?.text
   );
 
   // ---- rename: creates the folder if missing, and on OUR file ----

@@ -3,9 +3,10 @@
 // Agent SDK is ESM packed into a CJS bundle, and that is where the CLI really
 // starts. If this passes, inside VS Code the only thing that changes is who draws
 // the pixels.
-const Module = require('node:module');
+
 const path = require('node:path');
 const fs = require('node:fs');
+const { uri, newRegistry, fakeWebview, makeVscode, install, memento } = require('./lib/fake-vscode.cjs');
 
 const root = path.dirname(__dirname);
 
@@ -33,173 +34,35 @@ process.on('exit', () => {
 });
 
 // ---- the fake `vscode` -----------------------------------------------------
-const uri = (p) => ({
-  fsPath: p,
-  scheme: 'file',
-  toString: () => 'file:///' + p.replace(/\\/g, '/'),
-});
+// The shared surface lives in lib/fake-vscode.cjs; here only what this check needs
+// to see: a permission dialog that answers "Allow" (we want the tool to actually
+// run), an editor that already knows about an error, and one open tab.
+const registered = newRegistry();
+const vscode = makeVscode({ workspaceRoot: root, registered });
 
-const registered = { provider: null, views: new Map(), commands: new Map(), panels: [] };
 const asked = [];
-let statusBar;
 
-/** Fake webview: collects whatever gets sent to it and lets you answer. */
-function fakeWebview() {
-  const got = [];
-  const w = {
-    cspSource: 'vscode-webview://x',
-    options: {},
-    _html: '',
-    _onMsg: () => {},
-    got,
-    asWebviewUri: (u) => u,
-    onDidReceiveMessage: (fn) => {
-      w._onMsg = fn;
-      return { dispose() {} };
-    },
-    postMessage: async (m) => {
-      got.push(m);
-      return true;
-    },
-    set html(v) {
-      w._html = v;
-    },
-    get html() {
-      return w._html;
-    },
-  };
-  return w;
-}
-
-const vscode = {
-  ViewColumn: { Active: -1, Beside: -2, One: 1 },
-  StatusBarAlignment: { Left: 1, Right: 2 },
-  DiagnosticSeverity: { Error: 0, Warning: 1, Information: 2, Hint: 3 },
-  TextEditorRevealType: { InCenter: 2 },
-  ThemeColor: class {
-    constructor(id) {
-      this.id = id;
-    }
-  },
-  MarkdownString: class {
-    constructor(v) {
-      this.value = v;
-    }
-  },
-  Uri: {
-    file: uri,
-    joinPath: (base, ...parts) => uri(path.join(base.fsPath, ...parts)),
-    from: (o) => uri(o.path || ''),
-  },
-  window: {
-    createOutputChannel: () => ({
-      appendLine() {},
-      show() {},
-      dispose() {},
-    }),
-    createStatusBarItem: () => {
-      statusBar = { text: '', tooltip: '', show() {}, hide() {}, dispose() {} };
-      return statusBar;
-    },
-    showInputBox: async () => undefined,
-    /** The window is always "in the foreground": there is nobody to notify here. */
-    state: { focused: true },
-    onDidChangeWindowState: () => ({ dispose() {} }),
-    registerWebviewViewProvider: (id, p) => {
-      registered.views.set(id, p);
-      if (id === 'claudeStudio.chat') registered.provider = p;
-      return { dispose() {} };
-    },
-    registerWebviewPanelSerializer: () => ({ dispose() {} }),
-    createWebviewPanel: (type, title, column, opts) => {
-      const panel = {
-        type,
-        title,
-        column,
-        opts,
-        webview: fakeWebview(),
-        iconPath: undefined,
-        active: true,
-        reveal() {
-          panel.revealed = true;
-        },
-        dispose() {},
-        onDidDispose: () => ({ dispose() {} }),
-        onDidChangeViewState: () => ({ dispose() {} }),
-      };
-      registered.panels.push(panel);
-      return panel;
-    },
-    showWarningMessage: async (msg, _opts, ...items) => {
-      asked.push(msg);
-      return items[0]; // "Allow": here we want to see the tool actually run
-    },
-    showInformationMessage: async () => undefined,
-    showErrorMessage: async () => undefined,
-    showTextDocument: async () => ({}),
-    activeTextEditor: undefined,
-    onDidChangeActiveTextEditor: () => ({ dispose() {} }),
-    onDidChangeTextEditorSelection: () => ({ dispose() {} }),
-    tabGroups: {
-      all: [{ tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] }],
-      onDidChangeTabs: () => ({ dispose() {} }),
-      onDidChangeTabGroups: () => ({ dispose() {} }),
-    },
-  },
-  languages: {
-    getDiagnostics: () => [
-      [
-        uri(path.join(root, 'src', 'extension.ts')),
-        [{ severity: 0, message: 'fake error for the test', range: { start: { line: 3, character: 2 } } }],
-      ],
-    ],
-  },
-  commands: {
-    registerCommand: (id, fn) => {
-      registered.commands.set(id, fn);
-      return { dispose() {} };
-    },
-    executeCommand: async () => undefined,
-  },
-  workspace: {
-    workspaceFolders: [{ uri: uri(root) }],
-    // The tests must not go to npm looking for updates: the automatic check is off
-    // here, as if you had turned it off yourself.
-    getConfiguration: () => ({ get: (k, d) => (k === 'autoUpdate' ? 'off' : d) }),
-    findFiles: async () => [uri(path.join(root, 'package.json'))],
-    openTextDocument: async () => ({ getText: () => '' }),
-    registerTextDocumentContentProvider: () => ({ dispose() {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose() {} }),
-    onDidChangeConfiguration: () => ({ dispose() {} }),
-    fs: { stat: async () => ({}) },
-    asRelativePath: (p) => {
-      const s = String(p?.fsPath ?? p);
-      return s.startsWith(root) ? s.slice(root.length + 1).replace(/\\/g, '/') : s;
-    },
-  },
-  Position: class {},
-  Range: class {},
-  Selection: class {},
+vscode.window.showWarningMessage = async (msg, _opts, ...items) => {
+  asked.push(msg);
+  return items[0]; // "Allow": here we want to see the tool actually run
 };
+vscode.window.tabGroups.all = [
+  { tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] },
+];
+vscode.languages.getDiagnostics = () => [
+  [
+    uri(path.join(root, 'src', 'extension.ts')),
+    [{ severity: 0, message: 'fake error for the test', range: { start: { line: 3, character: 2 } } }],
+  ],
+];
+// Nothing here drives the editor's own commands, and running them would recurse.
+vscode.commands.executeCommand = async () => undefined;
 
-const load = Module._load;
-Module._load = function (req, parent, isMain) {
-  if (req === 'vscode') return vscode;
-  return load.call(this, req, parent, isMain);
-};
+install(vscode);
 
 // ---- start-up --------------------------------------------------------------
 const ext = require(path.join(root, 'dist', 'extension.js'));
 
-/** The chat preferences live here: an in-memory map is enough. */
-function memento() {
-  const map = new Map();
-  return {
-    get: (k, d) => (map.has(k) ? map.get(k) : d),
-    update: async (k, v) => void map.set(k, v),
-    keys: () => [...map.keys()],
-  };
-}
 const ctx = {
   extensionUri: uri(root),
   extensionPath: root,
@@ -322,7 +185,7 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   const mine = ctxData?.cards?.find((c) => c.own);
   // The status bar has to be captured now: further down the test resets the
   // conversation to test the history, and there it is right that it says nothing.
-  const ctxStatus = statusBar?.text ?? '';
+  const ctxStatus = registered.statusBar?.text ?? '';
 
   // ---- history: listing, fishing back and resuming ----
   // `from` is not a detail: without it the wait immediately finds the old messages

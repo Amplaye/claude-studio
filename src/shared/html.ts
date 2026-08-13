@@ -1,14 +1,12 @@
 // The webviews load real files through asWebviewUri and run under a tight CSP with
 // a nonce: no external resources, no 'unsafe-inline', no interface buried inside
 // JavaScript strings (with animations to tweak, that road is a dead end).
+import { randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as vscode from 'vscode';
 
-export function makeNonce(): string {
-  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let s = '';
-  for (let i = 0; i < 32; i++) s += abc[Math.floor(Math.random() * abc.length)];
-  return s;
+function makeNonce(): string {
+  return randomBytes(16).toString('hex');
 }
 
 /**

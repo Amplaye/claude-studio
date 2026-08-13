@@ -148,16 +148,6 @@ body {
   letter-spacing: 0.01em;
 }
 
-/* ---------- the section row ---------- */
-
-.ctx .secline {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 14px 0 8px;
-}
-
 .ctx .count {
   padding: 1px 7px;
   border-radius: var(--pill);
@@ -412,30 +402,6 @@ body {
   font-size: 12.5px;
 }
 
-/* ---------- the footer ---------- */
-
-.ctx .foot {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 calc(-1 * var(--pad));
-  padding: 8px var(--pad);
-  border-top: 1px solid var(--line);
-  font-size: 11.5px;
-}
-.ctx .fitem {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.ctx .foot .ico {
-  opacity: 0.75;
-}
 
 /* ---------- i passi, dentro la card della loro conversazione ----------
    Niente etichetta, niente riquadro: la card sopra dice gia' di chi sono, ed era
