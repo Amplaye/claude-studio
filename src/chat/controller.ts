@@ -978,13 +978,34 @@ export class ChatController {
     // pannello restava vuoto per sempre. Quale delle liste si vede lo decide lo store,
     // ed e' quella della conversazione che hai davanti (vedi tasks/store.ts).
     //
-    // Un messaggio nuovo azzera: l'elenco appartiene al prompt che lo ha prodotto.
-    if (e.k === 'user') tasks.clear(this.key);
+    // Un messaggio nuovo azzera un elenco scritto con TodoWrite: quello apparteneva al
+    // prompt che l'aveva prodotto. Le task del sistema nuovo restano — se le tiene la
+    // CLI per tutta la sessione, e quello che hai chiesto due messaggi fa e non e'
+    // ancora stato fatto deve continuare a vedersi (vedi tasks/store.ts).
+    if (e.k === 'user') tasks.newTurn(this.key);
     if (e.k === 'busy') tasks.setBusy(this.key, e.value);
-    if (e.k === 'tool_start' && e.name === 'TodoWrite') {
-      const todos = (e.input as { todos?: unknown })?.todos;
-      if (Array.isArray(todos)) tasks.set(this.key, todos as never);
+    // I passi che Claude si segna. TodoWrite era l'unico ascoltato qui, e la CLI ha
+    // smesso di averlo: adesso scrive una task per volta con TaskCreate e la muove con
+    // TaskUpdate — motivo per cui questo pannello e' rimasto sul "sto capendo cosa
+    // fare" per sessioni intere mentre l'elenco esisteva eccome.
+    //
+    // Solo quelle del filo principale: `parent` c'e' quando la chiamata viene da un
+    // sub-agent, e i passi che si segna lui sono affari suoi — mescolarli a questi
+    // vorrebbe dire un elenco che cresce di roba che non hai chiesto.
+    if (e.k === 'tool_start' && !e.parent) {
+      if (e.name === 'TodoWrite') {
+        const todos = (e.input as { todos?: unknown })?.todos;
+        if (Array.isArray(todos)) tasks.set(this.key, todos as never);
+      } else if (e.name === 'TaskCreate') {
+        tasks.created(this.key, e.id, e.input);
+      } else if (e.name === 'TaskUpdate') {
+        tasks.updated(this.key, e.input);
+      }
     }
+    // Il numero della task ("#3") non sta nella chiamata che la crea: torna indietro
+    // nella risposta del tool, ed e' quello che poi le TaskUpdate useranno per dire di
+    // quale stanno parlando.
+    if (e.k === 'tool_end') tasks.named(this.key, e.id, e.text);
     this.broadcast(e);
   }
 

@@ -1,4 +1,13 @@
-/* The task list: what Claude is doing now, and how much is left of it. */
+/* The task list: what Claude is doing now, and how much is left of it.
+ *
+ * Nothing in here is dimmed. The house rule is written at the top of tokens.css —
+ * "text is full white, hierarchy comes from size and weight, never grey" — and this
+ * panel had been breaking it in five places: the hint, the count's other half, the
+ * state word, and every row that was not the one in progress. On the sidebar's
+ * background that put the only line most sessions ever show ("Working out what to
+ * do…") at just over half strength, which is a sentence you have to lean in to read.
+ * The order still reads: the step being worked on has weight, a tinted bed and a
+ * beating icon; the finished ones have a green check and a rule through them. */
 
 .taskroot {
   padding: 10px 12px 14px;
@@ -22,12 +31,13 @@
    from the other side, and two bold numbers side by side compete. */
 .tk-left {
   font-size: 11px;
-  opacity: 0.62;
+  font-weight: 400;
   white-space: nowrap;
 }
 .tk-left[hidden] {
   display: none;
 }
+/* The separator is punctuation, not words: it can sit back without becoming unreadable. */
 .tk-left::before {
   content: '·';
   margin: 0 5px;
@@ -39,15 +49,12 @@
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.6;
 }
 .tk-state.live {
   color: var(--claude-2);
-  opacity: 1;
 }
 .tk-state.ok {
   color: var(--ok, #5dbf8a);
-  opacity: 1;
 }
 
 /* How much of the prompt is behind you. */
@@ -113,14 +120,10 @@
   overflow-wrap: anywhere;
 }
 
-.tk-row.completed {
-  opacity: 0.5;
-}
+/* Done is said by the green check and the rule through the words, both of which you
+   can read. It used to be said by half an opacity, which you cannot. */
 .tk-row.completed .ico {
   color: var(--ok, #5dbf8a);
-}
-.tk-row.pending {
-  opacity: 0.7;
 }
 
 /* The one being worked on is the only one that should catch the eye. */
@@ -192,10 +195,12 @@
   }
 }
 
+/* Most sessions this is the only line the section ever shows. It is a sentence, and
+   it has to be readable as one. */
 .tk-empty {
   margin: 2px 0 0;
-  opacity: 0.55;
   font-size: 11.5px;
+  color: var(--fg);
 }
 
 @media (prefers-reduced-motion: reduce) {

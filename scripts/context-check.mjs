@@ -306,6 +306,28 @@ for (const width of [320, 620]) {
   t(/1 of 3/.test(tk.count || ''), 'il conteggio dei passi e\' sbagliato: ' + tk.count);
   t(tk.beat === 'tk-beat', 'il passo in corso non pulsa: ' + tk.beat);
 
+  // Nessun passo va scritto in grigio. La regola sta in cima a tokens.css — il testo
+  // e' bianco pieno, la gerarchia la fanno corpo e peso — e questa sezione la
+  // rompeva in cinque punti: la riga di attesa, il "ne restano", la parola di stato e
+  // ogni riga che non fosse quella in corso stavano fra il 50 e il 70 percento. Su
+  // questo fondo e' la differenza fra leggere e indovinare.
+  const faded = await page.evaluate(() => {
+    const bad = [];
+    for (const n of document.querySelectorAll('.steps .lab, .steps .tk-row, .steps .tk-count, .steps .tk-left, .steps .tk-state, .steps .tk-empty')) {
+      const o = parseFloat(getComputedStyle(n).opacity);
+      if (o < 0.95) bad.push(n.className + '@' + o);
+    }
+    return bad;
+  });
+  t(faded.length === 0, 'testo dei passi scritto in grigio: ' + faded.join(' | '));
+
+  // Lo scatto si fa con i passi a schermo: da vuoti la sezione non c'e', e una
+  // sezione che non c'e' non si puo' guardare.
+  await page.screenshot({
+    path: path.join(root, 'dist', `preview-context-steps-${width}.png`),
+    fullPage: true,
+  });
+
   // Finita la conversazione la sezione si ritira: le task erano di quel prompt.
   await steps({ items: [], done: 0, total: 0, active: -1, busy: false });
   await page.waitForTimeout(80);

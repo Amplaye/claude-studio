@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- **The STEPS section was reading a tool the CLI no longer has.** It listened for
+  `TodoWrite` — one call carrying the whole list — and Claude Code stopped writing its
+  steps that way: it now creates them one at a time with `TaskCreate` and moves them
+  with `TaskUpdate`, and the number a task goes under ("#2") is not even in the call
+  that creates it, it comes back in the tool's answer. So the section sat on "Working
+  out what to do…" for entire sessions while the list existed the whole time, three
+  feet away. Both dialects are now understood, and the list is built here as the calls
+  arrive rather than waiting for one that never comes. Steps written the new way also
+  survive the next message, because the CLI keeps them across a whole conversation and
+  what you asked for two messages ago and has not been done yet is exactly what this
+  section is for. Steps a sub-agent writes for itself stay out of it.
+
+- **Nothing in that section is grey any more.** The house rule is written at the top of
+  tokens.css — text is full white, hierarchy comes from size and weight — and this was
+  breaking it in five places at once: the waiting line, the "2 to go", the state word
+  and every row that was not the one in progress, all between 50% and 70%. On the
+  sidebar's background that is the difference between reading a sentence and guessing
+  it. The order still reads: the step being worked on has weight, a tinted bed and a
+  beating icon; the finished ones have a green check and a rule through the words.
+  The panel's own test now fails if any of it goes back to grey.
+
 - **"Developer: Reload Window" no longer costs you every conversation but one.** The
   extension host dies at every reload and the conversations die with it; the
   transcripts stay on disk, so all that has to survive is knowing *which* transcript
