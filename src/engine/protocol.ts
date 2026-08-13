@@ -107,8 +107,11 @@ export type Wire =
   | { k: 'hello'; cwd: string; project: string; cliVersion: string; surface: 'view' | 'panel' }
   | { k: 'session'; id: string; model: string; cwd: string }
   // The images come back together with the message: in the chat they stay attached
-  // to what you sent, so you can see they really went out.
-  | { k: 'user'; text: string; images?: Pasted[] }
+  // to what you sent, so you can see they really went out. The other files do the
+  // same — they leave as a list of paths folded into the prompt, which is stripped
+  // from the echo, so without carrying them here a PDF would vanish the moment you
+  // pressed Enter while a PNG stayed put.
+  | { k: 'user'; text: string; images?: Pasted[]; files?: SentFile[] }
   | { k: 'turn_start' }
   // `parent` is there when the piece comes from a sub-agent: it's the tool_use_id of
   // the Task that launched it, and that's where underneath it has to be drawn.
@@ -185,6 +188,8 @@ export interface Attachment {
 export interface SentFile {
   path: string;
   name: string;
+  /** Only for the chip in the chat: 0 when nobody measured it. */
+  size?: number;
 }
 
 export type Cmd =

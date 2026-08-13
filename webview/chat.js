@@ -1360,6 +1360,23 @@
           }
           n.append(box);
         }
+        // Everything that isn't an image travelled as a path, so the message would
+        // otherwise show nothing at all: a PDF you'd just attached simply disappeared
+        // on Enter while a PNG stayed. The same chip as the composer's goes here, minus
+        // the remove button — the message is already gone, there is nothing to undo.
+        if (m.files && m.files.length) {
+          const box = el('div', 'ufiles');
+          for (const f of m.files) {
+            const chip = el('span', 'att att-file');
+            chip.title = f.path || f.name;
+            const info = el('span', 'att-info');
+            info.append(el('span', 'att-name', f.name));
+            if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
+            chip.append(icon(fileIcon(f.name)), info);
+            box.append(chip);
+          }
+          n.append(box);
+        }
         if (m.text) n.append(el('div', 'utext', m.text));
         add(n);
         break;
@@ -1912,7 +1929,9 @@
       cmd: 'send',
       text,
       images: images.length ? images : undefined,
-      files: files.length ? files.map((f) => ({ path: f.path, name: f.name })) : undefined,
+      // `size` comes back too: the chip in the sent message shows it, same as the one
+      // in the composer did a moment earlier.
+      files: files.length ? files.map((f) => ({ path: f.path, name: f.name, size: f.size })) : undefined,
       withSelection: !!(selection && useSelection),
     });
     input.value = '';

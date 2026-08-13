@@ -325,7 +325,10 @@ export class ChatController {
     // Da qui in poi le modifiche appartengono a questo messaggio: e' il punto a
     // cui "/rewind" sa tornare.
     this.checkpoints.begin(text);
-    this.ensureSession().send(full, images, text);
+    // I file viaggiano a parte dall'eco: nel messaggio vero sono gia' dentro `full`
+    // come percorsi, qui servono solo perche' la chat possa disegnarli attaccati al
+    // messaggio, esattamente come fa con le immagini.
+    this.ensureSession().send(full, images, text, files);
   }
 
   /** Il fermaglio: il selettore di VS Code, senza filtri. */

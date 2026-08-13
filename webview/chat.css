@@ -1121,6 +1121,21 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .uimgs:last-child {
   margin-bottom: 0;
 }
+/* The attached files sit above the words, where the images sit, so a message with
+   both reads as one stack. The chips are the composer's, without the remove button. */
+.ufiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  white-space: normal;
+}
+.ufiles:last-child {
+  margin-bottom: 0;
+}
+.ufiles .att {
+  max-width: 100%;
+}
 .msg.user .utext:empty {
   display: none;
 }
