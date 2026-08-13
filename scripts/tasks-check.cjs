@@ -304,6 +304,24 @@ const ctx = {
 const settle = (ms = 300) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * The last thing the panel was handed: every conversation's list, under the id of the
+ * conversation that wrote it.
+ */
+const board = (panel) => {
+  const frames = panel.webview.got.filter((m) => m && m.k === 'tasks');
+  return frames.length ? frames[frames.length - 1].d : {};
+};
+/**
+ * The one list on the board. Used where the check has a single conversation open and
+ * does not know the id the CLI handed it — and it doubles as a check in itself: two
+ * lists where one was expected is exactly the mixing this is all about.
+ */
+const only = (panel) => {
+  const all = Object.values(board(panel));
+  return all.length === 1 ? all[0] : null;
+};
+
+/**
  * The sidebar panel, the one you actually look at while a tab works. It is a second
  * surface subscribing to the same list, and the tab passing on its own proves nothing
  * about it: this is where the section used to sit empty.
@@ -320,11 +338,6 @@ function mountSidebar() {
   return view;
 }
 
-/** The last list the panel was handed. */
-const shown = (panel) => {
-  const frames = panel.webview.got.filter((m) => m && m.k === 'tasks');
-  return frames.length ? frames[frames.length - 1].d : null;
-};
 const line = (d) =>
   (d?.items ?? []).map((i) => `${i.status[0]}:${i.content}`).join(' | ') || '(empty)';
 
@@ -333,7 +346,13 @@ const line = (d) =>
  * staged — if the panel ends the turn without the steps, the panel is broken.
  */
 async function live(tab, side) {
-  const seen = () => tab.webview.got.filter((m) => m && m.k === 'tasks').map((m) => m.d);
+  // Every board the tab was handed, flattened to the single conversation's list: only
+  // one is open here, and a board with two in it would be a bug of its own.
+  const seen = () =>
+    tab.webview.got
+      .filter((m) => m && m.k === 'tasks')
+      .map((m) => Object.values(m.d || {}))
+      .map((v) => (v.length === 1 ? v[0] : null));
   let ended = 0;
   const watch = setInterval(() => {}, 1000); // keeps the loop alive while the CLI thinks
   tab.webview.got.length = 0;
@@ -361,7 +380,7 @@ async function live(tab, side) {
       'Non leggere e non toccare nessun file: e\' solo la lista che mi serve.'
   );
 
-  const frames = seen();
+  const frames = seen().filter(Boolean);
   const d = frames[frames.length - 1] ?? null;
   console.log('  turn 1: ' + frames.length + ' list(s) handed over; the last one: ' + line(d));
   t(ok1, 'the turn never finished: no CLI, no login, or no network');
@@ -378,7 +397,7 @@ async function live(tab, side) {
     'the list only appeared once, at the end — it is not being built as Claude writes it'
   );
 
-  const s = shown(side);
+  const s = only(side);
   console.log('  the sidebar was handed: ' + line(s));
   t(line(s) === line(d), 'the sidebar panel does not show what the tab shows: ' + line(s));
 
@@ -389,8 +408,8 @@ async function live(tab, side) {
   // wrong and the panel empties itself the moment you say "go on".
   const before = seen().length;
   const ok2 = await turn('Adesso completa anche la terza task della lista. Nient\'altro.');
-  const after = seen().slice(before);
-  const d2 = after[after.length - 1] ?? shown(tab);
+  const after = seen().slice(before).filter(Boolean);
+  const d2 = after[after.length - 1] ?? only(tab);
   console.log('  turn 2: ' + line(d2));
   t(ok2, 'the second turn never finished');
   t((d2?.total ?? 0) >= 3, 'the list emptied itself on the second message: ' + line(d2));
@@ -399,8 +418,8 @@ async function live(tab, side) {
     'the step ticked off in the second turn did not reach the panel: ' + line(d2)
   );
   t(
-    line(shown(side)) === line(d2),
-    'after a second message the sidebar and the tab disagree: ' + line(shown(side))
+    line(only(side)) === line(d2),
+    'after a second message the sidebar and the tab disagree: ' + line(only(side))
   );
   clearInterval(watch);
 }
@@ -426,7 +445,7 @@ async function live(tab, side) {
   tab.webview._onMsg({ cmd: 'open', id: ID_TASK });
   await settle();
 
-  const d = shown(tab);
+  const d = board(tab)[ID_TASK];
   t(!!d, 'the panel was handed no list at all');
   t(
     d && d.total === 3,
@@ -446,14 +465,14 @@ async function live(tab, side) {
   // The sidebar is the surface you leave open while a tab works: it has to be told
   // the same thing, not merely be able to be.
   t(
-    line(shown(side)) === line(d),
-    'the sidebar panel does not show what the tab shows: ' + line(shown(side))
+    line(board(side)[ID_TASK]) === line(d),
+    'the sidebar panel does not show what the tab shows: ' + line(board(side)[ID_TASK])
   );
 
   // ---- the old tool, still spoken by older CLIs ----
   tab.webview._onMsg({ cmd: 'open', id: ID_TODO });
   await settle();
-  const old = shown(tab);
+  const old = board(tab)[ID_TODO];
   t(
     line(old) === 'c:Read the file | i:Write the patch',
     'a list written with TodoWrite no longer arrives: ' + line(old)
@@ -466,7 +485,40 @@ async function live(tab, side) {
   // ---- a new conversation leaves nothing behind ----
   tab.webview._onMsg({ cmd: 'newSession' });
   await settle();
-  t((shown(tab)?.total ?? 0) === 0, 'the steps of the old conversation stayed on screen');
+  t(
+    !board(tab)[ID_TODO] && !board(tab)[ID_TASK],
+    'the steps of the old conversation stayed on screen: ' + JSON.stringify(Object.keys(board(tab)))
+  );
+
+  // ---- two conversations at once, each with its own list -------------------
+  //
+  // This is the one you hit with three tabs open. Each conversation writes its own
+  // steps; the panel used to hand over one list and nothing said whose it was, so the
+  // section swapped under you depending on which conversation had moved last. Every
+  // list travels now, under the id of the conversation that wrote it.
+  tab.webview._onMsg({ cmd: 'open', id: ID_TASK });
+  await settle();
+  await registered.commands.get('claudeStudio.openNewTab')();
+  const tab2 = registered.panels[registered.panels.length - 1];
+  tab2.webview._onMsg({ cmd: 'ready' });
+  tab2.webview._onMsg({ cmd: 'open', id: ID_TODO });
+  await settle();
+
+  const both = board(side);
+  t(
+    both.items === undefined,
+    'the sidebar is still handed one nameless list instead of one per conversation'
+  );
+  const mine = both[ID_TASK];
+  const theirs = both[ID_TODO];
+  t(
+    line(mine) === 'c:Rename the column | i:Update the three call sites | p:Run the tests',
+    'the first conversation lost its own steps: ' + line(mine)
+  );
+  t(
+    line(theirs) === 'c:Read the file | i:Write the patch',
+    'the second conversation lost its own steps: ' + line(theirs)
+  );
 
   for (const dsp of ctx.subscriptions) dsp.dispose?.();
 

@@ -254,12 +254,17 @@ for (const width of [320, 620]) {
   await page.waitForTimeout(120);
   t((await page.locator('.ctxcard').count()) === 1, 'after the empty state the card does not come back');
 
-  // ---- i passi, sotto l'ultima card ----
+  // ---- i passi, dentro la card della loro conversazione ----
   // Stavano in un pannello loro, che era un riquadro in piu' da aprire per leggere
-  // una cosa che riguarda la conversazione di cui hai gia' la card sotto gli occhi.
-  // Da vuoti non devono occupare niente: una riga fissa che dice "ancora nessuna
-  // task" e' rumore per il 90% del tempo.
-  const steps = (d) => page.evaluate((x) => window.postMessage({ k: 'tasks', d: x }, '*'), d);
+  // una cosa che riguarda la conversazione di cui hai gia' la card sotto gli occhi;
+  // poi in una sezione sola in fondo alla colonna, che con piu' conversazioni aperte
+  // mostrava i passi di una e non diceva di quale. Adesso ogni lista arriva sotto
+  // l'id della sua conversazione e finisce dentro la sua card. Da vuoti non devono
+  // occupare niente: una riga fissa che dice "ancora nessuna task" e' rumore per il
+  // 90% del tempo, e moltiplicata per il numero di card e' rumore tre volte.
+  const ID = 'aaaaaaaa-1111-2222-3333-444444444444';
+  const steps = (d) =>
+    page.evaluate((x) => window.postMessage({ k: 'tasks', d: x }, '*'), d ? { [ID]: d } : {});
   const list = (over = {}) => ({
     items: [
       { content: 'Read the transcript', activeForm: 'Reading the transcript', status: 'completed' },
@@ -273,21 +278,22 @@ for (const width of [320, 620]) {
     ...over,
   });
 
-  await steps({ items: [], done: 0, total: 0, active: -1, busy: false });
+  await steps(null);
   await page.waitForTimeout(80);
-  t(await page.locator('.steps').isHidden(), 'la sezione dei passi occupa spazio da vuota');
+  t(await page.locator('.csteps').isHidden(), 'la sezione dei passi occupa spazio da vuota');
 
   await steps(list());
   await page.waitForTimeout(500);
   const tk = await page.evaluate(() => {
-    const sec = document.querySelector('.steps');
+    const sec = document.querySelector('.csteps');
     const cards = document.querySelector('.cards');
     return {
       shown: !sec.hidden,
-      // Sotto l'ultima card, non da qualche altra parte: e' il posto che le da' un
-      // senso — i passi sono di quella conversazione li' sopra.
-      belowCards: !!(cards.compareDocumentPosition(sec) & Node.DOCUMENT_POSITION_FOLLOWING),
-      sameScroller: cards.parentElement === sec.parentElement,
+      // Dentro la card, non sotto a tutte: e' il posto che le da' un senso — i passi
+      // sono di quella conversazione li', e con tre card aperte non c'e' piu' niente
+      // da indovinare su di chi siano.
+      insideCard: !!sec.closest('.ctxcard'),
+      sameScroller: !!cards.contains(sec),
       rows: sec.querySelectorAll('.tk-row').length,
       running: sec.querySelectorAll('.tk-row.in_progress').length,
       ticked: sec.querySelectorAll('.tk-row.completed').length,
@@ -298,7 +304,7 @@ for (const width of [320, 620]) {
     };
   });
   t(tk.shown, 'i passi non compaiono quando ci sono');
-  t(tk.belowCards, 'i passi non stanno sotto le card');
+  t(tk.insideCard, 'i passi non stanno dentro la card della loro conversazione');
   t(tk.sameScroller, 'i passi scorrono in un riquadro separato dalle card');
   t(tk.rows === 3, 'i passi disegnati sono ' + tk.rows + ' invece di 3');
   t(tk.running === 1, 'il passo in corso non e\' segnato: ' + tk.running);
@@ -313,7 +319,7 @@ for (const width of [320, 620]) {
   // questo fondo e' la differenza fra leggere e indovinare.
   const faded = await page.evaluate(() => {
     const bad = [];
-    for (const n of document.querySelectorAll('.steps .lab, .steps .tk-row, .steps .tk-count, .steps .tk-left, .steps .tk-state, .steps .tk-empty')) {
+    for (const n of document.querySelectorAll('.csteps .tk-row, .csteps .tk-count, .csteps .tk-left, .csteps .tk-state, .csteps .tk-empty')) {
       const o = parseFloat(getComputedStyle(n).opacity);
       if (o < 0.95) bad.push(n.className + '@' + o);
     }
@@ -328,10 +334,71 @@ for (const width of [320, 620]) {
     fullPage: true,
   });
 
+  // ---- due conversazioni aperte, due liste ----
+  // Il motivo per cui i passi si sono spostati dentro le card. Con una sezione sola
+  // in fondo alla colonna, di questi sei passi ne vedevi tre e non sapevi di quale
+  // delle due conversazioni fossero — e cambiavano da soli ogni volta che l'altra si
+  // muoveva. Ogni lista deve stare nella sua card, e restarci.
+  await post(
+    data({
+      cards: [
+        card({ name: 'Studio — i passi' }),
+        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'CRM — reminder', focused: false, busy: false }),
+      ],
+    })
+  );
+  await page.evaluate(
+    (x) => window.postMessage({ k: 'tasks', d: x }, '*'),
+    {
+      [ID]: list(),
+      bbbb: {
+        items: [{ content: 'Send the reminder', status: 'completed' }],
+        done: 1,
+        total: 1,
+        active: -1,
+        busy: false,
+      },
+    }
+  );
+  await page.waitForTimeout(200);
+  const split = await page.evaluate(() =>
+    [...document.querySelectorAll('.ctxcard')].map((c) => ({
+      name: c.querySelector('.cname').textContent,
+      rows: [...c.querySelectorAll('.csteps .tk-txt')].map((n) => n.textContent).join(' | '),
+    }))
+  );
+  t(split.length === 2, 'le due conversazioni non sono entrambe a schermo: ' + split.length);
+  t(
+    split[0].rows === 'Read the transcript | Fixing the counter | Run the checks',
+    'la prima conversazione non ha i suoi passi: ' + split[0].rows
+  );
+  t(
+    split[1].rows === 'Send the reminder',
+    'la seconda conversazione ha i passi di un\'altra: ' + split[1].rows
+  );
+  await page.screenshot({
+    path: path.join(root, 'dist', `preview-context-steps2-${width}.png`),
+    fullPage: true,
+  });
+
+  // Una lista che se ne va lascia la sua card intatta e non tocca quella accanto.
+  await page.evaluate((x) => window.postMessage({ k: 'tasks', d: x }, '*'), { bbbb: { items: [{ content: 'Send the reminder', status: 'completed' }], done: 1, total: 1, active: -1, busy: false } });
+  await page.waitForTimeout(120);
+  const left = await page.evaluate(() =>
+    [...document.querySelectorAll('.ctxcard')].map((c) => c.querySelectorAll('.csteps .tk-row').length)
+  );
+  t(left[0] === 0, 'i passi della conversazione azzerata sono rimasti: ' + left[0]);
+  t(left[1] === 1, 'azzerare una conversazione ha portato via i passi dell\'altra: ' + left[1]);
+
+  // Rimessa a una sola card per quello che viene dopo.
+  await post(data({ cards: [card()] }));
+  await steps(list());
+  await page.waitForTimeout(120);
+
   // Finita la conversazione la sezione si ritira: le task erano di quel prompt.
-  await steps({ items: [], done: 0, total: 0, active: -1, busy: false });
+  await steps(null);
   await page.waitForTimeout(80);
-  t(await page.locator('.steps').isHidden(), 'i passi restano a schermo dopo essere stati azzerati');
+  t(await page.locator('.csteps').isHidden(), 'i passi restano a schermo dopo essere stati azzerati');
 
   t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
 

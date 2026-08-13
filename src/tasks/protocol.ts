@@ -21,11 +21,21 @@ export interface TaskData {
   busy: boolean;
 }
 
-/** Extension -> panel. */
-export type TaskWire = { k: 'tasks'; d: TaskData } | { k: 'lang'; value: 'en' | 'it' };
+/**
+ * Every conversation's list, under the id of the conversation that wrote it.
+ *
+ * One list used to travel, and nothing on the wire said whose it was: with three tabs
+ * open the panel had to guess which one you meant, and the section swapped under you
+ * whenever another conversation moved. There is nothing to guess now — each card gets
+ * its own steps, and a conversation with none simply has none.
+ */
+export type TaskBoard = Record<string, TaskData>;
 
-/** Extension -> chat tab, where the same list is drawn in the rail. */
-export type TaskToChat = { k: 'tasks'; d: TaskData };
+/** Extension -> panel. */
+export type TaskWire = { k: 'tasks'; d: TaskBoard } | { k: 'lang'; value: 'en' | 'it' };
+
+/** Extension -> chat tab, where the same lists are drawn in the rail. */
+export type TaskToChat = { k: 'tasks'; d: TaskBoard };
 
 /** Panel -> extension. */
 export type TaskCmd = { cmd: 'ready' };

@@ -158,7 +158,17 @@ window.CtxPanel = (() => {
       row.append(pct, nums);
 
       const bar = makeBar();
-      c.append(chead, meta, row, bar);
+
+      // I passi di *questa* conversazione, dentro la sua card. Erano una sezione sola
+      // in fondo alla colonna: con tre conversazioni aperte mostrava i passi di una e
+      // non diceva di quale, e cambiavano sotto gli occhi ogni volta che un'altra si
+      // muoveva. Qui la domanda "di chi sono questi passi" non si pone: sono nella
+      // card che ha il nome sopra.
+      const steps = el('div', 'csteps');
+      steps.hidden = true;
+      const stepsPanel = window.TaskPanel ? window.TaskPanel(steps) : null;
+
+      c.append(chead, meta, row, bar, steps);
 
       ren.onclick = (ev) => {
         ev.stopPropagation();
@@ -170,7 +180,11 @@ window.CtxPanel = (() => {
       };
       c.onclick = () => post({ cmd: 'focus', id });
 
-      c._p = { dot, kind, name, badge, done, ren, shut, pill, sub, pct, tok, fill: bar.firstChild };
+      c._p = {
+        dot, kind, name, badge, done, ren, shut, pill, sub, pct, tok,
+        fill: bar.firstChild,
+        steps, stepsPanel,
+      };
       return c;
     }
 
@@ -216,27 +230,10 @@ window.CtxPanel = (() => {
       paintBar(p.fill, s.pct);
     }
 
-    // ---------- i passi, sotto l'ultima card ----------
-    //
-    // Stavano in un riquadro loro nella sidebar, ed era un riquadro di troppo: i passi
-    // che Claude sta spuntando riguardano una conversazione precisa, e quella
-    // conversazione ce l'hai gia' sotto gli occhi qui, con la sua card. Metterli
-    // altrove voleva dire aprire due pannelli per leggere una cosa sola — e nel
-    // pannello a se' stante non c'era modo di sapere di quale delle conversazioni
-    // aperte stessi leggendo i passi.
-    const steps = el('section', 'steps');
-    const stepsLab = el('div', 'lab');
-    const stepsLabText = document.createTextNode(t('ctx.steps'));
-    stepsLab.append(icon('list'), stepsLabText);
-    const stepsBody = el('div');
-    steps.append(stepsLab, stepsBody);
-    steps.hidden = true;
-    const stepsPanel = window.TaskPanel ? window.TaskPanel(stepsBody) : null;
-
-    // Le card e i passi scorrono insieme: i passi stanno sotto l'ultima card, non in
-    // un riquadro fisso in fondo che le mangerebbe l'altezza anche da vuoto.
+    // I passi non hanno piu' una sezione loro: stanno dentro le card, uno per
+    // conversazione. Vedi buildCard.
     const scroll = el('div', 'scroll');
-    scroll.append(host, steps);
+    scroll.append(host);
     root.append(head, scroll);
 
     // ---------- drawing ----------
@@ -248,7 +245,6 @@ window.CtxPanel = (() => {
 
     window.I18N.onChange(() => {
       labText.nodeValue = t('ctx.account');
-      stepsLabText.nodeValue = t('ctx.steps');
       if (last) render(last);
     });
 
@@ -296,6 +292,11 @@ window.CtxPanel = (() => {
           }
         }
       }
+      // Una card appena costruita nasce senza i suoi passi: le liste arrivano per
+      // conto loro e l'ultima che abbiamo e' ancora buona. Senza questo, la card di
+      // una conversazione che sta gia' lavorando comparirebbe vuota e resterebbe
+      // vuota fino alla spunta successiva.
+      paintTasks();
     }
 
     /**
@@ -303,15 +304,25 @@ window.CtxPanel = (() => {
      * consumi, e legarli allo stesso messaggio avrebbe voluto dire ridisegnare le
      * barre a ogni spunta.
      *
-     * La sezione sparisce del tutto quando non c'e' niente da spuntare. Un "ancora
-     * nessuna task" fisso sotto le card sarebbe una riga che non dice niente per il
-     * 90% del tempo, e proprio sotto la card che invece dice sempre qualcosa.
+     * Arrivano tutti insieme, uno per conversazione, sotto l'id della sua card. Non
+     * c'e' piu' niente da scegliere: ognuno va nella card che lo riguarda, e una
+     * conversazione senza passi resta una card e basta — un "ancora nessuna task"
+     * sotto ogni card sarebbe una riga che non dice niente moltiplicata per tre.
      */
+    let board = {};
+
+    function paintTasks() {
+      for (const [id, c] of cards) {
+        const d = board[id] || null;
+        const total = (d && d.total) || 0;
+        c._p.steps.hidden = !(total > 0 || (d && d.busy));
+        c._p.stepsPanel?.render(d);
+      }
+    }
+
     function renderTasks(d) {
-      if (!stepsPanel) return;
-      const total = (d && d.total) || 0;
-      steps.hidden = !(total > 0 || (d && d.busy));
-      stepsPanel.render(d);
+      board = d || {};
+      paintTasks();
     }
 
     return { render, renderTasks };
