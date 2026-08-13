@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions, your context always in sight — and attachments of any kind: PDF, Word, Excel, PowerPoint, CSV, zip, video, audio, logs and code, not just images.",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.10.0
+
+- **The new tab shows the commands.** The empty screen used to explain the
+  product to somebody who had already installed it, and teach five shortcuts.
+  Now it lists the commands you can actually run: click one and it lands in the
+  composer, ready to send.
+- **The mark is ours.** The starburst from the logo sheet, redrawn as a vector so
+  it holds at any size — 22 rays around a four-point star. It's on the editor
+  tab, in the activity bar and on the new-tab screen.
+- **The paperclip got warmer.** A white ring and an orange clip; on hover the
+  orange floods the button and it lifts on a soft glow. It used to tilt, which
+  read as the clip coming loose.
+- **Reloading the window keeps the conversation.** "Developer: Reload Window"
+  restarts the extension host and the chat went with it, even though the
+  transcript was on disk the whole time — what was missing was remembering which
+  one. The last conversation of the project is replayed on startup, so you come
+  back to your work instead of an empty screen.
+- **Picking a setting slides.** Same movement as the mode control up top. The
+  row rebuilt every button on each repaint, so the slider reappeared already
+  under the new choice and the move happened in the dark.
+- **Publishing works from a Mac.** The release script only knew where to find a
+  browser on Windows.
+
 ## 0.9.0
 
 - **The shortcuts work on a Mac.** They never had: Option is a compose key over

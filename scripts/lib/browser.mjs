@@ -10,11 +10,17 @@ import os from 'node:os';
 export const PROFILE_DIR = path.join(os.homedir(), '.claude-studio-publish-profile');
 export const CDP_PORT = 9333;
 
+// Windows e macOS: su un Mac i percorsi 'C:/...' non esistono e `existsSync` diceva
+// sempre di no, quindi pubblicare dal Mac finiva su "Nessun browser Chromium trovato".
 const BROWSERS = [
   'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe',
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+  '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+  '/Applications/Chromium.app/Contents/MacOS/Chromium',
 ];
 
 const cdpUp = async () => {
