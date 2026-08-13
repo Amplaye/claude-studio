@@ -125,13 +125,17 @@ console.log('  upload avviato, attendo esito...');
 // e poi la riga del portale ferma alla versione di prima, senza un errore da
 // nessuna parte. Prima di andare a controllare si aspetta che il dialogo si
 // chiuda da solo, che e' il portale che dice "ho finito di ricevere".
+// Un minuto non bastava: il dialogo restava aperto, si andava a controllare lo
+// stesso, e il primo controllo ricarica la pagina — cioe' proprio il gesto che
+// questa attesa esiste per evitare. Si aspetta fino a cinque minuti, che e' il
+// tempo di un upload lento, non quello di un upload finito.
 const dialogo = page.locator('input[type=file]');
-for (let i = 0; i < 40 && (await dialogo.count()) > 0; i++) {
+for (let i = 0; i < 200 && (await dialogo.count()) > 0; i++) {
   await page.waitForTimeout(1500);
 }
 console.log(
   (await dialogo.count()) > 0
-    ? '  il dialogo e’ ancora aperto dopo un minuto: proseguo a controllare comunque'
+    ? '  il dialogo e’ ancora aperto dopo cinque minuti: proseguo a controllare comunque'
     : '  dialogo chiuso: il file e’ arrivato'
 );
 

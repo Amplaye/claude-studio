@@ -2,6 +2,19 @@
 
 ## 0.14.1
 
+- **Each conversation's steps now live inside its own card.** With three tabs open the
+  list was a mess, and the reason was on the wire: the lists were already kept apart,
+  one per conversation, but only one of them was sent out and it travelled with no name
+  on it. The panel drew whoever had moved last — so while you were reading one
+  conversation's steps another one moved and swapped them under your eyes, with nothing
+  saying it had happened. Now they all travel, each under the id of the conversation
+  that wrote it, and the panel puts each list inside that conversation's card. "Whose
+  steps are these" is not a question any more: they sit under the name of whoever wrote
+  them down. A conversation with no steps stays a card and nothing else. The STEPS
+  heading goes too — it was there to say what that box at the bottom of the column was,
+  and inside a card that already carries its own name it would be the same word
+  repeated once per conversation.
+
 - **The account percentages follow the turn, instead of a clock.** They said "updated
   6m ago" and they were telling the truth: the panel was serving numbers from a
   quarter of an hour ago. Not because the timer was slow — because every "ask now"
