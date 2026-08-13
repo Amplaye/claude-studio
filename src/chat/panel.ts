@@ -40,6 +40,18 @@ export class ChatPanel {
   }
 
   /**
+   * Quello che fanno la scorciatoia e il comando "apri": sempre una conversazione
+   * nuova. La prima volta la scheda principale non c'e' ancora e si fa quella —
+   * nasce vuota, che e' gia' il foglio bianco che stai chiedendo. Dalla seconda in
+   * poi `open` si limiterebbe a riportare davanti la scheda di prima, quindi se ne
+   * apre una indipendente.
+   */
+  static openFresh(ctx: vscode.ExtensionContext, chat: ChatController, monitor?: ContextMonitor) {
+    if (!ChatPanel.primary) return ChatPanel.open(ctx, chat, undefined, monitor);
+    return ChatPanel.openNew(ctx, monitor);
+  }
+
+  /**
    * Opens a new independent tab, with its own controller and its own session. This
    * is the "+" in the header.
    */

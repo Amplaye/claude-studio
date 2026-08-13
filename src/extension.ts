@@ -4,6 +4,7 @@ import { registerDiffProvider } from './chat/editor';
 import { ChatPanel } from './chat/panel';
 import { ChatView, stayInSidebar } from './chat/view';
 import { ContextMonitor } from './context/monitor';
+import { owned } from './context/owned';
 import { ContextView } from './context/view';
 import { tasks } from './tasks/store';
 import { tips } from './chat/tips';
@@ -19,11 +20,13 @@ export function activate(ctx: vscode.ExtensionContext) {
   const monitor = new ContextMonitor();
   monitor.start(ctx);
 
-  // Reloading the window ("Developer: Reload Window") restarts the extension host and
-  // takes the in-memory conversation with it. The transcript is still on disk, so the
-  // last one is read back in and you carry on where you left off. Fire-and-forget: the
-  // views paint the moment they're ready and the replayed messages land as they come.
-  void chat.restoreLast();
+  // Aprire Studio vuol dire cominciare: la conversazione di ieri non torna da sola.
+  // Prima si rileggeva l'ultima del progetto, e cosi' ogni sessione "nuova" nasceva
+  // gia' piena di una conversazione che non avevi chiesto.
+  //
+  // Ricaricando la finestra invece le schede tornano ognuna sulla sua: quello lo fa il
+  // serializer in chat/panel.ts, scheda per scheda, e resta com'era — li' la
+  // conversazione non la stai aprendo, la stai ritrovando.
 
   ctx.subscriptions.push(
     registerDiffProvider(),
@@ -42,7 +45,13 @@ export function activate(ctx: vscode.ExtensionContext) {
     ChatPanel.register(ctx, chat, monitor),
     // "Open" opens the tab: that's the main face. The sidebar panel stays within
     // reach, but behind its own command.
-    vscode.commands.registerCommand('claudeStudio.show', () => ChatPanel.open(ctx, chat, undefined, monitor)),
+    // "Apri Claude Studio" apre una conversazione nuova. Chiedere Studio e' chiedere di
+    // cominciare qualcosa, non di riavere indietro quello che stavi facendo prima:
+    // quella la ritrovi dalla barra di contesto, dove ci sono tutte.
+    vscode.commands.registerCommand('claudeStudio.show', () => ChatPanel.openFresh(ctx, chat, monitor)),
+    // "Apri come scheda" invece e' il bottone sulla testata della sidebar, e vuol dire
+    // "questa conversazione, li'": porta di la' quella che stai guardando. Aprendone
+    // una nuova si perderebbe proprio la cosa che si stava chiedendo di spostare.
     vscode.commands.registerCommand('claudeStudio.openTab', () =>
       ChatPanel.open(ctx, chat, undefined, monitor)
     ),
@@ -72,16 +81,25 @@ export function activate(ctx: vscode.ExtensionContext) {
     // here — the click keeps its promise either way.
     vscode.commands.registerCommand('claudeStudio.openConversation', async (id: string) => {
       if (!id) return;
-      // The tab if there is one — brought to the front even from behind other
-      // editors — and the sidebar only when there's no tab at all. Opening a second
-      // face onto the same conversation is a window you then have to close.
-      if (ChatPanel.exists()) {
-        ChatPanel.open(ctx, chat, undefined, monitor);
-      } else {
-        stayInSidebar();
-        await vscode.commands.executeCommand('workbench.view.extension.claudeStudio');
+      // Cliccare una card apre una scheda su quella conversazione. Prima la caricava
+      // nella chat della sidebar — o dentro la scheda principale, sopra la
+      // conversazione che stavi guardando: due modi diversi di non darti quello che
+      // avevi chiesto, cioe' *quella* conversazione, davanti.
+      const here = owned.hosting(id);
+      if (here) {
+        // Gia' aperta in una scheda: si porta davanti. Una seconda faccia sulla
+        // stessa conversazione e' solo una finestra da richiudere.
+        if (ChatPanel.revealKey(here.key)) return;
+        // E' quella della sidebar: la sua chat e' la principale, che ha gia' la sua
+        // scheda: si apre quella, e la conversazione ci si trova gia' dentro.
+        if (here.key === chat.key) {
+          ChatPanel.open(ctx, chat, undefined, monitor);
+          return;
+        }
       }
-      await chat.open(id);
+      // Nessuno la tiene: una scheda nuova, con la sua chat, che se la carica.
+      const panel = ChatPanel.openNew(ctx, monitor);
+      await panel.chat.open(id);
     }),
     vscode.commands.registerCommand('claudeStudio.interrupt', () => chat.interrupt()),
     vscode.commands.registerCommand('claudeStudio.context.show', () =>

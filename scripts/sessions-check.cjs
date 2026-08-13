@@ -245,6 +245,21 @@ const ctx = {
   await vscode.commands.executeCommand('claudeStudio.openConversation', ID_A);
   t(tabA.revealed > before, 'clicking the card did not bring its own tab to the front');
 
+  // ---- a card nobody holds opens a tab of its own ----
+  // Prima finiva nella chat della sidebar, o dentro la scheda principale sopra la
+  // conversazione che stavi guardando: in un caso non la vedevi, nell'altro perdevi
+  // quella di prima. Una conversazione che apri e' una scheda.
+  const tabs = registered.panels.length;
+  await vscode.commands.executeCommand(
+    'claudeStudio.openConversation',
+    'cccccccc-1111-2222-3333-444444444444'
+  );
+  t(
+    registered.panels.length === tabs + 1,
+    'clicking a card of a conversation with no tab did not open one: ' +
+      `${registered.panels.length} vs ${tabs}`
+  );
+
   // ---- rename asks about the conversation you are in ----
   // Cancelled on purpose (showInputBox answers undefined): the test must not leave
   // names behind on the disk.

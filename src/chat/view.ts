@@ -58,18 +58,26 @@ export class ChatView implements vscode.WebviewViewProvider {
 
   /**
    * Clicking the activity bar icon opens the sidebar container: there's no event for
-   * that click, but there is this one — the view becoming visible. From there the
-   * tab is opened (or the one already there is brought forward: one only, never a
-   * second) and the sidebar panel closes, having already given what it had to give.
-   * Anyone who prefers the panel turns this off in Settings.
+   * that click, but there is this one — the view becoming visible. From there a tab
+   * with a conversation of its own is opened and the sidebar panel closes, having
+   * already given what it had to give. Anyone who prefers the panel turns this off
+   * in Settings.
+   *
+   * Con una scheda gia' aperta il clic non fa niente: si chiude solo la barra. Prima
+   * riportava davanti la scheda e poi chiudeva, e da fuori si vedeva una conversazione
+   * che si apriva e si richiudeva — un lampo che sembrava un difetto perche' lo era.
    */
   private maybeJumpToTab() {
     const on = vscode.workspace.getConfiguration('claudeStudio').get<boolean>('openAsTab', true);
     if (!on || Date.now() < stayInSidebarUntil) return;
+    if (ChatPanel.exists()) {
+      void vscode.commands.executeCommand('workbench.action.closeSidebar');
+      return;
+    }
     // We don't open a tab while VSCode is still mounting this view: let the round
     // finish, then jump.
     setTimeout(() => {
-      ChatPanel.open(this.ctx, this.chat, undefined, this.monitor);
+      ChatPanel.openFresh(this.ctx, this.chat, this.monitor);
       void vscode.commands.executeCommand('workbench.action.closeSidebar');
     }, 0);
   }
