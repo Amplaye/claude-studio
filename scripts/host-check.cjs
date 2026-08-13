@@ -296,7 +296,10 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   // it is also the proof that the MCP server survives bundling.
   onMsg({
     cmd: 'send',
-    text: 'Call the mcp__editor__errori_editor tool and report back the line it answers with, no comments.',
+    // Il nome per esteso, e quello vero: il ponte si chiama `editor_errors`. Chiedendo
+    // un tool che non esiste Claude non puo' che rispondere a parole, e il test dava
+    // per rotto il ponte quando era la domanda a essere sbagliata.
+    text: 'Call the mcp__editor__editor_errors tool and report back the line it answers with, no comments.',
   });
   await turns(4);
 

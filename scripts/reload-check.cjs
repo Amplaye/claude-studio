@@ -19,7 +19,12 @@ const os = require('node:os');
 const path = require('node:path');
 
 const root = path.dirname(__dirname);
-const home = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-reload-'));
+// Through realpath: su macOS la cartella temporanea sta sotto /var, che e' un
+// collegamento a /private/var. Una conversazione e' archiviata sotto il nome per
+// esteso della cartella a cui appartiene, quindi il test scriverebbe sotto un nome e
+// l'SDK cercherebbe sotto l'altro — non trovando niente e dando per rotto quello che
+// funziona.
+const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-reload-')));
 const work = path.join(home, 'project');
 fs.mkdirSync(work, { recursive: true });
 process.env.USERPROFILE = home;

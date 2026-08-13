@@ -25,7 +25,14 @@ const LIVE = process.argv.includes('--live');
 const root = path.dirname(__dirname);
 // Live needs your real home: that's where the login is. Offline moves it, so the
 // transcripts the test writes are the only ones the extension can find.
-const home = LIVE ? os.homedir() : fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-tasks-'));
+//
+// Through realpath, and it matters on macOS: the temp folder lives under /var, which
+// is a symlink to /private/var. A conversation is filed under the folder it belongs
+// to, spelled out — so the test would write to one name and the SDK look under the
+// other, find nothing, and report the panel as broken when it was fine.
+const home = LIVE
+  ? os.homedir()
+  : fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-tasks-')));
 const work = LIVE ? root : path.join(home, 'project');
 if (!LIVE) {
   fs.mkdirSync(work, { recursive: true });
@@ -374,10 +381,16 @@ async function live(tab, side) {
     return ended >= want;
   }
 
+  // Gli strumenti vanno nominati. Chiedendo "scriviti una lista" Claude risponde con
+  // un elenco puntato dentro al messaggio — che per lui e' aver ubbidito, e per questo
+  // test e' un panello vuoto e un fallimento che non significa niente. Quello che qui
+  // si sta provando e' il filo che parte da TaskCreate: se quel tool non viene chiamato
+  // non si sta provando nulla.
   const ok1 = await turn(
-    'Scriviti una lista di task con tre voci — "Leggere il README", "Contare le righe", ' +
-      '"Scrivere il risultato" — poi metti la prima in corso e la seconda completata. ' +
-      'Non leggere e non toccare nessun file: e\' solo la lista che mi serve.'
+    'Usa lo strumento TaskCreate (una chiamata per voce, non scriverle nel messaggio) ' +
+      'per creare tre task: "Leggere il README", "Contare le righe", "Scrivere il risultato". ' +
+      'Poi con TaskUpdate metti la prima in_progress e la seconda completed. ' +
+      'Non leggere e non toccare nessun file: servono solo le chiamate ai due strumenti.'
   );
 
   const frames = seen().filter(Boolean);
@@ -407,7 +420,9 @@ async function live(tab, side) {
   // one arrives; a Task* list belongs to the conversation and must not. Get that
   // wrong and the panel empties itself the moment you say "go on".
   const before = seen().length;
-  const ok2 = await turn('Adesso completa anche la terza task della lista. Nient\'altro.');
+  const ok2 = await turn(
+    'Adesso con TaskUpdate metti completed anche la terza task. Nient\'altro, nessun file.'
+  );
   const after = seen().slice(before).filter(Boolean);
   const d2 = after[after.length - 1] ?? only(tab);
   console.log('  turn 2: ' + line(d2));
