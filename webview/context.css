@@ -109,8 +109,7 @@ body {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.9;
+  text-transform: uppercase;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -123,8 +122,7 @@ body {
   letter-spacing: -0.02em;
 }
 .ctx .ar {
-  font-size: 11px;
-  opacity: 0.85;
+  font-size: 11px;
   max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
@@ -145,8 +143,7 @@ body {
 /* Only present when the numbers have gone stale, so it needs no attention-getting
    of its own: being there at all is the signal. */
 .ctx .aged {
-  font-size: 11px;
-  opacity: 0.55;
+  font-size: 11px;
   padding: 2px 0 0;
   letter-spacing: 0.01em;
 }
@@ -348,8 +345,7 @@ body {
   align-items: center;
   gap: 7px;
   margin-top: 7px;
-  font-size: 11.5px;
-  opacity: 0.9;
+  font-size: 11.5px;
 }
 
 .ctx .tabpill {
@@ -392,8 +388,7 @@ body {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  font-size: 11.5px;
-  opacity: 0.9;
+  font-size: 11.5px;
 }
 .ctx .bar {
   position: relative;
@@ -414,8 +409,7 @@ body {
   border: 1px dashed var(--line);
   border-radius: var(--r);
   text-align: center;
-  font-size: 12.5px;
-  opacity: 0.85;
+  font-size: 12.5px;
 }
 
 /* ---------- the footer ---------- */

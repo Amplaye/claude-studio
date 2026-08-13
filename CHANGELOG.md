@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **Nothing the panel says is written in grey any more — anywhere.** tokens.css has
+  said it from the first line since 0.0.6: text is full white, hierarchy comes from
+  size and weight. Forty-nine rules across the chat and the context panel were quietly
+  ignoring it, each carrying an `opacity` between 0.5 and 0.95 on plain words — the
+  language beside a code block, the file names in a recap, "8 steps · 18k context", the
+  size of an attachment, the description under every command in the menu, the timestamp
+  in the history list, the numbers on a conversation card. On its own each looked like
+  a tasteful half-tone. Together they meant most of what this thing says was grey on
+  near-black, which you decipher rather than read. Hierarchy is still there — it is
+  made of size, weight, spacing and the boxes things sit in, which is what those were
+  supposed to be doing all along. Three things still sit back, because being dimmed is
+  what they *mean*: disabled controls, the placeholder in an empty field (raised, but
+  not to full, or it reads as text you already typed) and decoration that is not a
+  word.
+
 - **The STEPS section was reading a tool the CLI no longer has.** It listened for
   `TodoWrite` — one call carrying the whole list — and Claude Code stopped writing its
   steps that way: it now creates them one at a time with `TaskCreate` and moves them
