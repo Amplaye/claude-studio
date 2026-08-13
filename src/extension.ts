@@ -14,6 +14,12 @@ export function activate(ctx: vscode.ExtensionContext) {
   const monitor = new ContextMonitor();
   monitor.start(ctx);
 
+  // Reloading the window ("Developer: Reload Window") restarts the extension host and
+  // takes the in-memory conversation with it. The transcript is still on disk, so the
+  // last one is read back in and you carry on where you left off. Fire-and-forget: the
+  // views paint the moment they're ready and the replayed messages land as they come.
+  void chat.restoreLast();
+
   ctx.subscriptions.push(
     registerDiffProvider(),
     // The chat has to know what you selected without asking you.

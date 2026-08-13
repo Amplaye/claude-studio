@@ -125,6 +125,7 @@
     'empty.key.new': 'new',
     'empty.key.history': 'history',
     'empty.key.stop': 'stop',
+    'empty.commands.wait': 'Loading the commands…',
 
     // ---- the conversation ----
     'msg.reasoning': 'Reasoning',
@@ -329,6 +330,7 @@
     'empty.key.new': 'nuova',
     'empty.key.history': 'cronologia',
     'empty.key.stop': 'ferma',
+    'empty.commands.wait': 'Carico i comandi…',
 
     'msg.reasoning': 'Ragionamento',
     'msg.thinking': 'Claude sta pensando…',

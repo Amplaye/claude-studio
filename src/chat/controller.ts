@@ -15,6 +15,8 @@ import type {
   Wire,
 } from '../engine/protocol';
 import { pickFiles, stashFile } from './attach';
+import { type CommandHost, runLocalCommand } from './commands';
+import { Checkpoints } from './checkpoints';
 import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
 import { setChatBadge } from './badge';
@@ -43,6 +45,13 @@ const PREFS_KEY = 'claudeStudio.prefs';
  */
 const MODELS_KEY = 'claudeStudio.models';
 const COMMANDS_KEY = 'claudeStudio.commands';
+/**
+ * L'ultima conversazione di *questo* progetto. Ricaricando la finestra il processo
+ * muore e la cronologia in memoria se ne va con lui, ma la trascrizione resta sul
+ * disco: basta ricordarsi quale, e si torna al lavoro dove lo si era lasciato.
+ * Sta in workspaceState perche' una sessione appartiene al progetto, non a te.
+ */
+const LAST_SESSION_KEY = 'claudeStudio.lastSession';
 
 /**
  * Il modello da mettere quando non ce n'e' uno scelto. Non essendoci piu'
@@ -76,6 +85,8 @@ let keySeq = 0;
 export class ChatController {
   private session?: Session;
   private history: Wire[] = [];
+  /** Com'era il codice prima di ogni messaggio: e' quello che "/rewind" rimette. */
+  private readonly checkpoints = new Checkpoints();
   private surfaces = new Set<Surface>();
   private busy = false;
   private mode: Mode = 'bypassPermissions';
@@ -286,6 +297,11 @@ export class ChatController {
    * che si legge nella chat: nella chat resta la frase, il muro di codice no.
    */
   send(text: string, images?: Pasted[], withSelection?: boolean, files?: SentFile[]) {
+    // I comandi che sono azioni dell'interfaccia si fermano qui: mandarli al
+    // motore come testo lascerebbe la chat piena e il contesto intatto — era il
+    // difetto di "/clear". Quelli che il motore sa fare passano oltre. Vedi
+    // chat/commands.ts.
+    if (runLocalCommand(text, this.commandHost())) return;
     let full = text;
     if (withSelection) {
       const sel = currentSelection();
@@ -306,6 +322,9 @@ export class ChatController {
         `(Read for text, PDFs and notebooks) before answering.`;
       full = full.trim();
     }
+    // Da qui in poi le modifiche appartengono a questo messaggio: e' il punto a
+    // cui "/rewind" sa tornare.
+    this.checkpoints.begin(text);
     this.ensureSession().send(full, images, text);
   }
 
@@ -340,7 +359,164 @@ export class ChatController {
 
   newSession() {
     this.resume = undefined;
+    // Chiedendo una conversazione nuova, quella vecchia non va piu' riaperta al
+    // prossimo avvio: il segnaposto si cancella subito, non alla prima risposta.
+    if (this.primary) void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
     this.clear();
+  }
+
+  // ---- i comandi che sono azioni dell'interfaccia (vedi chat/commands.ts) ----
+
+  /** Quello che i comandi locali hanno il permesso di toccare, e nient'altro. */
+  private commandHost(): CommandHost {
+    return {
+      lang: this.prefs.lang,
+      newSession: () => this.newSession(),
+      sendHistory: () => void this.sendHistory(),
+      rewind: () => void this.rewind(),
+      openMemory: () => void this.openMemory(),
+      exportConversation: () => void this.exportConversation(),
+      addDirectory: () => void this.addDirectory(),
+      closeTab: () => void vscode.commands.executeCommand('workbench.action.closeActiveEditor'),
+      showHelp: () => void this.showHelp(),
+      showStatus: () => void this.showStatus(),
+      // Non ripassa da send(): li' verrebbe riletto come comando e non partirebbe
+      // mai. Un checkpoint pero' si apre lo stesso — cambia file come un turno
+      // qualsiasi, e "/rewind" deve poterlo disfare.
+      askEngine: (prompt) => {
+        this.checkpoints.begin(prompt);
+        this.ensureSession().send(prompt, undefined, prompt);
+      },
+    };
+  }
+
+  /**
+   * "/rewind": si sceglie un messaggio di prima e si torna li'. Il codice torna
+   * com'era perche' i checkpoint l'hanno messo da parte prima di ogni modifica
+   * (vedi chat/checkpoints.ts); la conversazione torna indietro riaprendola a
+   * quel punto. Come nell'originale, si puo' scegliere solo il codice, solo la
+   * conversazione, o tutti e due.
+   */
+  private async rewind() {
+    const points = this.checkpoints.entries();
+    if (!points.length) {
+      void vscode.window.showInformationMessage(t(this.prefs.lang, 'rewind.none'));
+      return;
+    }
+    const lang = this.prefs.lang;
+    const pick = await vscode.window.showQuickPick(
+      points.map((p) => ({
+        label: p.prompt.replace(/\s+/g, ' ').slice(0, 70) || '—',
+        description:
+          p.files > 0 ? t(lang, 'rewind.files', { n: String(p.files) }) : t(lang, 'rewind.noFiles'),
+        detail: new Date(p.at).toLocaleTimeString(),
+        index: p.index,
+      })),
+      { title: t(lang, 'rewind.pick'), matchOnDescription: true }
+    );
+    if (!pick) return;
+
+    // Le due voci sul codice compaiono solo se c'e' davvero qualcosa da rimettere,
+    // esattamente come fa l'originale.
+    const hasFiles = this.checkpoints.filesAt(pick.index) > 0;
+    type Action = 'both' | 'code' | 'talk';
+    const choices: { label: string; action: Action }[] = [
+      ...(hasFiles
+        ? [
+            { label: t(lang, 'rewind.both'), action: 'both' as Action },
+            { label: t(lang, 'rewind.code'), action: 'code' as Action },
+          ]
+        : []),
+      { label: t(lang, 'rewind.talk'), action: 'talk' as Action },
+    ];
+    const what = await vscode.window.showQuickPick(choices, { title: t(lang, 'rewind.what') });
+    if (!what) return;
+
+    if (what.action === 'both' || what.action === 'code') {
+      const { restored, skipped } = await this.checkpoints.restore(pick.index);
+      if (skipped.length) {
+        void vscode.window.showWarningMessage(
+          t(lang, 'rewind.skipped', { n: String(restored), s: String(skipped.length) })
+        );
+      } else {
+        void vscode.window.showInformationMessage(
+          t(lang, 'rewind.done', { n: String(restored) })
+        );
+      }
+    }
+
+    if (what.action === 'both' || what.action === 'talk') {
+      // La conversazione torna indietro riaprendo la sessione su un ramo nuovo:
+      // quella di prima resta intera, come quando si sceglie un punto passato.
+      const mine = owned.all().find((s) => s.key === this.key);
+      if (mine?.id) await this.open(mine.id, true);
+    }
+  }
+
+  /** "/memory": il CLAUDE.md del progetto, aperto come file vero. */
+  private async openMemory() {
+    const root = workspaceRoot();
+    if (!root) {
+      void vscode.window.showInformationMessage(t(this.prefs.lang, 'cmd.noProject'));
+      return;
+    }
+    const uri = vscode.Uri.joinPath(vscode.Uri.file(root), 'CLAUDE.md');
+    try {
+      await vscode.workspace.fs.stat(uri);
+    } catch {
+      // Non c'e' ancora: si crea vuoto, com'e' piu' utile che un errore.
+      await vscode.workspace.fs.writeFile(uri, new Uint8Array());
+    }
+    await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+  }
+
+  /** "/export": la conversazione come testo, negli appunti. */
+  private async exportConversation() {
+    // Quello che si e' scritto e quello che ha risposto: i pezzi finiti, non i
+    // frammenti dello streaming (quelli ridirebbero la stessa frase a pezzi).
+    const lines: string[] = [];
+    for (const e of this.history) {
+      if (e.k === 'user') lines.push(`> ${e.text}`);
+      else if (e.k === 'block_final' && e.kind === 'text' && e.text.trim()) lines.push(e.text);
+    }
+    if (!lines.length) {
+      void vscode.window.showInformationMessage(t(this.prefs.lang, 'cmd.nothingToExport'));
+      return;
+    }
+    await vscode.env.clipboard.writeText(lines.join('\n\n'));
+    void vscode.window.showInformationMessage(t(this.prefs.lang, 'cmd.exported'));
+  }
+
+  /** "/add-dir": un'altra cartella a cui il motore puo' arrivare. */
+  private async addDirectory() {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: t(this.prefs.lang, 'cmd.addDir'),
+    });
+    if (!picked?.length) return;
+    // Una cartella in piu' la vede il motore che parte dopo: si riparte da qui.
+    await vscode.commands.executeCommand('vscode.openFolder', picked[0], {
+      forceNewWindow: true,
+    });
+  }
+
+  /** "/help": l'elenco di cosa si puo' scrivere. */
+  private async showHelp() {
+    void vscode.env.openExternal(vscode.Uri.parse('https://code.claude.com/docs/en/commands'));
+  }
+
+  /** "/status" e "/cost": com'e' messa questa sessione, in breve. */
+  private async showStatus() {
+    const cli = findClaudeCli(cliSetting());
+    const parts = [
+      `${t(this.prefs.lang, 'cmd.model')}: ${this.prefs.model || '—'}`,
+      `${t(this.prefs.lang, 'cmd.mode')}: ${this.mode}`,
+      `CLI: ${cli ? claudeCliVersion(cli) || '?' : '—'}`,
+      `${t(this.prefs.lang, 'cmd.cwd')}: ${currentCwd()}`,
+    ];
+    void vscode.window.showInformationMessage(parts.join('   ·   '));
   }
 
   // ---- cronologia --------------------------------------------------------
@@ -369,11 +545,43 @@ export class ChatController {
     this.titleChanged();
   }
 
+  /**
+   * Ricaricando la finestra ("Developer: Reload Window") il processo riparte da zero:
+   * la conversazione era solo in memoria e sparisce, anche se la trascrizione e'
+   * ancora sul disco. Qui si riapre l'ultima di questo progetto, cosi' si torna al
+   * lavoro senza ricominciare.
+   *
+   * Non riaccende il motore: `open` prepara il `resume`, e la CLI riprende il filo
+   * al primo messaggio che scrivi. Se la trascrizione non c'e' piu' (cancellata, o
+   * un altro progetto) si resta sulla schermata vuota, che e' il comportamento giusto.
+   */
+  async restoreLast() {
+    if (!this.primary) return;
+    const id = this.ctx.workspaceState.get<string>(LAST_SESSION_KEY);
+    if (!id || this.history.length) return;
+    // Prima si guarda se c'e' davvero qualcosa da rileggere: `replaySession` non
+    // protesta per una trascrizione mancante, torna vuota. Riprendendola lo stesso
+    // si resterebbe agganciati a un id che non esiste piu', e il primo messaggio
+    // andrebbe a vuoto. Meglio scoprirlo adesso.
+    let past: Wire[] = [];
+    try {
+      past = await replaySession(id, currentCwd());
+    } catch {
+      past = [];
+    }
+    if (!past.length) {
+      void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
+      return;
+    }
+    await this.open(id);
+  }
+
   private clear() {
     this.closeAllPending('Switching conversation.');
     this.endEngine();
     this.history = [];
     this.busy = false;
+    this.checkpoints.clear(); // i punti di prima appartenevano alla conversazione andata
     owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
     this.broadcast({ k: 'reset' });
     this.broadcast({ k: 'mode', value: this.mode });
@@ -558,6 +766,7 @@ export class ChatController {
       effort: this.prefs.effort,
       thinking: this.prefs.thinking,
       ide: { editor: ideServer() },
+      beforeTool: (tool, input) => this.checkpoints.before(tool, input),
       ...(this.resume ? { resume: this.resume.id, fork: this.resume.fork } : {}),
     });
     // La ripresa vale per l'accensione, non per sempre: se poi si azzera la
@@ -577,6 +786,11 @@ export class ChatController {
     if (e.k === 'commands') {
       this.commands = e.items;
       void this.ctx.globalState.update(COMMANDS_KEY, e.items);
+    }
+    // Qual e' la conversazione in corso. Serve solo alla scheda principale: e' quella
+    // che si riapre da sola alla prossima finestra.
+    if (e.k === 'session' && this.primary) {
+      void this.ctx.workspaceState.update(LAST_SESSION_KEY, e.id);
     }
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa

@@ -147,6 +147,10 @@
   }
 
   // ---------- empty state ----------
+  // Declared up here, not down by the "/" menu that also reads it: the empty screen
+  // paints the command list on first render, long before that section is reached.
+  let commands = [];
+
   /** Shortcuts only get learned if they're written where you look while waiting. */
   // The modifier is written the way this machine writes it: "Alt+N" on a PC, "⌥N"
   // on a Mac. Nobody looks up a shortcut written for somebody else's keyboard.
@@ -158,21 +162,38 @@
     ['Esc', 'empty.key.stop'],
   ];
 
+  // The empty screen is the command list and nothing else: the brand mark, "Ready.",
+  // then the commands you can actually run. The old blurb explained the product to
+  // somebody who had already installed it, and the five shortcut pills said less than
+  // the list itself does. Commands arrive from the extension, so the list is repainted
+  // whenever they land (see the 'commands' case in the message handler).
   function showEmpty() {
     log.replaceChildren();
     const box = el('div', 'empty');
-    box.append(
-      icon('chatbubble-ellipses'),
-      el('h2', null, t('empty.title')),
-      el('p', null, t('empty.body'))
-    );
-    const keys = el('div', 'keys');
-    for (const [k, what] of KEYS) {
-      const item = el('span', 'key');
-      item.append(el('kbd', null, k), el('span', null, t(what)));
-      keys.append(item);
+    box.append(icon('studio-logo', 'brandmark'), el('h2', null, t('empty.title')));
+
+    const list = el('div', 'cmdlist');
+    if (commands.length) {
+      for (const c of commands) {
+        const row = el('button', 'cmdrow');
+        row.type = 'button';
+        row.append(
+          el('span', 'cmdname', '/' + (c.name || c.command || '')),
+          el('span', 'cmddesc', c.description || c.detail || '')
+        );
+        // Clicking a command drops it in the composer, ready to send.
+        row.addEventListener('click', () => {
+          input.value = '/' + (c.name || c.command || '') + ' ';
+          input.focus();
+          input.dispatchEvent(new Event('input'));
+        });
+        list.append(row);
+      }
+    } else {
+      // Before the first turn the extension has not sent the commands yet.
+      list.append(el('p', 'cmdhint', t('empty.commands.wait')));
     }
-    box.append(keys);
+    box.append(list);
     log.appendChild(box);
   }
 
@@ -1290,6 +1311,10 @@
         break;
       case 'commands':
         commands = m.items || [];
+        // The empty screen *is* the command list, so it has to be repainted when the
+        // list finally arrives — otherwise a new tab keeps showing "loading commands"
+        // until the first message replaces the screen entirely.
+        if (log.querySelector('.empty')) showEmpty();
         break;
       case 'files':
         showFiles(m.items || []);
@@ -1386,7 +1411,6 @@
 
   // ---------- the "@" and "/" menu ----------
   const menu = $('menu');
-  let commands = [];
   let picking = null; // {kind:'@'|'/', start, end, items, sel}
 
   /** The piece of word under the caret, if it starts with @ or with /. */
@@ -2357,25 +2381,47 @@
   function paintSeg(container, items, value, onChange) {
     // Keep the existing slider or make one
     let slider = container.querySelector('.seg-slider');
-    container.replaceChildren();
     if (!slider) {
       slider = el('div', 'seg-slider');
+      container.appendChild(slider);
     }
-    container.appendChild(slider);
     watchSeg(container);
 
-    for (const it of items) {
-      const btn = el('button', 'seg-btn' + (it.value === value ? ' on' : ''));
-      btn.type = 'button';
-      btn.textContent = it.label;
-      if (it.disabled) btn.disabled = true;
-      btn.addEventListener('click', () => {
-        if (btn.disabled) return;
-        pulse(btn);
-        onChange(it.value);
-      });
-      container.append(btn);
+    // The buttons are reused, never rebuilt. Picking an option repaints the whole
+    // panel, and tearing the row down threw away the element the slider was
+    // measuring: it came back already sitting under the new choice, so the move you
+    // were meant to see had happened in the dark. Same buttons, only the classes
+    // change — and the slider slides, exactly like the mode control up top.
+    const old = [...container.querySelectorAll('.seg-btn')];
+    const same =
+      old.length === items.length &&
+      items.every((it, i) => old[i].dataset.value === String(it.value));
+
+    if (!same) {
+      for (const b of old) b.remove();
+      for (const it of items) {
+        const btn = el('button', 'seg-btn');
+        btn.type = 'button';
+        btn.dataset.value = String(it.value);
+        btn.addEventListener('click', () => {
+          if (btn.disabled) return;
+          pulse(btn);
+          onChange(it.value);
+        });
+        container.append(btn);
+      }
     }
+
+    // The labels are refreshed either way: switching language keeps the same values
+    // and only changes the words.
+    const btns = container.querySelectorAll('.seg-btn');
+    items.forEach((it, i) => {
+      const btn = btns[i];
+      if (!btn) return;
+      if (btn.textContent !== it.label) btn.textContent = it.label;
+      btn.disabled = !!it.disabled;
+      btn.classList.toggle('on', it.value === value);
+    });
 
     if (!container.querySelector('.seg-btn.on')) slider.style.display = 'none';
     // Right away and then after a frame: the first pass handles the normal case, the

@@ -15,6 +15,7 @@ import type {
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 import type { Thinking, Wire } from './protocol';
+import { LOCAL_COMMANDS } from '../shared/localCommands';
 
 /**
  * Tutto quello che serve per chiedere il permesso. `id` e' il `tool_use_id`:
@@ -55,6 +56,12 @@ export interface SessionOptions {
   effort?: string;
   /** 'auto' = come farebbe la CLI da sola. */
   thinking?: Thinking;
+  /**
+   * Suona prima che uno strumento tocchi un file, e si aspetta: e' li' che i
+   * checkpoint mettono da parte com'era. Dopo, il contenuto di prima non esiste
+   * piu' da nessuna parte. Chi non tiene checkpoint non lo passa.
+   */
+  beforeTool?: (tool: string, input: Record<string, unknown>) => Promise<void>;
 }
 
 /**
@@ -253,18 +260,27 @@ export class Session {
     }
   }
 
-  /** Gli slash command veri della CLI: skill, comandi del progetto, plugin. */
+  /**
+   * Gli slash command veri della CLI — skill, comandi del progetto, plugin —
+   * piu' quelli che fa l'interfaccia da se' (vedi chat/commands.ts). Nel menu
+   * stanno insieme: da qui dentro sono la stessa cosa, si scrivono uguale.
+   */
   private async publishCommands() {
     try {
-      const list = await this.q?.supportedCommands();
-      if (!list) return;
-      this.o.emit({
-        k: 'commands',
-        items: list.map((c: any) => ({
+      const list = (await this.q?.supportedCommands()) ?? [];
+      const fromCli = list
+        .map((c: any) => ({
           name: String(c.name ?? ''),
           description: String(c.description ?? '').slice(0, 200),
-        })).filter((c) => c.name),
-      });
+        }))
+        .filter((c) => c.name);
+      // Il motore vince sui doppioni: "clear" e' suo di nome, ma a eseguirlo e'
+      // l'interfaccia — il menu pero' deve mostrarne uno solo.
+      const seen = new Set(fromCli.map((c) => c.name));
+      const mine = LOCAL_COMMANDS.filter((c) => !seen.has(c.name));
+      const items = [...fromCli, ...mine];
+      if (!items.length) return;
+      this.o.emit({ k: 'commands', items });
     } catch {
       /* una CLI piu' vecchia puo' non saperlo dire: si resta senza elenco */
     }
@@ -309,8 +325,12 @@ export class Session {
       displayName?: string;
       description?: string;
     }
-  ): Promise<PermissionResult> =>
-    this.o.ask({
+  ): Promise<PermissionResult> => {
+    // Com'era prima si prende adesso: qui il file e' ancora quello di partenza.
+    // Prima di chiedere il permesso, non dopo — a permesso dato lo strumento
+    // scrive subito, e chi arrivasse dopo copierebbe gia' il lavoro fatto.
+    await this.o.beforeTool?.(toolName, input);
+    return this.o.ask({
       id: opts.toolUseID,
       tool: toolName,
       input,
@@ -320,6 +340,7 @@ export class Session {
       suggestions: opts.suggestions,
       signal: opts.signal,
     });
+  };
 
   // ---- traduzione dei messaggi SDK in eventi per la webview --------------
 

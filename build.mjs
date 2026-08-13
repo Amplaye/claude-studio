@@ -41,6 +41,17 @@ function buildSprite() {
     const id = 'ion-' + name.replace(/-outline$/, '');
     symbols.push(`<symbol id="${id}" viewBox="${viewBox}">${inner}</symbol>`);
   }
+  // The brand mark is ours, not an Ionicon: it comes from media/logo.svg and keeps
+  // its own colours (the gradients are baked in), so it is copied in verbatim
+  // rather than being recoloured with currentColor like everything else.
+  const logoFile = path.join(root, 'media', 'logo.svg');
+  if (fs.existsSync(logoFile)) {
+    const raw = fs.readFileSync(logoFile, 'utf8');
+    const viewBox = (raw.match(/viewBox="([^"]+)"/) || [, '0 0 512 512'])[1];
+    const inner = raw.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '');
+    symbols.push(`<symbol id="ion-studio-logo" viewBox="${viewBox}">${inner}</symbol>`);
+  }
+
   // The sprite hides itself with a CLASS, never with style="display:none": the real
   // webview runs a CSP without 'unsafe-inline', which throws away style attributes
   // written into the markup. With those thrown away the sprite became a 150px-tall

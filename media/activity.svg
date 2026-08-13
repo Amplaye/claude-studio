@@ -1,1 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24"><path fill="#d97757" stroke="#d97757" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" d="M259.92 262.91 216.4 149.77a9 9 0 0 0-16.8 0l-43.52 113.14a9 9 0 0 1-5.17 5.17L37.77 311.6a9 9 0 0 0 0 16.8l113.14 43.52a9 9 0 0 1 5.17 5.17l43.52 113.14a9 9 0 0 0 16.8 0l43.52-113.14a9 9 0 0 1 5.17-5.17l113.14-43.52a9 9 0 0 0 0-16.8l-113.14-43.52a9 9 0 0 1-5.17-5.17z"/><path fill="#d97757" stroke="#d97757" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" d="M108 68 88 16 68 68 16 88l52 20 20 52 20-52 52-20z"/><path fill="#d97757" stroke="#d97757" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" d="M426.67 117.33 400 48l-26.67 69.33L304 144l69.33 26.67L400 240l26.67-69.33L496 144z"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="24" height="24" fill="none">
+<line x1="349.76" y1="269.48" x2="486.59" y2="289.15" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="342.16" y1="295.35" x2="467.91" y2="352.78" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="327.58" y1="318.03" x2="432.06" y2="408.56" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="307.21" y1="335.68" x2="381.95" y2="451.98" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="282.69" y1="346.88" x2="321.63" y2="479.52" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="256.00" y1="350.72" x2="256.00" y2="488.96" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="229.31" y1="346.88" x2="190.37" y2="479.52" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="204.79" y1="335.68" x2="130.05" y2="451.98" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="184.42" y1="318.03" x2="79.94" y2="408.56" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="169.84" y1="295.35" x2="44.09" y2="352.78" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="162.24" y1="269.48" x2="25.41" y2="289.15" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="162.24" y1="242.52" x2="25.41" y2="222.85" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="169.84" y1="216.65" x2="44.09" y2="159.22" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="184.42" y1="193.97" x2="79.94" y2="103.44" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="204.79" y1="176.32" x2="130.05" y2="60.02" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="229.31" y1="165.12" x2="190.37" y2="32.48" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="256.00" y1="161.28" x2="256.00" y2="23.04" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="282.69" y1="165.12" x2="321.63" y2="32.48" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="307.21" y1="176.32" x2="381.95" y2="60.02" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="327.58" y1="193.97" x2="432.06" y2="103.44" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="342.16" y1="216.65" x2="467.91" y2="159.22" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<line x1="349.76" y1="242.52" x2="486.59" y2="222.85" stroke="currentColor" stroke-width="17.41" stroke-linecap="round"/>
+<path d="M 256.0 197.12 Q 266.24 245.76 314.88 256.0 Q 266.24 266.24 256.0 314.88 Q 245.76 266.24 197.12 256.0 Q 245.76 245.76 256.0 197.12 Z" fill="currentColor"/>
+</svg>

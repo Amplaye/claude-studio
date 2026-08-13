@@ -64,28 +64,25 @@ for (const surface of ['view', 'panel']) {
 
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
 
-  // ---- the empty state: that's where you learn the shortcuts ----
+  // ---- the empty state: the brand mark, "Ready.", and the commands ----
   await page.waitForTimeout(120);
   const empty = await page.evaluate(() => {
-    const ico = document.querySelector('.empty .ico');
+    const mark = document.querySelector('.empty .ico.brandmark use');
     return {
-      keys: [...document.querySelectorAll('.empty .key kbd')].map((n) => n.textContent),
-      // The modifier is named after the machine running the check: "Alt+" here,
-      // "⌥" on a Mac. Asking for the literal "Alt+N" would pass on Windows and
-      // fail on macOS for a label that is perfectly correct there — which is
-      // exactly what it did.
-      alt: (window.I18N && window.I18N.alt) || 'Alt+',
-      dash: ico ? getComputedStyle(ico).strokeDasharray : '',
+      // Before the commands arrive the screen says so; once they do, it lists them.
+      // Either way the list has to be there — an empty screen with nothing under the
+      // title is the bug this replaced.
+      hasList: !!document.querySelector('.empty .cmdlist'),
+      rows: document.querySelectorAll('.empty .cmdrow').length,
+      hint: !!document.querySelector('.empty .cmdhint'),
+      mark: mark ? mark.getAttribute('href') : '',
+      title: (document.querySelector('.empty h2') || {}).textContent || '',
     };
   });
-  t(
-    empty.keys.includes('@') && empty.keys.includes(empty.alt + 'N') && empty.keys.includes('Esc'),
-    'the empty state does not mention the shortcuts: ' + empty.keys.join(',')
-  );
-  t(
-    /\d/.test(empty.dash),
-    'the empty-state icon does not draw itself (no stroke-dasharray): ' + empty.dash
-  );
+  t(empty.hasList, 'the empty state has no command list');
+  t(empty.rows > 0 || empty.hint, 'the command list is empty and says nothing about why');
+  t(empty.mark === '#ion-studio-logo', 'the empty state is not showing the Claude Studio mark: ' + empty.mark);
+  t(!!empty.title.trim(), 'the empty state lost its title');
   // the screenshot waits for the icon to finish drawing: halfway through it would
   // look like a broken icon
   await page.waitForTimeout(1100);

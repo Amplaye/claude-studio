@@ -2148,11 +2148,17 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   margin: auto;
   text-align: center;
   padding: 24px 18px;
-  max-width: 360px;
+  max-width: 420px;
 }
 .empty .ico {
   font-size: 34px;
   color: var(--claude-1);
+}
+/* The brand mark carries its own gradients, so it is sized rather than coloured. */
+.empty .ico.brandmark {
+  width: 56px;
+  height: 56px;
+  font-size: 0;
 }
 .empty h2 {
   margin: 12px 0 5px;
@@ -2165,30 +2171,58 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-size: 12.5px;
   opacity: 0.85;
 }
-/* the shortcuts sit where you look while there's nothing to read yet */
-.empty .keys {
-  margin-top: 14px;
+
+/* The command list is the whole empty screen: one row per command, click to load it
+   into the composer. Scrolls on its own so a long list never pushes the composer. */
+.empty .cmdlist {
+  margin-top: 16px;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  max-height: 46vh;
+  overflow-y: auto;
 }
-.empty .key {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--pill);
-  font-size: 11px;
-  opacity: 0.9;
+.empty .cmdrow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.empty kbd {
+.empty .cmdrow:hover,
+.empty .cmdrow:focus-visible {
+  background: color-mix(in srgb, var(--claude-1) 9%, transparent);
+  border-color: color-mix(in srgb, var(--claude-1) 35%, var(--line));
+  outline: none;
+}
+.empty .cmdname {
+  flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.02em;
   color: var(--claude-2);
+}
+.empty .cmddesc {
+  flex: 1 1 auto;
+  font-size: 11.5px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty .cmdhint {
+  font-size: 12px;
+  opacity: 0.6;
+  text-align: center;
 }
 
 /* clickable path in a tool's head */
@@ -2657,6 +2691,9 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 /* ---------- the paperclip ----------
    Same size as the send button and sitting right beside it, but quiet: this one
    opens a picker, the other one commits the message. */
+/* White ring, orange clip: the button says "attach" before the icon is even read.
+   On hover the orange floods the button and it lifts on a soft glow — a warmer
+   answer than the old tilt, which read as the clip coming loose. */
 .clip {
   display: inline-flex;
   align-items: center;
@@ -2664,28 +2701,40 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border: 1px solid var(--line);
+  border: 1px solid #fff;
   border-radius: 10px;
   background: transparent;
-  color: var(--fg);
+  color: var(--claude-1);
   cursor: pointer;
-  opacity: 0.75;
-  transition: opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease,
-    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 0.9;
+  transition: opacity 0.2s ease, border-color 0.22s ease, background 0.22s ease,
+    box-shadow 0.22s ease, color 0.22s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .clip .ico {
   width: 17px;
   height: 17px;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .clip:hover {
   opacity: 1;
-  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
-  background: color-mix(in srgb, var(--claude-1) 10%, transparent);
-  /* the clip tilts, the way one does when you hook it on */
-  transform: rotate(-14deg);
+  color: #fff;
+  border-color: var(--claude-1);
+  background: var(--claude-1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--claude-1) 45%, transparent);
+}
+.clip:hover .ico {
+  transform: scale(1.12);
+}
+.clip:focus-visible {
+  outline: none;
+  border-color: var(--claude-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--claude-1) 30%, transparent);
 }
 .clip:active {
-  transform: rotate(-14deg) scale(0.92);
+  transform: translateY(0) scale(0.94);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--claude-1) 35%, transparent);
 }
 /* While a file is being dragged over the composer the whole box says so, and the
    clip lights up: the drop target is the message, not the little button. */
@@ -2696,8 +2745,11 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .composer.dropping .clip {
   opacity: 1;
-  transform: rotate(-14deg) scale(1.1);
-  color: var(--claude-2);
+  color: #fff;
+  border-color: var(--claude-1);
+  background: var(--claude-1);
+  transform: translateY(-2px) scale(1.08);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--claude-1) 55%, transparent);
 }
 
 /* ---------- lightbox for attached images ---------- */
