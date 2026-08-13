@@ -64,23 +64,28 @@ for (const surface of ['view', 'panel']) {
 
   await post({ k: 'hello', cwd: 'C:/Users/Steward/CRM', project: 'CRM', cliVersion: '2.1.79', surface });
 
-  // ---- the empty state: the brand mark, "Ready.", and the commands ----
+  // ---- the empty state: the brand mark, "Ready.", the blurb and the five pills ----
   await page.waitForTimeout(120);
   const empty = await page.evaluate(() => {
     const mark = document.querySelector('.empty .ico.brandmark use');
     return {
-      // Before the commands arrive the screen says so; once they do, it lists them.
-      // Either way the list has to be there — an empty screen with nothing under the
-      // title is the bug this replaced.
-      hasList: !!document.querySelector('.empty .cmdlist'),
-      rows: document.querySelectorAll('.empty .cmdrow').length,
-      hint: !!document.querySelector('.empty .cmdhint'),
+      // The five shortcut pills are the point of the screen: each one has to carry a
+      // key and its label, or it teaches nothing.
+      pills: [...document.querySelectorAll('.empty .key')].map((k) => ({
+        key: (k.querySelector('kbd') || {}).textContent || '',
+        label: (k.querySelector('span') || {}).textContent || '',
+      })),
+      body: (document.querySelector('.empty p') || {}).textContent || '',
       mark: mark ? mark.getAttribute('href') : '',
       title: (document.querySelector('.empty h2') || {}).textContent || '',
     };
   });
-  t(empty.hasList, 'the empty state has no command list');
-  t(empty.rows > 0 || empty.hint, 'the command list is empty and says nothing about why');
+  t(empty.pills.length === 5, 'the empty state should show 5 shortcut pills, not ' + empty.pills.length);
+  t(
+    empty.pills.every((p) => p.key.trim() && p.label.trim()),
+    'a shortcut pill is missing its key or its label: ' + JSON.stringify(empty.pills)
+  );
+  t(!!empty.body.trim(), 'the empty state lost the line about what this is');
   t(empty.mark === '#ion-studio-logo', 'the empty state is not showing the Claude Studio mark: ' + empty.mark);
   t(!!empty.title.trim(), 'the empty state lost its title');
   // the screenshot waits for the icon to finish drawing: halfway through it would

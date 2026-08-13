@@ -117,9 +117,22 @@
 
     // ---- empty state ----
     'empty.title': 'Ready.',
-    'empty.body':
-      'Write below: you get the same Claude Code you use from the terminal, with your CLAUDE.md, skills, MCP and permissions. ' +
-      'And you can hand it any file you like — a PDF, a spreadsheet, a contract, a zip, a video, a log — not just pictures.',
+    'empty.didyouknow': 'Did you know?',
+    // One of these is drawn at random on every new session. They are the things people
+    // never find on their own — not a description of the product, which whoever is
+    // reading this has already installed.
+    'empty.tips': [
+      'You can drop a PDF, a spreadsheet, a zip or a video straight into the box — Claude opens it with its own tools, and it stays attached to your message.',
+      'Select some code in the editor before you write: it travels with the message, and it never clogs up the chat.',
+      'A CLAUDE.md at the root of the project is read at every session. It is the shortest way to stop repeating yourself.',
+      'Esc stops it mid-run. Nothing is lost: what was already done stays done.',
+      'This panel keeps the Claude Code CLI updated on its own, so a model released today is here today.',
+      'Plan mode reasons the work through without touching a single file. Handy before a large refactor.',
+      'Every file change arrives as a diff that stays shut until you open it — nothing gets past you, and nothing takes over the screen.',
+      'Skills, MCP servers and permissions are the ones from your terminal: whatever you set up there already works here.',
+      'Ask it to explain a stack trace by pasting it in whole — including the lines you think are irrelevant.',
+      'Your conversations stay on disk: ⌥H reopens them, even after closing VS Code.',
+    ],
     'empty.key.file': 'a file',
     'empty.key.command': 'a command',
     'empty.key.new': 'new',
@@ -322,9 +335,19 @@
     'menu.general': 'Generali',
 
     'empty.title': 'Pronto.',
-    'empty.body':
-      'Scrivi qui sotto: è lo stesso Claude Code che usi dal terminale, con il tuo CLAUDE.md, le skill, gli MCP e i permessi. ' +
-      'E puoi passargli qualunque file — un PDF, un foglio di calcolo, un contratto, uno zip, un video, un log — non solo immagini.',
+    'empty.didyouknow': 'Lo sapevi?',
+    'empty.tips': [
+      'Puoi trascinare un PDF, un foglio di calcolo, uno zip o un video dentro la casella: Claude lo apre con i suoi strumenti, e resta attaccato al messaggio.',
+      'Seleziona del codice nell’editor prima di scrivere: parte insieme al messaggio, e non intasa la chat.',
+      'Un CLAUDE.md nella radice del progetto viene letto a ogni sessione. È la via più corta per non ripeterti.',
+      'Esc lo ferma a metà. Non si perde niente: quello che ha già fatto resta fatto.',
+      'Questo pannello tiene aggiornata da solo la CLI di Claude Code: un modello uscito oggi è qui oggi.',
+      'La modalità Plan ragiona sul lavoro senza toccare un file. Comoda prima di un refactor grosso.',
+      'Ogni modifica arriva come un diff che resta chiuso finché non lo apri: non ti sfugge niente e niente ti invade lo schermo.',
+      'Skill, server MCP e permessi sono quelli del tuo terminale: quello che hai già configurato lì funziona qui.',
+      'Fatti spiegare uno stack trace incollandolo per intero, comprese le righe che credi inutili.',
+      'Le conversazioni restano su disco: ⌥H le riapre, anche dopo aver chiuso VS Code.',
+    ],
     'empty.key.file': 'un file',
     'empty.key.command': 'un comando',
     'empty.key.new': 'nuova',
@@ -446,6 +469,16 @@
     return s.replace(/\{(\w+)\}/g, (m, k) => (all[k] == null ? m : String(all[k])));
   }
 
+  /**
+   * A list-valued entry (the tips on the empty screen). Kept apart from t(): that one
+   * substitutes {vars} on a string and would throw on an array. Falls back to English
+   * so a language that hasn't translated the list still shows something.
+   */
+  function list(key) {
+    const v = (DICT[lang] && DICT[lang][key]) ?? EN[key];
+    return Array.isArray(v) ? v : [];
+  }
+
   /** Rewrites everything the HTML declared. Safe to call as often as you like. */
   function apply(root) {
     const r = root || document;
@@ -462,6 +495,7 @@
     alt: ALT,
     isMac: IS_MAC,
     t,
+    list,
     apply,
     /** Switches language and tells whoever draws by hand to draw again. */
     set(next) {

@@ -529,18 +529,96 @@
 /* The brand mark is not an outline to be traced: it is 22 filled strokes around a
    star, and the dasharray above would inherit straight into them and chop the rays
    into dashes — which is exactly what it did, leaving the star alone on screen.
-   It gets its own entrance instead: it comes up turning, the way a light does. */
+   It gets its own entrance instead: a full turn that overshoots its own size and
+   settles back — the pop happens on the way round, not after it, so it reads as one
+   move. The scale is on its own track from the rotation so the overshoot can peak
+   while the turn is still finishing. */
 .empty .ico.brandmark {
-  animation: cs-mark 0.72s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: cs-mark-spin 0.92s cubic-bezier(0.16, 0.84, 0.28, 1) both, cs-mark-pop 0.92s
+      cubic-bezier(0.33, 0, 0.2, 1) both;
 }
-@keyframes cs-mark {
+/* Two animations on one element can't both write `transform`, so the turn lives on
+   the <svg> and the swell on a wrapper the icon() helper does not emit — instead
+   both are folded into one keyframe track each, composed via individual transform
+   properties, which every engine that ships webviews now supports. */
+@keyframes cs-mark-spin {
+  from {
+    rotate: -180deg;
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    rotate: 0deg;
+    opacity: 1;
+  }
+}
+@keyframes cs-mark-pop {
+  from {
+    scale: 0.4;
+  }
+  62% {
+    scale: 1.18;
+  }
+  82% {
+    scale: 0.96;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+/* The title and the blurb are typed out a character at a time by chat.js, the way a
+   typewriter does it — not clipped by a growing width, which cannot work once the copy
+   wraps onto several lines. The real text sits underneath at zero opacity so the block
+   already occupies its final height: without it every new line would shove the pills
+   down the screen as the sentence grows. */
+.empty .typed {
+  position: relative;
+}
+.empty .typed .ghost {
+  visibility: hidden;
+}
+.empty .typed .ink {
+  position: absolute;
+  inset: 0;
+}
+/* The caret is a real element that rides along at the end of the text, so it sits
+   wherever the last character landed instead of being pinned to the box. */
+.empty .typed .tcaret {
+  display: inline-block;
+  width: 0.58em;
+  height: 1.02em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--claude-2);
+  border-radius: 1px;
+  animation: cs-caret 1s steps(1, end) infinite;
+}
+.empty .typed.done .tcaret {
+  display: none;
+}
+/* The pills land one after the other once the typing is done — same stagger the rest
+   of the app uses for lists, so the screen finishes assembling in one direction. */
+.empty .keys .key {
+  animation: cs-pill 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation-delay: calc(var(--pill-base, 0s) + var(--i, 0) * 70ms);
+}
+/* Held back until the typing has finished: chat.js drops .waiting and the stagger
+   starts from there, so the pills never arrive on top of a sentence still being
+   written. Paused rather than hidden, so they hold on the animation's first frame. */
+.empty .keys.waiting .key {
+  animation-play-state: paused;
+}
+@keyframes cs-pill {
   from {
     opacity: 0;
-    transform: scale(0.72) rotate(-35deg);
+    transform: translateY(6px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: scale(1) rotate(0);
+    transform: none;
   }
 }
 
@@ -734,6 +812,7 @@
   .ctxcard,
   .log.swap-in,
   .empty .ico,
+  .empty .keys .key,
   .fill.glide::after,
   .pop.dealing .pop-sec,
   .pop.dealing .model-list,
@@ -749,6 +828,16 @@
   .sel-list .sel-opt,
   .activity::before {
     animation: none !important;
+  }
+  /* The typed lines cannot simply have their animation cancelled: the keyframe holds
+     the text clipped to width 0, so killing it mid-flight would leave an empty
+     screen. They get the finished state written out instead. */
+  .empty h2.typed,
+  .empty p.typed {
+    animation: none !important;
+    width: auto;
+    opacity: 1;
+    transform: none;
   }
   /* The switches still move, they just move less: the knob slides instead of
      springing, and that's the one thing that has to stay — it's what tells you

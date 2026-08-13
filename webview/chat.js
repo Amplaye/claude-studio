@@ -139,7 +139,10 @@
       return node;
     }
     const empty = log.querySelector('.empty');
-    if (empty) empty.remove();
+    if (empty) {
+      emptyStop();
+      empty.remove();
+    }
     log.appendChild(node);
     seen.observe(node);
     toBottom();
@@ -162,39 +165,98 @@
     ['Esc', 'empty.key.stop'],
   ];
 
-  // The empty screen is the command list and nothing else: the brand mark, "Ready.",
-  // then the commands you can actually run. The old blurb explained the product to
-  // somebody who had already installed it, and the five shortcut pills said less than
-  // the list itself does. Commands arrive from the extension, so the list is repainted
-  // whenever they land (see the 'commands' case in the message handler).
+  // Every timer the empty screen starts is registered here, so repainting it (a new
+  // language, a theme change, the first message landing) cannot leave a half-finished
+  // typewriter running against a node that is no longer on screen.
+  let emptyTimers = [];
+  /** Which tip was shown last, so the next draw picks a different one. */
+  let lastTip = -1;
+  function emptyRun(fn, ms) {
+    emptyTimers.push(setTimeout(fn, ms));
+  }
+  function emptyStop() {
+    for (const id of emptyTimers) clearTimeout(id);
+    emptyTimers = [];
+  }
+
+  /**
+   * A line that types itself out. The finished text is always in the DOM as a hidden
+   * copy, so the line reserves its full height from the start and nothing below it
+   * moves while the words arrive; the visible copy is laid over it and filled a
+   * character at a time. Returns the node and the function that starts it.
+   */
+  function typed(tag, text) {
+    const node = el(tag, 'typed');
+    const ghost = el('span', 'ghost', text);
+    const ink = el('span', 'ink');
+    const out = el('span', 'tx');
+    const caret = el('span', 'tcaret');
+    ink.append(out, caret);
+    node.append(ghost, ink);
+    return {
+      node,
+      /** cps: characters per second. `then` runs once the last one has landed. */
+      type(cps, then) {
+        let i = 0;
+        const step = () => {
+          // A typewriter is not metronomic: it stalls a beat on a full stop and skips
+          // ahead over a space. Without that it reads as a progress bar.
+          out.textContent = text.slice(0, ++i);
+          if (i >= text.length) {
+            node.classList.add('done');
+            if (then) then();
+            return;
+          }
+          const c = text[i - 1];
+          const pause = /[.,;:—]/.test(c) ? 5 : c === ' ' ? 0.4 : 1;
+          emptyRun(step, (1000 / cps) * pause);
+        };
+        step();
+      },
+    };
+  }
+
+  // The empty screen: the brand mark, "Ready.", a line about what this is, and the
+  // five shortcut pills. The command list that briefly lived here dumped every skill
+  // the CLI reports — dozens of rows nobody reads — while the five pills teach the
+  // handful of keys you actually need on the first day.
   function showEmpty() {
+    emptyStop();
     log.replaceChildren();
     const box = el('div', 'empty');
-    box.append(icon('studio-logo', 'brandmark'), el('h2', null, t('empty.title')));
-
-    const list = el('div', 'cmdlist');
-    if (commands.length) {
-      for (const c of commands) {
-        const row = el('button', 'cmdrow');
-        row.type = 'button';
-        row.append(
-          el('span', 'cmdname', '/' + (c.name || c.command || '')),
-          el('span', 'cmddesc', c.description || c.detail || '')
-        );
-        // Clicking a command drops it in the composer, ready to send.
-        row.addEventListener('click', () => {
-          input.value = '/' + (c.name || c.command || '') + ' ';
-          input.focus();
-          input.dispatchEvent(new Event('input'));
-        });
-        list.append(row);
-      }
-    } else {
-      // Before the first turn the extension has not sent the commands yet.
-      list.append(el('p', 'cmdhint', t('empty.commands.wait')));
+    const title = typed('h2', t('empty.title'));
+    // A different tip every time the screen is drawn, never the same one twice in a
+    // row: the whole point is that you read it, and a line you've already seen is a
+    // line you skip.
+    const tips = I18N.list('empty.tips');
+    let pick = 0;
+    if (tips.length) {
+      do {
+        pick = Math.floor(Math.random() * tips.length);
+      } while (tips.length > 1 && pick === lastTip);
+      lastTip = pick;
     }
-    box.append(list);
+    const body = typed('p', tips[pick] || '');
+    const lead = el('span', 'tiplead', t('empty.didyouknow'));
+    box.append(icon('studio-logo', 'brandmark'), title.node, lead, body.node);
+
+    const keys = el('div', 'keys');
+    KEYS.forEach(([k, what], i) => {
+      const item = el('span', 'key');
+      item.append(el('kbd', null, k), el('span', null, t(what)));
+      item.style.setProperty('--i', i);
+      keys.append(item);
+    });
+    box.append(keys);
     log.appendChild(box);
+
+    // The screen assembles in one order: the mark turns in, the title types itself,
+    // then the blurb, then the pills drop in. Each step starts the next one, so the
+    // timings can never drift apart the way separate delays do.
+    const MARK = 920; // ms, matches cs-mark-* in motion.css
+    keys.style.setProperty('--pill-base', '0s');
+    keys.classList.add('waiting');
+    emptyRun(() => title.type(26, () => body.type(90, () => keys.classList.remove('waiting'))), MARK * 0.55);
   }
 
   /**
