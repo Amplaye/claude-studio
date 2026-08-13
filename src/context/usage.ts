@@ -19,8 +19,18 @@ export interface Usage {
   weekResetAt: string | null;
 }
 
-const TTL_MS = 30000; // the numbers refresh twice a minute, one window only
-const COOLDOWN_MS = 600000; // after a 429 we keep quiet for ten minutes
+const TTL_MS = 30000; // idle nobody is spending: twice a minute is plenty
+/**
+ * The floor between two calls, `force` included. The TTL alone didn't hold the line:
+ * every forced refresh (panel opened, panel back in sight, session born, turn running)
+ * skipped it, so a handful of clicks fired a handful of requests back to back and the
+ * endpoint answered 429 — and a 429 is exactly what makes the numbers old.
+ */
+const MIN_GAP_MS = 10000;
+/** After a 429: a minute, then double, up to ten. It used to be ten flat, which turned
+ *  one unlucky burst into ten minutes of numbers frozen on screen. */
+const COOLDOWN_MS = 60000;
+const COOLDOWN_MAX_MS = 600000;
 /** Past this the cached numbers are shown, but no longer presented as current. */
 const STALE_MS = 90000;
 
@@ -29,6 +39,10 @@ const state = {
   ts: 0,
   pending: false,
   cooldownUntil: 0,
+  /** When we last knocked, answer or not: the floor counts attempts, not successes. */
+  lastTry: 0,
+  /** How long the last 429 cost us: the next one costs double. */
+  penalty: 0,
 };
 
 export function currentUsage(): Usage | null {
@@ -124,14 +138,19 @@ export function refreshUsage(done: () => void, force = false) {
   if (state.pending) return;
   loadSharedUsage(); // first look at what the other windows have already done
   if (now < state.cooldownUntil) return;
+  // `state.ts` comes from the shared file: the floor holds across windows too, not
+  // just inside this one.
+  if (now - Math.max(state.lastTry, state.ts) < MIN_GAP_MS) return;
   if (!force && state.data && now - state.ts < TTL_MS) return;
 
   const token = readOauthToken();
   if (!token) return;
   state.pending = true;
+  state.lastTry = now;
 
   const backoff = () => {
-    state.cooldownUntil = Date.now() + COOLDOWN_MS;
+    state.penalty = Math.min(state.penalty ? state.penalty * 2 : COOLDOWN_MS, COOLDOWN_MAX_MS);
+    state.cooldownUntil = Date.now() + state.penalty;
     saveSharedUsage(); // the cooldown applies to all, not just whoever got the no
     done();
   };
@@ -175,6 +194,7 @@ export function refreshUsage(done: () => void, force = false) {
         };
         state.ts = Date.now();
         state.cooldownUntil = 0;
+        state.penalty = 0;
         saveSharedUsage();
         done();
       });

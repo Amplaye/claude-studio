@@ -160,9 +160,33 @@ const vscode = {
   Selection: class {},
 };
 
+// ---- the fake network, only for the account numbers -------------------------
+// The endpoint is rate limited and the extension is the only thing that calls it:
+// what gets checked here is how often we knock, which by eye you only find out when
+// a 429 has already frozen the percentages on screen.
+let httpStatus = 200;
+const httpCalls = [];
+const usageBody = JSON.stringify({
+  five_hour: { utilization: 42, resets_at: '2099-01-01T00:00:00Z' },
+  seven_day: { utilization: 7, resets_at: '2099-01-01T00:00:00Z' },
+});
+const fakeHttps = {
+  request(opts, cb) {
+    httpCalls.push(opts.path);
+    setTimeout(() => {
+      const h = {};
+      cb({ statusCode: httpStatus, on: (k, fn) => (h[k] = fn) });
+      if (httpStatus === 200 && h.data) h.data(usageBody);
+      if (h.end) h.end();
+    }, 5);
+    return { on: () => {}, end: () => {}, destroy: () => {} };
+  },
+};
+
 const load = Module._load;
 Module._load = function (req, parent, isMain) {
   if (req === 'vscode') return vscode;
+  if (req === 'node:https') return fakeHttps;
   return load.call(this, req, parent, isMain);
 };
 
@@ -445,9 +469,28 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   t(d4?.focusHow === 'position', 'the fallback by position does not kick in: ' + d4?.focusHow);
   // second tab active -> second session by startedAt
   t(focused?.id === SID2, 'matching by position latches onto the wrong session: ' + focused?.id);
-  kid.kill();
+  // ---- account numbers: one knock at a time, and a 429 doesn't freeze them ----
+  const refresh = registered.commands.get('claudeStudio.context.refresh');
+  fs.writeFileSync(
+    path.join(home, '.claude', '.credentials.json'),
+    JSON.stringify({ claudeAiOauth: { accessToken: 'test-token' } }),
+    'utf8'
+  );
+  httpCalls.length = 0;
+  httpStatus = 429;
+  refresh();
+  await wait(60);
+  // Il pannello aperto, la scheda tornata davanti, una sessione nuova: erano tutte
+  // "chiedi adesso", e in fila facevano una raffica — cioe' il 429.
+  refresh();
+  refresh();
+  await wait(60);
+  t(httpCalls.length === 1, 'la raffica di refresh arriva tutta all API: ' + httpCalls.length);
+  t(/retrying in 1m/.test(lastData()?.usageWait || ''), 'un 429 costa ancora dieci minuti: ' + lastData()?.usageWait);
+  httpStatus = 200;
 
   for (const s of ctx.subscriptions) s.dispose?.();
+  kid.kill();
 
   if (fails.length) {
     console.error('FAILED:\n- ' + fails.join('\n- '));

@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.14.0
+## 0.14.1
+
+- **The account percentages follow the turn, instead of a clock.** They said "updated
+  6m ago" and they were telling the truth: the panel was serving numbers from a
+  quarter of an hour ago. Not because the timer was slow — because every "ask now"
+  (panel opened, panel back in sight, session born) went straight out to an endpoint
+  that is rate limited, and a handful of them in a row earned a 429, whose price was
+  ten minutes of silence. One unlucky burst froze the numbers for the rest of the
+  coffee. Now there is a floor of ten seconds between two calls that nothing skips,
+  the 429 costs a minute (then two, then four, up to ten, and it forgets as soon as an
+  answer comes back), and above all the numbers are asked for while a turn is running
+  — which is the only moment they move. You watch them climb as you spend, and they
+  settle the second Claude stops. Idle, when nothing can change, it goes back to
+  asking twice a minute.
 
 - **The engine now asks for Claude Code's instructions by name.** Not asking did not
   mean "use the default": the SDK, with that line missing, sends the CLI an *empty*

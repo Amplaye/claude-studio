@@ -100,6 +100,8 @@ export class ContextMonitor {
   private forceUsage = false;
   /** Le conversazioni gia' viste: serve a riconoscere quella appena nata. */
   private seenIds = new Set<string>();
+  /** C'era qualcosa al lavoro nel giro precedente: serve a vedere quando si ferma. */
+  private wasBusy = false;
 
   /** Il pannello si iscrive e riceve subito l'ultima fotografia. */
   subscribe(fn: (d: CtxData) => void): vscode.Disposable {
@@ -280,6 +282,15 @@ export class ContextMonitor {
       }
     }
     this.seenIds = ids;
+
+    // I consumi si muovono solo mentre un turno gira: chiederli a orologio voleva dire
+    // numeri vecchi proprio mentre stai spendendo, e chiamate a vuoto mentre non fai
+    // niente. Finche' qualcosa lavora si chiede a ogni giro — il pavimento in usage.ts
+    // tiene comunque le chiamate a una ogni dieci secondi — e una volta ancora appena
+    // si ferma, che e' quando il numero smette di salire.
+    const anyBusy = rows.some((r) => r.card.busy);
+    if (anyBusy || anyBusy !== this.wasBusy) this.forceUsage = true;
+    this.wasBusy = anyBusy;
 
     const g = gitInfo(cwd);
     const usage = currentUsage();
