@@ -18,6 +18,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const chatUrl = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 const ctxUrl = pathToFileURL(path.join(root, 'dist', 'preview-context.html')).href;
+const tasksUrl = pathToFileURL(path.join(root, 'dist', 'preview-tasks.html')).href;
 const out = path.join(root, 'docs', 'img');
 fs.mkdirSync(out, { recursive: true });
 
@@ -208,7 +209,23 @@ async function act(page, { slow = false, upTo = 'end' } = {}) {
   await post({ k: 'mode', value: 'default' });
   await post({ k: 'ctx', d: CTX });
   await beat(900);
-  if (upTo === 'empty') return post;
+  if (upTo === 'empty') {
+    // The empty screen types itself in, so a fixed pause would photograph it
+    // mid-sentence. Wait for the last line to mark itself done — and for the pills
+    // that follow it — instead of guessing how long the typing takes.
+    await page
+      .waitForFunction(
+        () => {
+          const lines = [...document.querySelectorAll('.empty .typed')];
+          const keys = document.querySelector('.empty .keys');
+          return lines.length > 0 && lines.every((l) => l.classList.contains('done')) && keys && !keys.classList.contains('waiting');
+        },
+        { timeout: 15000 }
+      )
+      .catch(() => {});
+    await wait(600); // the pills stagger in after the text is done
+    return post;
+  }
 
   await post({ k: 'user', text: ASK });
   await post({ k: 'busy', value: true });
@@ -403,6 +420,32 @@ await shot(browser, {
   await page.screenshot({ path: path.join(out, 'contesto.png') });
   await page.close();
   console.log('docs/img/contesto.png');
+}
+
+// 6b. the task list, halfway through a job: two ticked off, one being worked on
+{
+  const page = await browser.newPage({ viewport: { width: 360, height: 300 }, colorScheme: 'dark' });
+  await page.goto(tasksUrl);
+  const items = [
+    { content: 'Read the invoice and the sheet', status: 'completed' },
+    { content: 'Compare the totals', status: 'completed' },
+    { content: 'Fix the VAT column', activeForm: 'Fixing the VAT column', status: 'in_progress' },
+    { content: 'Write the summary', status: 'pending' },
+  ];
+  await page.evaluate(
+    (d) => window.postMessage({ k: 'tasks', d }, '*'),
+    {
+      items,
+      done: items.filter((i) => i.status === 'completed').length,
+      total: items.length,
+      active: items.findIndex((i) => i.status === 'in_progress'),
+      busy: true,
+    }
+  );
+  await wait(1200);
+  await page.screenshot({ path: path.join(out, 'task.png') });
+  await page.close();
+  console.log('docs/img/task.png');
 }
 
 // 7. the sidebar, chat and context one under the other

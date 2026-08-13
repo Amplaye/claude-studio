@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/media/icon.png" width="110" alt="Claude Studio" />
+<img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/media/mark.png" width="110" alt="Claude Studio" />
 
 # Claude Studio
 
@@ -17,6 +17,10 @@ panel: **same CLI, same account, same `CLAUDE.md`, same skills, same
 permissions** — nothing new to learn, nothing new to pay. What changes is what
 you see while it works.
 
+**It keeps itself current.** Claude Studio checks the Claude Code CLI and updates
+it on its own, so the newest models and features are there the day they ship —
+you never end up stuck on an old version.
+
 ![Claude Studio](https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/demo.gif)
 
 ## What you get that you didn't have
@@ -28,6 +32,12 @@ ticks. No more staring at a still screen wondering if it's crashed.
 **Every change is a card, and cards stay shut.** A file edit arrives as a
 coloured diff you open when you want to. Nothing unfolds by itself and pushes
 your reading off the screen.
+
+**A task list in the sidebar, ticking itself off.** When Claude plans a job it
+writes down the steps — the **Tasks** panel shows them live: which one it's on
+right now, how many are done, how many are left. It starts fresh at every
+prompt, so what you're looking at is always this question's work and never the
+last one's.
 
 **It asks before it touches anything.** *Allow* · *Always allow* · *Deny*. When
 it asks you to choose between options, there's always a line to write your own
@@ -97,6 +107,10 @@ and close with a recap of what changed.
 <tr>
 <td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>PDF, Excel, Word, video, zip, logs — any file at all</em></td>
 <td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/suoni.png" alt="Sounds" /><br /><em>Even the lists are ours, and they open</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/task.png" alt="Task list" /><br /><em>The steps, ticking themselves off as it goes</em></td>
+<td></td>
 </tr>
 </table>
 
