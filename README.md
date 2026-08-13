@@ -4,7 +4,9 @@
 
 # Claude Studio
 
-**The same Claude Code you already use — with a better place to use it.**
+**Same Claude Code but, a better IDE!**
+
+The same Claude Code you already use — with a better place to use it.
 
 </div>
 
