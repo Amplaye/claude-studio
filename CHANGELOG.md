@@ -1,6 +1,26 @@
 # Changelog
 
-## 0.13.0
+## Unreleased
+
+- **"Developer: Reload Window" no longer costs you every conversation but one.** The
+  extension host dies at every reload and the conversations die with it; the
+  transcripts stay on disk, so all that has to survive is knowing *which* transcript
+  belonged to *which* tab. Nothing did. The deserializer threw away every tab after
+  the first — `panel.dispose()`, written when there was one chat and one tab — so a
+  window with four conversations came back with one, and reloading became something
+  you learnt not to do. Each tab now puts its conversation id aside in its own
+  webview state, the only memory that survives a reload still attached to the single
+  tab, and comes back on it.
+
+- **And the tab that came back first stopped being handed somebody else's
+  conversation.** VS Code wakes a tab when it needs to draw it, so the one you were
+  looking at returns first and the rest follow when you click them. Meanwhile the
+  project kept a note of its own — the last conversation of the window, there for the
+  sidebar chat, which has no tab to be woken from — and that note was read at startup,
+  before any tab had spoken. It won by being first: whichever tab came back first was
+  filled with the note's conversation instead of its own, and with three tabs open you
+  got the same conversation twice and lost one. A tab now speaks for itself, including
+  to say it had nothing open, and the note only talks when no tab does.
 
 - **The steps Claude is working through now sit under the last card.** They had a
   panel of their own in the sidebar, which was a third box to open in order to read

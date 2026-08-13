@@ -1473,6 +1473,14 @@
         // The model icon in the header was removed:
         // the model gets picked in the settings.
         break;
+      // Quale conversazione sta in questa scheda. Non si disegna: si mette da parte
+      // qui e basta, perche' questa memoria e' l'unica che appartiene alla singola
+      // scheda e sopravvive a "Developer: Reload Window". Al ritorno VS Code la
+      // ridà all'estensione, che riapre in ogni scheda la sua invece di lasciarne
+      // una sola in piedi. Vuota = schermata nuova, niente da riaprire.
+      case 'sid':
+        vscode.setState(Object.assign({}, vscode.getState() || {}, { sid: m.id || '' }));
+        break;
       case 'user': {
         const n = el('div', 'msg user');
         // The attached images go on top, above the words — exactly where they sat

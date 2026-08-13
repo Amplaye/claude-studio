@@ -107,6 +107,30 @@ export class ChatController {
   private mode: Mode = 'bypassPermissions';
   /** Conversazione da riprendere alla prossima accensione del motore. */
   private resume?: { id: string; fork: boolean };
+  /**
+   * La conversazione che questa chat ha davanti adesso, motore acceso o spento.
+   * Va detta alle facce (wire `sid`): e' quello che ognuna si mette da parte per
+   * ritrovarla dopo un reload della finestra. Vuota = schermata nuova.
+   */
+  private sid = '';
+  /**
+   * Una riapertura per volta. Al reload la richiesta puo' arrivare due volte quasi
+   * insieme — dalla scheda che torna e dal segnaposto del progetto — e senza una
+   * coda la stessa conversazione verrebbe riletta e ridisegnata due volte.
+   */
+  private opening: Promise<void> = Promise.resolve();
+  /**
+   * Una scheda ha gia' detto qual e' la sua conversazione, tornando da un reload —
+   * anche se la risposta e' "nessuna". Da quel momento il segnaposto del progetto
+   * (vedi `restoreLast`) non ha piu' niente da dire: la scheda lo sa meglio di lui.
+   */
+  private claimed = false;
+  /**
+   * Quello che si vede adesso l'ha rimesso il segnaposto del progetto, e nessuno
+   * l'ha ancora toccato. E' roba di ripiego: se poi arriva la scheda vera con la
+   * sua conversazione, quella ha la precedenza e questa si lascia sostituire.
+   */
+  private provisional = false;
   /** Permessi in attesa di risposta, per tool_use_id. */
   private pending = new Map<string, Pending>();
   private prefs: Prefs;
@@ -242,6 +266,9 @@ export class ChatController {
     if (this.models.length) s.post({ k: 'models', items: this.models });
     if (this.commands.length) s.post({ k: 'commands', items: this.commands });
     for (const e of this.history) s.post(e);
+    // Una faccia che si attacca a una conversazione gia' in corso deve saperne l'id
+    // subito: e' quello che si mettera' da parte per riaprirla al prossimo reload.
+    s.post({ k: 'sid', id: this.sid });
     s.post({ k: 'busy', value: this.busy });
   }
 
@@ -346,6 +373,9 @@ export class ChatController {
     // difetto di "/clear". Quelli che il motore sa fare passano oltre. Vedi
     // chat/commands.ts.
     if (runLocalCommand(text, this.commandHost())) return;
+    // Hai scritto qui dentro: quello che c'e' non e' piu' di ripiego, e nessuna
+    // scheda che torna tardi da un reload puo' piu' portartelo via.
+    this.provisional = false;
     let full = text;
     if (withSelection) {
       const sel = currentSelection();
@@ -408,8 +438,23 @@ export class ChatController {
     this.resume = undefined;
     // Chiedendo una conversazione nuova, quella vecchia non va piu' riaperta al
     // prossimo avvio: il segnaposto si cancella subito, non alla prima risposta.
-    if (this.primary) void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
+    // Se ne occupa `setSid('')`, dentro `clear()`.
     this.clear();
+  }
+
+  /**
+   * Qual e' la conversazione di questa chat, adesso.
+   *
+   * Lo sanno in tre, e ognuno per un motivo suo: la pagina se lo mette da parte per
+   * ritrovarla dopo un reload (vedi il wire `sid`), il progetto se lo ricorda per la
+   * chat della sidebar, che una scheda propria non ce l'ha, e noi lo teniamo per
+   * dirlo alle facce che si attaccano dopo.
+   */
+  private setSid(id: string) {
+    if (this.sid === id) return;
+    this.sid = id;
+    if (this.primary) void this.ctx.workspaceState.update(LAST_SESSION_KEY, id || undefined);
+    this.broadcast({ k: 'sid', id });
   }
 
   // ---- i comandi che sono azioni dell'interfaccia (vedi chat/commands.ts) ----
@@ -588,8 +633,13 @@ export class ChatController {
     // la conversazione di prima. Un fork non ha ancora un id suo: quello arriva
     // dal motore, e la card compare allora.
     if (!fork) owned.adopt(this.key, id, currentCwd());
-    // `past` gia' letto da chi chiama (vedi restoreLast): la trascrizione e' un file
-    // solo, e riaprirlo due volte per la stessa conversazione non serve a nessuno.
+    // Da adesso la faccia sta su questa conversazione, e deve saperlo prima dei
+    // messaggi: se il reload arriva mentre la trascrizione si sta ridisegnando, la
+    // scheda ha gia' in mano l'id da riaprire. Un fork il suo id non ce l'ha ancora
+    // — arriva dal motore — e fino ad allora non c'e' niente da ricordare.
+    this.setSid(fork ? '' : id);
+    // `past` gia' letto da chi chiama (vedi restoreSession): la trascrizione e' un
+    // file solo, e riaprirlo due volte per la stessa conversazione non serve a nessuno.
     for (const e of past ?? (await replaySession(id, currentCwd()))) this.emit(e);
     this.titleChanged();
   }
@@ -604,28 +654,79 @@ export class ChatController {
    * al primo messaggio che scrivi. Se la trascrizione non c'e' piu' (cancellata, o
    * un altro progetto) si resta sulla schermata vuota, che e' il comportamento giusto.
    */
-  async restoreLast() {
-    if (!this.primary) return;
-    const id = this.ctx.workspaceState.get<string>(LAST_SESSION_KEY);
-    if (!id || this.history.length) return;
-    // Prima si guarda se c'e' davvero qualcosa da rileggere: `replaySession` non
-    // protesta per una trascrizione mancante, torna vuota. Riprendendola lo stesso
-    // si resterebbe agganciati a un id che non esiste piu', e il primo messaggio
-    // andrebbe a vuoto. Meglio scoprirlo adesso.
-    let past: Wire[] = [];
-    try {
-      past = await replaySession(id, currentCwd());
-    } catch {
-      past = [];
-    }
-    if (!past.length) {
-      void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
-      return;
-    }
-    await this.open(id, false, past);
+  restoreLast(): Promise<void> {
+    if (!this.primary) return Promise.resolve();
+    return this.restoreSession(this.ctx.workspaceState.get<string>(LAST_SESSION_KEY) ?? '', {
+      fallback: true,
+    });
+  }
+
+  /**
+   * Riapre una conversazione precisa, se questa chat e' ancora vuota.
+   *
+   * E' la stessa strada di `restoreLast`, ma l'id lo dice chi chiama: al ritorno da un
+   * reload ogni scheda ha il suo, tenuto da parte dalla pagina (vedi il wire `sid`), e
+   * cosi' tornano tutte quelle che erano aperte invece della sola ultima.
+   *
+   * Chiede la coda perche' al reload le richieste arrivano appaiate — la scheda e il
+   * segnaposto del progetto parlano della stessa conversazione — e la seconda trova la
+   * chat gia' occupata e lascia stare.
+   */
+  restoreSession(id: string, opts?: { fallback?: boolean }): Promise<void> {
+    const fallback = !!opts?.fallback;
+    // Una scheda che torna dal reload parla per se': appena lo dice, il segnaposto
+    // del progetto tace. Vale anche quando la scheda non aveva niente aperto: una
+    // schermata nuova deve tornare nuova, non con addosso la conversazione di
+    // qualcun altro.
+    if (!fallback) this.claimed = true;
+    // L'id si prende subito, prima ancora di leggere la trascrizione: la pagina si
+    // attacca in un attimo, e `hello` le direbbe "nessuna conversazione" cancellando
+    // dalla scheda l'unico appunto che sopravvive al reload. Poi, se sul disco non
+    // c'e' piu' niente, si azzera qui sotto.
+    if (id && !fallback && !this.history.length && !this.resume && !this.session) this.setSid(id);
+    const run = async () => {
+      // Il segnaposto e' arrivato secondo: si e' fatto avanti una scheda, e ha ragione lei.
+      if (fallback && this.claimed) return;
+      if (!id) return;
+      // Occupata: qualcuno ha gia' riaperto qualcosa, o hai gia' cominciato a
+      // scrivere. Riaprire adesso vorrebbe dire buttare via quello che c'e'.
+      if (this.history.length || this.resume || this.session) {
+        // Con un'eccezione sola: quello che c'e' l'ha rimesso il segnaposto del
+        // progetto — l'ultima conversazione della finestra — e adesso arriva la
+        // scheda a dire qual era davvero la sua. Roba di ripiego contro roba certa:
+        // vince la scheda. Un motore acceso o una riga che hai scritto, no.
+        const provisionalOnly = !fallback && this.provisional && !this.session && this.sid !== id;
+        if (!provisionalOnly) return;
+      }
+      // Prima si guarda se c'e' davvero qualcosa da rileggere: `replaySession` non
+      // protesta per una trascrizione mancante, torna vuota. Riprendendola lo stesso
+      // si resterebbe agganciati a un id che non esiste piu', e il primo messaggio
+      // andrebbe a vuoto. Meglio scoprirlo adesso.
+      let past: Wire[] = [];
+      try {
+        past = await replaySession(id, currentCwd());
+      } catch {
+        past = [];
+      }
+      if (!past.length) {
+        if (this.sid === id && !this.history.length && !this.session) this.setSid('');
+        if (this.primary && this.ctx.workspaceState.get<string>(LAST_SESSION_KEY) === id) {
+          void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
+        }
+        return;
+      }
+      await this.open(id, false, past);
+      // `open` passa da `clear`, che azzera il flag: si rimette dopo, e solo se a
+      // rimettere in piedi la conversazione e' stato il segnaposto.
+      this.provisional = fallback;
+    };
+    this.opening = this.opening.then(run, run);
+    return this.opening;
   }
 
   private clear() {
+    this.provisional = false; // quello che c'era non c'e' piu': non e' piu' roba da sostituire
+    this.setSid(''); // la faccia non sta piu' su niente: non c'e' piu' niente da riaprire
     this.closeAllPending('Switching conversation.');
     this.endEngine();
     this.history = [];
@@ -843,11 +944,10 @@ export class ChatController {
       this.commands = e.items;
       void this.ctx.globalState.update(COMMANDS_KEY, e.items);
     }
-    // Qual e' la conversazione in corso. Serve solo alla scheda principale: e' quella
-    // che si riapre da sola alla prossima finestra.
-    if (e.k === 'session' && this.primary) {
-      void this.ctx.workspaceState.update(LAST_SESSION_KEY, e.id);
-    }
+    // Qual e' la conversazione in corso. Vale per tutte le chat, non solo per la
+    // principale: ogni scheda si riapre da sola alla prossima finestra, e per farlo
+    // deve sapere di essere questa. Un fork prende il suo id proprio qui.
+    if (e.k === 'session') this.setSid(e.id);
     this.remember(e);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.

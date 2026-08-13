@@ -114,6 +114,12 @@ export type Wire =
       tip?: { en: string; it: string } | null;
     }
   | { k: 'session'; id: string; model: string; cwd: string }
+  // Quale conversazione sta in *questa* faccia. La pagina non la disegna: se la
+  // ricorda con vscode.setState, che e' l'unica memoria che sopravvive a
+  // "Developer: Reload Window" restando attaccata alla singola scheda. Al ritorno
+  // VS Code la ridà al deserializzatore, e ogni scheda riapre la sua invece di
+  // trovarsi davanti quella di qualcun altro — o niente. Vuota = nessuna.
+  | { k: 'sid'; id: string }
   // The images come back together with the message: in the chat they stay attached
   // to what you sent, so you can see they really went out. The other files do the
   // same — they leave as a list of paths folded into the prompt, which is stripped

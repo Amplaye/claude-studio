@@ -96,19 +96,38 @@ export class ChatPanel {
     return !!ChatPanel.primary?.panel.visible;
   }
 
-  /** You reload the window and the tab is still there. */
+  /**
+   * You reload the window and the tabs are still there — all of them, each on the
+   * conversation it had.
+   *
+   * VS Code brings back one panel per tab that was open and hands each one the state
+   * its page had put aside: the id of its conversation (see the `sid` wire). The tabs
+   * beyond the first used to be thrown away here — `panel.dispose()`, on the grounds
+   * that there was one chat and one tab — so a window with four conversations came
+   * back with one, and reloading became something you learnt not to do. Each extra tab
+   * gets a controller of its own, exactly like the ones the "+" opens, and reopens its
+   * own transcript.
+   */
   static register(
     ctx: vscode.ExtensionContext,
     chat: ChatController,
     monitor?: ContextMonitor
   ): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(TYPE, {
-      async deserializeWebviewPanel(panel) {
-        if (ChatPanel.primary) {
-          panel.dispose();
+      async deserializeWebviewPanel(panel, state: unknown) {
+        const sid = (state as { sid?: unknown } | undefined)?.sid;
+        const id = typeof sid === 'string' ? sid : '';
+        // La prima che torna e' la principale: e' quella che divide la conversazione
+        // con la chat della sidebar, e l'unica che il resto dell'estensione sa dove
+        // trovare (il badge, "apri", i comandi).
+        if (!ChatPanel.primary) {
+          new ChatPanel(panel, ctx, chat, monitor, true);
+          void chat.restoreSession(id);
           return;
         }
-        new ChatPanel(panel, ctx, chat, monitor, true);
+        const own = new ChatController(ctx, { primary: false });
+        new ChatPanel(panel, ctx, own, monitor, false);
+        void own.restoreSession(id);
       },
     });
   }
