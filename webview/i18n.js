@@ -140,6 +140,14 @@
     'empty.key.stop': 'stop',
     'empty.commands.wait': 'Loading the commands…',
 
+    // ---- the task panel ----
+    'tasks.none': 'No tasks yet. Ask for something and the list appears here.',
+    'tasks.thinking': 'Working out what to do…',
+    'tasks.count': '{done} of {total} done',
+    'tasks.working': 'working',
+    'tasks.paused': 'paused',
+    'tasks.finished': 'finished',
+
     // ---- the conversation ----
     'msg.reasoning': 'Reasoning',
     'msg.thinking': 'Claude is thinking…',
@@ -354,6 +362,14 @@
     'empty.key.history': 'cronologia',
     'empty.key.stop': 'ferma',
     'empty.commands.wait': 'Carico i comandi…',
+
+    // ---- il pannello delle task ----
+    'tasks.none': 'Ancora nessuna task. Chiedi qualcosa e la lista compare qui.',
+    'tasks.thinking': 'Sto capendo cosa fare…',
+    'tasks.count': '{done} di {total} fatte',
+    'tasks.working': 'in corso',
+    'tasks.paused': 'in pausa',
+    'tasks.finished': 'finito',
 
     'msg.reasoning': 'Ragionamento',
     'msg.thinking': 'Claude sta pensando…',

@@ -31,3 +31,4 @@ function build(page, out) {
 
 build('chat.html', 'preview.html');
 build('context.html', 'preview-context.html');
+build('tasks.html', 'preview-tasks.html');

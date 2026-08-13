@@ -1,0 +1,189 @@
+/* The task list: what Claude is doing now, and how much is left of it. */
+
+.taskroot {
+  padding: 10px 12px 14px;
+  font-size: 12px;
+}
+
+.tk-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.tk-count {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.tk-state {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+}
+.tk-state.live {
+  color: var(--claude-2);
+  opacity: 1;
+}
+.tk-state.ok {
+  color: var(--ok, #5dbf8a);
+  opacity: 1;
+}
+
+/* How much of the prompt is behind you. */
+.tk-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg, #fff) 12%, transparent);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.tk-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--claude-1), var(--claude-2));
+  transition: width 0.45s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.tk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tk-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1.35;
+  /* Every state change is a move, not a cut: the row that becomes the current one
+     lights up and slides, the one that's finished fades and greys out. */
+  transition: background 0.32s ease, opacity 0.32s ease, transform 0.32s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+/* A row that has just appeared drops in, one after the other down the list. */
+.tk-row.new {
+  animation: tk-in 0.36s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+@keyframes tk-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tk-ic {
+  flex: 0 0 auto;
+  display: flex;
+  padding-top: 1px;
+}
+.tk-ic .ico {
+  width: 13px;
+  height: 13px;
+}
+.tk-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tk-row.completed {
+  opacity: 0.5;
+}
+.tk-row.completed .ico {
+  color: var(--ok, #5dbf8a);
+}
+.tk-row.pending {
+  opacity: 0.7;
+}
+
+/* The one being worked on is the only one that should catch the eye. */
+.tk-row.in_progress {
+  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
+  font-weight: 600;
+  transform: translateX(2px);
+}
+.tk-row.in_progress .ico {
+  color: var(--claude-2);
+  animation: tk-beat 1.4s ease-in-out infinite;
+}
+@keyframes tk-beat {
+  0%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+  50% {
+    opacity: 0.4;
+    scale: 0.86;
+  }
+}
+/* The moment a task is ticked off: the check springs in and the line strikes itself
+   through from left to right. It is the one bit of the panel worth watching. */
+.tk-row.justdone .ico {
+  animation: tk-pop 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes tk-pop {
+  from {
+    scale: 0.2;
+    rotate: -90deg;
+  }
+  60% {
+    scale: 1.25;
+  }
+  to {
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+/* The strike-through is drawn rather than switched on: a line that grows reads as
+   "this just got done", where text-decoration appearing all at once reads as a glitch. */
+/* The rule is drawn over the words themselves, not the row: .tk-label is a flex child
+   that stretches to fill the line, so a 100%-wide bar would run out past the end of
+   short text. An inline wrapper is only ever as wide as what it contains. */
+.tk-row.completed .tk-label > .tk-txt {
+  position: relative;
+}
+.tk-row.completed .tk-label > .tk-txt::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform-origin: left center;
+}
+.tk-row.justdone .tk-label > .tk-txt::after {
+  animation: tk-strike 0.4s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+@keyframes tk-strike {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.tk-empty {
+  margin: 2px 0 0;
+  opacity: 0.55;
+  font-size: 11.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-fill {
+    transition-duration: 0.12s;
+  }
+  .tk-row.in_progress .ico {
+    animation: none;
+  }
+}

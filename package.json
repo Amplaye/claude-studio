@@ -72,6 +72,11 @@
         },
         {
           "type": "webview",
+          "id": "claudeStudio.tasks",
+          "name": "Tasks"
+        },
+        {
+          "type": "webview",
           "id": "claudeStudio.context",
           "name": "Context"
         }

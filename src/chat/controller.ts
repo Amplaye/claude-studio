@@ -28,6 +28,7 @@ import { recentSessions, replaySession } from './history';
 import { sound } from './sound';
 import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
+import type { TaskStore } from '../tasks/store';
 
 export interface Surface {
   readonly kind: 'view' | 'panel';
@@ -107,8 +108,15 @@ export class ChatController {
   readonly key: string;
   private titleFns = new Set<() => void>();
 
-  constructor(private readonly ctx: vscode.ExtensionContext, opts?: { primary?: boolean }) {
+  /** Dove finisce l'elenco delle task, se qualcuno lo sta guardando. */
+  private readonly tasks?: TaskStore;
+
+  constructor(
+    private readonly ctx: vscode.ExtensionContext,
+    opts?: { primary?: boolean; tasks?: TaskStore }
+  ) {
     this.primary = opts?.primary !== false;
+    this.tasks = opts?.tasks;
     this.key = 'chat' + ++keySeq;
     this.prefs = { ...DEFAULT_PREFS, ...(ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
     // Migrazione: suoni rimossi → si torna a coccola
@@ -588,6 +596,7 @@ export class ChatController {
     this.busy = false;
     this.checkpoints.clear(); // i punti di prima appartenevano alla conversazione andata
     owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
+    if (this.primary) this.tasks?.clear(); // le task erano di quella conversazione
     this.broadcast({ k: 'reset' });
     this.broadcast({ k: 'mode', value: this.mode });
     this.titleChanged();
@@ -821,6 +830,18 @@ export class ChatController {
     if (e.k === 'ask') this.alert('ask');
     // Il nome della scheda e' la prima cosa che hai scritto: si sa da qui.
     if (e.k === 'user' || e.k === 'session') this.titleChanged();
+    // L'elenco delle task del pannello. Solo la chat principale lo alimenta: con tre
+    // schede aperte, un pannello solo non puo' raccontarne tre insieme, e quella
+    // davanti e' quella che stai guardando.
+    if (this.tasks && this.primary) {
+      // Un messaggio nuovo azzera: l'elenco appartiene al prompt che lo ha prodotto.
+      if (e.k === 'user') this.tasks.clear();
+      if (e.k === 'busy') this.tasks.setBusy(e.value);
+      if (e.k === 'tool_start' && e.name === 'TodoWrite') {
+        const todos = (e.input as { todos?: unknown })?.todos;
+        if (Array.isArray(todos)) this.tasks.set(todos as never);
+      }
+    }
     this.broadcast(e);
   }
 
