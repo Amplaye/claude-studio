@@ -227,6 +227,22 @@ export class Session {
       forwardSubagentText: true,
       permissionMode: this.o.permissionMode ?? 'default',
       canUseTool: this.canUseTool,
+      // Le istruzioni di Claude Code, chieste per nome.
+      //
+      // Non chiederle non voleva dire "prendi quelle di serie": l'SDK, quando questa
+      // riga manca, manda alla CLI un prompt di sistema *vuoto* — `if (s === void 0)
+      // p = ""` — cioe' le dice esplicitamente "non hai istruzioni". Che oggi la CLI
+      // ignori una stringa vuota e si comporti lo stesso da Claude Code e' un
+      // dettaglio della sua implementazione, non una promessa: le si stava dicendo una
+      // cosa e contando su un'altra, e il giorno in cui prendesse quel vuoto alla
+      // lettera il pannello resterebbe con un modello senza mestiere, senza che qui
+      // dentro sia cambiata una virgola. Un prompt di sistema personalizzato lo
+      // rispetta eccome — provato — quindi la stringa vuota vive solo di clemenza.
+      //
+      // Il preset e' la strada documentata per dire "voglio Claude Code": si paga
+      // pieno una volta per sessione — sta in testa alla richiesta, dentro la cache
+      // del prompt — e da li' in poi si rilegge, che costa una frazione.
+      systemPrompt: { type: 'preset', preset: 'claude_code' },
       // Vuoto vuol dire "non dire niente": la CLI usa quello che useresti da
       // terminale. Si passa solo cio' che hai scelto apposta.
       ...(this.o.model ? { model: this.o.model } : {}),

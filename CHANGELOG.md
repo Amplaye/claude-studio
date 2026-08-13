@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
+
+- **The engine now asks for Claude Code's instructions by name.** Not asking did not
+  mean "use the default": the SDK, with that line missing, sends the CLI an *empty*
+  system prompt — it explicitly says "you have no instructions". That today's CLI
+  shrugs and behaves like Claude Code anyway is a detail of how it happens to be
+  written, not a promise; a custom system prompt is honoured to the letter, so the
+  empty one was living on clemency alone. The day it were taken at face value this
+  panel would be talking to a model with the tools of Claude Code and none of its
+  trade, without a line changing here. It is asked for properly now. The prompt rides
+  at the head of the request, inside the prompt cache: paid for once a session, reread
+  for a fraction after that.
 
 - **Nothing the panel says is written in grey any more — anywhere.** tokens.css has
   said it from the first line since 0.0.6: text is full white, hierarchy comes from

@@ -104,6 +104,15 @@ if (!skipVerify) {
   nodeMust('scripts/preview.mjs');
   nodeMust('scripts/ui-check.mjs');
   nodeMust('scripts/context-check.mjs');
+  nodeMust('scripts/lang-check.mjs');
+  nodeMust('scripts/sessions-check.cjs');
+  // Le due che guardano cosa sopravvive a un reload e se i passi arrivano al
+  // pannello: sono state scritte dietro a due difetti che si vedevano solo usando
+  // l'estensione, ed e' esattamente il genere di cosa che un rilascio non deve
+  // rimettere in circolo.
+  nodeMust('scripts/reload-check.cjs');
+  nodeMust('scripts/tasks-check.cjs');
+  nodeMust('scripts/menu-check.mjs');
   nodeMust('scripts/data-check.cjs');
   nodeMust('scripts/host-check.cjs');
 } else {
