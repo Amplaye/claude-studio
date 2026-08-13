@@ -16,23 +16,33 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+// `--live` runs the same check against the real CLI instead of a written transcript:
+// a prompt goes out, Claude writes its own list, and the panel has to receive it. It
+// costs a call and needs your login, so it stays out of `npm run ui-check` — but it is
+// the only thing that proves the whole chain, and a replayed transcript never can.
+const LIVE = process.argv.includes('--live');
+
 const root = path.dirname(__dirname);
-const home = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-tasks-'));
-const work = path.join(home, 'project');
-fs.mkdirSync(work, { recursive: true });
-process.env.USERPROFILE = home;
-process.env.HOME = home;
-if (os.homedir() !== home) {
-  console.error('FAILED: cannot move the home folder for the test');
-  process.exit(1);
-}
-process.on('exit', () => {
-  try {
-    fs.rmSync(home, { recursive: true, force: true });
-  } catch {
-    /* the system will clean it up */
+// Live needs your real home: that's where the login is. Offline moves it, so the
+// transcripts the test writes are the only ones the extension can find.
+const home = LIVE ? os.homedir() : fs.mkdtempSync(path.join(os.tmpdir(), 'claude-studio-tasks-'));
+const work = LIVE ? root : path.join(home, 'project');
+if (!LIVE) {
+  fs.mkdirSync(work, { recursive: true });
+  process.env.USERPROFILE = home;
+  process.env.HOME = home;
+  if (os.homedir() !== home) {
+    console.error('FAILED: cannot move the home folder for the test');
+    process.exit(1);
   }
-});
+  process.on('exit', () => {
+    try {
+      fs.rmSync(home, { recursive: true, force: true });
+    } catch {
+      /* the system will clean it up */
+    }
+  });
+}
 
 const fails = [];
 const t = (cond, msg) => !cond && fails.push(msg);
@@ -42,13 +52,14 @@ const ID_TASK = 'aaaaaaaa-2222-4222-8333-444444444444';
 const ID_TODO = 'bbbbbbbb-2222-4222-8333-444444444444';
 
 const projects = path.join(home, '.claude', 'projects', work.replace(/[^a-zA-Z0-9]/g, '-'));
-fs.mkdirSync(projects, { recursive: true });
+if (!LIVE) fs.mkdirSync(projects, { recursive: true });
 
 let uuidSeq = 0;
 const uuidFor = () => `cccccccc-2222-4222-8333-${String(++uuidSeq).padStart(12, '0')}`;
 
 /** Writes a transcript from a list of {role, content} the way the CLI lays one out. */
 function writeTranscript(id, turns) {
+  if (LIVE) return; // the real home is not a scratch pad
   const common = {
     isSidechain: false,
     userType: 'external',
@@ -291,6 +302,24 @@ const ctx = {
 };
 
 const settle = (ms = 300) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The sidebar panel, the one you actually look at while a tab works. It is a second
+ * surface subscribing to the same list, and the tab passing on its own proves nothing
+ * about it: this is where the section used to sit empty.
+ */
+function mountSidebar() {
+  const view = {
+    webview: fakeWebview(),
+    visible: true,
+    onDidChangeVisibility: () => ({ dispose() {} }),
+    onDidDispose: () => ({ dispose() {} }),
+  };
+  registered.views.get('claudeStudio.context').resolveWebviewView(view);
+  view.webview._onMsg({ cmd: 'ready' });
+  return view;
+}
+
 /** The last list the panel was handed. */
 const shown = (panel) => {
   const frames = panel.webview.got.filter((m) => m && m.k === 'tasks');
@@ -299,11 +328,99 @@ const shown = (panel) => {
 const line = (d) =>
   (d?.items ?? []).map((i) => `${i.status[0]}:${i.content}`).join(' | ') || '(empty)';
 
+/**
+ * The real thing: a prompt goes to the CLI and Claude writes its own list. Nothing is
+ * staged — if the panel ends the turn without the steps, the panel is broken.
+ */
+async function live(tab, side) {
+  const seen = () => tab.webview.got.filter((m) => m && m.k === 'tasks').map((m) => m.d);
+  let ended = 0;
+  const watch = setInterval(() => {}, 1000); // keeps the loop alive while the CLI thinks
+  tab.webview.got.length = 0;
+  const orig = tab.webview.postMessage;
+  tab.webview.postMessage = async (m) => {
+    // Every permission gets a no: this check is about the list, not about letting a
+    // test edit the repo it is being run in.
+    if (m?.k === 'ask') setTimeout(() => tab.webview._onMsg({ cmd: 'answer', id: m.id, choice: 'deny' }), 0);
+    if (m?.k === 'turn_end') ended++;
+    return orig(m);
+  };
+  /** Sends a prompt and waits for the turn to end. */
+  async function turn(text) {
+    const want = ended + 1;
+    tab.webview._onMsg({ cmd: 'send', text });
+    const deadline = Date.now() + 240000;
+    while (ended < want && Date.now() < deadline) await settle(200);
+    await settle(500);
+    return ended >= want;
+  }
+
+  const ok1 = await turn(
+    'Scriviti una lista di task con tre voci — "Leggere il README", "Contare le righe", ' +
+      '"Scrivere il risultato" — poi metti la prima in corso e la seconda completata. ' +
+      'Non leggere e non toccare nessun file: e\' solo la lista che mi serve.'
+  );
+
+  const frames = seen();
+  const d = frames[frames.length - 1] ?? null;
+  console.log('  turn 1: ' + frames.length + ' list(s) handed over; the last one: ' + line(d));
+  t(ok1, 'the turn never finished: no CLI, no login, or no network');
+  t(frames.length > 0, 'the panel was handed no list at all while Claude was writing one');
+  t((d?.total ?? 0) >= 3, 'the steps Claude wrote down did not reach the panel: ' + line(d));
+  t(
+    (d?.items ?? []).some((i) => i.status === 'completed'),
+    'a step Claude ticked off is still drawn as pending: ' + line(d)
+  );
+  // The list must be built as it goes, not handed over in one piece at the end: that
+  // delay is the whole reason this panel exists.
+  t(
+    frames.filter((f) => f.total > 0).length > 1,
+    'the list only appeared once, at the end — it is not being built as Claude writes it'
+  );
+
+  const s = shown(side);
+  console.log('  the sidebar was handed: ' + line(s));
+  t(line(s) === line(d), 'the sidebar panel does not show what the tab shows: ' + line(s));
+
+  // ---- the second message: this is where a list used to disappear ----------
+  //
+  // A TodoWrite list belongs to the prompt that produced it and goes when the next
+  // one arrives; a Task* list belongs to the conversation and must not. Get that
+  // wrong and the panel empties itself the moment you say "go on".
+  const before = seen().length;
+  const ok2 = await turn('Adesso completa anche la terza task della lista. Nient\'altro.');
+  const after = seen().slice(before);
+  const d2 = after[after.length - 1] ?? shown(tab);
+  console.log('  turn 2: ' + line(d2));
+  t(ok2, 'the second turn never finished');
+  t((d2?.total ?? 0) >= 3, 'the list emptied itself on the second message: ' + line(d2));
+  t(
+    (d2?.items ?? []).filter((i) => i.status === 'completed').length >= 2,
+    'the step ticked off in the second turn did not reach the panel: ' + line(d2)
+  );
+  t(
+    line(shown(side)) === line(d2),
+    'after a second message the sidebar and the tab disagree: ' + line(shown(side))
+  );
+  clearInterval(watch);
+}
+
 (async () => {
   require(path.join(root, 'dist', 'extension.js')).activate(ctx);
+  const side = mountSidebar();
   await registered.commands.get('claudeStudio.openTab')();
   const tab = registered.panels[0];
   tab.webview._onMsg({ cmd: 'ready' });
+
+  if (LIVE) {
+    await live(tab, side);
+    if (fails.length) {
+      console.error('FAILED:\n- ' + fails.join('\n- '));
+      process.exit(1);
+    }
+    console.log('tasks-check --live ok — Claude wrote its list and the panel drew it');
+    process.exit(0);
+  }
 
   // ---- the tool the CLI actually uses ----
   tab.webview._onMsg({ cmd: 'open', id: ID_TASK });
@@ -325,6 +442,12 @@ const line = (d) =>
   t(
     d && d.active === 1,
     'the panel does not know which step is being worked on: ' + (d && d.active)
+  );
+  // The sidebar is the surface you leave open while a tab works: it has to be told
+  // the same thing, not merely be able to be.
+  t(
+    line(shown(side)) === line(d),
+    'the sidebar panel does not show what the tab shows: ' + line(shown(side))
   );
 
   // ---- the old tool, still spoken by older CLIs ----

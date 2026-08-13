@@ -283,6 +283,7 @@
     "preview": "node build.mjs && node scripts/preview.mjs",
     "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/lang-check.mjs && node scripts/sessions-check.cjs && node scripts/reload-check.cjs && node scripts/tasks-check.cjs && node scripts/tips-check.mjs && node scripts/menu-check.mjs",
     "smoke": "node scripts/smoke-engine.mjs",
+    "tasks-live": "node build.mjs && node scripts/tasks-check.cjs --live",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
     "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs"
