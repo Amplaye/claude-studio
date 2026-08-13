@@ -7,6 +7,9 @@ media/ionicons-studio.woff2
 # "Consenti sempre" scrive qui: sono permessi di questa macchina, non del progetto
 .claude/settings.local.json
 
+# handoff di sessione: appunti di lavoro, non fanno parte del progetto
+.claude/handoffs/
+
 # helper temporanei driver browser
 .az-shot.png
 
