@@ -533,7 +533,7 @@ export class ChatController {
    * motore di riprenderla al prossimo messaggio. `fork` la lascia intatta e
    * lavora su un ramo nuovo.
    */
-  async open(id: string, fork = false) {
+  async open(id: string, fork = false, past?: Wire[]) {
     this.clear();
     this.resume = { id, fork };
     // La barra di contesto lo sa subito, non al prossimo messaggio: il motore
@@ -541,7 +541,9 @@ export class ChatController {
     // la conversazione di prima. Un fork non ha ancora un id suo: quello arriva
     // dal motore, e la card compare allora.
     if (!fork) owned.adopt(this.key, id, currentCwd());
-    for (const e of await replaySession(id, currentCwd())) this.emit(e);
+    // `past` gia' letto da chi chiama (vedi restoreLast): la trascrizione e' un file
+    // solo, e riaprirlo due volte per la stessa conversazione non serve a nessuno.
+    for (const e of past ?? (await replaySession(id, currentCwd()))) this.emit(e);
     this.titleChanged();
   }
 
@@ -573,7 +575,7 @@ export class ChatController {
       void this.ctx.workspaceState.update(LAST_SESSION_KEY, undefined);
       return;
     }
-    await this.open(id);
+    await this.open(id, false, past);
   }
 
   private clear() {
