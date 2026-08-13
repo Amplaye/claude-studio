@@ -1,8 +1,8 @@
 {
   "name": "claude-studio",
   "displayName": "Claude Studio",
-  "description": "A better home for Claude Code in VS Code: same CLI and account, plus live progress, diffs you open when you want, one-click permissions, your context always in sight — and attachments of any kind: PDF, Word, Excel, PowerPoint, CSV, zip, video, audio, logs and code, not just images.",
-  "version": "0.10.0",
+  "description": "The same Claude Code, in a panel you can actually watch. It keeps the Claude Code CLI updated on its own, so you're never behind on models or features. Live progress, diffs you open when you want, one-click permissions, and attach any file, not just images.",
+  "version": "0.11.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
