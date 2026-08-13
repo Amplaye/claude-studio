@@ -135,29 +135,90 @@ console.log(
     : '  dialogo chiuso: il file e’ arrivato'
 );
 
-// L'esito NON si deduce dal modal: si va a rileggere la riga del publisher e si
-// pretende di trovarci la versione appena caricata. Prima si accettava qualunque
-// stato non-errore, cosi' un upload mai avvenuto passava per riuscito.
-let confermato = false;
-let stato = 'sconosciuto';
-for (let tentativo = 0; tentativo < 8 && !confermato; tentativo++) {
-  await page.waitForTimeout(7000);
-  await page.goto(MANAGE_URL, { waitUntil: 'load', timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3500);
-  const t = (await page.locator('body').innerText().catch(() => '')).replace(/[ \t]+/g, ' ');
-  if (/Verification failed|already exists/i.test(t)) {
-    stato = (t.match(/Verification failed|already exists/i) || [])[0] ?? 'errore';
-    break;
-  }
-  if (t.includes(VERSION)) {
-    confermato = true;
-    stato = (t.match(/Verifying|Approved|Published/i) || ['presente'])[0];
+/**
+ * La galleria pubblica, interrogata senza browser.
+ *
+ * E' la fonte che conta e l'unica che non puo' sparire a meta' controllo: il portale
+ * si legge dentro una finestra che qualcuno puo' chiudere — ed e' successo, con
+ * l'upload gia' arrivato e lo script morto su "Target page has been closed" mentre
+ * andava a verificarlo. Un rilascio riuscito segnato come fallito e' peggio di uno
+ * fallito: ti manda a rifare una cosa che era fatta.
+ */
+async function inGalleria() {
+  try {
+    const r = await fetch('https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json;api-version=7.2-preview.1' },
+      body: JSON.stringify({
+        filters: [
+          { criteria: [{ filterType: 7, value: `${PUBLISHER}.claude-studio` }], pageSize: 1, pageNumber: 1 },
+        ],
+        flags: 0x1,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const j = await r.json();
+    const vs = (j?.results?.[0]?.extensions?.[0]?.versions ?? []).map((v) => v.version);
+    return vs.includes(VERSION);
+  } catch {
+    return false;
   }
 }
 
-console.log(`  versione ${VERSION} sul portale: ${confermato ? 'sì' : 'NON trovata'} — stato: ${stato}`);
+/**
+ * Il portale, letto senza poterci morire sopra. Se la finestra e' sparita si torna a
+ * chiederne una: la sessione sta nel profilo su disco, non nella finestra.
+ */
+async function nelPortale() {
+  try {
+    if (page.isClosed()) {
+      const b = await ensureBrowser({ startUrl: MANAGE_URL });
+      page = b.contexts()[0].pages().find((p) => p.url().includes('marketplace.visualstudio.com'))
+        ?? (await b.contexts()[0].newPage());
+    }
+    await page.goto(MANAGE_URL, { waitUntil: 'load', timeout: 60000 });
+    await page.waitForTimeout(3500);
+    const t = (await page.locator('body').innerText()).replace(/[ \t]+/g, ' ');
+    if (/Verification failed|already exists/i.test(t)) {
+      return { esito: 'errore', stato: (t.match(/Verification failed|already exists/i) || [])[0] };
+    }
+    if (t.includes(VERSION)) {
+      return { esito: 'ok', stato: (t.match(/Verifying|Approved|Published/i) || ['presente'])[0] };
+    }
+  } catch (e) {
+    return { esito: 'illeggibile', stato: e.message.split('\n')[0] };
+  }
+  return { esito: 'assente', stato: 'non ancora' };
+}
+
+// L'esito NON si deduce dal modal: si pretende di ritrovare la versione appena
+// caricata. Prima si accettava qualunque stato non-errore, cosi' un upload mai
+// avvenuto passava per riuscito.
+let confermato = false;
+let stato = 'sconosciuto';
+for (let tentativo = 0; tentativo < 8 && !confermato; tentativo++) {
+  await new Promise((r) => setTimeout(r, 7000));
+  if (await inGalleria()) {
+    confermato = true;
+    stato = 'in galleria';
+    break;
+  }
+  const p = await nelPortale();
+  if (p.esito === 'errore') {
+    stato = p.stato;
+    break;
+  }
+  if (p.esito === 'ok') {
+    confermato = true;
+    stato = p.stato;
+  } else {
+    stato = p.stato;
+  }
+}
+
+console.log(`  versione ${VERSION}: ${confermato ? 'confermata' : 'NON trovata'} — ${stato}`);
 await page.screenshot({ path: '.publish-last.png' }).catch(() => {});
-await browser.close();
+await browser.close().catch(() => {});
 
 if (!confermato) {
   console.error(`✗ Marketplace: impossibile confermare la pubblicazione di ${VERSION}.`);
