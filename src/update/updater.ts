@@ -13,6 +13,7 @@
 // doesn't ask permission, because the only thing worse than an update is having to
 // remember it. It's switched off in Settings > Claude Studio > Auto Update.
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { execFile } from 'node:child_process';
 import * as vscode from 'vscode';
@@ -43,14 +44,20 @@ function mode(): Mode {
   return vscode.workspace.getConfiguration('claudeStudio').get<Mode>('autoUpdate', 'auto');
 }
 
-/** Where the source lives: the setting wins, then the folder it was built from. */
+/**
+ * Where the source lives: the setting wins, then the folder it was built from, then
+ * the same folder name under home. The last one matters because a build made on one
+ * machine carries that machine's path: on the other one it points nowhere, and
+ * without a fallback the extension would never rebuild itself there again.
+ */
 function sourceRoot(): string | undefined {
   const conf = vscode.workspace
     .getConfiguration('claudeStudio')
     .get<string>('updateSourcePath', '')
     .trim();
   const baked = typeof __CS_SOURCE_ROOT === 'string' ? __CS_SOURCE_ROOT : '';
-  for (const p of [conf, baked]) {
+  const home = path.join(os.homedir(), path.basename(baked || 'claude-studio'));
+  for (const p of [conf, baked, home]) {
     if (p && fs.existsSync(path.join(p, 'package.json'))) return p;
   }
   return undefined;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.1
+
+- **The update works on the other machine too.** A build carries inside it the path of
+  the folder it came out of, and that path only exists on the machine that made it: on
+  the second one the extension looked for its own source, did not find it, and quietly
+  stopped updating itself — whatever folder you had open. Now, when that path leads
+  nowhere, it looks for the source under your home folder, which is where it is.
+
 ## 0.15.0
 
 - **Opening Studio opens something new.** It used to read the last conversation of the
