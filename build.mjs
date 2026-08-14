@@ -175,13 +175,11 @@ const options = {
   // sdk.mjs uses createRequire(import.meta.url): in the CJS output import.meta does
   // not exist, so it gets replaced with the URL of the bundle file.
   //
-  // __CS_SOURCE_ROOT and __CS_SDK_VERSION are for the automatic update: once
-  // installed, the extension has no way of knowing where it came from nor which SDK
-  // it carries, and those are the two things it has to compare to work out whether
-  // it has fallen behind. They are written here, where they are known for sure.
+  // __CS_SDK_VERSION is for the update check: once installed, the extension has no
+  // way of knowing which SDK it carries, and that is what it compares to work out
+  // whether it has fallen behind. It is written here, where it is known for sure.
   define: {
     'import.meta.url': '__claudeStudioModuleUrl',
-    __CS_SOURCE_ROOT: JSON.stringify(root),
     __CS_SDK_VERSION: JSON.stringify(sdkVersion()),
   },
   banner: {

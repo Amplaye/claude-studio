@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.15.2
+
+- **Updating the extension is VS Code's job.** Every build carried inside it the path
+  of the folder it was compiled in, and on startup it went looking there to rebuild
+  itself — a path that on anybody else's computer leads nowhere, and on a second
+  computer of your own leads to the wrong place. Now there is nothing to look for:
+  installed from the Marketplace the extension is updated by VS Code, as it should be.
+  Whoever works on the source says so in **Claude Studio: Update Source Path**, and
+  only that folder gets rebuilt — `~/claude-studio` holds on every machine you have.
+  The CLI keeps being updated as before: it's the one that brings the new models.
+
 ## 0.15.1
 
 - **The update works on the other machine too.** A build carries inside it the path of

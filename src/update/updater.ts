@@ -5,8 +5,11 @@
 //  1. the `claude` CLI installed on the PC — it's the one that knows which models
 //     exist, so as long as it lags behind, the extension shows last year's models,
 //     however new the extension itself is;
-//  2. the extension itself — the code in here, together with the Agent SDK it uses
-//     to talk to the CLI.
+//  2. the extension itself — but only for whoever develops it. Installed from the
+//     Marketplace it is VS Code that keeps it updated, and it does it well: nothing
+//     here has to touch it. Rebuilding from source happens only if you point
+//     `claudeStudio.updateSourcePath` at your own checkout, and only if that folder
+//     really is Claude Studio's source.
 //
 // This file watches both, on its own, at generous intervals: at startup and then
 // every six hours. If it finds something newer it puts it right and says so; it
@@ -19,8 +22,7 @@ import { execFile } from 'node:child_process';
 import * as vscode from 'vscode';
 import { claudeCli, resetCliCache } from '../engine/cli';
 
-/** The source this build came out of, and the SDK it brought along with it. */
-declare const __CS_SOURCE_ROOT: string;
+/** The SDK this build brought along with it. */
 declare const __CS_SDK_VERSION: string;
 
 const CLI_PKG = '@anthropic-ai/claude-code';
@@ -45,22 +47,24 @@ function mode(): Mode {
 }
 
 /**
- * Where the source lives: the setting wins, then the folder it was built from, then
- * the same folder name under home. The last one matters because a build made on one
- * machine carries that machine's path: on the other one it points nowhere, and
- * without a fallback the extension would never rebuild itself there again.
+ * Where the source lives: only where you said it is. `~` counts as your home folder,
+ * so the same line works on every machine you have. Nothing is taken as source unless
+ * its package.json carries this extension's own name: pointing at the wrong folder by
+ * mistake must not turn into git and npm being run inside somebody else's repository.
  */
-function sourceRoot(): string | undefined {
+export function sourceRoot(ctx: vscode.ExtensionContext): string | undefined {
   const conf = vscode.workspace
     .getConfiguration('claudeStudio')
     .get<string>('updateSourcePath', '')
     .trim();
-  const baked = typeof __CS_SOURCE_ROOT === 'string' ? __CS_SOURCE_ROOT : '';
-  const home = path.join(os.homedir(), path.basename(baked || 'claude-studio'));
-  for (const p of [conf, baked, home]) {
-    if (p && fs.existsSync(path.join(p, 'package.json'))) return p;
+  if (!conf) return undefined;
+  const root = conf.startsWith('~') ? path.join(os.homedir(), conf.slice(1)) : conf;
+  const pkg = readJson(path.join(root, 'package.json'));
+  if (pkg?.name !== ctx.extension.packageJSON.name) {
+    log(`${root} is not the Claude Studio source: nothing gets rebuilt from there.`);
+    return undefined;
   }
-  return undefined;
+  return root;
 }
 
 // ---- tools ---------------------------------------------------------------
@@ -167,15 +171,18 @@ async function updateCli(auto: boolean): Promise<string | undefined> {
 }
 
 /**
- * The extension. It gets rebuilt from source when there's a real reason: a `git pull`
- * brought a higher version, or an Agent SDK newer than the one baked into this build
- * came out. Without a reason nothing gets touched: recompiling for sport would mean
- * asking you to reload the window every six hours.
+ * The extension, for whoever develops it. It gets rebuilt from source when there's a
+ * real reason: a `git pull` brought a higher version, or an Agent SDK newer than the
+ * one baked into this build came out. Without a reason nothing gets touched:
+ * recompiling for sport would mean asking you to reload the window every six hours.
+ *
+ * Without a source folder there is nothing to do and nothing is wrong: the extension
+ * came from the Marketplace and VS Code updates it by itself.
  */
 async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Promise<string | undefined> {
-  const root = sourceRoot();
+  const root = sourceRoot(ctx);
   if (!root) {
-    log("source not found: the extension can't be rebuilt from here.");
+    log('installed as it is: VS Code takes care of updating the extension.');
     return;
   }
 

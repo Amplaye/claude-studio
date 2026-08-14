@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code but, a better IDE! The same Claude Code, in a panel you can actually watch. It keeps the Claude Code CLI updated on its own, so you're never behind on models or features. Live progress, diffs you open when you want, one-click permissions, and attach any file, not just images.",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -235,7 +235,7 @@
             "off"
           ],
           "enumDescriptions": [
-            "Updates the Claude Code CLI and the extension on its own, and tells you once it's done.",
+            "Updates the Claude Code CLI on its own, and tells you once it's done.",
             "Just watches: warns you when something new is out, but changes nothing.",
             "Checks nothing. The \"Claude Studio: Check for Updates\" command is still there."
           ],
@@ -245,7 +245,7 @@
         "claudeStudio.updateSourcePath": {
           "type": "string",
           "default": "",
-          "description": "Folder holding the Claude Studio source, used to rebuild the extension when something new comes out. Leave empty to use the folder it was built from."
+          "description": "For whoever develops Claude Studio: the folder holding its source, rebuilt and reinstalled when a git pull or a new Agent SDK brings something newer. `~` means your home folder. Leave empty — installed from the Marketplace, VS Code keeps the extension updated on its own."
         },
         "claudeStudio.contextLimit": {
           "type": "number",
@@ -286,7 +286,7 @@
     "tasks-live": "node build.mjs && node scripts/tasks-check.cjs --live",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
-    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs"
+    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/update-check.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

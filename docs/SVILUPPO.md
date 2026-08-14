@@ -257,9 +257,12 @@ ore, Claude Studio guarda da solo se c'e' qualcosa di piu' nuovo:
 - la **CLI** (`@anthropic-ai/claude-code`), se e' installata via npm: la aggiorna
   e te lo dice a cose fatte. Con l'installer nativo non la tocca, perche' quella
   si aggiorna da sola;
-- l'**estensione**, ricostruendola dal sorgente da cui e' uscita — quando un
-  `git pull` porta una versione piu' alta, o quando esce un Agent SDK piu' nuovo
-  di quello cotto in questa build. Se nel sorgente c'e' lavoro non committato non
+- l'**estensione**, ma solo per chi la sviluppa: installata dal Marketplace la
+  aggiorna VS Code da solo e qui non si tocca niente. La ricostruzione dal
+  sorgente parte solo se `claudeStudio.updateSourcePath` indica il tuo checkout —
+  e solo se quella cartella e' davvero il sorgente di Claude Studio — quando un
+  `git pull` porta una versione piu' alta o esce un Agent SDK piu' nuovo di
+  quello cotto in questa build. Se nel sorgente c'e' lavoro non committato non
   tocca niente e riprova al giro dopo.
 
 Si guida da `claudeStudio.autoUpdate` (`auto` fa, `check` avvisa e basta, `off`
@@ -272,8 +275,8 @@ Aggiornamenti*.
 | Chiave | Cosa fa |
 |---|---|
 | `claudeStudio.cliPath` | Percorso del comando `claude`. Vuoto = lo trova da solo. |
-| `claudeStudio.autoUpdate` | `auto` aggiorna CLI ed estensione da solo, `check` avvisa, `off` non guarda. |
-| `claudeStudio.updateSourcePath` | Da dove ricostruire l'estensione. Vuoto = la cartella da cui e' stata compilata. |
+| `claudeStudio.autoUpdate` | `auto` aggiorna la CLI da solo, `check` avvisa, `off` non guarda. |
+| `claudeStudio.updateSourcePath` | Solo per chi sviluppa: il sorgente da cui ricostruire l'estensione (`~/claude-studio` vale su ogni macchina). Vuoto = ci pensa VS Code. |
 | `claudeStudio.contextLimit` | La finestra di contesto su cui si calcola la %. |
 | `claudeStudio.refreshSeconds` | Ogni quanto la barra di contesto rifa' i conti (1,5s). |
 | `claudeStudio.statusBar` | Spegne la riga nella barra di stato. |
