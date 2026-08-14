@@ -254,9 +254,11 @@ ferma a sei mesi fa vuol dire lavorare con i modelli di sei mesi fa, per quanto
 nuova sia l'estensione. Per questo trenta secondi dopo l'avvio, e poi ogni sei
 ore, Claude Studio guarda da solo se c'e' qualcosa di piu' nuovo:
 
-- la **CLI** (`@anthropic-ai/claude-code`), se e' installata via npm: la aggiorna
-  e te lo dice a cose fatte. Con l'installer nativo non la tocca, perche' quella
-  si aggiorna da sola;
+- la **CLI** (`@anthropic-ai/claude-code`), come e' stata installata: via npm
+  reinstalla il pacchetto, con l'installer nativo lancia `claude update` (che sa
+  dove si e' messo e non ha bisogno di npm — su quelle macchine npm puo' non
+  esistere proprio). Te lo dice a cose fatte, e **te lo dice anche se fallisce**:
+  un aggiornamento che muore nel log ti lascia indietro per sempre;
 - l'**estensione**, ma solo per chi la sviluppa: installata dal Marketplace la
   aggiorna VS Code da solo e qui non si tocca niente. La ricostruzione dal
   sorgente parte solo se `claudeStudio.updateSourcePath` indica il tuo checkout —

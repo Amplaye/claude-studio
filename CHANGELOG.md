@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.3
+
+- **The CLI gets updated the way you installed it.** Only an npm installation was
+  kept up to date; installed with the native installer it was left alone, on the
+  assumption it would see to itself. Now it is `claude update` that gets called
+  there — its own command for this, which knows where it put itself and doesn't need
+  npm, which on those machines may not be installed at all. Claude Code is what
+  brings the new models and the fixes: falling behind on it is the one thing this
+  extension must not let happen.
+- **An update that fails now says so.** It went into a log nobody opens, so the only
+  visible outcome was staying a version behind, quietly, forever.
+
 ## 0.15.2
 
 - **Updating the extension is VS Code's job.** Every build carried inside it the path

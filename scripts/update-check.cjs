@@ -45,8 +45,38 @@ vscode.workspace.getConfiguration = () => ({
 });
 install(vscode);
 
-const { sourceRoot } = require(bundle);
+const { sourceRoot, updateCommand } = require(bundle);
 const ctx = { extension: { packageJSON: { name: 'claude-studio' } } };
+
+// ---- how the CLI gets updated, one way per kind of installation ----
+// The one that matters for everybody: a CLI left behind means old models and old
+// fixes, whatever the extension does.
+const runs = [
+  [
+    'npm install: the package gets reinstalled',
+    { kind: 'npm', path: '/usr/lib/node_modules/@anthropic-ai/claude-code/bin/claude' },
+    { cmd: 'npm', args: ['install', '-g', '@anthropic-ai/claude-code@latest'], shell: true },
+  ],
+  [
+    'native installer: it updates itself, npm never asked',
+    { kind: 'native', path: '/home/tizio/.local/bin/claude' },
+    { cmd: '/home/tizio/.local/bin/claude', args: ['update'], shell: false },
+  ],
+  [
+    'a path with a space stays whole (no shell)',
+    { kind: 'manual', path: 'C:\\Program Files\\claude\\claude.exe' },
+    { cmd: 'C:\\Program Files\\claude\\claude.exe', args: ['update'], shell: false },
+  ],
+  ['an old cli.js outside npm: nothing can update it', { kind: 'manual', path: '/opt/claude/cli.js' }, undefined],
+];
+
+let bad = 0;
+for (const [what, cli, want] of runs) {
+  const got = updateCommand(cli);
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) bad++;
+  console.log(`${ok ? 'ok  ' : 'NO  '}${what}: ${got ? got.cmd + ' ' + got.args.join(' ') : '—'}`);
+}
 
 const cases = [
   ['empty: nothing gets rebuilt', '', undefined],
@@ -56,7 +86,6 @@ const cases = [
   ["somebody else's repository", notMine, undefined],
 ];
 
-let bad = 0;
 for (const [what, value, want] of cases) {
   setting = value;
   const got = sourceRoot(ctx);
@@ -67,7 +96,7 @@ for (const [what, value, want] of cases) {
 
 fs.rmSync(home, { recursive: true, force: true });
 if (bad) {
-  console.error(`\n${bad} case(s) wrong: the update would rebuild from the wrong place.`);
+  console.error(`\n${bad} case(s) wrong: the update would go to the wrong place.`);
   process.exit(1);
 }
-console.log('\nupdate: it only rebuilds from the source you named.');
+console.log('\nupdate ok — the CLI updated the way it was installed, the extension only from the source you named.');

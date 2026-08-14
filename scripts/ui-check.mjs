@@ -342,6 +342,19 @@ for (const surface of ['view', 'panel']) {
   // ---- one column: every box lines up with the writing field ----
   // Not just the left edge — the right one too. The scrollbar lives inside the
   // thread and used to eat ten pixels off every card on that side.
+  //
+  // First the boxes have to stop moving: every message arrives with a scale, and
+  // measured mid-flight the last one is always a couple of pixels narrower than it
+  // will be. That is the animation, not the layout — waiting for it to end is the
+  // difference between measuring the column and measuring the entrance.
+  await page.waitForFunction(
+    () =>
+      [...document.querySelectorAll('#log > .msg, #log > .perm')].every((n) =>
+        n.getAnimations().every((a) => a.playState !== 'running')
+      ),
+    null,
+    { timeout: 5000 }
+  );
   const col = await page.evaluate(() => {
     const box = (n) => {
       const r = n.getBoundingClientRect();

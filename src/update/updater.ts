@@ -75,7 +75,11 @@ interface RunResult {
 }
 
 /** A command, and what it said. It never throws: the caller looks at `ok`. */
-function run(cmd: string, args: string[], opts: { cwd?: string; timeout?: number } = {}) {
+function run(
+  cmd: string,
+  args: string[],
+  opts: { cwd?: string; timeout?: number; shell?: boolean } = {}
+) {
   return new Promise<RunResult>((resolve) => {
     execFile(
       cmd,
@@ -84,7 +88,9 @@ function run(cmd: string, args: string[], opts: { cwd?: string; timeout?: number
         cwd: opts.cwd,
         timeout: opts.timeout ?? 120_000,
         // npm and git on Windows are .cmd scripts: without a shell they don't start.
-        shell: true,
+        // A binary of ours goes without: its path can contain a space, and through
+        // the shell that space would split it in two.
+        shell: opts.shell ?? true,
         windowsHide: true,
         maxBuffer: 8 * 1024 * 1024,
         env: { ...process.env, NO_COLOR: '1', npm_config_fund: 'false', npm_config_audit: 'false' },
@@ -134,36 +140,86 @@ function readJson(file: string): Record<string, unknown> | undefined {
 // ---- the two pieces to keep updated --------------------------------------
 
 /**
- * The CLI. It's the one that brings the new models, so it's the more important of
- * the two. If it was installed with the native installer it updates itself and we
- * touch nothing here: reaching in through npm would leave two installations quarrelling.
+ * The CLI. It's the one that brings the new models and the fixes, so it's the piece
+ * that must not fall behind: an extension that stays current on top of a CLI six
+ * months old is a new frame around an old picture.
+ *
+ * It gets updated the way it was installed. Through npm, `npm i -g`; installed on
+ * its own — the native installer — `claude update`, which is its own command for
+ * this and knows where it put itself. Going in through npm there would leave two
+ * installations quarrelling.
  */
+/**
+ * What updates this installation, and nothing else — no spawning here, so the
+ * routing can be read (and checked) on its own:
+ *
+ * - through npm, the package gets reinstalled;
+ * - a binary of its own — the native installer, or one you pointed us at — has
+ *   `claude update`, which knows where it put itself and needs no npm at all;
+ * - a `cli.js` outside npm is neither: nothing can update it from here.
+ */
+export function updateCommand(
+  cli: { path: string; kind: string }
+): { cmd: string; args: string[]; shell: boolean } | undefined {
+  if (cli.kind === 'npm') {
+    return { cmd: 'npm', args: ['install', '-g', `${CLI_PKG}@latest`], shell: true };
+  }
+  if (cli.path.endsWith('.js')) return undefined;
+  return { cmd: cli.path, args: ['update'], shell: false };
+}
+
 async function updateCli(auto: boolean): Promise<string | undefined> {
   const cli = claudeCli();
   if (!cli) {
+    // Nothing to update, and nothing to say here: the chat already says it plainly
+    // the moment you try to use it, which is when it matters.
     log('Claude Code CLI not found: nothing to update.');
     return;
   }
-  if (cli.kind !== 'npm') {
-    log(`CLI ${cli.version || '?'} installed outside npm (${cli.kind}): it updates itself.`);
+  const how = updateCommand(cli);
+  // Its own binary never asks npm anything — on that kind of machine npm may not
+  // even exist: `claude update` both looks and installs.
+  const own = !!how && cli.kind !== 'npm';
+  if (own && auto) {
+    const r = await run(how!.cmd, how!.args, { timeout: 10 * 60_000, shell: how!.shell });
+    resetCliCache();
+    const now = claudeCli()?.version || '';
+    if (!r.ok) {
+      log(`\`claude update\` failed:\n${r.out}`);
+      return `Claude Code could not update on its own (you have ${cli.version || '?'}). Details in the log.`;
+    }
+    if (newer(now, cli.version)) {
+      log(`CLI updated to ${now}.`);
+      return `Claude CLI updated to ${now}: the new models are already there.`;
+    }
+    log(`CLI ${now || cli.version || '?'}: already the latest.`);
     return;
   }
+
   const latest = await latestOnNpm(CLI_PKG);
   if (!latest) {
     log("npm isn't answering: the CLI gets checked next time.");
     return;
   }
   if (!newer(latest, cli.version)) {
-    log(`CLI ${cli.version}: already the latest.`);
+    log(`CLI ${cli.version || '?'}: already the latest (${latest}).`);
     return;
   }
-  log(`CLI ${cli.version} -> ${latest}`);
-  if (!auto) return `Claude Code CLI ${latest} available (currently ${cli.version}).`;
+  log(`CLI ${cli.version || '?'} -> ${latest} (installed via ${cli.kind})`);
+  if (!auto) return `Claude Code CLI ${latest} available (currently ${cli.version || '?'}).`;
 
-  const r = await run('npm', ['install', '-g', `${CLI_PKG}@latest`], { timeout: 10 * 60_000 });
+  // Here only the leftovers: a cli.js outside npm's reach, with no binary to call
+  // and no package to reinstall. Nothing to do but say it.
+  if (!how) {
+    return `Claude Code ${latest} is out (you have ${cli.version || '?'}): update it the way you installed it.`;
+  }
+
+  const r = await run(how.cmd, how.args, { timeout: 10 * 60_000, shell: how.shell });
   if (!r.ok) {
+    // Said out loud, not just written in the log: an update that fails in silence
+    // leaves you a version behind for good, and this is the version that matters.
     log(`CLI update failed:\n${r.out}`);
-    return;
+    return `Claude Code ${latest} could not be installed on its own (you have ${cli.version || '?'}). Details in the log.`;
   }
   resetCliCache();
   log(`CLI updated to ${latest}.`);
