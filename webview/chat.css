@@ -355,19 +355,22 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
    The animated border is a ::before poking out from under the card and an
    ::after that cuts out its centre: a real border can't be made to spin. */
 
-.model-card.fam-haiku {
+/* The colours hang off the family class alone, not off the card: the chip that
+   closes a turn says which model answered, and it has to be the same colour as the
+   card that model lives on. One place, two users. */
+.fam-haiku {
   --fam: #22d3ee;
   --fam-2: #67e8f9;
 }
-.model-card.fam-sonnet {
+.fam-sonnet {
   --fam: #a78bfa;
   --fam-2: #d8b4fe;
 }
-.model-card.fam-opus {
+.fam-opus {
   --fam: var(--claude-1);
   --fam-2: var(--claude-2);
 }
-.model-card.fam-fable {
+.fam-fable {
   --fam: #f5c87a;
   --fam-2: #ffe9c9;
 }
@@ -1428,6 +1431,17 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   opacity: 1;
   border-color: color-mix(in srgb, var(--claude-1) 40%, var(--line));
   color: var(--claude-2);
+}
+
+/* Who answered, in that model's own colour — the same one its card carries, so you
+   recognise it before you read it. It sits at the end of the row because it is the
+   receipt, not the result; it is on every turn because the day the model is picked
+   for you, the one that did the work must not be something you go looking for. */
+.recap-chip.model {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--fam) 45%, var(--line));
+  background: color-mix(in srgb, var(--fam) 8%, transparent);
+  color: var(--fam-2);
 }
 
 /* The names themselves. Buttons, because every one of them opens the file. */

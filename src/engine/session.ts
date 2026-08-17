@@ -14,7 +14,7 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { SentFile, Thinking, Wire } from './protocol';
+import type { SentFile, Thinking, TurnCtx, TurnModelUsage, Wire } from './protocol';
 import { LOCAL_COMMANDS } from '../shared/localCommands';
 
 /**
@@ -52,9 +52,9 @@ export interface SessionOptions {
   fork?: boolean;
   /** '' = il modello predefinito della CLI, quello che useresti da terminale. */
   model?: string;
-  /** '' = l'impegno lo decide il motore. */
+  /** '' solo se il modello non prende livelli d'impegno. */
   effort?: string;
-  /** 'auto' = come farebbe la CLI da sola. */
+  /** Acceso o spento: non c'e' piu' un "decidi tu" da passare al motore. */
   thinking?: Thinking;
   /**
    * Suona prima che uno strumento tocchi un file, e si aspetta: e' li' che i
@@ -91,7 +91,8 @@ export class Session {
   /** Messaggi che hanno prodotto almeno un blocco in streaming. */
   private streamed = new Set<string>();
   /**
-   * Quanto contesto occupa l'ultima chiamata API del filo principale.
+   * Quanto contesto occupa l'ultima chiamata API del filo principale, tenuto a
+   * pezzi invece che sommato.
    *
    * NON si puo' usare l'usage del messaggio 'result': quello e' cumulativo su
    * tutto il turno, e siccome ogni chiamata API rilegge la cache i
@@ -99,8 +100,22 @@ export class Session {
    * round trip arrivava a dichiarare milioni di token su una finestra da 1M,
    * da cui le percentuali sopra il 100%. L'usage dei singoli messaggi
    * assistant, invece, e' per chiamata: e' quello che misura il contesto.
+   *
+   * A pezzi e non solo sommati perche' il totale nasconde la cosa che si vuole
+   * sapere: una cache buttata via si vede come `cacheRead` che crolla e
+   * `cacheCreate` che esplode, mentre il totale resta li' dov'era.
    */
-  private ctxTokens = 0;
+  private ctx: TurnCtx = { input: 0, cacheRead: 0, cacheCreate: 0, output: 0 };
+  /**
+   * Il modello che ha davvero risposto, come lo dichiara il messaggio. Non e'
+   * detto sia quello chiesto: la CLI puo' risolvere un alias, o servire altro.
+   */
+  private served = '';
+  /**
+   * `result.modelUsage` com'era alla fine del turno prima. E' cumulativo sulla
+   * sessione, quindi il consumo del turno e' la differenza fra i due.
+   */
+  private usedBefore: Record<string, any> = {};
 
   sessionId?: string;
   model = '';
@@ -167,7 +182,7 @@ export class Session {
   async setThinking(v: Thinking) {
     this.o.thinking = v;
     try {
-      await this.q?.setMaxThinkingTokens(v === 'off' ? 0 : v === 'on' ? THINK_BUDGET : null);
+      await this.q?.setMaxThinkingTokens(v === 'off' ? 0 : THINK_BUDGET);
     } catch {
       /* idem */
     }
@@ -247,11 +262,11 @@ export class Session {
       // terminale. Si passa solo cio' che hai scelto apposta.
       ...(this.o.model ? { model: this.o.model } : {}),
       ...(this.o.effort ? { effort: this.o.effort as Options['effort'] } : {}),
-      ...(this.o.thinking === 'on'
-        ? { thinking: { type: 'adaptive' as const } }
-        : this.o.thinking === 'off'
-          ? { thinking: { type: 'disabled' as const } }
-          : {}),
+      // Sempre detto, mai sottinteso. Prima, con "auto", questa riga spariva e la
+      // CLI faceva di testa sua — che per i modelli capaci vuol dire comunque
+      // ragionamento adattivo, cioe' la stessa cosa di "acceso", ma decisa altrove.
+      thinking:
+        this.o.thinking === 'off' ? { type: 'disabled' as const } : { type: 'adaptive' as const },
       ...(this.o.resume ? { resume: this.o.resume, forkSession: !!this.o.fork } : {}),
       ...(this.o.ide ? { mcpServers: this.o.ide } : {}),
       // Chiamiamo la CLI installata sul PC: senza questo l'SDK cerca il proprio
@@ -396,14 +411,19 @@ export class Session {
       case 'assistant': {
         // Solo il filo principale: un sub-agente ha una finestra sua, e prenderla
         // per buona farebbe crollare la percentuale del discorso principale.
-        const u: any = (m as any).message?.usage;
-        if (u && !m.parent_tool_use_id) {
-          const n =
-            (u.input_tokens ?? 0) +
-            (u.cache_read_input_tokens ?? 0) +
-            (u.cache_creation_input_tokens ?? 0) +
-            (u.output_tokens ?? 0);
-          if (n > 0) this.ctxTokens = n;
+        if (!m.parent_tool_use_id) {
+          const said = String((m as any).message?.model ?? '');
+          if (said) this.served = said;
+          const u: any = (m as any).message?.usage;
+          if (u) {
+            const c: TurnCtx = {
+              input: u.input_tokens ?? 0,
+              cacheRead: u.cache_read_input_tokens ?? 0,
+              cacheCreate: u.cache_creation_input_tokens ?? 0,
+              output: u.output_tokens ?? 0,
+            };
+            if (c.input + c.cacheRead + c.cacheCreate + c.output > 0) this.ctx = c;
+          }
         }
         this.onAssistant(m.message.id, m.message.content as any[], m.parent_tool_use_id ?? null);
         return;
@@ -417,13 +437,20 @@ export class Session {
         this.acc.clear();
         this.msgOf.clear();
         const ok = m.subtype === 'success';
+        const models = this.turnUsage((m as any).modelUsage);
+        const c = this.ctx;
         this.o.emit({
           k: 'turn_end',
           ok,
-          costUsd: (m as any).total_cost_usd ?? 0,
+          totalUsd: (m as any).total_cost_usd ?? 0,
+          turnUsd: models.reduce((s, u) => s + u.costUsd, 0),
           durationMs: (m as any).duration_ms ?? 0,
           // Contesto occupato dall'ultima chiamata, non la somma del turno.
-          tokens: this.ctxTokens,
+          tokens: c.input + c.cacheRead + c.cacheCreate + c.output,
+          ctx: c,
+          models,
+          model: this.served,
+          effort: this.o.effort ?? '',
         });
         if (!ok && (m as any).subtype !== 'success') {
           const msg = (m as any).result;
@@ -433,6 +460,39 @@ export class Session {
         return;
       }
     }
+  }
+
+  /**
+   * Cosa ha consumato *questo* turno, modello per modello.
+   *
+   * `result.modelUsage` e' cumulativo sulla sessione — e comprende sub-agent,
+   * sidechain e compattazioni, che `result.usage` invece lascia fuori — quindi il
+   * turno e' la differenza col turno prima. Un `/clear` a meta' sessione azzera il
+   * conteggio del motore: si vede da un numero che va all'indietro, e in quel caso
+   * il valore grezzo *e'* gia' il turno.
+   */
+  private turnUsage(now: unknown): TurnModelUsage[] {
+    const cur = (now ?? {}) as Record<string, any>;
+    const out: TurnModelUsage[] = [];
+    for (const [model, u] of Object.entries(cur)) {
+      const p = this.usedBefore[model];
+      const reset = !p || (u.inputTokens ?? 0) < (p.inputTokens ?? 0);
+      const was = reset ? undefined : p;
+      const d: TurnModelUsage = {
+        model,
+        input: (u.inputTokens ?? 0) - (was?.inputTokens ?? 0),
+        output: (u.outputTokens ?? 0) - (was?.outputTokens ?? 0),
+        cacheRead: (u.cacheReadInputTokens ?? 0) - (was?.cacheReadInputTokens ?? 0),
+        cacheCreate: (u.cacheCreationInputTokens ?? 0) - (was?.cacheCreationInputTokens ?? 0),
+        costUsd: (u.costUSD ?? 0) - (was?.costUSD ?? 0),
+        contextWindow: u.contextWindow ?? 0,
+      };
+      // Un modello che questo turno non ha toccato resta nell'elenco cumulativo: la
+      // sua differenza e' zero, e una riga di zeri non e' una notizia.
+      if (d.input || d.output || d.cacheRead || d.cacheCreate || d.costUsd) out.push(d);
+    }
+    this.usedBefore = cur;
+    return out;
   }
 
   private onStreamEvent(ev: any, parent: string | null) {

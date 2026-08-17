@@ -33,9 +33,20 @@ const t = (cond, msg) => !cond && fails.push(msg);
 
 await post({ k: 'hello', cwd: 'C:/x/CRM', project: 'CRM', cliVersion: '2.1.79', surface: 'view' });
 await post({ k: 'models', items: MODELS });
-await post({ k: 'prefs', value: { model: 'opus', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, lang: 'en' } });
+await post({ k: 'prefs', value: { model: 'opus', effort: 'high', thinking: 'on', sound: 'cozy', volume: 0.6, lang: 'en' } });
 await page.click('#btnCfg');
 await page.waitForTimeout(250);
+
+// ---- the two columns hold the same keys ----
+// Nothing else catches this. A key added to English and forgotten in Italian shows
+// English inside an Italian panel; one that only exists in Italian is dead weight
+// nobody will ever see. Neither throws, neither fails a test, and both survive
+// forever unless somebody compares the sets.
+const dict = await page.evaluate(() => ({ en: window.I18N.keys('en'), it: window.I18N.keys('it') }));
+const missing = dict.en.filter((k) => !dict.it.includes(k));
+const extra = dict.it.filter((k) => !dict.en.includes(k));
+t(!missing.length, 'keys with no Italian: ' + missing.join(', '));
+t(!extra.length, 'Italian keys that do not exist in English: ' + extra.join(', '));
 
 // ---- the grid: two columns, the heavyweights on the first row ----
 const grid = await page.evaluate(() => {
@@ -140,4 +151,6 @@ if (fails.length) {
   console.error('FAILED:\n- ' + fails.join('\n- '));
   process.exit(1);
 }
-console.log('lang-check ok — EN/IT switch, 2x2 grid with Opus and Fable on top, distinct effects');
+console.log(
+  `lang-check ok — ${dict.en.length} keys in both languages, EN/IT switch, 2x2 grid with Opus and Fable on top, distinct effects`
+);

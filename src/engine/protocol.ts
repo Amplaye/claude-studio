@@ -26,8 +26,41 @@ export interface AskQuestion {
   options: AskOption[];
 }
 
-/** The thinking: the engine decides it ("auto"), or you do. */
-export type Thinking = 'auto' | 'on' | 'off';
+/**
+ * Il ragionamento: acceso o spento. Lo decidi tu.
+ *
+ * C'era anche un "auto", che voleva dire "non dire niente al motore e lascia fare
+ * alla CLI". Non era una scelta in piu': la CLI, a cui non dici niente, accende
+ * comunque il ragionamento adattivo sui modelli che lo sanno fare — cioe' fa quello
+ * che fa gia' "acceso". Due bottoni per la stessa cosa, e uno dei due sembrava
+ * cedere la decisione a qualcun altro.
+ */
+export type Thinking = 'on' | 'off';
+
+/**
+ * I livelli d'impegno, nell'ordine che conta.
+ *
+ * Da `xhigh` in su il ragionamento **deve** essere acceso, e non e' una nostra
+ * regola: e' l'API che rifiuta la richiesta, testualmente —
+ *
+ *   400 output_config.effort 'xhigh' is not supported when thinking is disabled on
+ *   this model. Use effort 'high' or below, or enable thinking.
+ *
+ * Per questo si tiene l'ordine e non un elenco dei due nomi: un livello nuovo che
+ * arrivasse sopra questi ci finisce dentro da solo, senza che nessuno se ne ricordi.
+ * Il gemello di questa riga sta in `webview/chat.js` — la webview non e' bundlata e
+ * non puo' importare da qui (vedi build.mjs).
+ */
+export const EFFORT_ORDER = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+
+/** Il primo livello che pretende il ragionamento acceso. */
+const THINKING_FROM = EFFORT_ORDER.indexOf('xhigh');
+
+/** Questo impegno obbliga ad accendere il ragionamento? */
+export function needsThinking(effort: string): boolean {
+  const i = EFFORT_ORDER.indexOf(effort as (typeof EFFORT_ORDER)[number]);
+  return i >= 0 && i >= THINKING_FROM;
+}
 
 /** The end-of-work sounds. `off` = muted. */
 export type SoundName = 'cozy' | 'harvest' | 'levelup' | 'starlit' | 'chest' | 'off';
@@ -45,9 +78,15 @@ export type Lang = 'en' | 'it';
  * notice.
  */
 export interface Prefs {
-  /** '' = the CLI's default one. */
+  /**
+   * Sempre un modello vero. Vuoto solo prima che la CLI abbia detto quali esistono:
+   * appena arriva l'elenco diventa quello che la CLI consiglia oggi.
+   */
   model: string;
-  /** '' = the engine decides. */
+  /**
+   * Sempre un livello vero. Vuoto solo in due casi: prima che l'elenco sia
+   * arrivato, e sui modelli che i livelli non li prendono affatto.
+   */
   effort: string;
   thinking: Thinking;
   sound: SoundName;
@@ -66,7 +105,7 @@ export interface Prefs {
 export const DEFAULT_PREFS: Prefs = {
   model: '',
   effort: '',
-  thinking: 'auto',
+  thinking: 'on',
   sound: 'cozy',
   volume: 0.6,
   onlyWhenAway: false,
@@ -92,6 +131,31 @@ export interface ModelChoice {
   adaptive: boolean;
   /** It's the choice the CLI recommends: the one you'd get from the terminal. */
   recommended: boolean;
+}
+
+/** I quattro pezzi dell'ultima chiamata API del filo principale. */
+export interface TurnCtx {
+  input: number;
+  cacheRead: number;
+  cacheCreate: number;
+  output: number;
+}
+
+/**
+ * Quello che un modello ha consumato in un turno. Non c'e' nessun listino prezzi
+ * scritto qui dentro: il costo lo dice il motore (`modelUsage[...].costUSD`), come
+ * la finestra di contesto. Un listino a mano invecchia; questo no.
+ */
+export interface TurnModelUsage {
+  /** Come lo chiama il motore, es. "claude-opus-5[1m]". */
+  model: string;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheCreate: number;
+  costUsd: number;
+  /** 0 se il motore non l'ha detto. */
+  contextWindow: number;
 }
 
 /** A conversation that already happened, as it appears in the history. */
@@ -178,7 +242,36 @@ export type Wire =
   | { k: 'attached'; items: Attachment[] }
   // empty `file` = there's nothing selected in the editor any more
   | { k: 'selection'; file: string; lines: string }
-  | { k: 'turn_end'; ok: boolean; costUsd: number; durationMs: number; tokens: number }
+  | {
+      k: 'turn_end';
+      ok: boolean;
+      /**
+       * Quanto e' costata la *sessione* finora. E' `total_cost_usd`, che l'SDK
+       * documenta come cumulativo: ogni fine turno riporta il totale corrente, non
+       * quello del turno. Si legge, non si somma — sommarlo conta ogni turno tante
+       * volte quanti ne sono passati. Il nome dice cumulativo apposta: quando si
+       * chiamava `costUsd` qualcuno lo sommava.
+       */
+      totalUsd: number;
+      /** Quanto e' costato *questo* turno: la differenza di `modelUsage` col turno
+       *  prima. Sub-agent compresi — sono soldi veri quanto gli altri. */
+      turnUsd: number;
+      durationMs: number;
+      /** Contesto che si porta dietro l'ultima chiamata del filo principale. */
+      tokens: number;
+      /**
+       * Gli stessi token, ma divisi. Il totale da solo non dice la cosa che conta:
+       * se `cacheRead` crolla e `cacheCreate` esplode, la cache e' stata buttata via
+       * — ed e' l'unico modo per accorgersene.
+       */
+      ctx: TurnCtx;
+      /** Cosa ha consumato questo turno, modello per modello. */
+      models: TurnModelUsage[];
+      /** Il modello che ha davvero risposto, come lo dichiara lui: "claude-opus-5". */
+      model: string;
+      /** Il livello d'impegno in vigore per questo turno. '' = quello della CLI. */
+      effort: string;
+    }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
   // A new conversation draws the empty screen again, so it gets a new tip with it.

@@ -68,8 +68,6 @@
     'sound.off': 'Mute',
 
     // ---- effort ----
-    'effort.': 'Auto',
-    'effort..desc': 'Claude decides how hard to work based on the question',
     'effort.low': 'Fast',
     'effort.low.desc': 'Answers right away — good for simple questions',
     'effort.medium': 'Balanced',
@@ -80,16 +78,16 @@
     'effort.xhigh.desc': 'Analyses everything in depth before acting',
     'effort.max': 'Maximum',
     'effort.max.desc': 'Spares nothing, the highest quality',
-    'effort.none': "This model doesn't take effort levels: it decides for itself",
+    'effort.none': "This model doesn't take effort levels: there is nothing to set here",
+    'effort.needsThink': ' — from here up, thinking has to be on',
 
     // ---- thinking ----
-    'think.auto': 'Auto',
-    'think.auto.desc': 'Claude decides when to reason in depth',
     'think.on': 'On',
     'think.on.desc': 'Reasons step by step before every answer',
     'think.off': 'Off',
     'think.off.desc': 'Answers directly, with no intermediate reasoning',
     'think.capped': ' — on this model it means a fixed token ceiling',
+    'think.forced': 'Turned on by "{level}": above that, the engine refuses to work without it',
 
     // ---- what each model is for (the CLI always words these the same way) ----
     'model.everyday': 'For every day, complex ones too',
@@ -307,8 +305,6 @@
     'sound.chest': 'Scrigno',
     'sound.off': 'Muto',
 
-    'effort.': 'Auto',
-    'effort..desc': 'Decide Claude quanto impegnarsi, in base alla domanda',
     'effort.low': 'Veloce',
     'effort.low.desc': 'Risponde subito — va bene per le domande semplici',
     'effort.medium': 'Bilanciato',
@@ -319,15 +315,15 @@
     'effort.xhigh.desc': 'Analizza tutto a fondo prima di agire',
     'effort.max': 'Massimo',
     'effort.max.desc': 'Non si risparmia niente, la qualità più alta',
-    'effort.none': 'Questo modello non prende livelli di impegno: decide da sé',
+    'effort.none': 'Questo modello non prende livelli di impegno: qui non c\'è niente da scegliere',
+    'effort.needsThink': ' — da qui in su il ragionamento deve stare acceso',
 
-    'think.auto': 'Auto',
-    'think.auto.desc': 'Decide Claude quando ragionare a fondo',
     'think.on': 'Sì',
     'think.on.desc': 'Ragiona passo per passo prima di ogni risposta',
     'think.off': 'No',
     'think.off.desc': 'Risponde diretto, senza ragionamento intermedio',
     'think.capped': ' — su questo modello vuol dire un tetto fisso di token',
+    'think.forced': 'Acceso da «{level}»: più su di lì il motore si rifiuta di lavorare senza',
 
     'model.everyday': 'Per ogni giorno, anche le cose complesse',
     'model.hardest': 'Il più capace, per i lavori tosti',
@@ -529,6 +525,13 @@
     t,
     list,
     apply,
+    /**
+     * The keys a language actually has. Only `lang-check` asks: a key that exists in
+     * one column and not the other fails nothing on its own — in Italian you get the
+     * English back, in English you get the bare key — so the two sets have to be
+     * compared by somebody, and nobody was.
+     */
+    keys: (l) => Object.keys(DICT[l] || {}),
     /** Switches language and tells whoever draws by hand to draw again. */
     set(next) {
       const v = DICT[next] ? next : 'en';

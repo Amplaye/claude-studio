@@ -213,7 +213,8 @@ class OwnedSessions {
       case 'turn_end':
         if (!cur) break;
         if (e.tokens) cur.tokens = e.tokens;
-        if (e.costUsd) cur.costUsd = e.costUsd;
+        // Si assegna, non si somma: il motore manda gia' il totale della sessione.
+        if (e.totalUsd) cur.costUsd = e.totalUsd;
         cur.updatedAt = Date.now();
         break;
       case 'busy':

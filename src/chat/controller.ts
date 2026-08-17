@@ -12,8 +12,10 @@ import type {
   Pasted,
   Prefs,
   SentFile,
+  Thinking,
   Wire,
 } from '../engine/protocol';
+import { needsThinking } from '../engine/protocol';
 import { pickFiles, stashFile } from './attach';
 import { type CommandHost, runLocalCommand } from './commands';
 import { Checkpoints } from './checkpoints';
@@ -76,6 +78,17 @@ function pickDefaultModel(items: ModelChoice[]): string {
     if (hit) return hit.value;
   }
   return real[0]?.value ?? '';
+}
+
+/**
+ * Il livello da accendere quando quello salvato non vale piu' e uno bisogna pur
+ * sceglierlo. "Alto" se il modello ce l'ha: e' il livello a cui la CLI stessa lavora
+ * di serie sui modelli grossi, ed e' l'ultimo che non obbliga ad accendere il
+ * ragionamento — cosi' scegliere per te non ti cambia anche l'altra manopola.
+ * Se non c'e', l'ultimo che offre.
+ */
+function defaultEffort(levels: string[]): string {
+  return levels.includes('high') ? 'high' : levels[levels.length - 1] ?? '';
 }
 
 interface Pending {
@@ -281,14 +294,11 @@ export class ChatController {
    */
   setPrefs(patch: Partial<Prefs>) {
     const before = this.prefs;
-    const next = { ...before, ...patch };
     // Cambiando modello, il livello d'impegno di prima puo' non esistere piu' —
     // "massimo" su un modello che arriva ad "alto" e' una parola che il motore non
-    // conosce. In quel caso si torna ad Auto, che vale per tutti: e' l'unico modo
-    // perche' "automatico" resti una scelta vera e non una che si rompe da sola.
-    if (patch.model !== undefined && next.model !== before.model) {
-      next.effort = this.effortFor(next.model, next.effort);
-    }
+    // conosce — e alzando l'impegno il ragionamento puo' diventare obbligatorio.
+    // Se ne occupa `normalise`, che e' l'unico posto dove queste regole stanno.
+    const next = this.normalise({ ...before, ...patch });
     this.prefs = next;
     void this.ctx.globalState.update(PREFS_KEY, this.prefs);
     // The context panel is a webview of its own: it doesn't see this wire, so it
@@ -1016,37 +1026,70 @@ export class ChatController {
    * c'e' piu' si butta via e si torna al consigliato — che e' sempre l'ultimo.
    */
   /**
-   * Il livello d'impegno buono per un modello: quello che hai scelto se lui lo
-   * accetta, altrimenti '' — cioe' "decidi tu". Finche' l'elenco dei modelli non
-   * e' arrivato non si tocca niente: meglio la scelta di prima che una cancellata
-   * per ignoranza.
+   * Le tre scelte messe in riga, in un posto solo.
+   *
+   * Ci passano tutte e due le strade che possono cambiarle — quella che le chiedi tu
+   * (`setPrefs`) e quella che le corregge quando la CLI cambia elenco
+   * (`dropStaleModel`) — perche' una regola scritta in una sola delle due si rompe
+   * dall'altra: e' esattamente cosi' che un impegno rimasto appeso a un modello
+   * vecchio sopravvive per mesi.
+   *
+   * Finche' l'elenco dei modelli non e' arrivato non si inventa niente: meglio la
+   * scelta di prima che una cancellata per ignoranza.
    */
-  private effortFor(model: string, effort: string): string {
-    if (!effort || !this.models.length) return effort;
-    const m = this.models.find((x) => (model ? x.value === model : x.recommended));
-    if (!m) return effort;
-    return m.efforts.includes(effort) ? effort : '';
+  private normalise(p: Prefs): Prefs {
+    let model = p.model;
+    let effort = p.effort;
+
+    // Modello e livello si possono giudicare solo con l'elenco della CLI in mano.
+    // Finche' non e' arrivato non si inventa niente: meglio la scelta di prima che
+    // una cancellata per ignoranza.
+    if (this.models.length) {
+      const items = this.models;
+      // 1. Un modello vero, sempre. '' e l'alias 'default' non sono modelli: sono
+      //    due modi di dire "decidi tu", e qui non decide piu' nessun altro.
+      model = p.model && items.some((m) => m.value === p.model) ? p.model : '';
+      if (!model || model === 'default') model = pickDefaultModel(items);
+      // 2. Un livello vero, sempre — tranne sui modelli che i livelli non li
+      //    prendono affatto, dove l'unica risposta onesta e' "qui non c'e' niente
+      //    da scegliere".
+      const levels = items.find((m) => m.value === model)?.efforts ?? [];
+      effort = levels.includes(p.effort) ? p.effort : '';
+      if (!effort && levels.length) effort = defaultEffort(levels);
+    }
+
+    // 3. Il ragionamento, che invece non aspetta nessuno: dipende solo dal livello.
+    //    Da 'xhigh' in su l'API rifiuta la richiesta se e' spento (vedi
+    //    `needsThinking`), quindi alzare l'impegno lo accende — e si vede nel
+    //    pannello, non e' un aggiustamento fatto di nascosto al momento di partire.
+    //
+    //    Sta fuori dal blocco qui sopra apposta: legato all'arrivo dell'elenco,
+    //    il primo turno partiva col pensiero ancora spento a un livello che l'API
+    //    non accetta, cioe' proprio il 400 che questa regola esiste per evitare.
+    const thinking: Thinking = needsThinking(effort) ? 'on' : p.thinking;
+
+    return model === p.model && effort === p.effort && thinking === p.thinking
+      ? p
+      : { ...p, model, effort, thinking };
   }
 
+  /**
+   * Un modello scelto mesi fa resta scritto nelle preferenze anche quando la CLI ha
+   * smesso di offrirlo: e' cosi' che ci si ritrova a lavorare con un modello vecchio
+   * senza accorgersene. Quando arriva l'elenco vero si rimette tutto in riga.
+   */
   private dropStaleModel(items: ModelChoice[]) {
     if (!items.length) return;
-    let model =
-      this.prefs.model && !items.some((m) => m.value === this.prefs.model) ? '' : this.prefs.model;
-    // Il modello adesso si sceglie sempre a mano: "nessuna scelta" (che prima
-    // voleva dire "automatico") e l'alias 'default' diventano il modello vero che
-    // la CLI consiglia oggi, cosi' sulla carta si vede quale sta lavorando.
-    if (!model || model === 'default') model = pickDefaultModel(items);
-    // Caduto il modello cade anche il livello, se quello nuovo non lo accetta.
-    const effort = this.effortFor(model, this.prefs.effort);
-    if (model === this.prefs.model && effort === this.prefs.effort) return;
+    const before = this.prefs;
+    const next = this.normalise(before);
+    if (next === before) return;
 
-    const modelChanged = model !== this.prefs.model;
-    const effortChanged = effort !== this.prefs.effort;
-    this.prefs = { ...this.prefs, model, effort };
-    void this.ctx.globalState.update(PREFS_KEY, this.prefs);
-    if (modelChanged) void this.session?.setModel(model);
-    if (effortChanged) void this.session?.setEffort(effort);
-    this.broadcast({ k: 'prefs', value: this.prefs });
+    this.prefs = next;
+    void this.ctx.globalState.update(PREFS_KEY, next);
+    if (next.model !== before.model) void this.session?.setModel(next.model);
+    if (next.effort !== before.effort) void this.session?.setEffort(next.effort);
+    if (next.thinking !== before.thinking) void this.session?.setThinking(next.thinking);
+    this.broadcast({ k: 'prefs', value: next });
   }
 
   private broadcast(e: Wire) {

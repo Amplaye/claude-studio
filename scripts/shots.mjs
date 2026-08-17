@@ -205,7 +205,7 @@ async function act(page, { slow = false, upTo = 'end' } = {}) {
   const beat = (ms) => wait(slow ? ms : Math.round(ms / 3));
 
   await post({ k: 'models', items: MODELS });
-  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
+  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: 'high', thinking: 'on', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
   await post({ k: 'mode', value: 'default' });
   await post({ k: 'ctx', d: CTX });
   await beat(900);
@@ -310,7 +310,7 @@ async function act(page, { slow = false, upTo = 'end' } = {}) {
   await beat(600);
 
   await stream(post, 'b2', 'text', RECAP, slow ? 26 : 120, slow ? 22 : 6);
-  await post({ k: 'turn_end', ok: true, costUsd: 0.21, durationMs: 84000, tokens: 170000 });
+  await post({ k: 'turn_end', ok: true, totalUsd: 0.42, turnUsd: 0.21, durationMs: 84000, tokens: 170000, ctx: { input: 1200, cacheRead: 165000, cacheCreate: 2400, output: 1400 }, models: [], model: 'claude-opus-5[1m]', effort: 'high' });
   await post({ k: 'busy', value: false });
   return post;
 }
@@ -536,7 +536,7 @@ async function caption(page, text) {
   await page.goto(chatUrl);
   await post({ k: 'hello', cwd: 'C:/work/shop', project: 'shop', cliVersion: '2.1.228', surface: 'panel' });
   await post({ k: 'models', items: MODELS });
-  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: '', thinking: 'auto', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
+  await post({ k: 'prefs', value: { model: 'claude-opus-5', effort: 'high', thinking: 'on', sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true, lang: 'en' } });
   await post({ k: 'mode', value: 'default' });
   // The film opens with the other conversation still working: the green mark has
   // to *arrive*, at the end, or nobody reads it as "this one has just finished" —
@@ -628,7 +628,7 @@ async function caption(page, text) {
   // ---- 6. the recap (12.4 → 14.4) ----
   await cap(5);
   await stream(post, 'b2', 'text', RECAP, 190, 6);
-  await post({ k: 'turn_end', ok: true, costUsd: 0.21, durationMs: 84000, tokens: 170000 });
+  await post({ k: 'turn_end', ok: true, totalUsd: 0.42, turnUsd: 0.21, durationMs: 84000, tokens: 170000, ctx: { input: 1200, cacheRead: 165000, cacheCreate: 2400, output: 1400 }, models: [], model: 'claude-opus-5[1m]', effort: 'high' });
   await post({ k: 'busy', value: false });
   await wait(700);
 

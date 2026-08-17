@@ -377,7 +377,7 @@ for (const surface of ['view', 'panel']) {
   await post({
     k: 'prefs',
     value: {
-      model: '', effort: '', thinking: 'auto',
+      model: '', effort: 'high', thinking: 'on',
       sound: 'cozy', volume: 0.6, onlyWhenAway: false, soundOnAsk: true, toast: true,
     },
   });
@@ -414,9 +414,14 @@ for (const surface of ['view', 'panel']) {
   const sm = await lastSent();
   t(sm?.cmd === 'setPrefs' && sm.value?.model === 'opus', 'the chosen model does not arrive: ' + JSON.stringify(sm));
   await page.waitForTimeout(80);
-  // Effort follows the model: Auto + 3 levels = 4 buttons
-  const effortBtns = await page.locator('#cfgEffort .seg-btn').count();
-  t(effortBtns === 4, 'the effort levels do not follow the model: ' + effortBtns);
+  // Effort follows the model, and only real levels: no "Auto" among them — there is
+  // no such level in the engine, and a button claiming one was a promise nothing kept.
+  const effortBtns = await page.locator('#cfgEffort .seg-btn').allTextContents();
+  t(effortBtns.length === 3, 'the effort levels do not follow the model: ' + effortBtns.join(', '));
+  t(
+    !effortBtns.some((b) => /auto|default|predefinito/i.test(b)),
+    'there is still a non-level among the effort buttons: ' + effortBtns.join(', ')
+  );
   // The Opus card must show the description in the card itself
   const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-desc').textContent();
   t(opusDesc === 'The smartest.', 'the chosen model does not describe itself: ' + opusDesc);
@@ -434,27 +439,51 @@ for (const surface of ['view', 'panel']) {
     (await page.locator('#cfgModelList .model-card.fam-sonnet').count()) === 1,
     'Sonnet does not get its family effect'
   );
-  // Click Haiku: it takes no levels, so only "Auto" is left — and Auto must stay
-  // clickable, because it means "tell it nothing" and that works for every model.
-  await page.locator('#cfgModelList .model-card:nth-child(3)').click();
-  await page.waitForTimeout(80);
+  // Thinking: click Off (the second button; the first child is the slider)
+  await page.locator('#cfgThink .seg-btn').nth(1).click();
+  const st = await lastSent();
+  t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'thinking does not turn off: ' + JSON.stringify(st));
+
+  // ---- from "very thorough" up, thinking is not optional ----
+  //
+  // Not our rule: the API refuses the request outright — "output_config.effort
+  // 'xhigh' is not supported when thinking is disabled on this model. Use effort
+  // 'high' or below, or enable thinking." So raising the effort turns thinking on
+  // (the extension does that, and it lands here as a new prefs), and while you are
+  // up there Off has to be out of reach instead of taking a click that would earn
+  // you a 400 on the very next message.
+  await post({ k: 'prefs', value: { model: 'default', effort: 'xhigh', thinking: 'on' } });
+  await page.waitForTimeout(120);
+  const forced = await page.evaluate(() => {
+    const btns = [...document.querySelectorAll('#cfgThink .seg-btn')];
+    return {
+      on: btns.find((b) => b.classList.contains('on'))?.textContent,
+      offDisabled: btns[1]?.disabled,
+      hint: document.getElementById('cfgThinkHint').textContent,
+    };
+  });
+  t(forced.on === 'On', 'at xhigh the thinking is not on: ' + forced.on);
+  t(forced.offDisabled === true, 'at xhigh "Off" is still clickable: it would earn a 400');
+  t(/very thorough/i.test(forced.hint), 'the panel does not say who turned thinking on: ' + forced.hint);
+
+  // Back down to a level that does not demand it, and Off is available again.
+  await post({ k: 'prefs', value: { effort: 'high' } });
+  await page.waitForTimeout(120);
+  t(
+    (await page.locator('#cfgThink .seg-btn:disabled').count()) === 0,
+    'coming back down to "high", thinking is still locked'
+  );
+
+  // A model that takes no levels at all: the panel says so instead of showing
+  // buttons nobody can press.
+  await post({ k: 'prefs', value: { model: 'haiku', effort: '', thinking: 'on' } });
+  await page.waitForTimeout(120);
   t(
     (await page.locator('#cfgModelList .model-card.fam-haiku.on').count()) === 1,
     'Haiku does not get its family effect'
   );
-  const haikuBtns = await page.locator('#cfgEffort .seg-btn').count();
-  t(haikuBtns === 1, 'on a model with no levels only Auto should be left: ' + haikuBtns);
-  const autoOff = await page.locator('#cfgEffort .seg-btn:disabled').count();
-  t(autoOff === 0, 'Auto must never be disabled: it is always a valid choice');
-  t(
-    await page.locator('#cfgEffort .seg-btn.on').isVisible(),
-    'with no levels the panel is left with nothing switched on'
-  );
-
-  // Thinking: click Off (the third button; the first child is the slider)
-  await page.locator('#cfgThink .seg-btn').nth(2).click();
-  const st = await lastSent();
-  t(st?.cmd === 'setPrefs' && st.value?.thinking === 'off', 'thinking does not turn off: ' + JSON.stringify(st));
+  const haikuHint = await page.locator('#cfgEffortHint').textContent();
+  t(/nothing to set/i.test(haikuHint), 'with no levels the panel does not explain itself: ' + haikuHint);
   // The sound list is ours, not the operating system's: a button that opens a
   // listbox, so it can unroll and tick the one in force like everything else in
   // this panel. Which means it has to be driven like one.
@@ -709,10 +738,34 @@ for (const surface of ['view', 'panel']) {
   for (const t of ['The first one ', 'uses `esbuild`, ', 'the second does not:\n\n```json\n{ "build": "esbuild" }\n```\n'])
     await post({ k: 'delta', id: 'b2_0', kind: 'text', text: t });
   await post({ k: 'block_final', id: 'b2_0', kind: 'text', text: ending });
-  await post({ k: 'turn_end', ok: true, costUsd: 0.014, durationMs: 4200, tokens: 18234 });
+  await post({
+    k: 'turn_end',
+    ok: true,
+    totalUsd: 0.031,
+    turnUsd: 0.014,
+    durationMs: 4200,
+    tokens: 18234,
+    ctx: { input: 412, cacheRead: 16800, cacheCreate: 620, output: 402 },
+    models: [{ model: 'claude-opus-5[1m]', input: 412, output: 402, cacheRead: 16800, cacheCreate: 620, costUsd: 0.014, contextWindow: 1000000 }],
+    model: 'claude-opus-5[1m]',
+    effort: 'high',
+  });
   await post({ k: 'busy', value: false });
 
   await page.waitForTimeout(900);
+
+  // Who actually answered has to be readable at the end of the turn. It is the one
+  // promise the automatic mode rests on — a model picked for you and not shown is
+  // exactly the thing this must never become — so it is checked here, not by eye.
+  const recap = await page.evaluate(() => {
+    const chip = document.querySelector('.msg.recap .recap-chip.model');
+    if (!chip) return null;
+    return { text: chip.textContent, fam: [...chip.classList].find((c) => c.startsWith('fam-')) };
+  });
+  t(!!recap, 'the end of turn does not say which model answered');
+  t(/Opus 5/.test(recap?.text || ''), 'the model chip does not name the model: ' + recap?.text);
+  t(/Thorough/.test(recap?.text || ''), 'the model chip does not name the effort: ' + recap?.text);
+  t(recap?.fam === 'fam-opus', 'the model chip is not in its family colour: ' + recap?.fam);
 
   const r = await page.evaluate(() => {
     const log = document.getElementById('log');

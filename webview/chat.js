@@ -1150,28 +1150,26 @@
   $('drawerClose').addEventListener('click', closeDrawer);
 
   // ---------- what it cost ----------
-  // The cost adds up turn by turn; the tokens are the ones from the last turn, that
-  // is, how much context the conversation is carrying right now.
-  let spent = { usd: 0, tokens: 0 };
+  // The tokens are the ones from the last turn: how much context the conversation is
+  // carrying right now. What you spend is read in the context panel — the header
+  // chip that used to show it here is gone, and so is the code that filled it.
   const fmtTokens = (n) =>
     n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n);
 
-  function paintSpent() {
-    // The usage chip was taken out of the header: what you spend is read in the
-    // context panel. As long as it isn't there we touch nothing — without this
-    // check the function blew up at every end of turn, and took the rest of the
-    // message down with it.
-    const chip = $('spend');
-    if (!chip) return;
-    if (!spent.tokens) {
-      chip.hidden = true;
-      return;
-    }
-    chip.hidden = false;
-    $('spendTokens').textContent = fmtTokens(spent.tokens);
-    // La cifra in dollari non si mostra: accanto al contesto non aggiungeva nulla.
-    const c = $('spendCost');
-    if (c) c.hidden = true;
+  /**
+   * "claude-opus-5[1m]" → "Opus 5". No list of models in here: whatever the engine
+   * answers with reads the same way the cards do, and a model that ships tomorrow
+   * needs nobody to come and add it. The date some ids carry ("-20250929") is
+   * dropped: it's an id, not something you read at the end of a turn.
+   */
+  function servedLabel(id) {
+    const bare = String(id || '')
+      .replace(/\[.*$/, '')
+      .replace(/^claude-/, '');
+    if (!bare) return '';
+    const [fam, ...rest] = bare.split('-');
+    const ver = rest.filter((p) => !/^\d{6,}$/.test(p)).slice(0, 2).join('.');
+    return fam.charAt(0).toUpperCase() + fam.slice(1) + (ver ? ' ' + ver : '');
   }
 
   /**
@@ -1194,6 +1192,16 @@
       chip(t(paths.length === 1 ? 'recap.file' : 'recap.files', { n: paths.length }), 'files');
     }
     if (m.durationMs) chip(clock(m.durationMs));
+    // Who actually answered. It closes the row because it's the receipt, not the
+    // headline — but it is always there, on every turn: the day the model gets
+    // picked for you, the one that did the work must never be something you have to
+    // go and look for. The effort rides along when there is one to name ('' is
+    // whatever the CLI works at, which is not a choice anybody made).
+    const who = servedLabel(m.model);
+    if (who) {
+      const level = m.effort ? ' · ' + effortLabel(m.effort) : '';
+      chip(who + level, 'model fam-' + modelFamily({ value: m.model, resolved: m.model }));
+    }
     body.append(chips);
 
     // Line two — which files, by name, each one click from the editor. "3 files
@@ -1384,8 +1392,6 @@
         isTab = m.surface === 'panel';
         if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
-        spent = { usd: 0, tokens: 0 };
-        paintSpent();
         if (m.tip) currentTip = m.tip;
         showEmpty();
         // Opening animation: the tab comes in whole, while the side panel
@@ -1404,8 +1410,6 @@
         filesTouched.clear();
         // A new conversation is a new empty screen, so it earns a new tip.
         if (m.tip) currentTip = m.tip;
-        spent = { usd: 0, tokens: 0 };
-        paintSpent();
         // the previous conversation scrolls out while the new one takes its place
         swapLog(showEmpty);
         break;
@@ -1559,9 +1563,6 @@
         break;
       case 'turn_end':
         blocks.clear();
-        spent.usd += m.costUsd || 0;
-        spent.tokens = m.tokens || spent.tokens;
-        paintSpent();
         turnRecap(m);
         break;
       case 'busy':
@@ -2242,7 +2243,7 @@
   let prefs = {
     model: '',
     effort: '',
-    thinking: 'auto',
+    thinking: 'on',
     sound: 'cozy',
     volume: 0.6,
     onlyWhenAway: false,
@@ -2254,11 +2255,25 @@
 
   // Every effort level has a name and a plain explanation. The words live in
   // i18n.js — here we only keep which levels exist, and in what order.
-  const EFFORTS = ['', 'low', 'medium', 'high', 'xhigh', 'max'];
+  const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
   const effortLabel = (v) => t('effort.' + v);
   const effortDesc = (v) => t('effort.' + v + '.desc');
 
-  const THINKS = ['auto', 'on', 'off'];
+  /**
+   * Da qui in su il ragionamento deve stare acceso, e non lo diciamo noi: l'API
+   * rifiuta la richiesta, testualmente —
+   *
+   *   400 output_config.effort 'xhigh' is not supported when thinking is disabled on
+   *   this model. Use effort 'high' or below, or enable thinking.
+   *
+   * Si guarda l'ordine, non i due nomi: un livello nuovo sopra questi ci finisce
+   * dentro da solo. Il gemello sta in `src/engine/protocol.ts` — questa pagina non
+   * e' bundlata e da li' non puo' importare (vedi build.mjs).
+   */
+  const THINKING_FROM = EFFORTS.indexOf('xhigh');
+  const needsThinking = (e) => EFFORTS.indexOf(e) >= THINKING_FROM;
+
+  const THINKS = ['on', 'off'];
   const thinkLabel = (v) => t('think.' + v);
   const thinkDesc = (v) => t('think.' + v + '.desc');
 
@@ -2649,34 +2664,46 @@
     const chosen = chosenModel();
     const levels = chosen ? chosen.efforts : ['low', 'medium', 'high'];
     const noEffort = !!chosen && !chosen.efforts.length;
-    // "Auto" never gets disabled. It isn't a level like the others: it means "tell
-    // it nothing", and saying nothing is always possible — even to a model that
-    // doesn't take levels at all. Disabling it left the panel with no choice lit up
-    // and the slider hanging in mid-air.
-    const items = [{ value: '', label: effortLabel('') }].concat(
-      levels.map((l) => ({
-        value: l,
-        label: EFFORTS.includes(l) ? effortLabel(l) : l,
-        disabled: noEffort,
-      }))
-    );
+    // No "Auto" any more. There was never a level by that name — it meant "tell the
+    // engine nothing", which leaves the CLI's own fixed level in force. A button
+    // that says Claude decides, sitting next to four that really are choices, was
+    // the panel promising something no part of this ever did.
+    const items = levels.map((l) => ({
+      value: l,
+      label: EFFORTS.includes(l) ? effortLabel(l) : l,
+      disabled: noEffort,
+    }));
     paintSeg($('cfgEffort'), items, prefs.effort, (v) => push({ effort: v }));
     $('cfgEffortHint').textContent = noEffort
       ? t('effort.none')
-      : effortDesc(EFFORTS.includes(prefs.effort) ? prefs.effort : '');
+      : (EFFORTS.includes(prefs.effort) ? effortDesc(prefs.effort) : '') +
+        (needsThinking(prefs.effort) ? t('effort.needsThink') : '');
   }
 
   function paintThinking() {
     const chosen = chosenModel();
     // Not every model can decide on its own how much to think: where they can't,
     // "On" is a fixed token ceiling, not adaptive thinking. Better to say so than to
-    // show three buttons that look like they mean the same thing everywhere.
+    // show buttons that look like they mean the same thing everywhere.
     const adaptive = !chosen || chosen.adaptive !== false;
-    const items = THINKS.map((v) => ({ value: v, label: thinkLabel(v) }));
+    // From "very thorough" up, the API refuses the request outright with thinking
+    // off. Raising the effort turns it on (the extension does that, and you see it
+    // land here); "Off" then stays out of reach until you come back down. Better a
+    // button you can see is unavailable, with the reason written underneath, than
+    // one that takes your click and gets you a 400 on the next message.
+    const forced = needsThinking(prefs.effort);
+    const items = THINKS.map((v) => ({
+      value: v,
+      label: thinkLabel(v),
+      disabled: forced && v === 'off',
+    }));
     paintSeg($('cfgThink'), items, prefs.thinking, (v) => push({ thinking: v }));
     const base = THINKS.includes(prefs.thinking) ? thinkDesc(prefs.thinking) : '';
-    $('cfgThinkHint').textContent =
-      adaptive || prefs.thinking === 'off' ? base : base + t('think.capped');
+    $('cfgThinkHint').textContent = forced
+      ? t('think.forced', { level: effortLabel(prefs.effort) })
+      : adaptive || prefs.thinking === 'off'
+        ? base
+        : base + t('think.capped');
   }
 
   /**

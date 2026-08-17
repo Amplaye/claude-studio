@@ -17,3 +17,6 @@ media/ionicons-studio.woff2
 .publish-tokens.json
 .publish-error.png
 .publish-last.png
+
+# le misure del banco di prova: nascono in locale, non appartengono al repo
+.bench/

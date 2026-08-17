@@ -87,12 +87,11 @@ che vive nel motore, non nell'interfaccia.
   - **Impostazioni nella testata** (`Alt+I`): modello, impegno e pensiero. L'elenco
     dei modelli lo dice la **CLI installata** (`supportedModels`) — una carta per
     modello, col nome e la descrizione sue, nessuna scritta a mano qui dentro:
-    quello che esce domani compare da solo. La prima e' **Automatico**, che non
-    fissa niente e segue il consigliato della CLI; un modello scelto tempo fa e
-    che la CLI non offre piu' viene lasciato cadere, invece di restare appeso a
-    lavorare con un modello vecchio. Si porta dietro anche quali livelli
-    d'impegno accetta ciascuno — se un modello non li accetta, il menu si spegne. Le scelte valgono **dal turno dopo**
-    senza buttare via la conversazione (`setModel`, `applyFlagSettings`,
+    quello che esce domani compare da solo. Un modello scelto tempo fa e che la CLI
+    non offre piu' viene lasciato cadere, invece di restare appeso a lavorare con un
+    modello vecchio. Si porta dietro anche quali livelli d'impegno accetta ciascuno
+    — se un modello non li accetta, il menu si spegne. Le scelte valgono **dal turno
+    dopo** senza buttare via la conversazione (`setModel`, `applyFlagSettings`,
     `setMaxThinkingTokens`) e restano fra una finestra e l'altra.
   - **Avviso di fine lavoro**: un suono caldo costruito con Web Audio (nessun file
     audio da spedire) — Coccola, Campanella, Sottovoce o muto, col volume. Suona a
@@ -105,12 +104,107 @@ che vive nel motore, non nell'interfaccia.
     l'avviso va a una delle due — altrimenti si sentirebbe doppio. A decidere *se*
     e' il momento e' l'estensione, l'unica che sa se stai guardando.
 
+- **Fase 6 — fatta**: le tre manopole le giri tu, e una tira l'altra.
+  - **Niente piu' "automatico", da nessuna parte.** Modello, impegno e pensiero sono
+    tre scelte esplicite. Le due Auto che c'erano non decidevano niente: sull'impegno
+    voleva dire "non dire niente al motore", e la CLI resta al suo livello fisso —
+    nell'SDK `EffortLevel` e' `low|medium|high|xhigh|max`, un `auto` non esiste; sul
+    pensiero voleva dire la stessa cosa di "acceso", perche' a una CLI che non sente
+    niente il ragionamento adattivo lo accende lei. Due bottoni per la stessa cosa,
+    e tutti e due scritti come se cedessero la scelta a qualcun altro.
+  - **Alzando l'impegno il pensiero si accende da solo.** Da `xhigh` in su l'API
+    rifiuta la richiesta a pensiero spento (la frase esatta sta piu' sotto), e prima
+    quel rifiuto arrivava addosso a te, come turno fallito, al messaggio dopo. Adesso
+    scegliendo quel livello il pensiero si accende — **nel pannello, dove lo vedi**,
+    non di nascosto al momento di partire — e finche' stai lassu' il bottone "No"
+    resta fuori portata, con scritto sotto chi l'ha acceso.
+  - **Le regole stanno in un posto solo** (`normalise`, in `chat/controller.ts`): ci
+    passano sia le scelte che fai tu sia quelle che si correggono quando la CLI
+    cambia elenco. Scritte in una sola delle due strade, si rompono dall'altra.
+- **Fase 6 (righello) — fatta**: il banco di prova, costruito prima di toccare le
+  manopole.
+  - **Il registro per turno**. `turn_end` non porta piu' un totale e basta. Porta i
+    quattro pezzi dell'ultima chiamata (input, cache letta, cache scritta, output),
+    quanto ha consumato *questo* turno modello per modello — la differenza di
+    `result.modelUsage` col turno prima, sub-agent compresi — il modello che ha
+    davvero risposto e l'impegno in vigore. Nessun listino prezzi scritto a mano: i
+    costi li dice il motore.
+  - **Il chip di fine turno** dice chi ha risposto, nel colore della sua famiglia. Su
+    ogni turno, sempre: un modello scelto per te e non mostrato e' esattamente la
+    cosa che questo non deve diventare. Lo controlla `ui-check`, non l'occhio.
+  - **`scripts/router-check.cjs`**: 22 conversazioni, 31 turni, sulla CLI vera. Piu'
+    `--ab`, che e' il modo giusto di confrontare (sotto il perche'), e `--diff`, che
+    mette a fronte due registri senza chiamare nessuno.
+  - **`scripts/fake-vscode.cjs`**: il VSCode finto, prima copiato dentro `drive.cjs`.
+    Due banchi che girano su editor diversi non confrontano niente.
+
 Il piano completo, con le indagini gia' fatte sul protocollo e i percorsi del
 materiale di riferimento, sta in
-`C:\Users\Steward\.claude\plans\io-non-me-ne-bright-lemur.md`.
+`C:\Users\Steward\.claude\plans\io-non-me-ne-bright-lemur.md`. Quello della Fase 6
+in `C:\Users\Steward\.claude\plans\l-auto-mode-dimenticatelo-indexed-moonbeam.md`.
 
 ## Cose imparate provando (non si vedono dal codice)
 
+- **Due giri dello stesso banco non sono confrontabili.** Provato: stessa batteria,
+  stesse identiche parole, a venti minuti di distanza. Totali $9,08 e $5,13 — il 44%
+  di scarto — e il singolo "ciao" e' passato da $0,021 a $0,170, **otto volte tanto**,
+  senza che fosse cambiata una virgola. Chi confronta due giri consecutivi non misura
+  quello che ha cambiato: misura in che stato ha trovato la cache della CLI. Per
+  questo `router-check` ha `--ab`, che prova ogni caso con tutti e due i bracci a
+  pochi secondi di distanza, alternando chi va per primo.
+- **Non tutti gli impegni condividono la stessa cache del prompt.** A `low` la CLI
+  legge 26k e ne riscrive 15k; a `high` legge 41k e non riscrive niente. Sono due
+  prefissi diversi, e quei 15k sono un pezzo di prompt di sistema che cambia col
+  livello. Il conto: appaiato, cinque casi banali, `low` $0,838 contro `high` $0,138.
+  Non e' che `low` sia caro — a impegno **fermo** costa quanto gli altri. E' che
+  **cambiare** impegno costa, perche' ogni cambio riscrive quel pezzo.
+- **Cambiare impegno a conversazione accesa butta via la cache**, e si vede: due
+  conversazioni gemelle, gli stessi quattro messaggi, l'unica differenza il cambio al
+  terzo turno. Senza cambio, cache letta 52k e $0,055; cambiando, cache letta 26k,
+  27k riscritti e **$0,306** — cinque volte e mezzo, per lo stesso messaggio.
+  Riprodotto tre volte su quattro. Vuol dire che un router che alza e abbassa
+  l'impegno turno per turno *paga* invece di risparmiare: l'aritmetica del piano,
+  che dava il cambio d'impegno per gratuito, era sbagliata.
+- **`result.total_cost_usd` e' cumulativo di sessione, non del turno.** Lo dice l'SDK
+  e nessuno lo leggeva: la webview lo sommava a ogni fine turno, contando il primo
+  turno tante volte quanti ne erano passati. Il costo del turno e' la differenza di
+  `result.modelUsage` con quello prima. E `usage` non serve al confronto: quello e'
+  **solo il filo principale**, mentre `modelUsage` comprende sub-agent e
+  compattazioni — che sono soldi veri quanto gli altri.
+- **`--deny` non protegge da niente per conto suo.** Un giro con 28 strumenti si e'
+  chiuso con **zero** permessi chiesti: la CLI approva da se' quelli di sola lettura
+  e `canUseTool` non viene mai interpellato. Un banco che si fida di quel guardiano
+  si fida di uno che non c'e'. Adesso c'e' anche un filo d'inciampo: se parte uno
+  strumento che scrive, il giro lo dichiara e finisce male.
+- **Il registro del banco non va in `dist/`**: `build.mjs` cancella quella cartella a
+  ogni build, quindi la prima `npm run verify` si portava via la misura con cui si
+  doveva fare il confronto. Sta in `.bench/`, che non e' un artefatto di nessuno.
+- **Il finto VSCode deve avere `createOutputChannel` e gli aggiornamenti spenti.**
+  Trenta secondi dopo l'avvio l'estensione apre il registro degli aggiornamenti: le
+  prove corte non ci arrivavano mai, una lunga ci arriva e moriva li' dentro a meta'
+  misura. E di serie si sarebbe messa a reinstallare la CLI da npm — rete, minuti, e
+  una misura fatta mentre sotto cambia il motore.
+- **`effort: ''` non e' "decide Claude".** Nell'SDK `EffortLevel` e'
+  `low|medium|high|xhigh|max`: un `auto` non esiste. La stringa vuota toglie
+  l'override e lascia il livello fisso della CLI. Il pannello prometteva "decide
+  Claude quanto impegnarsi": adesso quel bottone non c'e' piu'.
+- **Sopra `high` il pensiero non e' facoltativo**, e non lo decidiamo noi. Chiesto
+  alla CLI e risposto dall'API, testualmente:
+  `400 output_config.effort 'xhigh' is not supported when thinking is disabled on
+  this model. Use effort 'high' or below, or enable thinking.` Vale per `xhigh` e
+  `max`; `high` e sotto girano anche a pensiero spento. **Non sta in `ModelInfo`**:
+  l'SDK espone `supportedEffortLevels` e `supportsAdaptiveThinking`, ma niente che
+  leghi i due. Nel catalogo interno della CLI esiste `rejects_disabled_thinking`,
+  che pero' e' una cosa del *modello* (ce l'ha Fable 5), non del livello.
+- **Un errore 400 dell'API torna come turno riuscito.** La CLI lo trasforma in una
+  risposta di un modello `<synthetic>` da zero dollari, e il `result` arriva con
+  subtype `success`: la riga di fine turno dice "Fatto" per un turno che non ha
+  fatto niente. Se ne accorge solo chi guarda il modello nel chip.
+- **Una regola che aspetta l'elenco dei modelli arriva tardi.** Il legame
+  impegno→pensiero dipende dal solo livello, ma stava dentro il ramo che si sblocca
+  quando la CLI dice quali modelli esistono: il primo turno partiva col pensiero
+  ancora spento a un livello che l'API non accetta — cioe' proprio il 400 che quella
+  regola esiste per evitare. Trovato con `drive.cjs`, non da una rilettura.
 - Il messaggio `assistant` completo arriva **prima** che il blocco finisca di
   scorrere: non e' li' che si chiude un blocco di testo. Si chiude su
   `content_block_stop`, col testo accumulato dallo streaming.
@@ -223,6 +317,25 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
   nella barra di contesto **senza euristica** (`focusHow: studio`).
 - `smoke` e `trace-order` sono le prove secche del motore, utili quando si sospetta
   che sia cambiato qualcosa nel protocollo.
+
+`router-check` e' l'unico che **spende**: sono turni veri su modelli veri, e il giro
+intero costa qualche dollaro e una decina di minuti. Serve a rispondere a una
+domanda sola — questa cosa nuova peggiora la spesa o la qualita'? — e senza chiamare
+nessuno quella risposta non esiste.
+
+```
+node scripts/router-check.cjs --list                    cosa c'e' dentro, gratis
+node scripts/router-check.cjs --only cache              solo una classe
+node scripts/router-check.cjs --ab effort=low --ab effort=high    il confronto vero
+node scripts/router-check.cjs --diff a,b                due registri a fronte, gratis
+```
+
+⚠️ **Il confronto si fa con `--ab`, non lanciandolo due volte.** Fra un giro e
+l'altro la cache del prompt della CLI cambia stato per conto suo e lo stesso "ciao"
+costa otto volte tanto: due giri consecutivi hanno dato $9,08 e $5,13 sulle stesse
+identiche parole. Appaiando, i due bracci provano ogni caso a pochi secondi l'uno
+dall'altro e a turno per primo, e quello che resta e' la differenza che si cercava.
+I registri finiscono in `.bench/`, che non e' sotto git.
 
 Per usare la chat **a mano**, senza aprire VSCode, c'e' `scripts/drive.cjs`: carica
 il bundle vero con un `vscode` finto e stampa quello che vedrebbe la webview.

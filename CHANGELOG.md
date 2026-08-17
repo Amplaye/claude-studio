@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.15.4
+
+- **Le tre manopole le giri tu.** Modello, impegno e ragionamento avevano tutti e tre
+  un "automatico" che non decideva niente. Sull'impegno voleva dire non dire niente
+  al motore, e la CLI resta al livello fisso che ha: un livello chiamato "auto", nel
+  motore, non esiste proprio. Sul ragionamento voleva dire la stessa identica cosa di
+  "acceso", perche' a una CLI che non sente niente il ragionamento lo accende lei.
+  Erano due bottoni per la stessa cosa, tutti e due scritti come se passassero la
+  scelta a qualcun altro. Adesso ci sono solo scelte vere, e sono tue.
+
+- **Alzando l'impegno, il ragionamento si accende da solo.** Da "molto accurato" in
+  su il motore si rifiuta di lavorare col ragionamento spento — e quel rifiuto
+  arrivava addosso a te, come turno fallito, al messaggio dopo aver toccato la
+  manopola sbagliata. Ora scegliendo quel livello il ragionamento si accende **nel
+  pannello, dove lo vedi**, e finche' resti lassu' il "No" e' fuori portata, con
+  scritto sotto chi l'ha acceso. Nessuna correzione fatta di nascosto un attimo prima
+  di partire: quello che leggi e' quello che parte.
+
+- **La riga di fine turno dice quale modello ha risposto.** Nel colore del suo, lo
+  stesso della sua carta, con accanto l'impegno di quel turno. C'era gia' tutto per
+  saperlo e non veniva detto: aprivi il pannello per ricordarti con che cosa stavi
+  parlando.
+
+- **I conti del turno erano sbagliati, e adesso ci sono.** Il costo che arrivava a
+  fine turno e' il totale della *sessione*, non del turno — la chat lo sommava a ogni
+  giro, contando il primo turno tante volte quanti ne erano passati. Ora si tiene il
+  totale per quello che e' e si misura a parte quanto e' costato davvero quel turno,
+  sub-agent compresi, insieme a quanto contesto e' stato riletto dalla cache e quanto
+  riscritto da zero: e' l'unico modo per vedere quando una scelta manda all'aria il
+  lavoro gia' pagato.
+
 ## 0.15.3
 
 - **The CLI gets updated the way you installed it.** Only an npm installation was
