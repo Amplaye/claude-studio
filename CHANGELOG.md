@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.15.4
+## 0.15.5
 
 - **Le tre manopole le giri tu.** Modello, impegno e ragionamento avevano tutti e tre
   un "automatico" che non decideva niente. Sull'impegno voleva dire non dire niente

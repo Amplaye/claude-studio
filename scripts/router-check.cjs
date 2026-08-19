@@ -29,7 +29,9 @@
 // arriva a partire, il giro lo dichiara e finisce male.
 const fs = require('node:fs');
 const path = require('node:path');
-const { boot, root } = require('./fake-vscode.cjs');
+const { boot } = require('./lib/fake-vscode.cjs');
+
+const root = path.dirname(__dirname);
 
 // ---- riga di comando ---------------------------------------------------------
 const argv = process.argv.slice(2);
@@ -263,7 +265,7 @@ const turns = []; // il registro: una riga per turno
 let cur = null; // il turno in volo
 let pendingAsks = 0;
 
-const { send, ctx } = boot(onPost);
+const { send, ctx } = boot(root, onPost);
 
 function onPost(m) {
   switch (m.k) {

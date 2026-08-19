@@ -15,9 +15,12 @@
 //   node scripts/drive.cjs --mode plan "..."
 //   node scripts/drive.cjs --cmd '{"cmd":"history"}' "..."   comando arbitrario prima
 const fs = require('node:fs');
-// Il VSCode finto sta a parte: se lo divide con `router-check.cjs`, che deve girare
-// sullo stesso editor o non sta misurando la stessa cosa.
-const { boot } = require('./fake-vscode.cjs');
+const path = require('node:path');
+// Il VSCode finto e' quello di tutti gli altri controlli: se ne tenessimo una copia
+// qui, questo banco misurerebbe un editor diverso da quello che provano loro.
+const { boot, uri } = require('./lib/fake-vscode.cjs');
+
+const root = path.dirname(__dirname);
 
 const argv = process.argv.slice(2);
 /** Interruttore: c'e' o non c'e', e non si porta via il messaggio che lo segue. */
@@ -133,7 +136,24 @@ function firstAnswers(m) {
 }
 
 // ---- accensione --------------------------------------------------------------
-const { send, ctx, view } = boot(show);
+// Della superficie condivisa qui servono piegati solo due rami: una scheda aperta e
+// un errore che l'editor gia' conosce, cosi' si vede che il ponte riporta roba vera.
+const { send, ctx, view } = boot(root, show, (vscode) => {
+  vscode.window.tabGroups.all = [
+    { tabs: [{ isActive: true, input: { uri: uri(path.join(root, 'package.json')) } }] },
+  ];
+  vscode.languages.getDiagnostics = () => [
+    [
+      uri(path.join(root, 'src', 'extension.ts')),
+      [{ severity: 0, message: 'prova di errore', range: { start: { line: 3, character: 2 } } }],
+    ],
+  ];
+  vscode.workspace.findFiles = async () => [
+    uri(path.join(root, 'package.json')),
+    uri(path.join(root, 'src', 'extension.ts')),
+  ];
+  vscode.window.showErrorMessage = async (m) => (console.log('  [errore VSCode]', m), undefined);
+});
 
 (async () => {
   send({ cmd: 'ready' });

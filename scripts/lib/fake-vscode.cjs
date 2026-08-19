@@ -209,4 +209,52 @@ const memento = (map = new Map()) => ({
   keys: () => [...map.keys()],
 });
 
-module.exports = { uri, newRegistry, fakeWebview, fakePanel, makeVscode, install, memento };
+/**
+ * Accende l'estensione vera e le attacca una faccia della chat.
+ *
+ * Lo fanno gia' quasi tutti i controlli qui dentro, ognuno con le sue dieci righe;
+ * questo serve ai due che *guidano* la chat invece di ispezionarla — `drive.cjs` e
+ * `router-check.cjs` — e che devono per forza girare sullo stesso editor finto, o
+ * non stanno confrontando la stessa cosa.
+ *
+ * @param root    la cartella su cui l'estensione crede di essere aperta
+ * @param onPost  chiamata con ogni evento che la webview riceverebbe
+ * @param tweak   ricevi il `vscode` prima dell'accensione, per piegare i due o tre
+ *                rami che ti interessano (vedi il commento in testa a questo file)
+ */
+function boot(root, onPost, tweak) {
+  const registered = newRegistry();
+  const vscode = makeVscode({ workspaceRoot: root, registered });
+  tweak?.(vscode);
+  install(vscode);
+
+  const ext = require(path.join(root, 'dist', 'extension.js'));
+  const ctx = {
+    extensionUri: uri(root),
+    extensionPath: root,
+    subscriptions: [],
+    globalState: memento(),
+    workspaceState: memento(),
+  };
+  ext.activate(ctx);
+  if (!registered.provider) throw new Error('nessun provider di webview registrato');
+
+  const view = {
+    webview: fakeWebview(),
+    visible: true,
+    onDidChangeVisibility: () => ({ dispose() {} }),
+    onDidDispose: () => ({ dispose() {} }),
+  };
+  // La faccia della libreria mette da parte quello che riceve; qui serve invece
+  // vederlo passare, uno per uno, mentre passa.
+  const collect = view.webview.postMessage;
+  view.webview.postMessage = async (m) => {
+    onPost(m);
+    return collect(m);
+  };
+  registered.provider.resolveWebviewView(view);
+
+  return { send: (m) => view.webview._onMsg(m), ctx, view, registered, vscode };
+}
+
+module.exports = { boot, uri, newRegistry, fakeWebview, fakePanel, makeVscode, install, memento };
