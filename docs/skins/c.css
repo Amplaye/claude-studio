@@ -1,0 +1,120 @@
+/* ============================================================
+     6 — CARTA RITAGLIATA   (fogli sovrapposti, ombre corte)
+     ============================================================ */
+  /* Il tavolo sotto il collage: scuro e caldo, e' l'unico modo perche' la
+     carta chiara galleggi invece di sciogliersi nello sfondo. */
+  .c .pane { background: radial-gradient(120% 100% at 50% 0%, #3b3226, #1d1a14); }
+  /* Un filo meno di zoom del solito: il margine attorno al foglio e' cio' che
+     lo fa leggere come un foglio appoggiato e non come lo schermo. */
+  .c .stage { transform: scale(1.76) rotate(-.5deg); }
+
+  /* Grana finta: due righe incrociate a passo primo fra loro, altrimenti si
+     incontrano sempre nello stesso punto e viene fuori la carta a quadretti. */
+  .c .floor {
+    background:
+      repeating-linear-gradient(64deg, rgba(122,34,17,.055) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(-27deg, rgba(51,61,44,.04) 0 1px, transparent 1px 7px),
+      radial-gradient(130% 100% at 28% 12%, var(--s3), var(--s1));
+    border-radius: 5px 3px 6px 4px / 4px 6px 3px 5px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.5) inset, 0 8px 18px -8px rgba(0,0,0,.7);
+  }
+  /* Il secondo foglio sotto il primo, girato dall'altra parte: e' quello che
+     dice "collage" prima ancora che si guardi cosa c'e' sopra. */
+  .c .floor::before {
+    content: ""; position: absolute; inset: -7px; z-index: -1;
+    transform: rotate(1.1deg); border-radius: 4px 7px 3px 6px / 6px 3px 7px 4px;
+    background: linear-gradient(160deg, #d8b494, #c39a76);
+    box-shadow: 0 14px 26px -10px rgba(0,0,0,.85);
+  }
+
+  /* I muri sono strisce della stessa carta, piu' chiara, appoggiate sopra: il
+     taglio prende luce in alto e lascia un'ombra corta sotto. */
+  .c .wall {
+    background: linear-gradient(180deg, var(--s5) 60%, var(--s4));
+    border-radius: 2px 1px 2px 1px;
+    box-shadow: inset 0 1px 0 #fff, 0 1px 0 rgba(122,34,17,.14),
+                0 3px 5px -2px rgba(60,40,20,.55);
+  }
+
+  .c .prop i, .c .desk i, .c .fig i { display: none; }
+
+  /* Ombra corta e stretta per ogni ritaglio: una diffusa larga impasterebbe
+     trentadue mobili in una macchia sola. */
+  .c .prop, .c .desk, .c .stool {
+    border-radius: 4px 2px 3px 2px / 2px 4px 2px 3px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.5), 0 1px 0 rgba(122,34,17,.12),
+                0 3px 4px -2px rgba(60,40,20,.6);
+  }
+  /* La stessa fibra del pavimento anche sui ritagli: senza, sono plastica. */
+  .c .prop:not([data-k=plant])::before,
+  .c .desk::before, .c .stool::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: repeating-linear-gradient(74deg, rgba(122,34,17,.07) 0 1px, transparent 1px 5px);
+  }
+  /* Appoggiati a mano: mezzo grado alternato toglie la squadratura da stampa
+     senza che niente sembri storto per davvero. */
+  .c .prop:nth-child(odd), .c .desk:nth-child(odd),
+  .c .stool:nth-child(odd), .c .guy:nth-child(odd)  { transform: rotate(-.7deg); }
+  .c .prop:nth-child(even), .c .desk:nth-child(even),
+  .c .stool:nth-child(even), .c .guy:nth-child(even) { transform: rotate(.7deg); }
+
+  /* Cartoncino kraft: sta fra la sabbia e la terracotta scura della palette,
+     ed e' l'unico tono che distingue il legno dal pavimento. */
+  .c .desk,
+  .c .prop[data-k=bar],
+  .c .prop[data-k=table] { background: linear-gradient(170deg, #d3a682, #bd8c64); }
+  .c .prop[data-k=shelf] { background: linear-gradient(170deg, #c2916a, #a9784f); }
+  .c .desk { width: 32px; height: 16px; border-radius: 4px 3px 4px 3px; }
+
+  /* Sedie e sgabelli sono i pezzi piu' piccoli della stanza: il terracotta
+     chiaro spariva nella sabbia, serve un tono che stacchi da solo. */
+  .c .prop[data-k=chair],
+  .c .prop[data-k=stool],
+  .c .stool { background: var(--t300); box-shadow: inset 0 0 0 1.5px var(--t400),
+                                                   0 3px 4px -2px rgba(60,40,20,.6); }
+  .c .stool { width: 16px; height: 16px; border-radius: 4px 3px 4px 3px; }
+  .c .prop[data-k=sofa]  { background: var(--t400); border-radius: 5px 4px 5px 4px;
+                           box-shadow: inset 0 -3px 0 var(--t600), 0 3px 5px -2px rgba(60,40,20,.6); }
+  /* Il tappeto e' l'unico pezzo davvero steso a terra: niente ombra. */
+  .c .prop[data-k=rug]   { background: repeating-linear-gradient(90deg, var(--t100) 0 5px, var(--t200) 5px 10px);
+                           box-shadow: inset 0 0 0 2px var(--t300); border-radius: 2px; }
+  .c .prop[data-k=board] { background: var(--o700);
+                           box-shadow: 0 0 0 1.5px var(--s5), 0 3px 5px -2px rgba(60,40,20,.6); }
+  .c .prop[data-k=green] { background: var(--o500);
+                           box-shadow: 0 0 0 1.5px var(--s5), 0 3px 5px -2px rgba(60,40,20,.6); }
+  .c .prop[data-k=sink],
+  .c .prop[data-k=fridge],
+  .c .prop[data-k=copier] { background: var(--o200); box-shadow: inset 0 -2px 0 var(--o300),
+                                                                 0 3px 4px -2px rgba(60,40,20,.6); }
+  .c .prop[data-k=bin]   { background: var(--o400); border-radius: 50%; }
+
+  /* Vista dall'alto una pianta e' due dischetti di carta sovrapposti. */
+  .c .prop[data-k=plant] { background: none; box-shadow: none; }
+  .c .prop[data-k=plant]::before,
+  .c .prop[data-k=plant]::after { content: ""; position: absolute; border-radius: 50%;
+                                  box-shadow: 0 3px 4px -2px rgba(60,40,20,.65); }
+  .c .prop[data-k=plant]::before { inset: 1px; background: var(--o600); }
+  .c .prop[data-k=plant]::after  { inset: 4px 6px 6px 3px; background: var(--o400); }
+
+  .c .mon { width: 13px; height: 8px; margin: 2px 0 0 1.5px; border-radius: 2px 1px 2px 1px;
+            background: var(--o700);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 1px 2px rgba(60,40,20,.55); }
+  .c .mon.on   { background: var(--o400); }
+  .c .mon.busy { background: var(--t500);
+                 box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 0 6px rgba(244,85,23,.6); }
+
+  /* Le persone sono tondini di carta colorata montati su un dischetto crema:
+     e' il bordo chiaro, non l'ombra, che le stacca dai mobili. */
+  .c .guy { width: 16px; height: 16px; }
+  .c .fig { position: absolute; left: 1px; top: 1px; width: 14px; height: 14px;
+            border-radius: 50%; background: var(--shirt);
+            box-shadow: 0 0 0 2px var(--s5), 0 4px 5px -2px rgba(60,40,20,.7); }
+  .c .fig::after { content: attr(data-i); position: absolute; inset: 0;
+                   display: grid; place-items: center;
+                   font: 800 8px/1 ui-sans-serif, system-ui, sans-serif;
+                   color: var(--s5); text-shadow: 0 1px 0 rgba(60,30,10,.4); }
+
+  .c .plate { background: linear-gradient(180deg, var(--s5) 60%, var(--s4));
+              border-radius: 2px 3px 2px 3px; color: var(--o800);
+              box-shadow: inset 0 1px 0 #fff, 0 3px 5px -2px rgba(60,40,20,.65); }
+  .c .plate s, .c .plate s i { border-radius: 1px; }

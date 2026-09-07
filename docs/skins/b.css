@@ -1,0 +1,265 @@
+/* ============================================================
+     7 — TERRAZZA BALINESE   (teak, pietra, rattan, verde)
+     ============================================================ */
+
+  /* Legno, pietra e foglia non stanno nella palette del CRM perche' li' i
+     colori sono inchiostro: qui sono materiali. Restano pero' nella stessa
+     famiglia calda di sabbia e terracotta. */
+  .b .pane {
+    --teak: #a4714a; --teak-hi: #c69061; --teak-lo: #7c5230;
+    --wood: #63421f; --wood-lo: #3f2a14;
+    /* Due pietre diverse apposta: il muro e' calda e chiara, il lastricato e'
+       grigio e spento, se no il muro sparisce dentro il pavimento. */
+    --stone: #f2e8d4; --stone-lo: #d9c5a3;
+    --pave: #c8bb9f; --pave-jo: rgba(96,74,50,.24);
+    --rattan: #dbb684; --weave: rgba(118,84,48,.32);
+    --leaf: #5d8a4f; --leaf-hi: #8bb267; --leaf-lo: #3c6135;
+    --sun: rgba(255,229,171,.30);
+    --shade: rgba(52,34,16,.5);
+    background:
+      radial-gradient(ellipse 55% 45% at 18% 4%, rgba(160,200,120,.20), transparent 70%),
+      radial-gradient(ellipse 70% 55% at 88% 100%, rgba(12,26,12,.9), transparent 75%),
+      linear-gradient(158deg, #26391f, #121b10 72%);
+  }
+
+  /* La terrazza e' un piano rialzato: rimpicciolita quel tanto che basta
+     perche' il giardino si veda tutto attorno. */
+  .b .stage { transform: scale(1.8); }
+
+  /* Doghe di teak, tutte nello stesso verso. Le venature usano due periodi
+     dispari e diversi fra loro: cosi' il disegno non si richiude su se stesso
+     e l'occhio non trova la riga da inseguire. */
+  .b .floor {
+    background-color: var(--teak);
+    background-image:
+      radial-gradient(ellipse 75% 65% at 16% 4%, var(--sun), transparent 72%),
+      /* la macchia d'ombra delle fronde di sopra: e' l'unica cosa che dice
+         "fuori" invece di "stanza col parquet" */
+      radial-gradient(ellipse 34% 22% at 28% 32%, rgba(44,30,12,.1), transparent 72%),
+      repeating-linear-gradient(180deg, rgba(74,44,20,.055) 0 1px, transparent 1px 7px),
+      repeating-linear-gradient(180deg, rgba(255,228,186,.05) 0 1px, transparent 1px 11px),
+      repeating-linear-gradient(180deg, var(--teak-lo) 0 1px, rgba(0,0,0,.09) 1px 2px, transparent 2px 16px),
+      repeating-linear-gradient(180deg, rgba(255,255,255,.045) 0 16px, transparent 16px 32px, rgba(0,0,0,.045) 32px 48px);
+    background-size: auto, 97px 71px, auto, auto, auto, auto;
+    box-shadow: 0 18px 36px -10px rgba(0,0,0,.8), inset 0 0 70px rgba(52,34,16,.3);
+  }
+
+  /* Le tre stanze in alto sono lastricate: il legno resta dove si lavora, il
+     coperto e' pietra. Il muro di mezzo cade esatto sul cambio di materiale. */
+  .b .floor::after {
+    content: ""; position: absolute; left: 0; top: 0; right: 0; height: 128px;
+    background-color: var(--pave);
+    background-image:
+      repeating-linear-gradient(90deg, var(--pave-jo) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(180deg, var(--pave-jo) 0 1px, transparent 1px 32px),
+      /* la grana e' fatta di chiazze larghe e sfumate: dei puntini piccoli a
+         questa scala diventerebbero pois, non pietra */
+      radial-gradient(circle at 32% 30%, rgba(255,252,240,.2), transparent 62%),
+      radial-gradient(circle at 68% 72%, rgba(88,66,42,.09), transparent 62%),
+      radial-gradient(ellipse 70% 90% at 18% 2%, var(--sun), transparent 72%);
+    background-size: auto, auto, 27px 23px, 33px 29px, auto;
+    box-shadow: inset 0 -4px 7px -4px rgba(52,34,16,.45);
+  }
+
+  /* Muretti bassi: si vede il piano di sopra, lo spigolo al sole e un dito di
+     spessore sul lato in ombra. Il sole sta a sinistra in alto per tutti. */
+  .b .wall {
+    background-color: var(--stone);
+    background-image:
+      /* i filari della pietra: appena accennati, se no un muro largo una
+         mattonella si legge come una scaletta invece che come un muretto */
+      repeating-linear-gradient(180deg, rgba(110,84,56,.1) 0 1px, transparent 1px 9px),
+      radial-gradient(circle at 30% 32%, rgba(255,255,255,.4), transparent 60%),
+      radial-gradient(circle at 70% 70%, rgba(110,84,56,.16), transparent 60%),
+      linear-gradient(158deg, #fffaf0, var(--stone) 45%, var(--stone-lo));
+    background-size: auto, 19px 15px, 23px 17px, auto;
+    box-shadow: inset 0 1.5px 0 rgba(255,255,255,.9),
+                inset -2px -2px 0 rgba(140,110,76,.4),
+                7px 9px 13px -4px rgba(52,34,16,.62);
+  }
+
+  .b .prop i, .b .desk i, .b .fig i { display: none; }
+  .b .prop { border-radius: 2px; }
+
+  .b .prop[data-k=table] {
+    background-color: var(--teak);
+    background-image:
+      repeating-linear-gradient(180deg, rgba(74,44,20,.06) 0 1px, transparent 1px 5px),
+      linear-gradient(162deg, var(--teak-hi), var(--teak) 42%, var(--teak-lo));
+    border-radius: 3px;
+    box-shadow: inset 0 1px 0 rgba(255,236,206,.45), 5px 7px 10px -4px var(--shade);
+  }
+
+  /* Rattan: due intrecci a quarantacinque gradi incrociati, che e' poi come e'
+     fatto davvero. La cupola la fanno le ombre interne e non un gradiente: la
+     casella dello sgabello ha gia' un background-position scritto inline. */
+  .b .prop[data-k=chair],
+  .b .prop[data-k=stool],
+  .b .prop[data-k=bin],
+  .b .stool {
+    background-color: var(--rattan);
+    background-image:
+      repeating-linear-gradient(45deg, var(--weave) 0 1px, transparent 1px 4px),
+      repeating-linear-gradient(-45deg, var(--weave) 0 1px, transparent 1px 4px);
+    box-shadow: inset 3px 3px 5px -2px rgba(255,244,220,.75),
+                inset -3px -3px 5px -2px rgba(112,78,42,.55),
+                4px 6px 8px -4px var(--shade);
+  }
+  .b .prop[data-k=chair] { border-radius: 6px; }
+  .b .prop[data-k=stool],
+  .b .prop[data-k=bin]   { border-radius: 50%; }
+  .b .stool { width: 16px; height: 16px; border-radius: 50%; }
+
+  /* Daybed: telaio di teak scuro, cuscini di lino crudo, cuciture terracotta.
+     I cuscini restano chiari perche' l'arancione acceso qui dentro serve solo
+     alla conversazione che sta lavorando. */
+  .b .prop[data-k=sofa] {
+    background-image:
+      repeating-linear-gradient(90deg, transparent 0 15px, rgba(164,74,38,.55) 15px 16px),
+      linear-gradient(180deg, #f6ead4, #dcc9a8);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 2px var(--wood), inset 0 3px 4px -2px rgba(255,255,255,.6),
+                5px 7px 10px -4px var(--shade);
+  }
+
+  /* Stuoia di paglia, bordata di terracotta bruciata. */
+  .b .prop[data-k=rug] {
+    background-color: #e7d4ac;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(150,112,66,.22) 0 2px, transparent 2px 4px),
+      repeating-linear-gradient(180deg, rgba(150,112,66,.22) 0 2px, transparent 2px 4px);
+    box-shadow: inset 0 0 0 2px #b0542a, 3px 4px 7px -3px var(--shade);
+  }
+
+  .b .prop[data-k=board] {
+    background-image: linear-gradient(168deg, var(--o600), var(--o800));
+    box-shadow: inset 0 0 0 2px var(--wood), 5px 7px 10px -4px var(--shade);
+  }
+
+  .b .prop[data-k=shelf] {
+    background-image:
+      repeating-linear-gradient(90deg, var(--wood-lo) 0 1px, transparent 1px 16px),
+      linear-gradient(168deg, var(--teak-hi), var(--teak-lo));
+    box-shadow: inset 0 1px 0 rgba(255,236,206,.35), 5px 7px 10px -4px var(--shade);
+  }
+
+  /* Bancone: piano di pietra, e sul lato lungo le canne di bambu'. */
+  .b .prop[data-k=bar] {
+    background-image:
+      repeating-linear-gradient(90deg, rgba(88,58,30,.26) 0 1px, transparent 1px 7px),
+      linear-gradient(180deg, #f6ecd9 0 10px, var(--stone-lo) 10px 12px, var(--teak-lo) 12px);
+    box-shadow: 5px 7px 10px -4px var(--shade);
+  }
+
+  .b .prop[data-k=sink] {
+    background-image: linear-gradient(162deg, #f6ecd9, var(--stone-lo));
+    border-radius: 3px;
+    box-shadow: 4px 6px 8px -4px var(--shade);
+  }
+  .b .prop[data-k=sink]::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, #d5dccd, #8d9c83);
+  }
+
+  .b .prop[data-k=fridge] {
+    background-image: linear-gradient(162deg, #f4f0e4, #ccc6b2);
+    border-radius: 3px;
+    box-shadow: inset 0 0 0 1px rgba(116,90,60,.28), 5px 7px 10px -4px var(--shade);
+  }
+  /* La fotocopiatrice e' l'unico oggetto che non e' un materiale: grigia, che
+     nel verde di questa stanza e' l'unico modo di non scambiarla per un cespuglio. */
+  .b .prop[data-k=copier] {
+    background-image: linear-gradient(162deg, #6d7168, #33372f);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 5px 7px 10px -4px var(--shade);
+  }
+
+  /* Le piante non stanno nella loro casella: la foglia che sborda e' proprio
+     quello che le fa sembrare piante e non pedine. Due strati di ellissi, il
+     secondo ruotato, cosi' le foglie cadono su otto direzioni invece che su
+     quattro; l'ombra sta sul genitore per non ruotare insieme a loro. */
+  .b .prop[data-k=plant],
+  .b .prop[data-k=green] {
+    background: none; overflow: visible; z-index: 2;
+    filter: drop-shadow(5px 6px 4px rgba(46,30,14,.5));
+  }
+  .b .prop[data-k=plant]::before {
+    content: ""; position: absolute; inset: -6px; transform: rotate(43deg);
+    background:
+      radial-gradient(ellipse 36% 15% at 12% 44%, var(--leaf), var(--leaf-lo) 74%, transparent 80%),
+      radial-gradient(ellipse 28% 12% at 86% 57%, var(--leaf), var(--leaf-lo) 74%, transparent 80%),
+      radial-gradient(ellipse 13% 31% at 44% 12%, var(--leaf), var(--leaf-lo) 74%, transparent 80%),
+      radial-gradient(ellipse 16% 27% at 57% 88%, var(--leaf), var(--leaf-lo) 74%, transparent 80%);
+  }
+  /* Foglie di taglia diversa: quattro identiche a raggiera fanno un girandola,
+     non una pianta. */
+  .b .prop[data-k=plant]::after {
+    content: ""; position: absolute; inset: -9px;
+    background:
+      radial-gradient(ellipse 33% 14% at 16% 38%, var(--leaf-hi), var(--leaf) 68%, transparent 76%),
+      radial-gradient(ellipse 25% 11% at 85% 61%, var(--leaf-hi), var(--leaf) 68%, transparent 76%),
+      radial-gradient(ellipse 12% 27% at 40% 16%, var(--leaf-hi), var(--leaf) 68%, transparent 76%),
+      radial-gradient(ellipse 15% 31% at 62% 85%, var(--leaf-hi), var(--leaf) 68%, transparent 76%),
+      radial-gradient(ellipse 18% 16% at 49% 51%, var(--leaf-lo) 55%, transparent 72%);
+  }
+  /* Nessuna pianta cresce come la vicina. */
+  .b .prop[data-k=plant]:nth-child(2n)::after  { transform: rotate(22deg) scale(1.06); }
+  .b .prop[data-k=plant]:nth-child(3n)::after  { transform: rotate(-16deg) scale(.9); }
+  .b .prop[data-k=plant]:nth-child(3n)::before { transform: rotate(72deg); }
+  .b .prop[data-k=plant]:nth-child(4n) { --leaf: #6d9550; --leaf-hi: #a0bf6d; --leaf-lo: #476b31; }
+  .b .prop[data-k=plant]:nth-child(5n) { --leaf: #4d7c4c; --leaf-hi: #79a460; --leaf-lo: #325331; }
+  /* Il verde basso del bar: una macchia di foglie corte, non una palla. */
+  .b .prop[data-k=green]::after {
+    content: ""; position: absolute; inset: -2px;
+    background:
+      radial-gradient(ellipse 26% 13% at 22% 40%, var(--leaf-hi), var(--leaf) 70%, transparent 78%),
+      radial-gradient(ellipse 24% 12% at 78% 62%, var(--leaf-hi), var(--leaf) 70%, transparent 78%),
+      radial-gradient(ellipse 12% 25% at 44% 22%, var(--leaf-hi), var(--leaf) 70%, transparent 78%),
+      radial-gradient(ellipse 13% 24% at 58% 80%, var(--leaf-hi), var(--leaf) 70%, transparent 78%),
+      radial-gradient(ellipse 22% 20% at 50% 50%, var(--leaf) 60%, transparent 74%);
+  }
+
+  /* Scrivania di legno scuro sul pavimento chiaro: e' lo spigolo al sole in
+     alto che la stacca, il colore da solo non basterebbe. */
+  .b .desk {
+    width: 32px; height: 16px; border-radius: 2px;
+    background-color: var(--wood);
+    background-image:
+      repeating-linear-gradient(180deg, rgba(255,226,186,.05) 0 1px, transparent 1px 4px),
+      linear-gradient(166deg, #74491f, #55360f 48%, #331f08);
+    box-shadow: inset 0 1.5px 0 rgba(255,228,188,.5), inset 0 0 0 1px rgba(30,18,6,.5),
+                7px 9px 12px -4px rgba(52,34,16,.65);
+  }
+
+  .b .mon {
+    width: 14px; height: 8px; margin: 3px 0 0 1px; border-radius: 1px;
+    background: #2a3125; box-shadow: inset 0 0 0 1px rgba(255,240,214,.14);
+  }
+  .b .mon.on   { background: linear-gradient(180deg, var(--o200), var(--o500)); }
+  .b .mon.busy { background: linear-gradient(180deg, var(--t200), var(--t500));
+                 box-shadow: 0 0 8px 1px rgba(244,85,23,.8); }
+
+  /* Vista dall'alto una persona e' due cose: le spalle in camicia di lino e la
+     testa. Il filo di luce attorno la stacca dal legno, che qui e' della
+     stessa temperatura di quasi tutte le camicie. */
+  .b .guy { width: 16px; height: 16px; }
+  .b .fig {
+    position: absolute; left: .5px; top: 3px; width: 15px; height: 12.5px;
+    border-radius: 7.5px 7.5px 5px 5px;
+    background-color: var(--shirt);
+    background-image: linear-gradient(162deg, rgba(255,255,255,.34), rgba(0,0,0,.18));
+    box-shadow: 0 0 0 1px rgba(255,242,218,.7), 5px 7px 8px -3px rgba(40,26,12,.7);
+  }
+  .b .fig::after {
+    content: ""; position: absolute; left: 3px; top: -2.5px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: radial-gradient(circle at 33% 27%, #7d5834, #40291a 72%);
+    box-shadow: 0 0 0 1px rgba(255,242,218,.65);
+  }
+
+  /* Cartellino di carta di riso in una cornice di teak. */
+  .b .plate {
+    background: linear-gradient(180deg, #fdf7ec, #f1e2cb);
+    border-radius: 2px; color: #3a2917;
+    box-shadow: 0 0 0 1px rgba(99,66,31,.7), 4px 6px 8px -3px rgba(28,18,8,.65);
+  }
+  .b .plate s, .b .plate s i { border-radius: 1px; }
