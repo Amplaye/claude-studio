@@ -32,13 +32,41 @@
   height: 100%;
   overflow: hidden;
 }
-/* L'ufficio e' una faccia della stessa pagina della chat: si accende una e si
-   spegne l'altra, e la scheda resta una sola. */
-body.inoffice .office {
+/* L'ufficio e la chat stanno nella stessa scheda, uno accanto all'altra: la
+   pianta a sinistra e il discorso a destra, che e' l'unico modo perche' l'ufficio
+   sia un posto dove si lavora invece di un quadro da guardare.
+
+   La colonna del contesto sparisce: quello che diceva — chi c'e', chi sta
+   lavorando, quanto contesto le resta — adesso e' la stanza. */
+body.inoffice {
   display: flex;
 }
+body.inoffice .office {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Nel documento l'ufficio viene dopo la chat, perche' la chat e' la faccia
+     normale. A schermo va prima: si guarda la stanza e si scrive a destra. */
+  order: -1;
+}
 body.inoffice .shell {
+  flex: 0 0 clamp(340px, 36%, 560px);
+  width: auto;
+  border-left: 1px solid var(--line);
+}
+/* Tre classi come la regola che l'accende in chat.css, se no quella vince e la
+   colonna resta li' a ripetere a parole quello che la stanza dice a figure. */
+body.inoffice.wide.rail-on .rail,
+body.inoffice .rail {
   display: none;
+}
+
+/* Scheda stretta: non c'e' spazio per due colonne, e spezzare la chat a 200
+   pixel non aiuta nessuno. L'ufficio si prende tutto, come faceva prima. */
+@media (max-width: 1000px) {
+  body.inoffice .shell {
+    display: none;
+  }
 }
 
 /* ---------- la fascia in cima ---------- */
@@ -67,6 +95,61 @@ body.inoffice .shell {
 .of-count {
   font-size: 12px;
   opacity: 0.72;
+}
+
+/* Chi comanda il piano: la stessa persona che sta seduta di la', ma grande
+   abbastanza da vederla in faccia. E' il modo piu' corto di dire con chi stai
+   parlando adesso — piu' corto di qualunque frase. */
+.of-boss {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 3px 12px 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: var(--hover);
+}
+.of-boss.busy {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+.of-face {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--of-floor);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+/* Gli strati stanno in una casella da 16 e la si guarda al triplo: il fattore e'
+   intero, quindi restano pixel e non diventano una macchia. */
+.of-face .folk {
+  position: absolute;
+  left: -3px;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  inset: auto;
+  transform: scale(3);
+  transform-origin: 0 0;
+}
+.of-boss-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.of-boss-name {
+  font-size: 12px;
+  font-weight: 800;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.of-boss-what {
+  font-size: 10.5px;
+  opacity: 0.66;
 }
 .of-chip {
   margin-left: 6px;
@@ -266,7 +349,7 @@ body.inoffice .shell {
      che quella e' l'unica cosa viva nella stanza. */
   filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.22));
 }
-/* I tre strati del pacchetto di Kenney, nell'ordine in cui si vestono. */
+/* Gli strati del pacchetto di Kenney, nell'ordine in cui si vestono. */
 .l-body {
   z-index: 1;
 }
@@ -417,10 +500,12 @@ body.inoffice .shell {
 /* La targhetta sotto la scrivania: il nome della conversazione e quanto
    contesto le resta. E' l'unico numero che l'ufficio si porta dietro dal
    pannello, ed e' quello che si guarda per decidere a chi andare a parlare. */
+/* Sopra la scrivania, non sotto: sotto si mangiava lo sgabello, e con due file
+   di scrivanie una targhetta finiva addosso al monitor della fila dopo. */
 .of-plate {
   position: absolute;
   left: 50%;
-  top: 30px;
+  top: -30px;
   width: 50px;
   margin-left: -25px;
   padding: 1px 2px 2px;

@@ -27,7 +27,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const url = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 
 /** Le scrivanie della pianta: office.js ne mette una per posto, sempre le stesse. */
-const DESKS = 16;
+const DESKS = 8;
 
 const card = (over = {}) => ({
   id: 'aaaa',
@@ -96,7 +96,11 @@ t(
   await page.locator('.office .of-back').isVisible(),
   "dall'ufficio non si vede il bottone per tornare alla chat"
 );
-t(!(await page.locator('.shell').isVisible()), "la chat resta a schermo sotto l'ufficio");
+// La chat non sparisce: sta accanto alla pianta, ed e' il punto — l'ufficio e'
+// un posto dove si lavora, non un quadro da guardare.
+t(await page.locator('.shell').isVisible(), "dall'ufficio la chat non si vede: non ci si puo' lavorare");
+t(await page.locator('#input').isVisible(), "dall'ufficio non si puo' scrivere a Claude");
+t(!(await page.locator('.rail').isVisible()), "la colonna del contesto ripete a parole quello che la stanza dice a figure");
 await page.click('.office .of-back');
 await page.waitForTimeout(200);
 t(!(await inOffice()), "dall'ufficio non si torna alla chat");

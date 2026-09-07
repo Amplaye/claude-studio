@@ -31,8 +31,11 @@ window.OFFICE = (() => {
   const TILE = 16;
   /** Il passo del foglio: 16 di disegno piu' 1 di margine fra una casella e l'altra. */
   const STEP = 17;
-  const COLS = 44;
-  const ROWS = 27;
+  // Una pianta piccola, non un piano intero. Meno mattonelle vuol dire piu' pixel
+  // per mattonella nello stesso spazio: la stessa stanza vista da vicino invece
+  // che dall'elicottero.
+  const COLS = 24;
+  const ROWS = 20;
 
   const t = (key, vars) => window.I18N.t(key, vars);
 
@@ -96,6 +99,12 @@ window.OFFICE = (() => {
     printB: [23, 9],
     binA: [22, 4],
     binB: [22, 5],
+    // Il bancone del bar: gli stessi mobili della cucina, ma con la roba sopra —
+    // ed e' la roba sopra a fare la differenza fra un bancone e un armadio.
+    barA: [4, 17],
+    barB: [5, 17],
+    barC: [6, 17],
+    barD: [7, 17],
   };
 
   /**
@@ -113,25 +122,45 @@ window.OFFICE = (() => {
     [1, 1],
     [1, 2],
   ];
+  /**
+   * Le magliette. Le righe 1 e 6 sono quelle col colletto bianco — camicia da
+   * ufficio; le righe 0 e 5 sono tinta unita.
+   *
+   * Le righe 4 e 9 no: da lontano sembrano magliette, ma sono corazze con gli
+   * spallacci, e mezzo ufficio andava in giro vestito da guerra.
+   */
   const SHIRT = [
-    [10, 0],
-    [14, 0],
-    [10, 4],
-    [6, 0],
-    [10, 5],
-    [14, 5],
-    [6, 5],
-    [12, 4],
+    [8, 1],
+    [12, 1],
+    [16, 1],
+    [8, 6],
+    [12, 6],
+    [16, 6],
+    [12, 0],
+    [16, 0],
+    [8, 0],
+    [8, 5],
   ];
+  /** La divisa di chi non e' nostro: neutra, e uguale per tutti. */
+  const SHIRT_GUEST = [12, 5];
+  /**
+   * I capelli. Nel foglio stanno alle colonne 19-26: un blocco per colore
+   * (castano, rosso, biondo, nero, bianco) e una pettinatura per casella.
+   *
+   * La colonna 3 — dove li avevamo cercati prima — sono le cinture. Per un
+   * giorno intero mezzo ufficio ha lavorato con una cintura in testa.
+   */
   const HAIR = [
-    [3, 0],
-    [3, 1],
-    [3, 2],
-    [3, 3],
-    [3, 5],
-    [3, 6],
-    [3, 7],
-    [3, 8],
+    [20, 0],
+    [21, 0],
+    [24, 0],
+    [25, 0],
+    [20, 4],
+    [21, 4],
+    [24, 4],
+    [25, 4],
+    [20, 8],
+    [21, 8],
   ];
 
   /** Somma dei caratteri: basta a spargere, e la stessa id da' sempre lo stesso. */
@@ -164,124 +193,88 @@ window.OFFICE = (() => {
     { c: 0, r: 0, w: 1, h: ROWS },
     { c: COLS - 1, r: 0, w: 1, h: ROWS },
 
-    // ufficio del capo, in alto a sinistra. Il buco fra i due pezzi e' la porta.
-    { c: 10, r: 1, w: 1, h: 3 },
-    { c: 10, r: 6, w: 1, h: 3 },
-    { c: 1, r: 8, w: 9, h: 1 },
+    // sala riunioni, in alto a sinistra. Il buco fra i due pezzi e' la porta.
+    { c: 10, r: 1, w: 1, h: 2 },
+    { c: 10, r: 5, w: 1, h: 3 },
 
-    // sala riunioni, in alto al centro
-    { c: 24, r: 1, w: 1, h: 3 },
-    { c: 24, r: 6, w: 1, h: 3 },
-    { c: 11, r: 8, w: 13, h: 1 },
+    // zona bar, in alto a destra
+    { c: 15, r: 1, w: 1, h: 2 },
+    { c: 15, r: 5, w: 1, h: 3 },
 
-    // il salone in alto a destra da' sul corridoio: due pezzi di muro e in mezzo
-    // il passaggio, che e' come si esce di la'
-    { c: 25, r: 8, w: 6, h: 1 },
-    { c: 36, r: 8, w: 7, h: 1 },
-
-    // le due stanze a destra: magazzino sopra, cucina sotto
-    { c: 32, r: 11, w: 11, h: 1 },
-    { c: 31, r: 11, w: 1, h: 3 },
-    { c: 31, r: 16, w: 1, h: 4 },
-    { c: 32, r: 19, w: 11, h: 1 },
-    { c: 31, r: 22, w: 1, h: 4 },
+    // il muro che divide le due stanze dal salone, e in mezzo il passaggio
+    { c: 1, r: 7, w: 9, h: 1 },
+    { c: 14, r: 7, w: 9, h: 1 },
   ];
 
   /** I mobili che non hanno nessuno seduto: fanno la differenza fra una pianta e un ufficio. */
   const PROPS = [
-    // --- ufficio del capo ---
+    // --- sala riunioni, in alto a sinistra ---
     { s: 'boardL', c: 3, r: 1 },
     { s: 'boardM', c: 4, r: 1 },
     { s: 'boardR', c: 5, r: 1 },
     { s: 'plantA', c: 8, r: 1 },
-    { s: 'sofaL', c: 1, r: 6 },
-    { s: 'sofaM', c: 2, r: 6 },
-    { s: 'sofaR', c: 3, r: 6 },
-    { s: 'binA', c: 8, r: 6 },
+    { s: 'tableTL', c: 3, r: 3 },
+    { s: 'tableTM', c: 4, r: 3 },
+    { s: 'tableTM', c: 5, r: 3 },
+    { s: 'tableTM', c: 6, r: 3 },
+    { s: 'tableTR', c: 7, r: 3 },
+    { s: 'tableBL', c: 3, r: 4 },
+    { s: 'tableBM', c: 4, r: 4 },
+    { s: 'tableBM', c: 5, r: 4 },
+    { s: 'tableBM', c: 6, r: 4 },
+    { s: 'tableBR', c: 7, r: 4 },
+    { s: 'chairUp', c: 4, r: 2 },
+    { s: 'chairUp', c: 6, r: 2 },
+    { s: 'stool', c: 4, r: 5 },
+    { s: 'stool', c: 6, r: 5 },
+    { s: 'chairL', c: 2, r: 3 },
+    { s: 'chairR', c: 8, r: 3 },
+    { s: 'plantB', c: 1, r: 5 },
 
-    // --- sala riunioni: il tavolo lungo e le sedie intorno ---
-    { s: 'tableTL', c: 14, r: 3 },
-    { s: 'tableTM', c: 15, r: 3 },
-    { s: 'tableTM', c: 16, r: 3 },
-    { s: 'tableTM', c: 17, r: 3 },
-    { s: 'tableTM', c: 18, r: 3 },
-    { s: 'tableTR', c: 19, r: 3 },
-    { s: 'tableBL', c: 14, r: 4 },
-    { s: 'tableBM', c: 15, r: 4 },
-    { s: 'tableBM', c: 16, r: 4 },
-    { s: 'tableBM', c: 17, r: 4 },
-    { s: 'tableBM', c: 18, r: 4 },
-    { s: 'tableBR', c: 19, r: 4 },
-    { s: 'chairUp', c: 15, r: 2 },
-    { s: 'chairUp', c: 17, r: 2 },
-    { s: 'chairUp', c: 19, r: 2 },
-    { s: 'stool', c: 15, r: 5 },
+    // --- l'ingresso, fra le due stanze: il divano dove si aspetta, le stampanti ---
+    { s: 'sofaL', c: 11, r: 1 },
+    { s: 'sofaM', c: 12, r: 1 },
+    { s: 'sofaR', c: 13, r: 1 },
+    { s: 'rugL', c: 11, r: 3 },
+    { s: 'rugR', c: 12, r: 3 },
+    { s: 'printT', c: 13, r: 4 },
+    { s: 'printB', c: 13, r: 5 },
+    { s: 'plantA', c: 11, r: 5 },
+
+    // --- la zona bar: il bancone con sopra la roba, il frigo, e il tavolino dove
+    //     ci si siede a non lavorare. Senza quello e' una cucina, non un bar. ---
+    { s: 'shelfA', c: 16, r: 1 },
+    { s: 'shelfB', c: 17, r: 1 },
+    { s: 'shelfC', c: 18, r: 1 },
+    { s: 'greenA', c: 20, r: 1 },
+    { s: 'barA', c: 16, r: 2 },
+    { s: 'barB', c: 17, r: 2 },
+    { s: 'barC', c: 18, r: 2 },
+    { s: 'barD', c: 19, r: 2 },
+    { s: 'sinkT', c: 20, r: 2 },
+    { s: 'fridgeT', c: 22, r: 1 },
+    { s: 'fridgeB', c: 22, r: 2 },
+    { s: 'chairUp', c: 17, r: 3 },
+    { s: 'chairUp', c: 19, r: 3 },
+    { s: 'tableTL', c: 17, r: 4 },
+    { s: 'tableTM', c: 18, r: 4 },
+    { s: 'tableTR', c: 19, r: 4 },
     { s: 'stool', c: 17, r: 5 },
     { s: 'stool', c: 19, r: 5 },
-    { s: 'chairL', c: 13, r: 3 },
-    { s: 'chairR', c: 20, r: 3 },
-    { s: 'boardL', c: 15, r: 1 },
-    { s: 'boardM', c: 16, r: 1 },
-    { s: 'boardR', c: 17, r: 1 },
-    { s: 'plantB', c: 22, r: 1 },
-    { s: 'plantA', c: 11, r: 6 },
-    { s: 'rugL', c: 16, r: 6 },
-    { s: 'rugR', c: 17, r: 6 },
+    { s: 'plantB', c: 16, r: 5 },
+    { s: 'plantA', c: 22, r: 5 },
 
-    // --- il salone in alto a destra ---
-    { s: 'picA', c: 26, r: 1 },
-    { s: 'picB', c: 27, r: 1 },
-    { s: 'picC', c: 28, r: 1 },
-    { s: 'plantA', c: 41, r: 1 },
-    { s: 'plantB', c: 25, r: 6 },
-    { s: 'binB', c: 41, r: 6 },
-
-    // --- magazzino / stampanti, a destra in alto ---
-    { s: 'printT', c: 33, r: 13 },
-    { s: 'printB', c: 33, r: 14 },
-    { s: 'rackT', c: 35, r: 13 },
-    { s: 'rackB', c: 35, r: 14 },
-    { s: 'rackT', c: 36, r: 13 },
-    { s: 'rackB', c: 36, r: 14 },
-    { s: 'shelfA', c: 39, r: 13 },
-    { s: 'shelfB', c: 40, r: 13 },
-    { s: 'shelfC', c: 41, r: 13 },
-    { s: 'copier', c: 33, r: 17 },
-    { s: 'copier', c: 35, r: 17 },
-    { s: 'greenA', c: 39, r: 17 },
-    { s: 'greenB', c: 40, r: 17 },
-
-    // --- cucina, a destra in basso ---
-    { s: 'counterL', c: 33, r: 21 },
-    { s: 'counterM', c: 34, r: 21 },
-    { s: 'counterM', c: 35, r: 21 },
-    { s: 'counterR', c: 36, r: 21 },
-    { s: 'sinkT', c: 38, r: 21 },
-    { s: 'fridgeT', c: 41, r: 21 },
-    { s: 'fridgeB', c: 41, r: 22 },
-    { s: 'tableTL', c: 34, r: 24 },
-    { s: 'tableTM', c: 35, r: 24 },
-    { s: 'tableTR', c: 36, r: 24 },
-    { s: 'stool', c: 34, r: 25 },
-    { s: 'stool', c: 36, r: 25 },
-    { s: 'chairUp', c: 35, r: 23 },
-    { s: 'plantA', c: 41, r: 25 },
-
-    // --- il salone in basso: l'angolo dove ci si ferma, e le piante ai capi ---
-    { s: 'sofaL', c: 2, r: 24 },
-    { s: 'sofaM', c: 3, r: 24 },
-    { s: 'sofaR', c: 4, r: 24 },
-    { s: 'rugL', c: 6, r: 24 },
-    { s: 'rugR', c: 7, r: 24 },
-    { s: 'plantA', c: 1, r: 24 },
-    { s: 'plantB', c: 9, r: 24 },
-    { s: 'plantA', c: 29, r: 12 },
-    { s: 'plantB', c: 29, r: 24 },
-    { s: 'plantA', c: 1, r: 11 },
-    { s: 'binB', c: 25, r: 24 },
-    { s: 'shelfA', c: 21, r: 24 },
-    { s: 'shelfB', c: 22, r: 24 },
-    { s: 'shelfC', c: 23, r: 24 },
+    // --- il salone: quello che sta fra una scrivania e l'altra ---
+    { s: 'plantA', c: 1, r: 8 },
+    { s: 'plantB', c: 22, r: 8 },
+    { s: 'copier', c: 20, r: 9 },
+    { s: 'rackT', c: 22, r: 12 },
+    { s: 'rackB', c: 22, r: 13 },
+    { s: 'shelfA', c: 20, r: 18 },
+    { s: 'shelfB', c: 21, r: 18 },
+    { s: 'shelfC', c: 22, r: 18 },
+    { s: 'binB', c: 1, r: 12 },
+    { s: 'plantB', c: 1, r: 18 },
   ];
 
   /**
@@ -294,22 +287,14 @@ window.OFFICE = (() => {
    * Chi ci lavora sta sotto, e sotto ancora c'e' lo sgabello.
    */
   const DESKS = [
-    { c: 2, r: 13 },
-    { c: 7, r: 13 },
-    { c: 12, r: 13 },
-    { c: 17, r: 13 },
-    { c: 22, r: 13 },
-    { c: 27, r: 13 },
-    { c: 2, r: 19 },
-    { c: 7, r: 19 },
-    { c: 12, r: 19 },
-    { c: 17, r: 19 },
-    { c: 22, r: 19 },
-    { c: 27, r: 19 },
-    { c: 26, r: 3 },
-    { c: 31, r: 3 },
-    { c: 36, r: 3 },
-    { c: 4, r: 3 },
+    { c: 2, r: 9 },
+    { c: 7, r: 9 },
+    { c: 12, r: 9 },
+    { c: 17, r: 9 },
+    { c: 2, r: 14 },
+    { c: 7, r: 14 },
+    { c: 12, r: 14 },
+    { c: 17, r: 14 },
   ];
   /** Quanto sta sotto la scrivania chi ci lavora, in mattonelle. */
   const SEAT_DR = 1.1;
@@ -325,6 +310,10 @@ window.OFFICE = (() => {
   let chips;
   let chipS;
   let chipW;
+  let boss;
+  let bossLayers;
+  let bossName;
+  let bossWhat;
   let send = () => {};
   let last = null;
   const people = new Map();
@@ -393,7 +382,25 @@ window.OFFICE = (() => {
     back.append(bico, backText);
     back.onclick = () => send({ cmd: 'view', value: 'chat' });
 
-    bar.append(title, count, el('span', 'of-grow'), chips, back);
+    // Chi comanda il piano. Non e' un'altra card: e' la stessa persona che sta
+    // seduta di la' in mezzo alle altre, disegnata grande abbastanza da vederla
+    // in faccia — cosi' sai con chi stai parlando senza doverla cercare fra
+    // sedici teste da sedici pixel.
+    boss = el('div', 'of-boss');
+    const face = el('span', 'of-face');
+    bossLayers = [
+      folk(0, 0, 'l-body'),
+      folk(0, 0, 'l-shirt'),
+      folk(0, 0, 'l-hair'),
+    ];
+    face.append(...bossLayers);
+    bossName = el('span', 'of-boss-name');
+    bossWhat = el('span', 'of-boss-what');
+    const bossText = el('span', 'of-boss-text');
+    bossText.append(bossName, bossWhat);
+    boss.append(face, bossText);
+
+    bar.append(title, count, el('span', 'of-grow'), boss, chips, back);
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');
@@ -476,7 +483,7 @@ window.OFFICE = (() => {
     // Le schede dell'estensione ufficiale vanno in camice bianco: la stessa
     // distinzione che il pannello fa con l'icona sulla card, detta senza parole.
     // Le nostre si vestono come gli pare.
-    const [sc, sr] = s.own ? pick(SHIRT, h, 2) : [10, 4];
+    const [sc, sr] = s.own ? pick(SHIRT, h, 2) : SHIRT_GUEST;
     const [hc, hr] = pick(HAIR, h, 3);
     who.append(folk(bc, br, 'l-body'), folk(sc, sr, 'l-shirt'), folk(hc, hr, 'l-hair'));
 
@@ -560,14 +567,13 @@ window.OFFICE = (() => {
         seat = seats.indexOf(null);
         if (seat >= 0) seats[seat] = s.id;
       }
-      // Finiti i posti si sta in piedi in corridoio, in fila. E' il corridoio
-      // vero, quello fra le stanze di sopra e il salone: la fila di chi aspetta
-      // una scrivania sta dove starebbe davvero.
-      // ponytail: oltre due file esce dal muro. Quaranta conversazioni aperte
-      // insieme non le ha nessuno; se capita, si va a capo.
+      // Finiti i posti si sta in piedi in fondo al salone, in fila lungo il muro:
+      // e' il posto dove uno aspetta davvero che si liberi una scrivania.
+      // ponytail: oltre una fila si va a capo, e alla seconda si esce dal muro.
+      // Ventidue conversazioni aperte insieme non le ha nessuno.
       const d0 = DESKS[seat];
-      const c = seat >= 0 ? d0.c + 0.5 : 2 + (spare % 20) * 1.4;
-      const r = seat >= 0 ? d0.r + SEAT_DR : 9.3 + Math.floor(spare++ / 20) * 1.4;
+      const c = seat >= 0 ? d0.c + 0.5 : 2 + (spare % 15) * 1.4;
+      const r = seat >= 0 ? d0.r + SEAT_DR : 17.6 + Math.floor(spare++ / 15) * 1.3;
       paintPerson(b, s, c, r);
     }
 
@@ -580,6 +586,32 @@ window.OFFICE = (() => {
       mon.classList.toggle('working', !!s?.busy);
       dk.seat.classList.toggle('taken', !!s);
     });
+
+    // Il ritratto in cima: la conversazione che stai guardando, o — se non ne
+    // stai guardando nessuna — quella che ha lavorato per ultima, che e' quella
+    // a cui torneresti.
+    const head = list.find((s) => s.focused) || list.find((s) => s.busy) || list[0];
+    boss.hidden = !head;
+    if (head) {
+      const h = hash(head.id);
+      const parts = [
+        pick(BODY, h, 1),
+        head.own ? pick(SHIRT, h, 2) : SHIRT_GUEST,
+        pick(HAIR, h, 3),
+      ];
+      bossLayers.forEach((n, i) => {
+        n.style.backgroundPosition = -parts[i][0] * STEP + 'px ' + -parts[i][1] * STEP + 'px';
+      });
+      bossName.textContent = head.name;
+      bossWhat.textContent = head.busy
+        ? t('ctx.busy')
+        : head.done
+          ? t('ctx.done')
+          : head.recent
+            ? t('ctx.recent')
+            : t('ctx.idle');
+      boss.classList.toggle('busy', !!head.busy);
+    }
 
     count.textContent = t('office.count', { n: list.length });
     empty.textContent = t('office.empty');
