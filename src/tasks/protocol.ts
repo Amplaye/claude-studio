@@ -33,6 +33,37 @@ export interface TaskData {
    * c'e' sempre, ed e' la risposta alla sola domanda che si fa guardando quella card.
    */
   doing?: string;
+  /**
+   * Da quando e' in corso quello che sta correndo adesso (epoch ms), e quanto ci si
+   * aspetta che duri.
+   *
+   * Quanto manca a *un* passo non e' una cosa che si sappia: nessuno sa quanto ci
+   * vuole a "sistemare i test" finche' non e' sistemato. Quello che si sa e' quanto
+   * ci hanno messo i passi gia' fatti in questa stessa lista, ed e' su quello che si
+   * fa la stima — come la fa una barra di download, che nemmeno lei conosce il
+   * futuro. Finche' non ne e' finito nemmeno uno vale un'attesa di partenza.
+   *
+   * Le due cose viaggiano crude apposta: e' il pannello a far girare l'orologio, una
+   * volta al secondo e in casa sua, invece di far battere il filo sessanta volte al
+   * minuto per disegnare una barra che si muove da sola.
+   */
+  activeSince?: number;
+  expectedMs?: number;
+  /**
+   * Gli ultimi passi di questo turno, dal piu' vecchio al piu' recente.
+   *
+   * Il piano lo scrive Claude, e "lo scrive" e' una cosa che si spera, non una che si
+   * ottiene: provato dal vivo tre volte con la stessa istruzione, due volte l'ha
+   * scritto e una no. Un pannello che dipende da quella scelta e' un pannello vuoto un
+   * turno su tre, ed e' esattamente il difetto da cui si e' partiti.
+   *
+   * Questa invece c'e' sempre, perche' non chiede niente a nessuno: sono i passi che
+   * il turno ha fatto davvero, gli stessi che scorrono nel discorso. Non e' una
+   * previsione e non finge di esserlo — non ha un totale, quindi non ha una
+   * percentuale — ma risponde a "cos'hai fatto finora e cosa stai facendo", che senza
+   * era una riga sola.
+   */
+  trail?: string[];
 }
 
 /**

@@ -35,11 +35,26 @@ import type { TaskBoard, TaskData, TaskItem } from './protocol';
 
 const EMPTY: TaskData = { items: [], done: 0, total: 0, active: -1, busy: false, doing: '' };
 
+/** Quanti passi del turno si tengono nella scia. Sei righe stanno in una card. */
+const TRAIL = 6;
+
 /** Una task com'e' tenuta qui: quella che va a schermo piu' il numero per ritrovarla. */
 interface Step extends TaskItem {
   /** Il "#3" della CLI. Vuoto finche' la risposta del tool non lo dice. */
   id: string;
+  /** Da quando e' in corso. Serve alla stima, e si mette una volta sola. */
+  startedAt?: number;
+  /** Quanto c'e' voluto, una volta chiuso. E' il solo dato vero su cui stimare. */
+  ms?: number;
 }
+
+/**
+ * Quanto si suppone duri un passo prima che ne sia finito uno vero da cui imparare.
+ * Mezzo minuto e' quello che ci mette un passo di lavoro qualunque — leggere due
+ * file e cambiarne uno — ed e' un numero che si corregge da solo al primo passo
+ * chiuso, quindi conta solo per il primo.
+ */
+const FIRST_GUESS_MS = 30000;
 
 interface List {
   /**
@@ -65,6 +80,8 @@ interface List {
   asked: Set<string>;
   /** L'ultimo passo annunciato: "Read package.json". Vuoto = fermo. */
   doing: string;
+  /** Gli ultimi passi del turno, dal piu' vecchio. Vedi `trail` in protocol.ts. */
+  trail: string[];
   /**
    * Il numero piu' alto visto in questa conversazione. La CLI numera da 1 e non
    * riusa mai un numero, nemmeno dopo una cancellazione: contarlo qui e' l'unico
@@ -83,6 +100,7 @@ const blank = (): List => ({
   waiting: new Map(),
   asked: new Set(),
   doing: '',
+  trail: [],
   next: 0,
   busy: false,
   data: EMPTY,
@@ -123,6 +141,25 @@ function cliStatus(s?: string): TaskItem['status'] | undefined {
   }
 }
 
+/**
+ * Quanto ci si aspetta che duri il passo in corso: la **mediana** di quelli gia'
+ * chiusi in questa stessa lista.
+ *
+ * La mediana e non la media, perche' in un elenco di passi ce n'e' quasi sempre uno
+ * che e' durato dieci volte gli altri — un `npm install`, una suite intera — e con la
+ * media quell'unico passo sposterebbe la stima di tutti quelli dopo. La mediana lo
+ * ignora, che e' esattamente quello che vuoi da lui.
+ */
+function expected(steps: Step[]): number {
+  const seen = steps
+    .map((s) => s.ms)
+    .filter((m): m is number => typeof m === 'number' && m > 0)
+    .sort((a, b) => a - b);
+  if (!seen.length) return FIRST_GUESS_MS;
+  const mid = seen.length >> 1;
+  return seen.length % 2 ? seen[mid] : Math.round((seen[mid - 1] + seen[mid]) / 2);
+}
+
 function statusOf(word: string): TaskItem['status'] {
   const w = word.toLowerCase();
   if (w === 'completed' || w === 'done') return 'completed';
@@ -153,14 +190,33 @@ export class TaskStore {
 
   // ---- TodoWrite: la lista arriva intera ----------------------------------
 
-  /** A fresh list from TodoWrite. */
+  /**
+   * La lista intera, riscritta: dal `plan` che l'estensione mette a disposizione
+   * (engine/ide.ts) o dal vecchio TodoWrite di una CLI di prima.
+   *
+   * Gli orologi si portano dietro dal testo del passo. Senza, ogni chiamata — e ne
+   * arriva una a ogni passo che parte o finisce — rifarebbe le righe da zero, e il
+   * passo in corso ripartirebbe da "appena cominciato" ogni volta che quello prima
+   * viene spuntato: una barra che torna a zero mentre avanzi.
+   */
   set(key: string, items: TaskItem[]) {
     const l = this.of(key);
+    const before = new Map(l.steps.map((s) => [s.content, s]));
     l.source = 'todo';
     l.waiting.clear();
     l.steps = (Array.isArray(items) ? items : [])
       .filter((i) => i && typeof i.content === 'string')
-      .map((i) => ({ id: '', content: i.content, activeForm: i.activeForm, status: i.status }));
+      .map((i) => {
+        const was = before.get(i.content);
+        return {
+          id: '',
+          content: i.content,
+          activeForm: i.activeForm,
+          status: i.status,
+          startedAt: was?.startedAt,
+          ms: was?.ms,
+        };
+      });
     this.settle(key, l);
   }
 
@@ -263,6 +319,10 @@ export class TaskStore {
       content: subject.trim(),
       activeForm: before.get(id)?.activeForm,
       status: statusOf(state),
+      // Gli orologi sopravvivono al rimettere in riga, come l'activeForm: e' la
+      // stessa task, la stiamo solo ricopiando da una fonte piu' affidabile.
+      startedAt: before.get(id)?.startedAt,
+      ms: before.get(id)?.ms,
     }));
     for (const [, id] of rows) l.next = Math.max(l.next, Number(id));
     this.settle(key, l);
@@ -349,10 +409,17 @@ export class TaskStore {
    */
   newTurn(key: string) {
     const l = this.lists.get(key);
+    if (!l) return;
+    // La scia e' dei passi di *questo* turno: al messaggio dopo riparte, sempre,
+    // qualunque sia la sorgente della lista.
+    l.trail = [];
     // Le liste dei due sistemi a task (quello vecchio e quello della CLI di oggi) se
     // le tiene il motore per tutta la sessione, e quello che hai chiesto due messaggi
     // fa e non e' ancora finito deve continuare a vedersi. Solo TodoWrite se ne va.
-    if (!l || l.source !== 'todo') return;
+    if (l.source !== 'todo') {
+      this.settle(key, l);
+      return;
+    }
     this.clear(key);
   }
 
@@ -377,6 +444,12 @@ export class TaskStore {
     const v = String(text || '').slice(0, 90);
     if (l.doing === v) return;
     l.doing = v;
+    // La scia. Un passo che comincia si aggiunge in fondo; la riga vuota di fine
+    // turno no — quella dice "fermo", non e' un passo, e cancellerebbe l'ultimo.
+    if (v && l.trail[l.trail.length - 1] !== v) {
+      l.trail.push(v);
+      if (l.trail.length > TRAIL) l.trail.splice(0, l.trail.length - TRAIL);
+    }
     this.settle(key, l);
   }
 
@@ -406,11 +479,26 @@ export class TaskStore {
 
   /** Rifa' i conti di una lista che e' cambiata e la manda a schermo. */
   private settle(key: string, l: List) {
+    // L'orologio di ogni passo, tenuto qui e non altrove perche' e' l'unico punto da
+    // cui passa ogni cambiamento di stato, da qualunque delle tre sorgenti arrivi.
+    // Non serve sapere com'era prima: "in corso e non ha ancora un inizio" e "non e'
+    // piu' in corso e non ha ancora una durata" sono le due sole domande, e si
+    // rispondono da sole.
+    const now = Date.now();
+    for (const s of l.steps) {
+      if (s.status === 'in_progress') {
+        if (!s.startedAt) s.startedAt = now;
+      } else if (s.startedAt && !s.ms) {
+        s.ms = Math.max(1, now - s.startedAt);
+      }
+    }
+
     const items: TaskItem[] = l.steps.map((s) => ({
       content: s.content,
       activeForm: s.activeForm,
       status: s.status,
     }));
+    const active = l.steps.findIndex((s) => s.status === 'in_progress');
     l.data = {
       items,
       // Una task andata storta e' chiusa quanto una finita bene: nella barra conta
@@ -418,9 +506,15 @@ export class TaskStore {
       // un avanzamento che non arrivera'.
       done: items.filter((i) => i.status === 'completed' || i.status === 'failed').length,
       total: items.length,
-      active: items.findIndex((i) => i.status === 'in_progress'),
+      active,
       busy: l.busy,
       doing: l.busy ? l.doing : '',
+      // La scia serve solo quando un elenco non c'e': con un piano a schermo sarebbe
+      // la stessa storia raccontata due volte, una in avanti e una all'indietro.
+      ...(items.length ? {} : { trail: l.trail.slice() }),
+      ...(active >= 0 && l.steps[active].startedAt
+        ? { activeSince: l.steps[active].startedAt, expectedMs: expected(l.steps) }
+        : {}),
     };
     this.lists.set(key, l);
     this.emit();
@@ -440,7 +534,9 @@ export class TaskStore {
     for (const s of owned.all()) {
       if (!s.id) continue; // conversazione appena nata: nessun indirizzo ancora
       const l = this.lists.get(s.key);
-      if (l && (l.data.total > 0 || l.busy)) out[s.id] = l.data;
+      // Anche una conversazione ferma con una scia alle spalle: quello che il turno
+      // appena finito ha fatto resta leggibile finche' non ne comincia un altro.
+      if (l && (l.data.total > 0 || l.busy || l.trail.length > 0)) out[s.id] = l.data;
     }
     return out;
   }

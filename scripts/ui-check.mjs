@@ -1342,6 +1342,9 @@ for (const surface of ['view', 'panel']) {
     };
     return {
       ink: getComputedStyle(document.body).getPropertyValue('--ink').trim(),
+      // L'argilla quando fa da testo. E' un token solo, quindi si controlla il token e
+      // non i venti posti che lo useranno: il pesca su carta bianca sta a due a uno.
+      accent: ratio(over(rgba(getComputedStyle(document.body).getPropertyValue('--accent')), paper), paper),
       // text has to be readable…
       userText: at('.msg.user .utext', 'color'),
       mode: at('.modeseg-btn', 'color'),
@@ -1354,6 +1357,7 @@ for (const surface of ['view', 'panel']) {
     };
   });
   t(light.ink !== '#fff', 'the light theme did not turn the ink over: --ink is ' + light.ink);
+  t(light.accent > 4.5, 'the clay accent is a smear on a light theme: ' + light.accent);
   t(light.userText > 4.5, 'your own message is unreadable on a light theme: ' + light.userText);
   t(light.mode > 4.5, 'the mode switch is unreadable on a light theme: ' + light.mode);
   t(light.mapName > 4.5, 'the map bands are unreadable on a light theme: ' + light.mapName);

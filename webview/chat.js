@@ -71,12 +71,31 @@
     AskUserQuestion: 'options',
     ToolSearch: 'search',
     Workflow: 'git-branch',
+    'mcp__editor__plan': 'list',
   };
+
+  /** Il piano che Claude si scrive: e' il nostro (vedi src/engine/ide.ts). */
+  const PLAN_TOOL = 'mcp__editor__plan';
+
+  /**
+   * Come si chiama uno strumento, a leggerlo.
+   *
+   * Gli strumenti del ponte con l'editor si annunciano col loro nome MCP intero —
+   * `mcp__editor__open_files` — che in mezzo a `Read` e `Bash` sembra un errore di
+   * stampa. Il server e' uno solo, quindi il prefisso non distingue niente: se ne va,
+   * e restano due parole che si leggono.
+   */
+  function toolName(name) {
+    const m = /^mcp__[a-z0-9_-]+__(.+)$/i.exec(name || '');
+    if (!m) return name;
+    const words = m[1].replace(/_/g, ' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
 
   /** Tools that show a diff: the "before" comes from the tool's data, not from disk. */
   const DIFF_TOOLS = { Write: 1, Edit: 1, NotebookEdit: 1 };
   /** Tools that already speak for themselves: on success there's nothing to add. */
-  const QUIET = { Write: 1, Edit: 1, NotebookEdit: 1, TodoWrite: 1 };
+  const QUIET = { Write: 1, Edit: 1, NotebookEdit: 1, TodoWrite: 1, [PLAN_TOOL]: 1 };
 
   /**
    * Tools that leave nothing behind them.
@@ -112,7 +131,8 @@
   };
   /** Anche il ponte con l'editor: leggere gli errori o sapere quali file sono aperti
       non cambia niente sul disco. */
-  const slimTool = (name) => !!SLIM[name] || /^mcp__editor__(open_files|editor_errors)$/.test(name);
+  const slimTool = (name) =>
+    !!SLIM[name] || /^mcp__editor__(open_files|editor_errors|plan)$/.test(name);
 
   let cwd = '';
   /** Absolute paths fill the line without saying anything: keep the useful part. */
@@ -128,8 +148,8 @@
   function toolArg(inp, name) {
     if (!inp || typeof inp !== 'object') return '';
     // The whole todo list shows up below: up top the JSON would just be noise.
-    if (name === 'TodoWrite') {
-      const n = (inp.todos || []).length;
+    if (name === 'TodoWrite' || name === PLAN_TOOL) {
+      const n = (inp.todos || inp.steps || []).length;
       return n === 1 ? t('msg.item') : t('msg.items', { n });
     }
     for (const k of ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'description', 'prompt']) {
@@ -1053,7 +1073,7 @@
 
   function todoBody(inp) {
     const list = el('div', 'todos');
-    for (const t of inp.todos || []) {
+    for (const t of inp.todos || inp.steps || []) {
       const row = el('div', 'todo ' + (t.status || 'pending'));
       const text = t.status === 'in_progress' ? t.activeForm || t.content : t.content;
       row.append(icon(TODO_ICON[t.status] || 'time'), el('span', null, String(text || '')));
@@ -1085,7 +1105,7 @@
         vscode.postMessage({ cmd: 'openFile', path: file });
       });
     }
-    head.append(ic, el('span', 'name', name), arg, icon('chevron-down', 'chev'));
+    head.append(ic, el('span', 'name', toolName(name)), arg, icon('chevron-down', 'chev'));
     sum.append(head, el('div', 'tool-bar'));
 
     // Nothing opens by itself. A diff that unfolds on its own pushes the message
@@ -1096,7 +1116,7 @@
     const diff = DIFF_TOOLS[name] ? diffBody(name, i) : null;
     if (diff) {
       body.append(diff);
-    } else if (name === 'TodoWrite') {
+    } else if (name === 'TodoWrite' || name === PLAN_TOOL) {
       body.append(todoBody(i));
     } else if (name === 'Task' || name === 'Agent') {
       if (i.prompt) body.append(el('div', 'prompt', String(i.prompt).slice(0, 600)));
@@ -2054,7 +2074,7 @@
         }
         // The name of the tool and nothing else: what it's running is already
         // written in full in the card that just opened in the thread.
-        activity('act.tool', { tool: m.name });
+        activity('act.tool', { tool: toolName(m.name) });
         break;
       case 'tool_end':
         toolEnd(m.id, m.ok, m.text);

@@ -9,6 +9,15 @@
   --claude-1: #d97757; /* clay  */
   --claude-2: #e9a97f; /* peach */
   --run: #6aa9d8; /* a command ran */
+  /**
+   * L'argilla quando fa da *testo* e non da fondo.
+   *
+   * Su nero il pesca legge benissimo; su carta bianca sta a due a uno, cioe' non
+   * legge affatto. Una tinta e' una cosa quando ci scrivi sopra e un'altra quando ci
+   * scrivi dentro, e questo token e' la seconda: si scurisce sui temi chiari senza
+   * toccare i fondi, i bordi e i gradienti, che sul chiaro vanno benissimo come sono.
+   */
+  --accent: var(--claude-1);
 
   /* The ink.
      The palette above was written for a dark surface, where "full contrast" means
@@ -66,6 +75,7 @@ body.vscode-high-contrast-light {
   --warn: #9a6700;
   --bad: #cf222e;
   --run: #2f6f9f;
+  --accent: #9a3f22;
 }
 
 * {

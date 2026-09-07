@@ -35,11 +35,14 @@ ticks. No more staring at a still screen wondering if it's crashed.
 coloured diff you open when you want to. Nothing unfolds by itself and pushes
 your reading off the screen.
 
-**A task list in the sidebar, ticking itself off.** When Claude plans a job it
-writes down the steps — the **Tasks** panel shows them live: which one it's on
-right now, how many are done, how many are left. It starts fresh at every
-prompt, so what you're looking at is always this question's work and never the
-last one's.
+**The whole list of steps, ticking itself off.** Before a job of any size Claude
+writes the plan down and it appears beside the conversation: every step, which one
+it's on right now, how many are done, how many are left — and, on the one that's
+running, roughly how far along it is. That last number is an estimate and says so:
+it's how long this step is taking against how long the ones already finished took,
+the way a download bar works. When Claude hasn't written a plan, the panel lists the
+steps it has actually taken instead, with the current one beating — so it is never
+just one line.
 
 **It asks before it touches anything.** *Allow* · *Always allow* · *Deny*. When
 it asks you to choose between options, there's always a line to write your own

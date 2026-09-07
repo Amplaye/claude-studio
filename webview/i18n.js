@@ -158,6 +158,9 @@
     'tasks.working': 'working',
     'tasks.paused': 'paused',
     'tasks.finished': 'finished',
+    'tasks.about': '~{n}%',
+    'tasks.aboutHint':
+      'An estimate, not a measurement: how long this step has been running against how long the steps already finished here took. It stops at 95% and waits.',
 
     // ---- the conversation ----
     'msg.reasoning': 'Reasoning',
@@ -411,6 +414,9 @@
     'tasks.working': 'in corso',
     'tasks.paused': 'in pausa',
     'tasks.finished': 'finito',
+    'tasks.about': '~{n}%',
+    'tasks.aboutHint':
+      'E’ una stima, non una misura: da quanto va questo passo rispetto a quanto ci hanno messo quelli gia’ finiti qui. Si ferma al 95% e aspetta.',
 
     'msg.reasoning': 'Ragionamento',
     'msg.thinking': 'Claude sta pensando…',

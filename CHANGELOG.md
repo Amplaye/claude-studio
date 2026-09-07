@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.19.0
+
+- **La lista dei passi, e non piu' solo quello in corso.** La CLI non ha piu' uno
+  strumento per scrivere una lista di cose da fare — TodoWrite non esiste, e quelle
+  che oggi chiama task sono i sub-agent, che un turno normale non apre mai. Il
+  pannello quindi aveva da disegnare una riga sola: *"Edit chat.css"*. Dice cosa sta
+  succedendo adesso e nient'altro; quanti passi ci sono e a che punto siamo non
+  aveva risposta da nessuna parte. Lo strumento mancante adesso ce lo mette
+  l'estensione: ospita gia' un server MCP suo — quello del diff nativo e degli errori
+  dell'editor — e ci ha aggiunto `plan`. Claude ci scrive il piano intero prima di
+  cominciare e lo riscrive a ogni passo che parte o finisce, e la lista compare nella
+  card della sua conversazione, con la spunta che si muove in tempo reale.
+
+- **Quanto manca a *questo* passo.** "2 di 5 fatte" dice quanto manca alla lista, non
+  al passo che sta correndo, e quella e' la domanda che ci si fa. Non e' una cosa che
+  si sappia — nessuno sa quanto ci vuole a "sistemare i test" finche' non e'
+  sistemato — quindi non e' una misura e non si presenta come tale: la tilde davanti
+  al numero e' la differenza fra una misura e un'ipotesi. La stima e' il tempo che
+  questo passo sta impiegando rispetto alla **mediana** di quelli gia' finiti nella
+  stessa lista; la mediana e non la media, perche' in ogni elenco c'e' un `npm
+  install` che e' durato dieci volte gli altri e con la media sposterebbe la stima di
+  tutti. Si ferma al 95% e aspetta: un passo che segna 100% ed e' ancora li' ha detto
+  una bugia, uno fermo al 95% ha detto "ci sta mettendo piu' degli altri", che e'
+  vero. L'estensione manda due numeri crudi e l'orologio gira nella pagina, cosi' la
+  barra cammina da sola senza far battere il filo una volta al secondo.
+
+- **E quando il piano non c'e', i passi che ha fatto davvero.** Questa e' la parte
+  onesta: il piano lo scrive Claude, e "lo scrive" e' una cosa che si spera. Provato
+  dal vivo tre volte con la stessa istruzione — due volte l'ha scritto, una no. Un
+  pannello che dipende da quella scelta e' vuoto un turno su tre, cioe' il difetto da
+  cui si e' partiti. Adesso, senza piano, la card elenca gli ultimi sei passi del
+  turno con l'ultimo che pulsa: `Read store.ts` · `Grep activeForm` · **`Edit
+  chat.css`**. Non e' una previsione e non si atteggia a tale — niente totale, niente
+  percentuale — ma non chiede niente a nessuno, quindi c'e' sempre.
+
+- **Gli strumenti del ponte con l'editor hanno un nome che si legge.** Si annunciavano
+  come `mcp__editor__open_files` in mezzo a `Read` e `Bash`, che sembra un errore di
+  stampa. Il server e' uno solo, quindi il prefisso non distingueva niente.
+
+- **L'argilla quando fa da testo.** Su fondo nero il pesca legge benissimo; su carta
+  bianca sta a due a uno, cioe' non legge affatto. Adesso e' un token suo (`--accent`)
+  che si scurisce sui temi chiari senza toccare fondi, bordi e gradienti, e il
+  controllo di contrasto verifica il token invece dei venti posti che lo useranno.
+
 ## 0.18.0
 
 - **La coda dei messaggi era tre cose che nessuno puo' indovinare.** Un riquadro

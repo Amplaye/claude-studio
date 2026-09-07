@@ -51,9 +51,11 @@
     barWrap.append(fill);
 
     const list = el('div', 'tk-list');
+    /** I passi gia' fatti, quando un piano non c'e'. Vedi `trail` in tasks/protocol.ts. */
+    const trailBox = el('div', 'tk-trail');
     const empty = el('p', 'tk-empty');
 
-    root.append(head, barWrap, list, empty);
+    root.append(head, barWrap, list, trailBox, empty);
 
     /** The rows currently on screen, so a repaint can reuse them. */
     let rows = [];
@@ -65,15 +67,30 @@
       const total = items.length;
       const done = (d && d.done) || 0;
 
-      // Nothing to show: one line, and the rest of the panel gets out of the way.
-      // Al lavoro: si dice il passo che sta facendo adesso, non una frase fissa. Le
-      // task esistono solo quando apre un sub-agent, e un turno normale non ne apre
-      // nessuno — la card restava con "sto capendo cosa fare" addosso per l'intera
-      // sessione, che dopo il primo minuto non e' piu' un'informazione.
+      // Senza un piano, i passi che il turno ha fatto davvero.
+      //
+      // Il piano lo scrive Claude, e "lo scrive" e' una cosa che si spera: provato dal
+      // vivo tre volte con la stessa istruzione, due l'ha scritto e una no. Un pannello
+      // che dipende da quella scelta e' vuoto un turno su tre — il difetto da cui si e'
+      // partiti. Questa invece non chiede niente a nessuno: sono i passi gia' fatti,
+      // l'ultimo dei quali sta succedendo adesso. Non e' una previsione e non si
+      // atteggia a tale: non ha totale, quindi non ha percentuale.
+      const trail = (!total && d && d.trail) || [];
       const doing = (d && d.busy && d.doing) || '';
+      trailBox.replaceChildren();
+      if (trail.length) {
+        trail.forEach((step, i) => {
+          const last = i === trail.length - 1;
+          const row = el('div', 'tk-step' + (last && d.busy ? ' live' : ''));
+          row.append(el('span', 'tk-step-dot'), el('span', 'tk-step-txt', step));
+          trailBox.append(row);
+        });
+      }
+      trailBox.hidden = !trail.length;
+      // La riga sola resta per il momento in cui non c'e' ancora nemmeno un passo.
       empty.textContent = doing || (d && d.busy ? t('tasks.thinking') : t('tasks.none'));
       empty.classList.toggle('live', !!doing);
-      empty.hidden = total > 0;
+      empty.hidden = total > 0 || trail.length > 0;
       head.hidden = barWrap.hidden = total === 0;
 
       if (total) {
@@ -98,8 +115,15 @@
         // as long as they are — see .tk-txt in tasks.css.
         const txt = el('span', 'tk-txt');
         label.append(txt);
-        row.append(ic, label);
-        rows.push({ row, ic, label: txt, status: null, fresh: true });
+        // How far along this one step is. Only ever drawn on the step that is
+        // running, and only as an estimate — see estimate() below for what it is
+        // actually made of, and why it is honest to show it at all.
+        const pct = el('span', 'tk-pct');
+        const wrap = el('div', 'tk-rowbar');
+        const bar = el('i', 'tk-rowfill');
+        wrap.append(bar);
+        row.append(ic, label, pct, wrap);
+        rows.push({ row, ic, label: txt, pct, bar, status: null, fresh: true });
         list.append(row);
       }
       while (rows.length > total) list.removeChild(rows.pop().row);
@@ -139,6 +163,47 @@
         rows[active].row.scrollIntoView({ block: 'nearest' });
       }
       lastActive = active;
+      tick();
+    }
+
+    /**
+     * How far along the step that is running is.
+     *
+     * Nobody knows how long "fix the failing tests" takes until it is fixed, so this
+     * is not a measurement and it is not drawn as one: it is elapsed time against how
+     * long the steps *already finished in this same list* took, which is the same
+     * thing a download bar does — it does not know the future either, it knows the
+     * speed so far. The extension sends the two raw numbers and the clock runs here,
+     * once a second, instead of the wire beating sixty times a minute to animate a
+     * bar that can animate itself.
+     *
+     * It stops at 95 and waits. A step that says 100% and is still running has told
+     * you something false; one that sits at 95 has told you "longer than the others
+     * are taking", which is true and is the thing worth knowing.
+     */
+    function estimate(d) {
+      if (!d || !d.busy || !d.activeSince || !d.expectedMs) return -1;
+      return Math.min(0.95, (Date.now() - d.activeSince) / d.expectedMs);
+    }
+
+    let ticker = 0;
+    function tick() {
+      const d = lastData;
+      const active = d && typeof d.active === 'number' ? d.active : -1;
+      const p = estimate(d);
+      for (let i = 0; i < rows.length; i++) {
+        const on = i === active && p >= 0;
+        rows[i].row.classList.toggle('running', on);
+        if (!on) continue;
+        rows[i].bar.style.width = Math.round(p * 100) + '%';
+        rows[i].pct.textContent = t('tasks.about', { n: String(Math.round(p * 100)) });
+        rows[i].pct.title = t('tasks.aboutHint');
+      }
+      clearInterval(ticker);
+      ticker = 0;
+      // Un orologio che gira su un pannello dove non c'e' niente che si muove e' solo
+      // una ventola accesa: parte se e solo se c'e' una riga in corso da far avanzare.
+      if (p >= 0) ticker = setInterval(tick, 1000);
     }
 
     // Redrawn on a language switch: the counts and the labels are ours, not the HTML's.

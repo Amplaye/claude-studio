@@ -87,6 +87,42 @@ const THINK_BUDGET = 31999;
  * "scrivimi il piano" tornerebbero in cinque punti, cioe' questa regola romperebbe
  * proprio le risposte che devono essere lunghe.
  */
+/**
+ * Il piano, mentre lo esegui.
+ *
+ * Il pannello dei passi ha qualcosa da disegnare solo quando si apre un sub-agent, e
+ * un turno normale non ne apre nessuno: restava la riga di cosa sta facendo *adesso*,
+ * che risponde alla meta' piccola della domanda. Quella grande — "quante cose ci sono
+ * da fare e a che punto siamo" — non aveva nessuna risposta da quando la CLI ha
+ * smesso di avere TodoWrite.
+ *
+ * Lo strumento che manca ce lo mette l'estensione (vedi engine/ide.ts). Questa e' la
+ * riga che glielo fa usare, e la soglia conta quanto lo strumento: senza, una domanda
+ * da una riga si porterebbe dietro una lista di un passo solo, che e' rumore con una
+ * barra di avanzamento sopra.
+ */
+const PLANNING = [
+  '## The plan on screen',
+  '',
+  'The person you are working for is watching a panel beside the chat, and for most',
+  'of a long turn that panel is the only thing they can see. `mcp__editor__plan` is',
+  'what fills it: the steps, which one you are on, how many are left.',
+  '',
+  'The rule, and it is a rule and not a suggestion: **if the job will take more than',
+  'two tool calls, call `mcp__editor__plan` before the first one.** Send the whole',
+  'checklist; each call replaces the last. Call it again every time a step starts and',
+  'every time one finishes, keeping exactly one step `in_progress`.',
+  '',
+  'Reading three files to answer a question is more than two tool calls. So is an',
+  'edit followed by a test run. Do not weigh up whether the job is "simple enough" to',
+  'skip it — count the calls.',
+  '',
+  'Steps are short and concrete, one line each: what changes, not how you will do it.',
+  '',
+  'Two things skip it, and only these two: something you can answer without touching',
+  'anything, and a job that really is one edit or one command.',
+].join('\n');
+
 const CLOSING = [
   '## Closing a turn',
   '',
@@ -412,7 +448,11 @@ export class Session {
       // Il preset e' la strada documentata per dire "voglio Claude Code": si paga
       // pieno una volta per sessione — sta in testa alla richiesta, dentro la cache
       // del prompt — e da li' in poi si rilegge, che costa una frazione.
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: CLOSING },
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: `${PLANNING}\n\n${CLOSING}`,
+      },
       // Vuoto vuol dire "non dire niente": la CLI usa quello che useresti da
       // terminale. Si passa solo cio' che hai scelto apposta.
       ...(this.o.model ? { model: this.o.model } : {}),

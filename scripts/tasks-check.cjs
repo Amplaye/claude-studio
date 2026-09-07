@@ -51,6 +51,19 @@ if (!LIVE) {
   });
 }
 
+/** Gli strumenti che non cambiano niente: nel test dal vivo passano, gli altri no. */
+const READONLY = new Set([
+  'Read',
+  'Glob',
+  'Grep',
+  'LS',
+  'NotebookRead',
+  'Task',
+  'mcp__editor__plan',
+  'mcp__editor__open_files',
+  'mcp__editor__editor_errors',
+]);
+
 const fails = [];
 const t = (cond, msg) => !cond && fails.push(msg);
 
@@ -59,6 +72,7 @@ const ID_TASK = 'aaaaaaaa-2222-4222-8333-444444444444';
 const ID_TODO = 'bbbbbbbb-2222-4222-8333-444444444444';
 const ID_EARLY = 'dddddddd-2222-4222-8333-444444444444';
 const ID_LIST = 'eeeeeeee-2222-4222-8333-444444444444';
+const ID_PLAN = 'ffffffff-2222-4222-8333-444444444444';
 
 const projects = path.join(home, '.claude', 'projects', work.replace(/[^a-zA-Z0-9]/g, '-'));
 if (!LIVE) fs.mkdirSync(projects, { recursive: true });
@@ -191,6 +205,32 @@ writeTranscript(ID_LIST, [
   },
 ]);
 
+// Il piano che l'estensione si e' data da sola.
+//
+// La CLI di oggi non ha piu' uno strumento per scrivere una lista di passi: le sue
+// task sono i sub-agent, e un turno normale non ne apre nessuno, quindi il pannello
+// restava con la riga di "cosa sta facendo adesso" e niente altro. Lo strumento
+// mancante lo mette l'estensione nel suo server MCP (engine/ide.ts), e la lista si
+// legge dalla chiamata mentre passa — non dalla risposta del gestore, che riaprendo
+// una conversazione non gira affatto. E' esattamente quello che questo transcript
+// prova: qui dentro c'e' solo la chiamata registrata, nessun gestore da nessuna parte.
+writeTranscript(ID_PLAN, [
+  { type: 'user', content: 'porta i pagamenti su interi' },
+  {
+    type: 'assistant',
+    content: [
+      call('p1', 'mcp__editor__plan', {
+        steps: [
+          { content: 'Leggere il modulo', activeForm: 'Leggendo il modulo', status: 'completed' },
+          { content: 'Portare i totali su interi', activeForm: 'Portando i totali su interi', status: 'in_progress' },
+          { content: 'Sistemare i test', status: 'pending' },
+        ],
+      }),
+    ],
+  },
+  { type: 'user', content: [answer('p1', 'Plan on screen: 1/3 done.')] },
+]);
+
 // The old tool, still spoken by older CLIs: one call, the whole list.
 writeTranscript(ID_TODO, [
   { type: 'user', content: 'the old way' },
@@ -279,9 +319,19 @@ async function live(tab, side) {
   tab.webview.got.length = 0;
   const orig = tab.webview.postMessage;
   tab.webview.postMessage = async (m) => {
-    // Every permission gets a no: this check is about the list, not about letting a
-    // test edit the repo it is being run in.
-    if (m?.k === 'ask') setTimeout(() => tab.webview._onMsg({ cmd: 'answer', id: m.id, choice: 'deny' }), 0);
+    // Guardare si', toccare no. Prima era un no a tutto, ed e' il no giusto per quello
+    // che questo test faceva; ma un lavoro da tre passi, che e' quello che serve per
+    // vedere se il piano compare da solo, con un no a ogni lettura non arriva al
+    // secondo passo — e allora non si starebbe misurando il piano, si starebbe
+    // misurando il rifiuto. Gli strumenti che non cambiano niente passano; tutto il
+    // resto no, che questo test gira nel repo vero.
+    if (m?.k === 'ask') {
+      const harmless = READONLY.has(m.tool);
+      setTimeout(
+        () => tab.webview._onMsg({ cmd: 'answer', id: m.id, choice: harmless ? 'allow' : 'deny' }),
+        0
+      );
+    }
     if (m?.k === 'turn_end') ended++;
     return orig(m);
   };
@@ -381,6 +431,64 @@ async function live(tab, side) {
     'the card only ever showed the sub-agents of the earlier turns: ' + steps.join(' | ')
   );
   void mark3;
+
+  // ---- il piano, senza che glielo si chieda ----
+  //
+  // La meta' della faccenda che un transcript non puo' provare. Lo strumento che
+  // scrive il piano c'e' (lo mette l'estensione, engine/ide.ts) e la strada dal
+  // tool al pannello e' gia' verificata piu' su — ma tutto questo vale zero se il
+  // modello non lo chiama da solo. Quindi qui non si nomina: si chiede un lavoro da
+  // tre passi e si guarda se il piano compare.
+  // Conversazione nuova, e non e' un dettaglio: i tre sub-agent dei turni prima
+  // avevano lasciato in piedi una lista da tre voci, e un controllo su "ci sono almeno
+  // tre passi" la trovava e passava senza che nessun piano fosse mai stato scritto.
+  // Su una lista vuota tutto quello che compare e' il piano, e non c'e' niente da
+  // distinguere.
+  tab.webview._onMsg({ cmd: 'newSession' });
+  await settle(400);
+  const mark4 = seen().length;
+  const ok4 = await turn(
+    'Guarda src/tasks/store.ts, src/tasks/protocol.ts e webview/taskspanel.js e dimmi ' +
+      'in una riga per file cosa fa ognuno. Non modificare niente.'
+  );
+  const planned = seen().slice(mark4).filter(Boolean);
+  const biggest = planned.reduce((a, b) => ((b?.total ?? 0) > (a?.total ?? 0) ? b : a), null);
+  console.log('  turn 4, il piano: ' + line(biggest));
+  t(ok4, 'the fourth turn never finished');
+  t(
+    (biggest?.total ?? 0) >= 3,
+    'Claude non ha scritto nessun piano per un lavoro da tre passi: ' + line(biggest)
+  );
+  // Uno alla volta, e si vede quale: e' la meta' della richiesta che la lista da sola
+  // non soddisfa.
+  t(
+    planned.some((f) => (f?.items ?? []).some((i) => i.status === 'in_progress')),
+    'il piano e’ arrivato ma non ha mai detto a quale passo era'
+  );
+  t(
+    planned.some((f) => typeof f?.activeSince === 'number' && typeof f?.expectedMs === 'number'),
+    'il passo in corso non ha mai portato i numeri con cui si stima quanto manca'
+  );
+
+  // La stessa cosa, chiesta a voce. Non e' un controllo — che il modello faccia una
+  // cosa quando gliela ordini non dimostra niente sul comportamento vero — e' la
+  // diagnosi del controllo qui sopra: se questo passa e quello no, lo strumento
+  // funziona e a essere debole e' l'istruzione nel prompt di sistema; se non passa
+  // nemmeno questo, lo strumento non arriva proprio al modello.
+  if (!planned.some((f) => (f?.total ?? 0) >= 3)) {
+    const mark5 = seen().length;
+    await turn(
+      'Chiama mcp__editor__plan con tre passi (uno in_progress, due pending) e poi fermati.'
+    );
+    const forced = seen().slice(mark5).filter(Boolean);
+    const got = forced.reduce((a, b) => ((b?.total ?? 0) > (a?.total ?? 0) ? b : a), null);
+    console.log(
+      '  diagnosi — chiamato a voce: ' +
+        (got?.total
+          ? line(got) + '  → lo strumento funziona, e’ l’istruzione a non bastare'
+          : '(niente) → lo strumento non arriva al modello')
+    );
+  }
   clearInterval(watch);
 }
 
@@ -440,6 +548,29 @@ async function live(tab, side) {
   t(
     old && old.total === 2 && old.done === 1 && old.active === 1,
     'the counts of a TodoWrite list are wrong: ' + JSON.stringify(old && { ...old, items: undefined })
+  );
+
+  // ---- il piano che l'estensione si e' data da sola ----
+  tab.webview._onMsg({ cmd: 'open', id: ID_PLAN });
+  await settle();
+  const plan = board(tab)[ID_PLAN];
+  t(
+    line(plan) === 'c:Leggere il modulo | i:Portare i totali su interi | p:Sistemare i test',
+    'il piano scritto con lo strumento nostro non arriva al pannello: ' + line(plan)
+  );
+  t(
+    plan && plan.total === 3 && plan.done === 1 && plan.active === 1,
+    'i conti del piano non tornano: ' + JSON.stringify(plan && { ...plan, items: undefined })
+  );
+  // La stima. Non e' una misura e non pretende di esserlo, ma i due numeri su cui si
+  // fa devono esserci: senza, la riga in corso non ha niente da far camminare.
+  t(
+    plan && typeof plan.activeSince === 'number' && plan.activeSince > 0,
+    'il passo in corso non dice da quando lo e’: ' + (plan && plan.activeSince)
+  );
+  t(
+    plan && typeof plan.expectedMs === 'number' && plan.expectedMs > 0,
+    'non c’e’ nessuna attesa su cui stimare: ' + (plan && plan.expectedMs)
   );
 
   // ---- started before it had a number ----

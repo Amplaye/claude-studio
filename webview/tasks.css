@@ -50,8 +50,10 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
+/* Argilla-testo, non pesca: il pesca su carta bianca non e' una parola, e' una
+   macchia. Vedi --accent in tokens.css. */
 .tk-state.live {
-  color: var(--claude-2);
+  color: var(--accent);
 }
 .tk-state.ok {
   color: var(--ok, #5dbf8a);
@@ -82,6 +84,9 @@
 .tk-row {
   display: flex;
   align-items: flex-start;
+  /* La barra del passo in corso va sotto le parole, a tutta riga: e' l'unico motivo
+     per cui questa riga sa andare a capo. */
+  flex-wrap: wrap;
   gap: 7px;
   padding: 4px 6px;
   border-radius: 6px;
@@ -167,6 +172,53 @@
     scale: 0.86;
   }
 }
+/* Quanto manca a *questo* passo.
+ *
+ * Sta solo sulla riga in corso, e solo mentre corre. E' una stima e si presenta come
+ * tale — la tilde davanti al numero non e' un vezzo, e' la differenza fra una misura
+ * e un'ipotesi — perche' quanto ci vuole a finire un passo non e' una cosa che si
+ * sappia: quello che si sa e' quanto ci hanno messo i passi gia' fatti qui accanto
+ * (vedi `estimate` in taskspanel.js). Le due parti sono nascoste sulle altre righe,
+ * cosi' nove passi fermi restano nove righe di testo e non nove barre a zero. */
+.tk-pct,
+.tk-rowbar {
+  display: none;
+}
+.tk-row.running .tk-pct {
+  display: block;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  padding-top: 1px;
+  cursor: help;
+}
+.tk-row.running .tk-rowbar {
+  display: block;
+  flex: 1 0 100%;
+  height: 2px;
+  margin-top: 1px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--fg, #fff) 14%, transparent);
+  overflow: hidden;
+}
+.tk-rowfill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  background: var(--claude-2);
+  /* Un secondo esatto: e' ogni quanto arriva il valore nuovo, quindi la barra
+     scivola da un battito all'altro invece di scattare. */
+  transition: width 1s linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-rowfill {
+    transition: none;
+  }
+}
+
 /* The moment a task is ticked off: the check springs in and the line strikes itself
    through from left to right. It is the one bit of the panel worth watching. */
 .tk-row.justdone .ico {
@@ -213,6 +265,56 @@
   }
   to {
     transform: scaleX(1);
+  }
+}
+
+/* La scia: i passi che il turno ha gia' fatto, quando un piano non c'e'.
+   Piu' leggera dell'elenco vero, perche' e' un'altra cosa — non dice cosa manca, dice
+   cos'e' successo — e l'ultima riga e' quella che sta succedendo adesso. */
+.tk-trail {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tk-trail[hidden] {
+  display: none;
+}
+.tk-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.tk-step-dot {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  transform: translateY(-1px);
+}
+.tk-step-txt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Quello di adesso: il pallino batte ed e' l'unica riga con un fondo. */
+.tk-step.live {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--claude-1) 14%, transparent);
+  font-weight: 600;
+}
+.tk-step.live .tk-step-dot {
+  background: var(--accent);
+  animation: tk-beat 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-step.live .tk-step-dot {
+    animation: none;
   }
 }
 

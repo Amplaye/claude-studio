@@ -121,6 +121,13 @@ let keySeq = 0;
 /** Gli strumenti che scrivono davvero su un file. Gli altri non sporcano niente. */
 const WRITERS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 
+/**
+ * Il nome col quale il modello vede lo strumento che scrive il piano: e' il nostro,
+ * ospitato nel server MCP dell'estensione (engine/ide.ts). Il gemello di questa riga
+ * sta in `webview/chat.js` — la webview non e' bundlata e non puo' importare da qui.
+ */
+const PLAN_TOOL = 'mcp__editor__plan';
+
 /** Un percorso puo' arrivare relativo o gia' intero: qui diventa sempre intero. */
 function absolute(p: string): string {
   return /^([a-zA-Z]:[\\/]|\/)/.test(p) ? p : nodePath.join(workspaceRoot(), p);
@@ -1196,7 +1203,18 @@ export class ChatController {
     // sub-agent, e i passi che si segna lui sono affari suoi — mescolarli a questi
     // vorrebbe dire un elenco che cresce di roba che non hai chiesto.
     if (e.k === 'tool_start' && !e.parent) {
-      if (e.name === 'TodoWrite') {
+      // Il piano che Claude si scrive. La CLI non ha piu' uno strumento per farlo, e
+      // questo glielo mette l'estensione col suo server MCP (vedi engine/ide.ts):
+      // stessi campi di TodoWrite, quindi stessa strada da qui in poi.
+      //
+      // Si legge la chiamata mentre passa, non la risposta del gestore, e il motivo e'
+      // la cronologia: riaprendo una conversazione i messaggi vengono ridipinti dal
+      // transcript, il gestore MCP non gira affatto, e un piano che arrivasse solo da
+      // li' sparirebbe ogni volta che riapri quello a cui stavi lavorando.
+      if (e.name === PLAN_TOOL) {
+        const steps = (e.input as { steps?: unknown })?.steps;
+        if (Array.isArray(steps)) tasks.set(this.key, steps as never);
+      } else if (e.name === 'TodoWrite') {
         const todos = (e.input as { todos?: unknown })?.todos;
         if (Array.isArray(todos)) tasks.set(this.key, todos as never);
       } else if (e.name === 'TaskCreate') {

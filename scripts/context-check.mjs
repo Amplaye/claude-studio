@@ -282,6 +282,45 @@ for (const width of [320, 620]) {
   await page.waitForTimeout(80);
   t(await page.locator('.csteps').isHidden(), 'la sezione dei passi occupa spazio da vuota');
 
+  // ---- senza piano: i passi che il turno ha fatto davvero ----
+  //
+  // La meta' che non chiede niente a nessuno. Il piano lo scrive Claude, e "lo scrive"
+  // e' una cosa che si spera: provato dal vivo tre volte con la stessa istruzione, due
+  // volte l'ha scritto e una no. Un pannello che dipende da quella scelta e' vuoto un
+  // turno su tre — il difetto da cui si e' partiti. La scia c'e' sempre.
+  await steps({
+    items: [],
+    done: 0,
+    total: 0,
+    active: -1,
+    busy: true,
+    doing: 'Edit chat.css',
+    trail: ['Read store.ts', 'Grep activeForm', 'Edit chat.css'],
+  });
+  await page.waitForTimeout(200);
+  const tr = await page.evaluate(() => {
+    const sec = document.querySelector('.csteps');
+    const rows = [...sec.querySelectorAll('.tk-step')];
+    return {
+      shown: !sec.hidden,
+      rows: rows.map((r) => r.querySelector('.tk-step-txt').textContent),
+      live: rows.filter((r) => r.classList.contains('live')).length,
+      liveIsLast: rows.length ? rows[rows.length - 1].classList.contains('live') : false,
+      oneLiner: !sec.querySelector('.tk-empty[hidden]') ? 'still there' : 'gone',
+      bar: !sec.querySelector('.tk-bar')?.hidden,
+    };
+  });
+  t(tr.shown, 'senza piano la sezione resta vuota anche se i passi ci sono');
+  t(
+    tr.rows.join(' | ') === 'Read store.ts | Grep activeForm | Edit chat.css',
+    'i passi gia’ fatti non arrivano al pannello: ' + tr.rows.join(' | ')
+  );
+  t(tr.live === 1 && tr.liveIsLast, 'non si vede quale passo sta succedendo adesso');
+  t(tr.oneLiner === 'gone', 'la riga singola resta sotto la scia che la sostituisce');
+  // Nessuna percentuale su una scia: non ha un totale, quindi non ha una frazione, e
+  // una barra li' sopra sarebbe una previsione inventata.
+  t(!tr.bar, 'una scia senza totale si e’ presa una barra di avanzamento');
+
   await steps(list());
   await page.waitForTimeout(500);
   const tk = await page.evaluate(() => {
@@ -326,6 +365,58 @@ for (const width of [320, 620]) {
     return bad;
   });
   t(faded.length === 0, 'testo dei passi scritto in grigio: ' + faded.join(' | '));
+
+  // ---- quanto manca a *questo* passo ----
+  //
+  // "2 di 5 fatte" dice quanto manca alla lista, non quanto manca al passo che sta
+  // correndo — e quella e' la domanda che ci si fa guardando la card. Non e' una cosa
+  // che si sappia: nessuno sa quanto ci vuole a "sistemare i test" finche' non e'
+  // sistemato. Quello che si sa e' quanto ci hanno messo i passi gia' finiti qui
+  // accanto, ed e' su quello che si stima, come fa una barra di download. Quindi il
+  // controllo e' su tre cose: che si veda solo sulla riga in corso, che cammini da
+  // sola senza che il filo la spinga, e che non arrivi mai a dire "finito".
+  await steps(list({ activeSince: Date.now() - 6000, expectedMs: 60000 }));
+  await page.waitForTimeout(300);
+  const read = () =>
+    page.evaluate(() => {
+      const sec = document.querySelector('.csteps');
+      const run = sec.querySelector('.tk-row.running');
+      return {
+        running: sec.querySelectorAll('.tk-row.running').length,
+        onActive: !!(run && run.classList.contains('in_progress')),
+        pct: run ? run.querySelector('.tk-pct').textContent : '',
+        width: run ? parseFloat(run.querySelector('.tk-rowfill').style.width) : -1,
+        titled: !!(run && run.querySelector('.tk-pct').title),
+      };
+    });
+  const e1 = await read();
+  t(e1.running === 1, 'la stima non sta su una riga sola: ' + e1.running);
+  t(e1.onActive, 'la stima non sta sulla riga in corso');
+  t(/^~\d+%$/.test(e1.pct), 'la stima non si presenta come una stima: ' + e1.pct);
+  t(e1.width > 0 && e1.width < 95, 'la barra del passo parte fuori scala: ' + e1.width);
+  t(e1.titled, 'la stima non spiega da nessuna parte di cosa e’ fatta');
+
+  // Cammina da sola: l'estensione manda due numeri crudi e l'orologio gira nella
+  // pagina, altrimenti il filo dovrebbe battere una volta al secondo per animare
+  // una barra che sa animarsi.
+  await page.waitForTimeout(2400);
+  const e2 = await read();
+  t(e2.width > e1.width, 'la stima non avanza da sola: ' + e1.width + ' -> ' + e2.width);
+
+  // E non dice mai "finito" mentre sta ancora correndo: un passo che segna 100% ed e'
+  // ancora li' ha detto una bugia; uno fermo al 95% ha detto "ci sta mettendo piu'
+  // degli altri", che e' vero ed e' la cosa che serve sapere.
+  await steps(list({ activeSince: Date.now() - 600000, expectedMs: 30000 }));
+  await page.waitForTimeout(200);
+  const e3 = await read();
+  t(e3.width === 95, 'un passo lunghissimo si dichiara finito: ' + e3.width);
+
+  // Senza i due numeri non si inventa niente: a turno fermo la riga e' una riga.
+  await steps(list({ busy: false }));
+  await page.waitForTimeout(200);
+  t((await read()).running === 0, 'la stima resta accesa su un turno fermo');
+  await steps(list({ activeSince: Date.now() - 6000, expectedMs: 60000 }));
+  await page.waitForTimeout(300);
 
   // Lo scatto si fa con i passi a schermo: da vuoti la sezione non c'e', e una
   // sezione che non c'e' non si puo' guardare.
