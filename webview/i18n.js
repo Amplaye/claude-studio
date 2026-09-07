@@ -280,6 +280,9 @@
     'ctx.lastActive': ' · last active',
     'ctx.activeNow': ' · active now',
     'ctx.empty': 'No conversations open in this project.',
+    'ctx.office': 'The office',
+    'ctx.officeHint': 'One person per open conversation. Click one to go there.',
+    'ctx.npc': '{name} — {state}',
   };
 
   const IT = {
@@ -514,6 +517,9 @@
     'ctx.lastActive': ' · ultima attiva',
     'ctx.activeNow': ' · attiva adesso',
     'ctx.empty': 'Nessuna conversazione aperta in questo progetto.',
+    'ctx.office': "L'ufficio",
+    'ctx.officeHint': 'Una persona per conversazione aperta. Clicca per andarci.',
+    'ctx.npc': '{name} — {state}',
   };
 
   const DICT = { en: EN, it: IT };

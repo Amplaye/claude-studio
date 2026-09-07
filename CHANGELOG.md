@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.21.0
+
+- **L'ufficio.** Sopra le card del contesto adesso c'e' una stanza, e dentro una
+  persona per ogni conversazione aperta, con il pavimento che le scorre piano sotto i
+  piedi. Chi sta lavorando batte a macchina e ha tre puntini sulla testa; chi ha finito
+  mentre guardavi altrove alza una spunta verde; chi e' fermo da un pezzo sbiadisce.
+  Quella dove sei ha il faretto sotto i piedi e il cartellino col nome sempre acceso,
+  le altre lo dicono passandoci sopra. Le nostre sono color creta e le schede
+  dell'estensione ufficiale azzurre — la stessa distinzione che fanno gia' l'icona e la
+  pillola sulla card, detta senza parole. Cliccare una persona porta alla sua
+  conversazione esattamente come cliccare la sua card, e quando una conversazione si
+  chiude le altre camminano nel posto che ha lasciato invece di saltarci dentro. Le
+  card non cambiano di una riga: i numeri sono da leggere, la stanza si guarda e basta,
+  ed e' la risposta a "chi c'e' e chi sta lavorando" senza leggere niente. Sparisce da
+  sola quando il pannello e' troppo basso per tenerla senza mangiarsi le card, e sta
+  ferma se al sistema hai chiesto meno animazioni.
+
 ## 0.20.1
 
 - **I messaggi in attesa vanno in alto a sinistra.** Stavano appoggiati sopra la barra

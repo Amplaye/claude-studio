@@ -230,11 +230,121 @@ window.CtxPanel = (() => {
       paintBar(p.fill, s.pct);
     }
 
+    // ---------- l'ufficio ----------
+    // Le stesse conversazioni delle card, viste da lontano: una stanza, e dentro una
+    // persona per ognuna. Le card rispondono a "quanto contesto le resta"; questa
+    // risponde a "chi c'e' e chi sta lavorando", che e' quello che chiedi al pannello
+    // guardandolo di sfuggita, senza leggere niente.
+    const office = el('section', 'office');
+    office.hidden = true;
+    const olab = el('span', 'lab olab');
+    const olabText = document.createTextNode(t('ctx.office'));
+    olab.append(icon('people'), olabText);
+    const floor = el('div', 'floor');
+    const crowd = el('div', 'crowd');
+    floor.append(el('div', 'tiles'), crowd);
+    office.append(olab, floor);
+    const npcs = new Map();
+
+    /**
+     * Un numero fermo per conversazione: il suo posto nella stanza non balla a ogni
+     * ridisegno, e due che entrano insieme non finiscono una dentro l'altra.
+     *
+     * FNV-1a con la coda di murmur3, e non la somma di caratteri che si scrive di
+     * getto: quella, su quattro id che si somigliano, da' quattro cifre che si
+     * somigliano — cioe' quattro persone ammucchiate nello stesso angolo in fondo.
+     */
+    function seed(id) {
+      let h = 2166136261;
+      for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+      h = Math.imul(h ^ (h >>> 15), 2246822507);
+      h = Math.imul(h ^ (h >>> 13), 3266489909);
+      return (h ^ (h >>> 16)) >>> 0;
+    }
+
+    function buildNpc(id) {
+      const n = el('button', 'npc');
+      n.type = 'button';
+      const h = seed(id);
+      // La stanza ha un davanti e un fondo: senza profondita' e' una fila di sagome.
+      // Mai attaccati al muro ne' oltre il bordo: la banda sta larga dentro i due.
+      const depth = 0.12 + ((h % 1000) / 1000) * 0.76;
+      n.style.setProperty('--d', depth.toFixed(3));
+      n.style.setProperty('--j', ((Math.floor(h / 1000) % 1000) / 1000).toFixed(3));
+      // Nessuno respira a tempo con il vicino.
+      n.style.setProperty('--beat', (2.3 + (Math.floor(h / 1e6) % 9) * 0.14).toFixed(2) + 's');
+      // Chi sta davanti passa sopra a chi sta dietro.
+      n.style.zIndex = String(100 - Math.round(depth * 100));
+
+      const guy = el('span', 'guy');
+      guy.append(el('span', 'head'), el('span', 'torso'), el('span', 'arm'));
+      // Sopra la testa: i puntini mentre lavora, la spunta quando ha finito.
+      const bubble = el('span', 'bubble');
+      const dots = el('span', 'dots');
+      dots.append(el('i'), el('i'), el('i'));
+      bubble.append(dots, icon('checkmark', 'bico'));
+      const tag = el('span', 'tag');
+      n.append(el('span', 'shadow'), guy, bubble, tag);
+
+      n.onclick = () => post({ cmd: 'focus', id });
+      n._p = { tag };
+      return n;
+    }
+
+    function paintNpc(n, s, i, total) {
+      // Il posto: una fetta di stanza a testa, e dentro la fetta lo scarto fisso di
+      // questa conversazione. Con la transizione in CSS, quando una se ne va gli altri
+      // camminano nel vuoto che ha lasciato invece di saltarci dentro.
+      const slot = 100 / total;
+      const j = parseFloat(n.style.getPropertyValue('--j')) || 0.5;
+      const x = slot * (i + 0.25 + 0.5 * j);
+      n.style.setProperty('--x', x.toFixed(2) + '%');
+      // Il cartellino col nome e' largo quanto un nome: centrato su chi sta contro il
+      // muro uscirebbe dalla stanza e il pannello lo taglierebbe. Vicino al bordo si
+      // appoggia al bordo invece di stare in mezzo.
+      n.classList.toggle('lft', x < 22);
+      n.classList.toggle('rgt', x > 78);
+
+      n.classList.toggle('own', !!s.own);
+      n.classList.toggle('busy', !!s.busy);
+      n.classList.toggle('done', !s.busy && !!s.done);
+      n.classList.toggle('recent', !s.busy && !s.done && !!s.recent);
+      n.classList.toggle('focused', !!s.focused);
+
+      const state = s.busy ? t('ctx.busy') : s.done ? t('ctx.done') : s.recent ? t('ctx.recent') : t('ctx.idle');
+      n._p.tag.textContent = s.name;
+      const who = t('ctx.npc', { name: s.name, state });
+      n.title = who;
+      n.setAttribute('aria-label', who);
+    }
+
+    function paintOffice(list) {
+      office.hidden = !list.length;
+      olab.title = t('ctx.officeHint');
+      const seen = new Set();
+      list.forEach((s, i) => {
+        seen.add(s.id);
+        let n = npcs.get(s.id);
+        if (!n) {
+          n = buildNpc(s.id);
+          npcs.set(s.id, n);
+          crowd.append(n);
+        }
+        paintNpc(n, s, i, list.length);
+      });
+      for (const [id, n] of [...npcs]) {
+        if (!seen.has(id)) {
+          n.remove();
+          npcs.delete(id);
+        }
+      }
+    }
+
     // I passi non hanno piu' una sezione loro: stanno dentro le card, uno per
     // conversazione. Vedi buildCard.
     const scroll = el('div', 'scroll');
     scroll.append(host);
-    root.append(head, scroll);
+    root.append(head, office, scroll);
 
     // ---------- drawing ----------
     // The last thing we were told, kept so the panel can be drawn again in another
@@ -245,6 +355,7 @@ window.CtxPanel = (() => {
 
     window.I18N.onChange(() => {
       labText.nodeValue = t('ctx.account');
+      olabText.nodeValue = t('ctx.office');
       if (last) render(last);
     });
 
@@ -292,6 +403,7 @@ window.CtxPanel = (() => {
           }
         }
       }
+      paintOffice(d.cards);
       // Una card appena costruita nasce senza i suoi passi: le liste arrivano per
       // conto loro e l'ultima che abbiamo e' ancora buona. Senza questo, la card di
       // una conversazione che sta gia' lavorando comparirebbe vuota e resterebbe
