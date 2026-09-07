@@ -34,7 +34,11 @@
 //    volte lo stesso lavoro;
 //  - l'aura del capo: chi ce l'ha a due passi ogni tanto gli tira una battuta, e
 //    il numero dentro la battuta e' vero — viene dal quadro delle task di quel
-//    capo li'. Un numero sbagliato in bocca a qualcuno e' peggio di nessun numero.
+//    capo li'. Un numero sbagliato in bocca a qualcuno e' peggio di nessun numero;
+//  - e le tazze: sono quattro e restano quattro, comunque girino fra la
+//    rastrelliera, le mani e le scrivanie. Una tazza persa non si vede finche'
+//    non sono finite tutte, e a quel punto e' finito il caffe' in un ufficio
+//    dove nessuno ha bevuto niente.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -674,6 +678,27 @@ const g = await fogli();
 t(g.fatte === 4, 'i foglietti archiviati sono ' + g.fatte + ' invece di 4');
 t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 
+// ---- le tazze ----
+//
+// Quattro, e sono quelle: girano fra la rastrelliera, la mano di chi le porta e
+// la scrivania di chi se l'e' riportata indietro, ma sono sempre quattro. E'
+// l'unica cosa che rende il bar un posto invece che un'animazione — quando
+// finiscono, la rastrelliera e' vuota davvero e chi arriva torna a mani vuote.
+//
+// Il conto e' anche l'unico modo in cui questa scena si rompe in silenzio: una
+// tazza persa non si vede finche' non sono finite tutte, e a quel punto e'
+// finito il caffe' in un ufficio dove nessuno ha bevuto niente. Qui si guarda
+// alla fine di tutto, quando la stanza ha gia' avuto un minuto per girare.
+const tazze = await page.evaluate(() => ({
+  scaffale: document.querySelectorAll('.of-tazze .of-tazza').length,
+  mano: document.querySelectorAll('.of-tazza.addosso').length,
+  scrivania: document.querySelectorAll('.of-tazza.piena').length,
+}));
+t(
+  tazze.scaffale + tazze.mano + tazze.scrivania === 4,
+  'le tazze non sono piu\' quattro: ' + JSON.stringify(tazze)
+);
+
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
 await page.screenshot({ path: path.join(root, 'dist', 'preview-office-full.png') });
@@ -684,5 +709,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, la bacheca e l’aura del capo'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, la bacheca, l’aura del capo e le tazze'
 );

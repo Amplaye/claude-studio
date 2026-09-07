@@ -358,6 +358,73 @@
   }
 }
 
+/* ---- le tazze ----
+   Cinque per quattro: bordo bianco in cima, corpo panna, una riga gialla in
+   mezzo e il manico di un pixel a destra. E' il minimo perche' a questa misura
+   si legga "tazza" e non "gomma da cancellare".
+
+   Sono in tre posti: sulla rastrelliera al bar, in mano a chi la porta, e sulla
+   scrivania di chi se l'e' portata indietro. Il disegno e' lo stesso; cambia
+   solo dove sta. */
+.of-tazze {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.of-tazza {
+  position: absolute;
+  width: 5px;
+  height: 4px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #fffdf8 0 1px, #f2ede2 1px 2px, #e8c14d 2px 3px, #f2ede2 3px);
+  box-shadow: inset 0 0 0 1px rgba(46, 42, 38, 0.28);
+}
+/* Il manico. Un pixel per due, attaccato a destra: senza, la tazza e' un
+   rettangolo, e un rettangolo bianco su una scrivania non e' niente. */
+.of-tazza::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 1px;
+  height: 2px;
+  background: #d9d2c4;
+  box-shadow: 0 0 0 1px rgba(46, 42, 38, 0.22);
+}
+/* Il fumo: un pixel che sale e sfuma. E' l'unica cosa che distingue una tazza
+   piena da una tazza e basta. Quelle sulla rastrelliera non fumano — sono
+   pulite e vuote, ed e' proprio quello il loro stato. */
+.of-tazza.addosso,
+.of-tazza.piena {
+  z-index: 12;
+}
+.of-tazza.addosso::after,
+.of-tazza.piena::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  bottom: 4px;
+  width: 1px;
+  height: 1px;
+  background: #fff;
+  animation: of-fumo 1.4s steps(5) infinite;
+}
+@keyframes of-fumo {
+  0% {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(-5px);
+    opacity: 0;
+  }
+}
+/* In mano: sul fianco, all'altezza della mano. */
+.of-tazza.addosso {
+  left: 12px;
+  top: 14px;
+}
+
 /* ---- i foglietti ----
    Cinque per quattro con la puntina sopra, e niente scritto sopra: a questa
    misura il testo non c'e', e il colore dice quello che una bacheca dice

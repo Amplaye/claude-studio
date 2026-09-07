@@ -682,6 +682,10 @@ window.OFFICE = (() => {
     });
     for (const [id, chi] of [...people]) {
       if (!live.has(id)) {
+        // La stanza vuole saperlo: chi se ne va con una tazza in mano se la
+        // porta via dal conto, e dopo qualche giro la rastrelliera resta vuota
+        // senza che nessuno abbia bevuto niente.
+        window.ROOM.congeda(chi);
         chi.el.remove();
         chi.plate.remove();
         people.delete(id);

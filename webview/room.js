@@ -90,8 +90,11 @@ window.ROOM = (() => {
     // --- in mezzo non c'e' niente: e' il passaggio, e serve libero ---
 
     // --- il bar: la dispensa in fila sul muro, il tavolino e due sgabelli ---
+    // Lo scaffale in mezzo e' vuoto apposta: e' la rastrelliera delle tazze, e le
+    // tazze che ci stanno sopra sono quelle che ci sono davvero. Su uno scaffale
+    // gia' pieno di roba disegnata non si sarebbe visto niente.
     { s: 'shelfJars', x: 258, b: 48 },
-    { s: 'shelfFull', x: 288, b: 48 },
+    { s: 'shelfEmpty', x: 288, b: 48 },
     { s: 'cabinet', x: 318, b: 48 },
     { s: 'nightstand', x: 348, b: 48 },
     { s: 'stoolRound', x: 270, b: 96 },
@@ -162,6 +165,31 @@ window.ROOM = (() => {
     muro: { griglia: [117, 10], posto: [134, 56], z: 37 },
     archivio: { griglia: [80, 66], posto: [88, 98], z: 85 },
   };
+
+  /* ---- il bar, e le tazze che ci girano ----
+   *
+   * Quattro tazze, e sono quelle. Chi va a prendersi un caffe' ne prende una
+   * dalla rastrelliera, la porta alla macchina, e da li' torna alla scrivania
+   * dove la tazza resta a fumare accanto al monitor. Al giro dopo se la riporta
+   * al bar: sei volte su dieci la ricarica e basta, quattro la lava e la
+   * rimette a posto.
+   *
+   * Il conto e' l'unica cosa che rende la scena una scena e non un'animazione:
+   * quando le tazze finiscono, la rastrelliera e' vuota davvero e chi arriva
+   * torna indietro a mani vuote. E' quello a far leggere il bar come un posto
+   * invece che come un mobile.
+   */
+  const MAX_TAZZE = 4;
+  const BAR = { rastrelliera: [302, 60], macchina: [330, 60], lavandino: [356, 60] };
+  /** Dove stanno le tazze sulla rastrelliera: due per ripiano. */
+  const SCAFFALI = [
+    [292, 22],
+    [301, 22],
+    [292, 32],
+    [301, 32],
+  ];
+  /** Presa, erogazione, lavaggio, deposito, e il broncio di chi non ne trova. */
+  const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600 };
 
   const METE = {
     caffe: [280, 62],
@@ -346,6 +374,7 @@ window.ROOM = (() => {
    * stanza che poi cambia: chi la usa lo accende e lo spegne.
    */
   function monta(stage, foglio) {
+    palco = stage;
     stage.style.width = W + 'px';
     stage.style.height = H + 'px';
     stage.style.setProperty('--sheet-room', 'url("' + foglio + '")');
@@ -360,6 +389,13 @@ window.ROOM = (() => {
       stage.append(depth(n, (w.r + w.h) * TILE));
     }
     for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
+
+    // Le tazze sulla rastrelliera. Vanno appena sopra lo scaffale — che sta
+    // contro il muro in fondo al bar — e sotto chi ci passa davanti.
+    rastrelliera = el('div', 'of-tazze');
+    depth(rastrelliera, 49);
+    stage.append(rastrelliera);
+    disegnaTazze();
 
     return DESKS.map((d) => {
       stage.append(prop('desk', d.x, d.b, 'of-desk'));
@@ -514,6 +550,104 @@ window.ROOM = (() => {
     }, 3200);
   }
 
+  // ---------- il caffe' ----------
+
+  /** Il palco, per le cose che non stanno addosso a nessuno: le tazze. */
+  let palco;
+  let rastrelliera;
+  let tazzePulite = MAX_TAZZE;
+
+  function disegnaTazze() {
+    if (!rastrelliera) return;
+    rastrelliera.replaceChildren(
+      ...SCAFFALI.slice(0, tazzePulite).map(([x, y]) => {
+        const n = el('i', 'of-tazza');
+        n.style.left = x + 'px';
+        n.style.top = y + 'px';
+        return n;
+      })
+    );
+  }
+
+  /** Se la prende in mano. */
+  function prendi(chi) {
+    chi.tazza = el('i', 'of-tazza addosso');
+    chi.el.append(chi.tazza);
+  }
+
+  /** E la posa sulla scrivania, dove resta a fumare anche mentre lui e' al bar. */
+  function posa(chi) {
+    if (!chi.tazza) return;
+    chi.tazza.remove();
+    chi.tazza = null;
+    if (!chi.casa || !palco) return;
+    chi.tazzaFerma = el('i', 'of-tazza piena');
+    chi.tazzaFerma.style.left = chi.casa.x + 20 + 'px';
+    chi.tazzaFerma.style.top = chi.casa.y - 6 + 'px';
+    chi.tazzaFerma.style.zIndex = chi.casa.y + 10;
+    palco.append(chi.tazzaFerma);
+  }
+
+  /**
+   * Il giro delle tazze, in coda a una pausa al bar.
+   *
+   * Chi ci arriva con la tazza in mano l'ha portata dalla scrivania: sei volte
+   * su dieci la ricarica e basta — che e' quello che si fa davvero — e quattro
+   * la lava e la rimette a posto. Chi ci arriva a mani vuote e non ne ha una che
+   * lo aspetta alla scrivania, tre volte su quattro se ne prende una.
+   *
+   * ponytail: i tragitti di qui dentro non si fermano se Claude riparte. Sono
+   * dieci secondi al massimo, e una corsa interrotta a meta' lascia una tazza
+   * fuori dal conto — che e' l'unico modo in cui questa scena si rompe davvero.
+   */
+  async function caffe(chi) {
+    if (chi.tazza) {
+      if (Math.random() < 0.6) {
+        if (await vai(chi, ...BAR.macchina, true)) {
+          parla(chi, 'Me ne faccio un altro');
+          await attesa(TEMPI.fa);
+        }
+        return;
+      }
+      if (await vai(chi, ...BAR.lavandino, true)) {
+        parla(chi, 'La lavo e la rimetto');
+        await attesa(TEMPI.lava);
+      }
+      if (await vai(chi, ...BAR.rastrelliera, true)) {
+        await attesa(TEMPI.posa);
+        if (chi.tazza) {
+          chi.tazza.remove();
+          chi.tazza = null;
+          tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
+          disegnaTazze();
+        }
+      }
+      return;
+    }
+    if (chi.tazzaFerma || Math.random() >= 0.75) return;
+    if (!(await vai(chi, ...BAR.rastrelliera, true))) return;
+    // La rastrelliera vuota e' vuota davvero: e' il conto a farla vuota, e sono
+    // le stesse quattro tazze che girano da mezz'ora.
+    if (tazzePulite <= 0) {
+      parla(chi, 'Non c’e’ piu’ una tazza pulita');
+      await attesa(TEMPI.broncio);
+      return;
+    }
+    tazzePulite--;
+    disegnaTazze();
+    await attesa(TEMPI.prende);
+    if (!chi.el.isConnected) {
+      tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
+      disegnaTazze();
+      return;
+    }
+    prendi(chi);
+    if (await vai(chi, ...BAR.macchina, true)) {
+      parla(chi, 'Ne metto su uno');
+      await attesa(TEMPI.fa);
+    }
+  }
+
   async function giro(chi, meta) {
     chi.fuori = true;
     chi.meta = meta;
@@ -522,21 +656,34 @@ window.ROOM = (() => {
     // corridoio" e' una cosa che si vede, e la posizione di chi cammina non
     // vuol dire niente finche' non e' tornato a sedersi.
     chi.el.classList.add('fuori');
+    // Se ne ha una che la aspetta sulla scrivania se la porta dietro: al bar ci
+    // si va con la propria tazza, non se ne prende un'altra ogni volta. E' la
+    // riga che tiene il conto delle quattro tazze a quattro.
+    if (chi.tazzaFerma && (meta === 'caffe' || meta === 'spuntino')) {
+      chi.tazzaFerma.remove();
+      chi.tazzaFerma = null;
+      prendi(chi);
+    }
     vesti(chi.fig, chi.seme, 'cammina');
+    const albar = meta === 'caffe' || meta === 'spuntino';
     if (await vai(chi, ...METE[meta])) {
       vesti(chi.fig, chi.seme, 'fermo');
       // Al bar ci si ferma quattro volte tanto. Non e' un vezzo: fra andata e
       // ritorno il tragitto e' mezzo minuto, e con una sosta di due secondi al
       // bar non ci si vede mai nessuno — si vede solo gente nei corridoi.
-      const sosta = meta === 'caffe' || meta === 'spuntino' ? 8000 : 2000;
+      const sosta = albar ? 8000 : 2000;
       parla(chi);
       await pausa(chi, sosta + Math.random() * 2500);
+      if (albar) await caffe(chi);
       vesti(chi.fig, chi.seme, 'cammina');
     }
     // Si torna sempre, anche se la pausa e' finita a meta' strada: l'unico modo
     // di non tornare e' che la conversazione si sia chiusa, o che nel frattempo
     // il posto non sia piu' suo.
     if (chi.el.isConnected && chi.casa) await vai(chi, chi.casa.x + 8, chi.casa.y + 24, true);
+    // E la tazza finisce sulla scrivania, dove resta a fumare anche mentre lui
+    // e' da un'altra parte.
+    posa(chi);
     vesti(chi.fig, chi.seme, chi.posa);
     chi.el.classList.remove('fuori');
     chi.fuori = false;
@@ -667,6 +814,28 @@ window.ROOM = (() => {
     parla,
     viaggio,
     vesti,
+    /**
+     * Se ne va per sempre: la conversazione si e' chiusa.
+     *
+     * Serve per una cosa sola, ed e' il conto delle tazze. Chi sparisce con una
+     * tazza in mano — o lasciandone una sulla scrivania — se la porta via dal
+     * conto, e dopo qualche giro la rastrelliera e' vuota per sempre senza che
+     * nessuno abbia bevuto niente. Qui la tazza torna a posto.
+     *
+     * Se torna quando il conto e' gia' pieno, il conto era gia' sbagliato prima:
+     * si dice, e si tappa lo stesso. Un ufficio con cinque tazze su quattro e'
+     * meno grave di uno che si ferma a discuterne.
+     */
+    congeda(chi) {
+      if (!chi.tazza && !chi.tazzaFerma) return;
+      if (chi.tazza) chi.tazza.remove();
+      if (chi.tazzaFerma) chi.tazzaFerma.remove();
+      chi.tazza = null;
+      chi.tazzaFerma = null;
+      if (tazzePulite >= MAX_TAZZE) console.warn('[ufficio] tazza di troppo: il conto e\' andato alla deriva');
+      tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
+      disegnaTazze();
+    },
     cammino,
     occupata,
     cella,
