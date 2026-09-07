@@ -159,6 +159,8 @@ window.OFFICE = (() => {
     // perche' la gente va e viene, e chi e' in corridoio quando si chiude la sua
     // conversazione deve semplicemente sparire.
     window.ROOM.accendi(() => [...people.values()]);
+    // E chi lavora per qualcuno tiene d'occhio il suo capo.
+    setInterval(aura, GIRO_AURA);
 
     window.I18N.onChange(() => {
       titleText.nodeValue = t('office.title');
@@ -488,6 +490,77 @@ window.OFFICE = (() => {
     }
 
     paintBacheche();
+  }
+
+  // ---------- l'aura del capo ----------
+  //
+  // Chi lavora per qualcuno, se quel qualcuno ce l'ha a due passi, ogni tanto gli
+  // tira una battuta. E se il capo e' dall'altra parte della stanza — al bar, di
+  // solito — ogni tanto ne dice una alle sue spalle.
+  //
+  // La cosa che la rende una battuta e non una scritta e' che il numero e' vero:
+  // "gia' otto cose fatte" lo dice solo se il quadro delle task ne conta otto
+  // chiuse per quel capo li'. Senza il numero vero e' un cartello; col numero
+  // vero e' un ufficio.
+
+  /* Le prime due dicono il numero, e si usano solo se il numero c'e'. Adulare
+     qualcuno per zero cose fatte non e' adulare, e' prendere in giro. */
+  const ADULAZIONE = [
+    'Gia’ {n} cose fatte, capo. Aumento?',
+    '{n} task chiuse, capo!',
+    'Gran visione come sempre, capo',
+    'Stavo giusto per farlo anch’io!',
+    'Bella la cravatta oggi, capo',
+    'Che ritmo, capo',
+    'Il miglior capo di sempre. Davvero.',
+  ];
+  const PETTEGOLEZZI = [
+    'Ma una riga l’ha mai scritta?',
+    'Un altro punto veloce da un’ora',
+    'La tazza se l’e’ comprata lui',
+    'La mia task l’ha spacciata per sua',
+    'Dice sempre di si’ e poi cambia idea',
+    'Ha annaffiato una pianta. La sua.',
+    'Trenta minuti per dire "vediamo"',
+  ];
+
+  /** Quanto vicino deve stare il capo perche' valga la pena adularlo. */
+  const VICINO = 44;
+  /** E quanto lontano perche' non senta. */
+  const LONTANO = 96;
+  /** Ogni quanto si guarda chi ha il capo accanto. */
+  const GIRO_AURA = 1500;
+  /** E ogni quanto la stessa persona puo' riaprire bocca. */
+  const RESPIRO = 25000;
+
+  const caso = (a) => a[Math.floor(Math.random() * a.length)];
+  const piedi = (n) => [parseFloat(n.style.left) + 8, parseFloat(n.style.top) + 24];
+
+  function aura() {
+    const ora = Date.now();
+    for (const chi of staff.values()) {
+      if (chi.va || chi.esce || chi.dice) continue;
+      const capo = people.get(chi.capoId);
+      if (!capo || !capo.el.isConnected) continue;
+      if (ora - (chi.zitto || 0) < RESPIRO) continue;
+      const [x, y] = piedi(chi.el);
+      const [cx, cy] = piedi(capo.el);
+      const d = Math.hypot(cx - x, cy - y);
+      // Chi parla e' l'impiegato, e conta che sia fermo al suo posto — uno che
+      // tira una battuta al capo mentre attraversa la stanza col foglietto in
+      // mano non e' un impiegato, e' un passante. Che il capo sia occupato non
+      // conta: se ha un sub-agent aperto lo e' sempre, e con quella condizione
+      // dentro non si sarebbe mai sentita una parola.
+      if (d <= VICINO && Math.random() < 0.6) {
+        chi.zitto = ora;
+        const fatte = (board[chi.capoId] && board[chi.capoId].done) || 0;
+        const pescate = fatte > 0 ? ADULAZIONE : ADULAZIONE.slice(2);
+        window.ROOM.parla(chi, caso(pescate).replace('{n}', fatte));
+      } else if (d > LONTANO && Math.random() < 0.35) {
+        chi.zitto = ora;
+        window.ROOM.parla(chi, caso(PETTEGOLEZZI));
+      }
+    }
   }
 
   /** Colore della barra: lo stesso semaforo del pannello. */

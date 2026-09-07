@@ -31,7 +31,10 @@
 //  - la bacheca: un foglietto per cosa da fare, e il colore dice quale. Quello
 //    che conta e' che il foglio sia UNO — quello che sta camminando in mano a
 //    qualcuno non deve stare anche appeso al muro, se no la bacheca conta due
-//    volte lo stesso lavoro.
+//    volte lo stesso lavoro;
+//  - l'aura del capo: chi ce l'ha a due passi ogni tanto gli tira una battuta, e
+//    il numero dentro la battuta e' vero — viene dal quadro delle task di quel
+//    capo li'. Un numero sbagliato in bocca a qualcuno e' peggio di nessun numero.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -608,6 +611,39 @@ t(
   'sulla bacheca c’e’ un foglietto che non e’ di nessuno stato: ' + f.muro
 );
 
+// ---- l'aura del capo ----
+//
+// Chi lavora per qualcuno, se quel qualcuno ce l'ha a due passi, ogni tanto gli
+// tira una battuta — e il numero dentro la battuta e' vero, viene dal quadro
+// delle task di quel capo li'. Con tre impiegati fermi al loro posto e una
+// possibilita' su due ogni secondo e mezzo, in dieci secondi qualcuno parla:
+// se non parla nessuno, l'aura non gira affatto.
+//
+// Il conto dei fatti di capo-a e' tre, e la battuta col numero puo' dire solo
+// quello: un numero sbagliato in bocca a qualcuno e' peggio di nessun numero.
+// Le nuvolette durano tre secondi e mezzo: guardare la stanza alla fine
+// dell'attesa vuol dire vedere solo chi sta parlando in quell'istante. Si
+// raccolgono mentre compaiono.
+await page.evaluate(() => {
+  window.__dette = [];
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.classList && n.classList.contains('of-say') && n.parentElement.classList.contains('of-staff')) {
+          window.__dette.push(n.textContent);
+        }
+      }
+    }
+  }).observe(document.querySelector('.of-crowd'), { childList: true, subtree: true });
+});
+await page.waitForTimeout(10000);
+const dette = await page.evaluate(() => window.__dette);
+t(dette.length > 0, 'nessuno ha aperto bocca in dieci secondi: l’aura del capo non gira');
+t(
+  dette.every((s) => !/\d/.test(s) || s.includes('3')),
+  'una battuta dice un numero che non e’ quello vero: ' + dette.join(' | ')
+);
+
 // E chi ha finito se ne va: per la porta, e ci mette il tempo di arrivarci.
 await tasks({
   'capo-a': {
@@ -648,5 +684,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati e la bacheca'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, la bacheca e l’aura del capo'
 );

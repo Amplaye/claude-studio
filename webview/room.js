@@ -498,11 +498,14 @@ window.ROOM = (() => {
   }
 
   /* Uno parla alla volta e per tre secondi: due nuvolette insieme a questa
-     misura sono due rettangoli bianchi, e nessuno legge due rettangoli bianchi. */
-  function parla(chi) {
+     misura sono due rettangoli bianchi, e nessuno legge due rettangoli bianchi.
+
+     `testo` si passa quando quello che si dice dipende da chi lo dice — le
+     battute che si tirano al capo, per esempio. Senza, si pesca dal mucchio. */
+  function parla(chi, testo) {
     if (chi.dice || !chi.el.isConnected) return;
     const n = el('div', 'of-say');
-    n.textContent = caso(FRASI);
+    n.textContent = testo || caso(FRASI);
     chi.el.append(n);
     chi.dice = n;
     setTimeout(() => {
@@ -661,6 +664,7 @@ window.ROOM = (() => {
     posto,
     monta,
     posta,
+    parla,
     viaggio,
     vesti,
     cammino,
