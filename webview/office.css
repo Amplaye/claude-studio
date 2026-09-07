@@ -79,14 +79,23 @@ body.inoffice .rail {
 
 /* ---------- la fascia in cima ---------- */
 
+/* La stessa ricetta della testata della chat in chat.css: `--ctl` di contenuto,
+   dieci di aria sopra e sotto, un pixel di riga. Non e' pignoleria — le due
+   fasce stanno appaiate nella stessa scheda, e sedici pixel di differenza
+   facevano uno scalino in mezzo allo schermo, con tutta la pianta piu' in basso
+   della conversazione che le sta accanto. Chi ci mette dentro qualcosa lo tiene
+   alto `--ctl`. */
 .of-bar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
+  padding: 10px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
+}
+.of-bar > * {
+  max-height: var(--ctl);
 }
 .of-lab {
   display: inline-flex;
@@ -111,10 +120,13 @@ body.inoffice .rail {
 .of-boss {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 3px 12px 3px 4px;
+  gap: 8px;
+  height: var(--ctl);
+  padding: 0 11px 0 0;
   border: 1px solid var(--line);
-  border-radius: var(--pill);
+  /* Lo stesso raggio dei bottoni della testata, non la pillola: dentro c'e' un
+     ritratto quadrato appoggiato al bordo, e la pillola gli tagliava l'angolo. */
+  border-radius: 8px;
   background: var(--hover);
 }
 .of-boss.busy {
@@ -123,24 +135,24 @@ body.inoffice .rail {
 .of-face {
   position: relative;
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   overflow: hidden;
-  border-radius: 4px;
+  border-radius: 7px 0 0 7px;
   background: var(--of-legno);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
 }
-/* La stessa faccia di chi sta seduto di la', al triplo: il fattore e' intero,
-   quindi restano pixel e non diventano una macchia. Ne entrano 48 di larghezza
-   in una casella da 42 — tre di sbordo per lato, e si taglia dai piedi in giu',
+/* La stessa faccia di chi sta seduto di la', al doppio: il fattore e' intero,
+   quindi restano pixel e non diventano una macchia. Ne entrano 32 di larghezza
+   in una casella da 28 — due di sbordo per lato, e si taglia dai piedi in giu',
    che in un ritratto e' l'unica parte che non serve. */
 .of-face .of-body {
   inset: 0;
   width: auto;
   height: auto;
-  /* Stessa striscia, ingrandita di tre. Ridefinendo `--nw` qui i keyframes non
-     vanno riscritti: scorrono di 48 invece che di 16 da soli. */
-  --nw: calc(var(--nf, 1) * 48px);
+  /* Stessa striscia, ingrandita di due. Ridefinendo `--nw` qui i keyframes non
+     vanno riscritti: scorrono di 32 invece che di 16 da soli. */
+  --nw: calc(var(--nf, 1) * 32px);
   background-position-y: top;
   background-size: var(--nw) auto;
   filter: none;
@@ -151,7 +163,7 @@ body.inoffice .rail {
   line-height: 1.25;
 }
 .of-boss-name {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   max-width: 190px;
   overflow: hidden;
@@ -279,28 +291,17 @@ body.inoffice .rail {
   }
 }
 
-/* Il faretto sulla conversazione dove sei. Sotto la persona, come l'alone dei
-   personaggi attivi nei giochi: e' l'unico modo di dire "questa" senza
-   aggiungere un'altra etichetta a una stanza che ne ha gia' una per testa. */
-.of-ring {
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  width: 34px;
-  height: 15px;
-  margin: -6px 0 0 -17px;
-  border-radius: 50%;
+/* Il faretto sulla conversazione dove sei. L'alone base ce l'hanno tutti e sta
+   in room.css, con la persona: qui c'e' solo cosa gli succede quando quella
+   conversazione e' quella che stai guardando. */
+.of-guy.focused .of-ring {
+  opacity: 1;
   background: radial-gradient(
     closest-side,
     color-mix(in srgb, var(--claude-1) 85%, transparent),
     color-mix(in srgb, var(--claude-1) 30%, transparent) 62%,
     transparent 78%
   );
-  opacity: 0;
-  pointer-events: none;
-}
-.of-guy.focused .of-ring {
-  opacity: 1;
   animation: of-spot 2.8s ease-in-out infinite;
 }
 @keyframes of-spot {
@@ -315,10 +316,12 @@ body.inoffice .rail {
 
 /* Sopra la testa: i puntini mentre lavora, la spunta verde quando ha finito e
    non l'hai ancora guardata. */
+/* Di fianco alla testa e non sopra: sopra c'e' la targhetta, che adesso e'
+   appesa alla persona. */
 .of-bubble {
   position: absolute;
-  left: 11px;
-  top: -7px;
+  left: 14px;
+  top: 1px;
   display: none;
   align-items: center;
   gap: 1px;
@@ -400,10 +403,10 @@ body.inoffice .rail {
   padding: 3px 8px;
   font-size: 8px;
   font-weight: 700;
-  /* Carta chiara sul legno scuro: e' l'unica scritta che sta sul pavimento e
-     non su una targhetta, e sul legno l'inchiostro non si legge. */
-  color: var(--paper);
-  text-shadow: 1px 1px 0 var(--of-contorno);
+  /* Inchiostro scuro sulla moquette chiara, con un filo di carta dietro: e'
+     l'unica scritta che sta sul pavimento e non su una targhetta. */
+  color: var(--of-contorno);
+  text-shadow: 1px 1px 0 var(--paper);
   text-align: center;
   pointer-events: none;
 }

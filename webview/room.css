@@ -1,18 +1,22 @@
 /* Claude Studio — la stanza, come si vede.
  *
- * Il foglio di stile che va con `room.js`: pavimento, muri, mobili, computer,
- * gente, targhette. Lo usano in due — l'ufficio vero e la pagina di prova
- * `docs/office-sv.html` — per lo stesso motivo per cui la pianta sta in comune:
- * due copie della stessa stanza si scollano al primo ritocco.
+ * Il foglio di stile che va con `room.js`: pavimento, corridoi, muri, quello che
+ * sta appeso al muro, mobili, computer, gente, targhette. Lo usano in due —
+ * l'ufficio vero e la pagina di prova `docs/office-sv.html` — per lo stesso
+ * motivo per cui la pianta sta in comune: due copie della stessa stanza si
+ * scollano al primo ritocco.
  *
  * Quello che resta in `office.css` e' quello che di qua non c'entra: la fascia
  * in cima, il ritratto di chi comanda, l'ufficio vuoto, il faretto sulla
  * conversazione che stai guardando. Roba dell'ufficio, non della stanza.
  *
- * Le tinte escono dal foglio dei mobili invece che scelte a parte: il legno di
- * SeasonVale e' #e86837 di corpo, #ff9148 di luce, #b64335 di ombra e #2e1c2c di
- * contorno. Pavimento, muri, targhette e monitor stanno tutti su quella famiglia
- * — e' quello che fa sembrare la stanza una stanza sola.
+ * La tavolozza e' quella di un ufficio, non quella di una taverna. Prima era
+ * tutta legno — pavimento di assito, muri di assito, mobili di legno — e tre
+ * aranci uno sull'altro sono una macchia sola: le scrivanie sparivano nel
+ * pavimento e non si capiva piu' dove finiva un mobile. Adesso il pavimento e'
+ * moquette verde salvia a quadri e i muri sono intonaco chiaro, cosi' il legno
+ * caldo di SeasonVale ci sta sopra e si stacca. E' la stessa idea di ogni pianta
+ * di ufficio disegnata: fondo spento, mobili accesi.
  *
  * Tutto a pixel e a stop netti: dove serve un rilievo ci sono due righe di
  * colore pieno, non una sfumatura, e l'ombra e' una copia spostata di due.
@@ -22,142 +26,191 @@
  */
 
 .of-stage {
+  /* Il legno dei mobili, per le poche cose disegnate a mano che devono stargli
+     accanto. Sono i colori del foglio di SeasonVale, non scelti a parte. */
   --wood-hi: #ff9148;
   --wood: #e86837;
   --wood-lo: #b64335;
-  --of-contorno: #2e1c2c;
+  --of-contorno: #2e2a26;
 
-  --floor: #8a4e2c;
-  --floor-hi: #9c5a34;
-  --floor-lo: #6e3d22;
-  --sand: #c9a887;
-  --sand-hi: #d9bb9b;
-  --sand-jo: #a8825c;
-  /* I muri sono di legno come i mobili: stessa famiglia del bancone, due
-     gradini piu' chiari perche' restino dietro invece che venire avanti. */
-  --wall: #cf8c4a;
-  --wall-hi: #e8a866;
-  --wall-lo: #a4652f;
-  --wall-jo: #7d4a21;
-  /* La carta delle targhette era il muro. Adesso che il muro e' legno le serve
-     una tinta sua, se no il nome sopra non si legge piu'. */
-  --paper: #f0dcc0;
+  /* Il pavimento: moquette a quadri. Il fiorellino sull'incrocio e' quello che
+     la fa leggere come un pavimento posato invece che come un rettangolo. */
+  --floor: #7f9a7b;
+  --floor-lo: #6d8869;
+  --floor-hi: #93ad8d;
+
+  /* Il corridoio: lo stesso quadrato, ma quasi bianco. In una pianta il
+     pavimento che cambia colore vuol dire "di qua si passa", e non serve altro.
+     Chiaro piu' del muro apposta: con la stessa tinta il corridoio e il muro che
+     ci corre sopra diventavano una macchia chiara sola, e le tre stanze in cima
+     sembravano isole invece che stanze. */
+  --lane: #f4efe4;
+  --lane-lo: #d8cdb6;
+
+  /* I muri: intonaco, un gradino piu' scuro del corridoio e con il contorno
+     nero di due pixel. E' il contorno a fare il muro — senza, un muro visto
+     dall'alto e' solo un rettangolo chiaro come tutti gli altri. */
+  --wall: #ded2ba;
+  --wall-hi: #f0e7d5;
+  --wall-lo: #a4977e;
+  --wall-jo: #2e2a26;
+
+  /* La carta delle targhette e delle nuvolette. */
+  --paper: #f7f2e6;
+  --inchiostro: #33302b;
+
+  --glass: #8fb6cf;
+  --rosso: #b8352f;
 
   --olive: #a1ab3c;
   --olive-lo: #68662b;
-  --shade: rgba(46, 28, 44, 0.42);
+  --shade: rgba(38, 46, 36, 0.3);
 
   position: relative;
   flex: 0 0 auto;
   transform-origin: center center;
 }
 
-/* Assito caldo. Le venature stanno su periodi dispari e primi fra loro perche'
-   il disegno non si richiuda ogni sedici insieme alle fughe: se no l'occhio
-   trova la riga e la insegue. */
+/* Moquette a quadri: mattonelle da due caselle, la fuga nei due versi e il
+   fiorellino su ogni incrocio. Le mattonelle sono grandi il doppio della
+   casella apposta — a sedici la fuga cadeva sotto ogni mobile e il pavimento
+   diventava una rete che tirava a se' l'occhio; a trentadue resta un fondo, che
+   e' quello che deve essere. */
 .of-floor {
   position: absolute;
   inset: 0;
   z-index: 0;
   background-color: var(--floor);
   background-image:
-    repeating-linear-gradient(
-      180deg,
-      var(--floor-lo) 0 1px,
-      var(--floor-hi) 1px 2px,
-      transparent 2px 16px
-    ),
-    repeating-linear-gradient(180deg, rgba(255, 200, 150, 0.07) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(180deg, rgba(60, 30, 15, 0.1) 0 1px, transparent 1px 11px),
-    linear-gradient(
-      135deg,
-      rgba(255, 210, 160, 0.1) 0 9%,
-      rgba(255, 210, 160, 0.05) 9% 20%,
-      transparent 20%
-    );
-}
-
-/* Le stanze in alto sono lastricate: il muro di riga 7 cade esatto sul cambio
-   di materiale, 8 caselle da 16. Sta in uno pseudo-elemento e non in un div
-   perche' la pianta la scrive room.js in mobili, e il lastricato non e' un
-   mobile: e' il pavimento stesso. */
-.of-floor::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  height: 128px;
-  background-color: var(--sand);
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      var(--sand-jo) 0 1px,
-      var(--sand-hi) 1px 2px,
-      transparent 2px 32px
-    ),
-    repeating-linear-gradient(
-      180deg,
-      var(--sand-jo) 0 1px,
-      var(--sand-hi) 1px 2px,
-      transparent 2px 32px
-    ),
-    conic-gradient(
-      rgba(255, 255, 255, 0.05) 0 25%,
-      transparent 0 50%,
-      rgba(255, 255, 255, 0.05) 0 75%,
-      transparent 0
-    ),
-    linear-gradient(
-      135deg,
-      rgba(255, 220, 180, 0.12) 0 14%,
-      rgba(255, 220, 180, 0.05) 14% 30%,
-      transparent 30%
-    );
+    radial-gradient(circle at 0 0, var(--floor-hi) 0 1.6px, transparent 2.1px),
+    repeating-linear-gradient(90deg, var(--floor-lo) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(180deg, var(--floor-lo) 0 1px, transparent 1px 32px);
   background-size:
+    32px 32px,
     auto,
-    auto,
-    4px 4px,
     auto;
-  box-shadow:
-    inset 0 -1px 0 var(--sand-jo),
-    inset 0 -2px 0 rgba(60, 40, 20, 0.14);
+  background-position:
+    0 0,
+    0 0,
+    0 0;
 }
 
-/* Muretti bassi di assito. Le assi stanno in piedi — fughe verticali ogni otto —
-   perche' e' cosi' che si mette il legno su un muro, e perche' il pavimento le
-   ha orizzontali: due tavolati nello stesso verso sarebbero la stessa superficie
-   piegata. Il sole sta a nord-ovest per tutti: spigolo illuminato in alto a
-   sinistra, spessore in ombra in basso a destra, e l'ombra per terra sono due
-   gradini pieni invece di una sfocatura. */
+/* Il corridoio. Stesso reticolo del pavimento, tinta chiara, e un filo scuro
+   attorno perche' si veda dove comincia. */
+.of-lane {
+  position: absolute;
+  background-color: var(--lane);
+  background-image:
+    repeating-linear-gradient(90deg, var(--lane-lo) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(180deg, var(--lane-lo) 0 1px, transparent 1px 32px);
+  box-shadow: inset 0 0 0 1px rgba(46, 42, 38, 0.12);
+}
+
+/* I muri visti dall'alto: la faccia di sopra chiara, un gradino d'ombra sullo
+   spessore in basso, il contorno scuro tutto attorno e due pixel d'ombra per
+   terra. Il sole sta a nord-ovest per tutti. */
 .of-wall {
   position: absolute;
   background-color: var(--wall);
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      var(--wall-jo) 0 1px,
-      var(--wall-hi) 1px 2px,
-      transparent 2px 8px
-    ),
-    repeating-linear-gradient(180deg, rgba(255, 215, 170, 0.1) 0 1px, transparent 1px 5px),
-    repeating-linear-gradient(180deg, rgba(70, 35, 18, 0.12) 0 1px, transparent 1px 7px);
   box-shadow:
-    inset 1px 1px 0 var(--wall-hi),
-    inset -1px -1px 0 var(--wall-lo),
-    2px 2px 0 rgba(46, 28, 44, 0.4),
-    4px 4px 0 rgba(46, 28, 44, 0.18);
+    inset 0 2px 0 var(--wall-hi),
+    inset 0 -4px 0 var(--wall-lo),
+    inset 0 0 0 2px var(--wall-jo),
+    2px 3px 0 rgba(46, 42, 38, 0.3);
+}
+/* Il muro in fondo e' l'unico che si vede in faccia: due caselle di intonaco
+   con il battiscopa sotto. E' quello che fa dire "stanza" invece di
+   "rettangolo", ed e' il posto dove si appendono le cose. */
+.of-wall.back {
+  background-image: linear-gradient(180deg, var(--wall-hi) 0 62%, var(--wall) 62%);
+  box-shadow:
+    inset 0 -4px 0 var(--wall-lo),
+    inset 0 -6px 0 var(--wall-jo),
+    inset 0 0 0 2px var(--wall-jo);
+}
+
+/* ---- quello che hanno appeso al muro ----
+   L'orologio, il calendario e le finestre. Nel pacchetto non ci sono — e' una
+   fattoria medievale — e sono tre forme semplici, quindi tre regole invece di
+   altri tre ritagli da tenere allineati a mano. */
+.of-art {
+  position: absolute;
+}
+/* La finestra: due ante, il vetro azzurro, il riflesso di traverso e la cornice
+   chiara col contorno scuro. */
+.of-art.win {
+  width: 32px;
+  height: 17px;
+  background-color: var(--glass);
+  background-image:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.5) 0 20%,
+      transparent 20% 42%,
+      rgba(255, 255, 255, 0.3) 42% 56%,
+      transparent 56%
+    ),
+    linear-gradient(90deg, transparent 0 15px, var(--wall) 15px 17px, transparent 17px);
+  box-shadow:
+    inset 0 0 0 2px var(--wall),
+    inset 0 0 0 3px var(--wall-jo);
+}
+/* L'orologio: quadrante chiaro, cassa rossa, due lancette. */
+.of-art.clock {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow:
+    inset 0 0 0 2px var(--rosso),
+    0 1px 0 rgba(46, 42, 38, 0.25);
+}
+.of-art.clock::before,
+.of-art.clock::after {
+  content: '';
+  position: absolute;
+  background: var(--of-contorno);
+}
+.of-art.clock::before {
+  left: 6px;
+  top: 3px;
+  width: 1px;
+  height: 4px;
+}
+.of-art.clock::after {
+  left: 6px;
+  top: 6px;
+  width: 4px;
+  height: 1px;
+}
+/* Il calendario: la testata rossa e la griglia dei giorni. */
+.of-art.cal {
+  width: 15px;
+  height: 17px;
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(180deg, transparent 0 3px, var(--wall-lo) 3px 4px),
+    repeating-linear-gradient(90deg, transparent 0 3px, var(--wall-lo) 3px 4px);
+  background-position: 0 6px;
+  box-shadow:
+    inset 0 5px 0 var(--rosso),
+    inset 0 0 0 1px var(--of-contorno);
 }
 
 /* Un mobile: la sua misura vera, ritagliata dal foglio. Niente
    ridimensionamenti — il foglio e' a 16 e la stanza e' a 16, quindi un pixel
    resta un pixel. */
+/* Il foglio di SeasonVale e' tarato per una fattoria al sole: in una stanza col
+   pavimento verde spento quell'arancio urlava, e sei scrivanie in fila erano una
+   striscia fluorescente. Un filo di saturazione in meno e il legno torna legno.
+   Si fa qui e non nel foglio: il foglio lo usano anche altrove, e un ritocco di
+   tinta non vale un secondo ritaglio da mantenere. */
 .of-prop {
   position: absolute;
   background-image: var(--sheet-room);
   background-repeat: no-repeat;
   image-rendering: pixelated;
-  filter: drop-shadow(2px 2px 0 var(--shade));
+  filter: saturate(0.78) brightness(0.97) drop-shadow(2px 2px 0 var(--shade));
 }
 
 /* ---- il computer ----
@@ -264,7 +317,7 @@
   background-size: var(--nw, 16px) 24px;
   background-repeat: no-repeat;
   image-rendering: pixelated;
-  filter: drop-shadow(2px 2px 0 rgba(46, 28, 44, 0.42));
+  filter: drop-shadow(2px 2px 0 rgba(46, 42, 38, 0.38));
   animation: of-passo var(--nd, 1700ms) steps(var(--nf, 1)) infinite;
 }
 @keyframes of-passo {
@@ -276,14 +329,40 @@
   }
 }
 
+/* L'alone sotto i piedi. Ce l'hanno tutti, non solo quella che stai guardando:
+   una figura da sedici pixel su un pavimento a quadri e' un mobile in piu', e
+   l'alone e' quello che dice "questa e' viva" prima ancora che si muova. Verde
+   acqua, che e' il colore che sul verde salvia si stacca senza gridare.
+
+   Su chi stai guardando diventa il faretto: colore dell'accento, pieno, e
+   respira. E' l'unico modo di dire "questa" senza aggiungere un'altra
+   etichetta a una stanza che ne ha gia' una per testa. */
+.of-ring {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 34px;
+  height: 15px;
+  margin: -6px 0 0 -17px;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    rgba(126, 214, 199, 0.75),
+    rgba(126, 214, 199, 0.28) 62%,
+    transparent 78%
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 /* ---- quello che uno dice ----
-   Sopra la testa e ben sotto la targhetta: la targhetta sta in alto sulla
-   scrivania e li' resta anche mentre uno cammina, quindi le due non si
-   incontrano mai. Compare e sparisce da sola; il JS mette solo il testo. */
+   Sopra la targhetta, non sopra la testa: la targhetta adesso sta attaccata a
+   chi la porta, e le due si sarebbero coperte a vicenda. Compare e sparisce da
+   sola; il JS mette solo il testo. */
 .of-say {
   position: absolute;
   left: 50%;
-  top: -15px;
+  bottom: calc(100% + 16px);
   transform: translateX(-50%);
   padding: 1px 2px;
   white-space: nowrap;
@@ -291,10 +370,10 @@
   z-index: 50;
   font: 700 6px/1.4 ui-sans-serif, system-ui, sans-serif;
   background: var(--paper);
-  color: #4a2c1c;
+  color: var(--inchiostro);
   box-shadow:
     inset 0 0 0 1px var(--of-contorno),
-    2px 2px 0 rgba(46, 28, 44, 0.5);
+    2px 2px 0 rgba(46, 42, 38, 0.45);
   animation: of-fiato 3.2s ease-out both;
 }
 /* Entra di scatto e se ne va sfumando: chi parla comincia di colpo e smette
@@ -317,22 +396,49 @@
 }
 
 /* ---- la targhetta ----
-   Il nome della conversazione e quanto contesto le resta. E' della scrivania e
-   non di chi ci siede: dice di chi e' quel posto, e un posto non si alza. */
+   Il nome della conversazione e quanto contesto le resta, appesa sopra la testa
+   di chi la porta.
+
+   Prima stava sulla scrivania, per non farla girare per la stanza. Ma la
+   scrivania non ha piu' posto: con tre file strette il pezzo di pavimento sopra
+   il piano e' occupato dal monitor, e la targhetta ci finiva sopra. E soprattutto
+   e' cosi' che si legge una pianta d'ufficio: l'etichetta sta addosso alla
+   persona, la segue dove va, e il posto lo dice lo schermo acceso — che resta
+   acceso anche mentre lei e' al bar. */
 .of-plate {
   position: absolute;
-  width: 52px;
-  margin-left: -26px;
+  /* Sopra la spalla sinistra e non in mezzo alla testa: appesa in mezzo copriva
+     tutta la scrivania, e la stanza diventava una fila di cartelli. Di lato
+     finisce quasi tutta nel corridoio fra due postazioni, e la coda di due
+     puntini la riporta a chi la sta dicendo. */
+  right: 12px;
+  bottom: 20px;
+  width: 46px;
   padding: 1px 2px 2px;
   pointer-events: none;
   /* Carta chiara, cornice di un pixel, ombra a gradino. Niente angoli
      arrotondati — a pixel un angolo o e' pieno o non c'e'. */
   border-radius: 0;
   background: var(--paper);
-  color: #4a2c1c;
+  color: var(--inchiostro);
   box-shadow:
     inset 0 0 0 1px var(--of-contorno),
-    2px 2px 0 rgba(46, 28, 44, 0.5);
+    2px 2px 0 rgba(46, 42, 38, 0.45);
+}
+/* La coda del fumetto: due puntini in diagonale dall'angolo giu' a destra verso
+   la testa. Sono loro a dire che quella targhetta e' di quella persona li'. */
+.of-plate::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  top: 100%;
+  width: 2px;
+  height: 2px;
+  background: var(--paper);
+  box-shadow:
+    2px 3px 0 0 var(--paper),
+    0 0 0 1px rgba(46, 42, 38, 0.55),
+    2px 3px 0 1px rgba(46, 42, 38, 0.55);
 }
 .of-name {
   display: block;
@@ -348,7 +454,7 @@
   display: block;
   height: 2px;
   margin-top: 1px;
-  background: rgba(46, 28, 44, 0.24);
+  background: rgba(46, 42, 38, 0.24);
   overflow: hidden;
 }
 .of-fill {

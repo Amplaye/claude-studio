@@ -1,8 +1,8 @@
 /* Claude Studio — la stanza.
  *
  * La pianta dell'ufficio e la vita che ci gira dentro, in un posto solo: i muri,
- * i mobili, le scrivanie, dove si puo' mettere i piedi, e il giro di chi ogni
- * tanto si alza e va a prendersi un caffe'.
+ * i corridoi, i mobili, le scrivanie, dove si puo' mettere i piedi, e il giro di
+ * chi ogni tanto si alza e va a prendersi un caffe'.
  *
  * Sta qui e non dentro `office.js` perche' la usano in due: l'ufficio vero
  * dell'estensione e la pagina di prova `docs/office-sv.html`, che e' dove la
@@ -18,14 +18,21 @@
  * in un foglio solo da `scripts/sv-sheet.mjs`, che scrive anche la mappa dei
  * nomi in `sv-room.js`. Le persone no: quelle le disegna `npc.js` dal seme.
  *
- * Misure: tutto in pixel di stanza, 384x320. Un mobile non e' grande quanto la
+ * La pianta e' quella di un ufficio open space vero, non di una stanza sola:
+ * il muro in fondo con le finestre e l'orologio, tre stanze chiuse in cima
+ * (l'ufficio, la sala riunioni, il bar), un corridoio che le collega e le porta
+ * al salone, e nel salone dodici postazioni in tre file, ognuna con la sua
+ * sedia. E' la pianta che si vede in tutti i giochi da ufficio, ed e' quella,
+ * non un elenco di mobili, a far capire cosa e' quel posto in un colpo d'occhio.
+ *
+ * Misure: tutto in pixel di stanza, 432x368. Un mobile non e' grande quanto la
  * sua casella — SeasonVale li disegna alti, perche' si vede anche il fianco —
  * quindi ognuno ha la sua misura vera e si appoggia per terra dal basso.
  */
 window.ROOM = (() => {
   const TILE = 16;
-  const COLS = 24;
-  const ROWS = 20;
+  const COLS = 27;
+  const ROWS = 23;
   const W = COLS * TILE;
   const H = ROWS * TILE;
 
@@ -49,23 +56,54 @@ window.ROOM = (() => {
   //
   // I muri sono bande, `{c, r, w, h}` in caselle. I vani delle porte non sono un
   // tipo a parte: sono il pezzo di muro che non c'e'.
+  //
+  // Le tre stanze in cima stanno fra le righe 2 e 7. Le dividono due muri in
+  // piedi, colonne 8 e 18, e le separa dal salone il muro lungo di riga 8, che
+  // ha tre buchi: sotto l'ufficio (colonne 5-6), sotto la sala riunioni (12-13)
+  // e sotto il bar (23-24). Quelli sono i vani delle porte, e il corridoio di
+  // riga 9 li mette in fila tutti e tre.
   const WALLS = [
-    { c: 0, r: 0, w: COLS, h: 1 },
+    // Il muro in fondo e' l'unico che si vede in faccia e non dall'alto: due
+    // caselle di intonaco chiaro, con appesi l'orologio, il calendario e le
+    // finestre. E' quello che fa dire "stanza" invece di "rettangolo".
+    { c: 0, r: 0, w: COLS, h: 2, k: 'back' },
+    { c: 0, r: 2, w: 1, h: ROWS - 2 },
+    { c: COLS - 1, r: 2, w: 1, h: ROWS - 2 },
     { c: 0, r: ROWS - 1, w: COLS, h: 1 },
-    { c: 0, r: 0, w: 1, h: ROWS },
-    { c: COLS - 1, r: 0, w: 1, h: ROWS },
-    // I due muri delle stanze in alto. Il buco fra i pezzi e' la porta: righe 3
-    // e 4, ed e' da li' che si entra al bar e in riunione.
-    { c: 10, r: 1, w: 1, h: 2 },
-    { c: 10, r: 5, w: 1, h: 3 },
-    { c: 15, r: 1, w: 1, h: 2 },
-    { c: 15, r: 5, w: 1, h: 3 },
-    // Il muro che divide le due stanze dal salone. Arriva fino a colonna 10,
-    // dove trova lo spigolo della sala riunioni: fermandosi a 9 restava un buco
-    // quadrato nell'angolo, il pezzo di muro che manca in una pianta disegnata a
-    // mano. Il passaggio e' quello fra le due stanze, colonne 11-14.
-    { c: 1, r: 7, w: 9, h: 1 },
-    { c: 15, r: 7, w: 8, h: 1 },
+    // I due muri in piedi che fanno le tre stanze in cima.
+    { c: 8, r: 2, w: 1, h: 7 },
+    { c: 18, r: 2, w: 1, h: 7 },
+    // Il muro lungo, riga 8, spezzato dai tre vani delle porte.
+    { c: 1, r: 8, w: 4, h: 1 },
+    { c: 7, r: 8, w: 1, h: 1 },
+    { c: 9, r: 8, w: 3, h: 1 },
+    { c: 14, r: 8, w: 4, h: 1 },
+    { c: 19, r: 8, w: 4, h: 1 },
+    { c: 25, r: 8, w: 1, h: 1 },
+  ];
+
+  /* I corridoi. Non sono un mobile e non sono un muro: sono pavimento di un
+     altro colore, ed e' quello che in una pianta dice "di qua si passa" senza
+     doverci scrivere niente sopra. Il lungo corre sotto le tre stanze; gli altri
+     tre sono i vani delle porte, cosi' la porta si vede da lontano anche quando
+     nessuno la sta attraversando. */
+  const LANES = [
+    { c: 1, r: 9, w: 25, h: 1 },
+    { c: 5, r: 8, w: 2, h: 1 },
+    { c: 12, r: 8, w: 2, h: 1 },
+    { c: 23, r: 8, w: 2, h: 1 },
+  ];
+
+  /* Quello che sta appeso al muro in fondo. Non viene dal foglio dei mobili —
+     SeasonVale e' una fattoria medievale, non ha ne' finestre da ufficio ne'
+     orologi a muro — e sono tre forme semplici, il che vuol dire tre regole di
+     CSS invece di altri tre ritagli da tenere allineati a mano. */
+  const MURO = [
+    { k: 'clock', x: 80, y: 9 },
+    { k: 'cal', x: 100, y: 7 },
+    { k: 'win', x: 152, y: 8 },
+    { k: 'win', x: 248, y: 8 },
+    { k: 'win', x: 336, y: 8 },
   ];
 
   /* Un mobile: `s` il ritaglio, `x` il bordo sinistro e `b` il bordo di sotto,
@@ -75,50 +113,75 @@ window.ROOM = (() => {
      numero intero di caselle, e allinearli alla griglia li lasciava sbilenchi in
      mezzo alle stanze. Cosi' invece si centrano davvero. */
   const PROPS = [
-    // --- sala riunioni: due posti uno di fronte all'altro sui lati lunghi del
-    //     tavolo, e la bacheca sul muro. Si siede su sgabelli e basta: la sedia
-    //     di SeasonVale ha uno schienale alto che dal davanti copre mezzo
-    //     tavolo, e in una stanza vista dall'alto era l'unico mobile di
+    // --- l'ufficio in alto a sinistra: la scrivania grande di traverso alla
+    //     stanza, lo sgabello davanti e la bacheca sul muro. E' la stanza dove
+    //     si va quando si va "a parlare col capo". ---
+    { s: 'cork', x: 32, b: 46 },
+    { s: 'cabinet', x: 20, b: 124 },
+    { s: 'desk', x: 48, b: 96 },
+    { s: 'stoolRound', x: 65, b: 116 },
+    { s: 'plantPurple', x: 100, b: 60 },
+
+    // --- la sala riunioni: due tavoli in fila fanno il tavolone, quattro
+    //     sgabelli attorno e la bacheca sul muro. Si siede su sgabelli e basta:
+    //     la sedia di SeasonVale ha uno schienale alto che dal davanti copre
+    //     mezzo tavolo, e in una stanza vista dall'alto era l'unico mobile di
     //     traverso. ---
-    { s: 'cork', x: 67, b: 36 },
-    { s: 'stoolRound', x: 81, b: 62 },
-    { s: 'meetTable', x: 64, b: 84 },
-    { s: 'stoolRound', x: 81, b: 100 },
-    { s: 'plantPurple', x: 22, b: 110 },
+    { s: 'board', x: 194, b: 44 },
+    { s: 'stoolRound', x: 180, b: 66 },
+    { s: 'stoolRound', x: 228, b: 66 },
+    { s: 'meetTable', x: 168, b: 92 },
+    { s: 'meetTable', x: 216, b: 92 },
+    { s: 'stoolRound', x: 168, b: 116 },
+    { s: 'stoolRound', x: 240, b: 116 },
+    { s: 'plantBlue', x: 260, b: 124 },
 
-    // --- in mezzo non c'e' niente: e' il passaggio, e serve libero ---
-
-    // --- il bar: la dispensa in fila sul muro, il tavolino e due sgabelli ---
-    { s: 'shelfJars', x: 258, b: 48 },
-    { s: 'shelfFull', x: 288, b: 48 },
-    { s: 'cabinet', x: 318, b: 48 },
-    { s: 'nightstand', x: 348, b: 48 },
-    { s: 'stoolRound', x: 270, b: 96 },
-    { s: 'meetTable', x: 288, b: 96 },
-    { s: 'stoolRound', x: 340, b: 96 },
-    { s: 'plantBlue', x: 350, b: 112 },
+    // --- il bar: la dispensa in fila sul muro, il tavolino e due sgabelli. Il
+    //     tavolino sta a sinistra e non in mezzo apposta: a destra ci passa
+    //     chi entra dalla porta, e un tavolo davanti alla porta sigilla la
+    //     stanza. ---
+    { s: 'shelfJars', x: 316, b: 72 },
+    { s: 'shelfFull', x: 346, b: 72 },
+    { s: 'cabinet', x: 376, b: 72 },
+    { s: 'meetTable', x: 316, b: 108 },
+    { s: 'stoolRound', x: 322, b: 124 },
+    { s: 'stoolRound', x: 346, b: 124 },
 
     // --- il salone: il verde sta contro i muri e negli angoli, il mezzo resta
     //     camminabile. Gli angoli in fondo sono l'unico posto di una stanza dove
     //     una pianta non e' mai d'intralcio a nessuno. ---
-    { s: 'plantPurple', x: 22, b: 150 },
-    { s: 'plantBlue', x: 350, b: 150 },
-    { s: 'plantBlue', x: 22, b: 300 },
-    { s: 'plantPurple', x: 24, b: 278 },
-    { s: 'plantPurple', x: 351, b: 300 },
-    { s: 'plantBlue', x: 349, b: 278 },
+    { s: 'barrel', x: 20, b: 172 },
+    { s: 'plantBlue', x: 20, b: 232 },
+    { s: 'plantPurple', x: 398, b: 232 },
+    { s: 'plantPurple', x: 22, b: 348 },
+    { s: 'plantBlue', x: 40, b: 350 },
+    { s: 'plantBlue', x: 396, b: 348 },
+    { s: 'plantPurple', x: 378, b: 350 },
+    { s: 'barrel', x: 398, b: 172 },
   ];
 
-  /* Sei scrivanie, due file da tre, centrate sulla larghezza della stanza. Le
-     corsie fra una colonna e l'altra sono quelle da cui si sale al passaggio:
-     e' il motivo per cui non sono attaccate fra loro. */
+  /* Dodici postazioni, tre file da quattro, centrate sulla larghezza della
+     stanza. Le corsie fra una colonna e l'altra sono quelle da cui si sale al
+     corridoio: e' il motivo per cui non sono attaccate fra loro.
+
+     Le file sono strette apposta — cinquantotto pixel di passo — perche' e'
+     cosi' che sta un open space vero: fra una fila e l'altra ci passi, ma non
+     ci giri un tavolo. Il conto e' 38 sopra il piano (targhetta e monitor) e 16
+     sotto (chi ci siede), quindi cinquantotto e' il minimo che non fa toccare
+     una targhetta con i piedi di quello davanti. */
   const DESKS = [
-    { x: 68, b: 176 },
-    { x: 168, b: 176 },
-    { x: 268, b: 176 },
-    { x: 68, b: 246 },
-    { x: 168, b: 246 },
-    { x: 268, b: 246 },
+    { x: 48, b: 200 },
+    { x: 144, b: 200 },
+    { x: 240, b: 200 },
+    { x: 336, b: 200 },
+    { x: 48, b: 258 },
+    { x: 144, b: 258 },
+    { x: 240, b: 258 },
+    { x: 336, b: 258 },
+    { x: 48, b: 316 },
+    { x: 144, b: 316 },
+    { x: 240, b: 316 },
+    { x: 336, b: 316 },
   ];
 
   const SW = SV.desk.w;
@@ -134,18 +197,18 @@ window.ROOM = (() => {
 
      Al bar ci sono due posti separati perche' due che ci vanno insieme sono una
      pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
-     due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
-     tavolino la fascia libera e' due pixel e la stanza sigillata. */
+     due volte. Si sta al bancone, fra la dispensa e il tavolino. */
   const METE = {
-    caffe: [280, 62],
-    spuntino: [320, 62],
-    riunione: [52, 100],
+    caffe: [336, 76],
+    spuntino: [392, 76],
+    riunione: [208, 106],
+    capo: [96, 112],
   };
-  /* Il bar pesa quattro volte il resto, ed e' giusto cosi': in un ufficio vero
-     si va piu' spesso a prendere un caffe' che in sala riunioni. Pesare
+  /* Il bar pesa il doppio del resto, ed e' giusto cosi': in un ufficio vero si
+     va piu' spesso a prendere un caffe' che in sala riunioni o dal capo. Pesare
      ripetendo il nome e' tutto quello che serve — una tabella di probabilita'
      sarebbe la stessa cosa scritta in dieci righe. */
-  const NOMI_METE = ['caffe', 'spuntino', 'caffe', 'spuntino', 'riunione'];
+  const NOMI_METE = ['caffe', 'spuntino', 'riunione', 'caffe', 'spuntino', 'capo'];
 
   /* Quello che si dice in ufficio. Frasi corte apposta: a sei pixel una riga
      lunga esce dalla stanza, e comunque in piedi vicino alla macchinetta nessuno
@@ -177,6 +240,10 @@ window.ROOM = (() => {
   // tutta la loro sagoma e non solo per la base — sono alti perche' si vede il
   // fianco, ma dietro non ci passa nessuno lo stesso: stanno tutti contro un
   // muro.
+  //
+  // Le sedie delle postazioni no: quelle si disegnano e basta. Una sedia e' il
+  // posto dove uno si siede, e marcarla occupata voleva dire che nessuno poteva
+  // piu' arrivare alla propria scrivania.
   //
   // Gli ostacoli si gonfiano di otto in orizzontale e di due in verticale prima
   // di marcare le caselle. Non e' un margine di sicurezza: e' la persona. Il
@@ -233,8 +300,8 @@ window.ROOM = (() => {
      Onda a quattro direzioni su tutte le caselle libere, poi si sceglie la piu'
      vicina alla meta' fra quelle a cui si e' arrivati: cosi' una meta' murata —
      o diventata tale spostando un mobile — porta comunque il piu' vicino
-     possibile, invece di non portare da nessuna parte. Millenovecento caselle
-     non si sentono.
+     possibile, invece di non portare da nessuna parte. Duemilacinquecento
+     caselle non si sentono.
 
      Il cammino grezzo e' tutto a scalini di otto pixel. Si tira la corda: si va
      avanti finche' si vede il punto in linea retta, e si tiene solo quello piu'
@@ -309,8 +376,19 @@ window.ROOM = (() => {
     return depth(n, b);
   }
 
+  /** Una banda in caselle — un muro, un corridoio — messa dove dice la pianta. */
+  function banda(cls, w) {
+    const n = el('div', cls);
+    n.style.left = w.c * TILE + 'px';
+    n.style.top = w.r * TILE + 'px';
+    n.style.width = w.w * TILE + 'px';
+    n.style.height = w.h * TILE + 'px';
+    return n;
+  }
+
   /**
-   * Costruisce la stanza dentro `stage`: pavimento, muri, mobili, scrivanie.
+   * Costruisce la stanza dentro `stage`: pavimento, corridoi, muri, quello che
+   * hanno appeso al muro, i mobili e le postazioni.
    *
    * Il foglio arriva come indirizzo e non come classe perche' nella webview e'
    * un URI che sa solo l'estensione. Da li' in poi e' foglio di stile.
@@ -324,17 +402,31 @@ window.ROOM = (() => {
     stage.style.setProperty('--sheet-room', 'url("' + foglio + '")');
     stage.append(el('div', 'of-floor'));
 
+    // I corridoi sono pavimento: vanno appena sopra il pavimento e sotto tutto
+    // il resto, se no un muro ci finisce sotto.
+    for (const l of LANES) stage.append(depth(banda('of-lane', l), 1));
+
     for (const w of WALLS) {
-      const n = el('div', 'of-wall');
-      n.style.left = w.c * TILE + 'px';
-      n.style.top = w.r * TILE + 'px';
-      n.style.width = w.w * TILE + 'px';
-      n.style.height = w.h * TILE + 'px';
+      const n = banda(w.k === 'back' ? 'of-wall back' : 'of-wall', w);
       stage.append(depth(n, (w.r + w.h) * TILE));
+    }
+    // Appesi al muro in fondo: stanno appena sopra il muro, che li' e' l'unica
+    // cosa che potrebbe coprirli.
+    for (const a of MURO) {
+      const n = el('div', 'of-art ' + a.k);
+      n.style.left = a.x + 'px';
+      n.style.top = a.y + 'px';
+      stage.append(depth(n, 33));
     }
     for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
 
     return DESKS.map((d) => {
+      // La sedia va prima della scrivania nell'ordine di lettura, ma sotto chi
+      // ci siede: la profondita' e' quella del piano piu' dodici, che sta sotto
+      // i piedi di chi occupa il posto (piu' sedici) e sopra il piano. Vuota si
+      // vede, occupata sparisce dietro le spalle — che e' esattamente quello che
+      // fa una sedia.
+      stage.append(depth(prop('stoolRound', d.x + 17, d.b + 16, 'of-seat'), d.b + 12));
       stage.append(prop('desk', d.x, d.b, 'of-desk'));
       // Il computer non viene dal foglio: nel pacchetto non c'e' — e' una
       // fattoria medievale — e comunque e' l'unico mobile che deve accendersi,
@@ -390,9 +482,14 @@ window.ROOM = (() => {
   // Ogni tanto uno si alza e va da qualche parte, e ci va per davvero: la strada
   // se la trova, mobile per mobile.
   //
-  // Chi e' fermo da un pezzo non si alza e non parla: sbiadito e in giro sarebbe
-  // una contraddizione. E si va in due al massimo, che a questa misura tre che
-  // si incrociano per i corridoi sembrano solo confusione.
+  // Ma solo chi non ha niente da fare. Chi sta lavorando resta alla sua
+  // scrivania e batte a macchina: e' l'unica regola che rende l'ufficio
+  // leggibile da lontano — se si alzano tutti, il fatto che uno sia in piedi non
+  // vuol piu' dire niente. E chi e' fermo da un pezzo non si alza e non parla:
+  // sbiadito e in giro sarebbe una contraddizione.
+  //
+  // E si va in due al massimo, che a questa misura tre che si incrociano per i
+  // corridoi sembrano solo confusione.
 
   /* Pixel al secondo. Due caselle al secondo: il bar sta in fondo alla stanza e
      dall'altra parte di due porte, e a passo di lumaca la pausa caffe' era tutta
@@ -400,6 +497,8 @@ window.ROOM = (() => {
   const VELOCITA = 32;
   /** Due in giro insieme sono una pausa; tre che si incrociano sono confusione. */
   const MAX_FUORI = 2;
+  /** Ogni quanto si guarda se Claude e' ripartito, mentre uno e' al bar. */
+  const ORECCHIO = 250;
 
   const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
   const caso = (a) => a[Math.floor(Math.random() * a.length)];
@@ -420,14 +519,29 @@ window.ROOM = (() => {
     return attesa(ms);
   }
 
-  async function vai(chi, fx, fy) {
+  /**
+   * Ci va, tratto per tratto.
+   *
+   * Si ferma per due motivi: la conversazione si e' chiusa mentre lui era in
+   * corridoio — e da li' in poi non c'e' piu' nessuno da muovere — oppure Claude
+   * e' ripartito, e allora la pausa finisce dov'e'. Il ritorno no: quello non lo
+   * ferma niente, perche' tornare a sedersi *e'* la cosa da fare.
+   */
+  async function vai(chi, fx, fy, ritorno) {
     for (const [x, y] of cammino(...piedi(chi), fx, fy)) {
-      // Una conversazione puo' chiudersi mentre chi la teneva e' in corridoio:
-      // da li' in poi non c'e' piu' nessuno da muovere.
       if (!chi.el.isConnected) return false;
+      if (!ritorno && chi.lavora) return false;
       await muovi(chi, x, y);
     }
     return chi.el.isConnected;
+  }
+
+  /** Aspetta, ma con un orecchio: se Claude riparte la pausa finisce subito. */
+  async function pausa(chi, ms) {
+    const fine = Date.now() + ms;
+    while (Date.now() < fine && !chi.lavora && chi.el.isConnected) {
+      await attesa(Math.min(ORECCHIO, fine - Date.now()));
+    }
   }
 
   /* Uno parla alla volta e per tre secondi: due nuvolette insieme a questa
@@ -455,10 +569,13 @@ window.ROOM = (() => {
       // bar non ci si vede mai nessuno — si vede solo gente nei corridoi.
       const sosta = meta === 'caffe' || meta === 'spuntino' ? 8000 : 2000;
       parla(chi);
-      await attesa(sosta + Math.random() * 2500);
+      await pausa(chi, sosta + Math.random() * 2500);
       vesti(chi.fig, chi.seme, 'cammina');
-      await vai(chi, chi.casa.x + 8, chi.casa.y + 24);
     }
+    // Si torna sempre, anche se la pausa e' finita a meta' strada: l'unico modo
+    // di non tornare e' che la conversazione si sia chiusa, o che nel frattempo
+    // il posto non sia piu' suo.
+    if (chi.el.isConnected && chi.casa) await vai(chi, chi.casa.x + 8, chi.casa.y + 24, true);
     vesti(chi.fig, chi.seme, chi.posa);
     chi.fuori = false;
     chi.meta = null;
@@ -472,8 +589,8 @@ window.ROOM = (() => {
    * Il giro, per sempre: `elenco` viene richiamata ogni volta perche' la gente
    * va e viene — una conversazione si chiude e chi la teneva sparisce.
    *
-   * Un abitante e': `{ el, fig, seme, casa: {x, y}, posa, ferma }`. Il resto —
-   * `fuori`, `meta`, `dice`, `ultimo` — se lo scrive la stanza addosso.
+   * Un abitante e': `{ el, fig, seme, casa: {x, y}, posa, ferma, lavora }`. Il
+   * resto — `fuori`, `meta`, `dice`, `ultimo` — se lo scrive la stanza addosso.
    */
   async function vita(elenco) {
     for (;;) {
@@ -481,7 +598,9 @@ window.ROOM = (() => {
       const tutti = elenco();
       const fuori = tutti.filter((c) => c.fuori);
       if (fuori.length >= MAX_FUORI) continue;
-      const liberi = tutti.filter((c) => !c.fuori && !c.ferma && c.casa);
+      // Chi lavora resta al suo posto: si va a cazzeggiare solo quando non c'e'
+      // niente da fare, come in ufficio.
+      const liberi = tutti.filter((c) => !c.fuori && !c.ferma && !c.lavora && c.casa);
       if (!liberi.length) continue;
       // Anche le mete girano, invece di uscire a caso: fra andata, sosta e
       // ritorno un giro dura mezzo minuto, quindi in una stanza guardata per un
@@ -506,11 +625,12 @@ window.ROOM = (() => {
     }
   }
 
-  /** Le chiacchiere vanno per conto loro: si parla anche da seduti. */
+  /** Le chiacchiere vanno per conto loro: si parla anche da seduti — ma non
+      mentre si lavora, che e' il punto di tutto il resto. */
   async function chiacchiere(elenco) {
     for (;;) {
       await attesa(4000 + Math.random() * 5000);
-      const vivi = elenco().filter((c) => !c.ferma && !c.dice);
+      const vivi = elenco().filter((c) => !c.ferma && !c.lavora && !c.dice);
       if (vivi.length) parla(caso(vivi));
     }
   }

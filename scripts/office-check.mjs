@@ -30,7 +30,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const url = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 
 /** Le scrivanie della pianta: room.js ne mette una per posto, sempre le stesse. */
-const DESKS = 6;
+const DESKS = 12;
 
 const card = (over = {}) => ({
   id: 'aaaa',
@@ -355,6 +355,49 @@ const full = await page.evaluate(() => {
 });
 t(full.n === DESKS + 6, 'con ' + (DESKS + 6) + ' conversazioni le persone sono ' + full.n);
 t(!full.out, full.out + ' persone in piedi finiscono fuori dal muro');
+
+// ---- e chi lavora, lavora ----
+//
+// La regola che tiene in piedi tutto il resto: al bar ci si va quando non c'e'
+// niente da fare, non mentre Claude sta macinando. Si guarda il comportamento e
+// non il codice, perche' e' un giro di attese: la pausa fra un giro e l'altro va
+// da tre secondi a sette, quindi in nove ne passa almeno uno — se qualcuno
+// doveva alzarsi, in nove secondi si e' alzato.
+//
+// Le due meta' vanno insieme. Da sola, "nessuno si e' mosso" la passerebbe anche
+// un ufficio morto, e un ufficio morto e' il modo piu' facile di far lavorare
+// tutti.
+const seduti = () =>
+  page.evaluate(() => [...document.querySelectorAll('.of-guy')].map((p) => p.style.left + ',' + p.style.top));
+const cinque = (over) =>
+  Array.from({ length: 5 }, (_, i) => card({ id: 'w' + i, name: 'Conversazione ' + i, recent: true, ...over }));
+
+await ctx(data(cinque()));
+await page.waitForTimeout(400);
+const fermiA = await seduti();
+await page.waitForTimeout(9000);
+const dopoA = await seduti();
+t(
+  dopoA.some((p, i) => p !== fermiA[i]),
+  "in nove secondi non si e' alzato nessuno: l'ufficio non vive piu'"
+);
+
+// Si svuota prima di rifare: chi era in corridoio sparisce con la sua
+// conversazione, e le cinque nuove nascono tutte sedute al posto loro.
+await ctx(data([]));
+await page.waitForTimeout(400);
+await ctx(data(cinque({ busy: true })));
+await page.waitForTimeout(400);
+const fermiB = await seduti();
+await page.waitForTimeout(9000);
+const dopoB = await seduti();
+t(
+  dopoB.join(' ') === fermiB.join(' '),
+  'qualcuno lascia la scrivania mentre sta lavorando: ' +
+    dopoB.filter((p, i) => p !== fermiB[i]).length +
+    ' su ' +
+    dopoB.length
+);
 
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
