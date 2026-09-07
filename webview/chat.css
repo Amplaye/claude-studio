@@ -3345,9 +3345,49 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   width: 13px;
   height: 13px;
 }
-/* On its way out — either it left for the conversation, or you took it back. */
+/* Ritirato: se ne va da dove e' venuto, verso sinistra. */
 .qmsg.going {
   animation: q-out 0.2s ease both;
+}
+/* Partito: e' la cosa opposta, e si vede che e' opposta. Diventa verde, si spunta,
+   e solo dopo sfuma — un attimo, ma abbastanza da non doverti chiedere se il
+   messaggio e' stato preso in carico o buttato via. */
+.qmsg.sent {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  animation: q-sent 0.9s ease both;
+}
+.qsent {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--ok);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.qsent .ico {
+  width: 12px;
+  height: 12px;
+}
+@keyframes q-sent {
+  0%,
+  62% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qmsg.sent {
+    animation: none;
+  }
 }
 @keyframes q-out {
   to {

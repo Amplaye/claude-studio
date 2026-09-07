@@ -479,26 +479,37 @@ export class TaskStore {
 
   /** Rifa' i conti di una lista che e' cambiata e la manda a schermo. */
   private settle(key: string, l: List) {
+    // Uno in corso, non quattro.
+    //
+    // Tutta la grammatica del pannello dice "uno": una riga accesa, un `active`, una
+    // stima. Le sorgenti pero' non lo garantiscono — il piano lo riscrive il modello a
+    // ogni giro, e gliene sfugge facilmente piu' d'uno acceso insieme — e allora
+    // quattro righe si accendevano tutte, la lista diventava un muro d'arancione e non
+    // si capiva piu' dove fosse arrivato. Vale il primo; gli altri tornano a essere
+    // quello che sono, cioe' da fare.
+    const active = l.steps.findIndex((s) => s.status === 'in_progress');
+
     // L'orologio di ogni passo, tenuto qui e non altrove perche' e' l'unico punto da
     // cui passa ogni cambiamento di stato, da qualunque delle tre sorgenti arrivi.
-    // Non serve sapere com'era prima: "in corso e non ha ancora un inizio" e "non e'
-    // piu' in corso e non ha ancora una durata" sono le due sole domande, e si
-    // rispondono da sole.
+    // Non serve sapere com'era prima: "sta correndo e non ha ancora un inizio" e "non
+    // corre piu' e non ha ancora una durata" sono le due sole domande.
+    //
+    // Corre solo quello scelto sopra, e conta: uno degli scartati che prendesse
+    // l'orologio adesso, quando poi tocca a lui davvero, ripartirebbe da mezz'ora fa.
     const now = Date.now();
-    for (const s of l.steps) {
-      if (s.status === 'in_progress') {
+    l.steps.forEach((s, i) => {
+      if (i === active) {
         if (!s.startedAt) s.startedAt = now;
       } else if (s.startedAt && !s.ms) {
         s.ms = Math.max(1, now - s.startedAt);
       }
-    }
+    });
 
-    const items: TaskItem[] = l.steps.map((s) => ({
+    const items: TaskItem[] = l.steps.map((s, i) => ({
       content: s.content,
       activeForm: s.activeForm,
-      status: s.status,
+      status: s.status === 'in_progress' && i !== active ? 'pending' : s.status,
     }));
-    const active = l.steps.findIndex((s) => s.status === 'in_progress');
     l.data = {
       items,
       // Una task andata storta e' chiusa quanto una finita bene: nella barra conta

@@ -76,10 +76,13 @@
   transition: width 0.45s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
+/* Un pixel di distacco fra righe che hanno tutte un fondo colorato non e' distacco:
+   otto passi diventano un blocco unico in cui bisogna cercare dove finisce uno e
+   comincia l'altro. Quattro, e ognuna torna a essere una cosa per conto suo. */
 .tk-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
 }
 .tk-row {
   display: flex;
@@ -88,8 +91,12 @@
      per cui questa riga sa andare a capo. */
   flex-wrap: wrap;
   gap: 7px;
-  padding: 4px 6px;
-  border-radius: 6px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  /* Anche i passi che devono ancora arrivare hanno il loro letto, appena accennato:
+     senza, in un elenco misto le righe col fondo sembravano schede e quelle senza
+     sembravano il vuoto fra una scheda e l'altra. */
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
   line-height: 1.35;
   /* Every state change is a move, not a cut: the row that becomes the current one
      lights up and slides, the one that's finished fades and greys out. */

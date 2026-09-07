@@ -382,7 +382,7 @@ export class Session {
       // `send`, ed e' il caso normale — la chat non deve aspettare il motore per
       // mostrarti quello che hai appena scritto.
       if (out.queued && !out.silent) {
-        this.o.emit({ k: 'unqueued', id: out.id });
+        this.o.emit({ k: 'unqueued', id: out.id, sent: true });
         this.o.emit({ k: 'user', text: out.echo ?? out.text, images: out.images, files: out.files, cp: out.cp });
       }
       // Le immagini incollate viaggiano come blocchi, prima del testo: e' l'ordine

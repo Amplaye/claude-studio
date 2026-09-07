@@ -2035,7 +2035,7 @@
         addQueued(m);
         break;
       case 'unqueued':
-        dropQueued(m.id);
+        dropQueued(m);
         break;
       // Il turno che riparte da solo per chiudere gli errori che ha appena aperto.
       // Ha una card sua e non entra come un messaggio tuo: un turno che riparte in
@@ -2463,7 +2463,13 @@
   qhead.append(icon('time', 'qico'), qheadText);
 
   function paintQueued() {
-    queuedBox.hidden = !queued.size;
+    // Chiuso solo quando non c'e' piu' nessuna riga *sullo schermo*. Una che sta
+    // uscendo e' ancora li', e sparecchiarle il riquadro da sotto le porterebbe via
+    // la spunta prima che tu faccia in tempo a vederla.
+    queuedBox.hidden = !queuedBox.querySelector('.qmsg');
+    // La frase in testa conta chi aspetta davvero: a zero non c'e' piu' niente da
+    // dire, e resta solo la riga che si sta congedando.
+    qhead.hidden = !queued.size;
     if (!queued.size) return;
     qheadText.textContent = t('queue.head', { n: String(queued.size) });
     // Numbered only from two up: a "1" on the only thing in the queue is a label
@@ -2594,16 +2600,43 @@
     say(t('queue.head', { n: String(queued.size) }));
   }
 
-  function dropQueued(id) {
+  /**
+   * Fuori dalla coda. Ma quale delle due cose e' successa?
+   *
+   * Partito e ritirato sono opposti, e uscivano con la stessa animazione: la riga
+   * scivolava via uguale, quindi guardando non c'era modo di sapere se il messaggio
+   * era stato preso in carico o buttato via — con la × li' accanto, che e' il posto
+   * peggiore in cui avere un dubbio del genere. Adesso il motore dice quale delle due
+   * (`sent`), e chi parte lo dice: la riga diventa verde, si spunta, e solo dopo se ne
+   * va — abbastanza da vederlo, e in ogni caso il messaggio ricompare subito sotto,
+   * nel discorso, che e' la conferma vera.
+   */
+  function dropQueued(m) {
+    const id = typeof m === 'string' ? m : m.id;
+    const sent = typeof m === 'object' && !!m.sent;
     const row = queued.get(id);
     if (!row) return;
     queued.delete(id);
-    // It leaves the way it came: gone at once would look like a click that missed.
-    row.classList.add('going');
-    setTimeout(() => {
-      row.remove();
-      paintQueued();
-    }, 200);
+    if (sent) {
+      // Da qui non si torna indietro: la × non deve piu' esserci nemmeno per un attimo.
+      for (const b of row.querySelectorAll('button')) b.remove();
+      row.classList.add('sent');
+      const mark = el('span', 'qsent');
+      mark.append(icon('checkmark'), el('span', null, t('queue.sent')));
+      row.append(mark);
+    } else {
+      row.classList.add('going');
+    }
+    setTimeout(
+      () => {
+        row.remove();
+        paintQueued();
+      },
+      sent ? 900 : 200
+    );
+    // Il conteggio in testa si aggiorna subito: la riga che se ne sta andando non e'
+    // piu' in attesa, e dire "2 in attesa" mentre una sta uscendo e' una bugia breve.
+    paintQueued();
   }
 
   function clearQueued() {

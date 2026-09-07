@@ -460,9 +460,36 @@ for (const surface of ['view', 'panel']) {
     return { rows: box.querySelectorAll('.qmsg').length, num: n ? getComputedStyle(n).display : '?' };
   });
   t(q1.rows === 1 && q1.num === 'none', 'the last one in the queue is still numbered: ' + JSON.stringify(q1));
-  await post({ k: 'unqueued', id: 'q1' });
+
+  // ---- partito non e' ritirato, e si deve vedere ----
+  //
+  // Le due uscite sono opposte e uscivano con la stessa animazione: la riga scivolava
+  // via uguale, quindi guardando non c'era modo di sapere se il messaggio era stato
+  // preso in carico o buttato via — con la × li' accanto, cioe' nel posto peggiore in
+  // cui avere quel dubbio.
+  await post({ k: 'unqueued', id: 'q1', sent: true });
+  await page.waitForTimeout(150);
+  const off = await page.evaluate(() => {
+    const row = document.querySelector('#queued .qmsg');
+    return {
+      row: !!row,
+      sent: !!row && row.classList.contains('sent'),
+      going: !!row && row.classList.contains('going'),
+      says: row?.querySelector('.qsent')?.textContent || '',
+      // Da li' non si torna indietro: la × non deve restare nemmeno per un attimo.
+      buttons: row ? row.querySelectorAll('button').length : -1,
+      boxShown: !document.getElementById('queued').hidden,
+      headShown: !document.querySelector('#queued .qhead').hidden,
+    };
+  });
+  t(off.row && off.sent && !off.going, 'un messaggio partito esce come uno ritirato');
+  t(off.says.trim().length > 0, 'niente dice che il messaggio e’ partito');
+  t(off.buttons === 0, 'la × resta su un messaggio che e’ gia’ partito: ' + off.buttons);
+  t(off.boxShown, 'il riquadro si chiude sotto la riga che sta uscendo');
+  t(!off.headShown, 'la frase in testa conta ancora chi non aspetta piu’');
+
   await page.fill('#input', '');
-  await page.waitForTimeout(320);
+  await page.waitForTimeout(1100);
   t(await page.locator('#queued').isHidden(), 'the empty queue leaves its box behind');
 
   // ---- permissions: the three kinds of question, really clicked ----

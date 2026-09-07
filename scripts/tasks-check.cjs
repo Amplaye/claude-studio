@@ -229,6 +229,28 @@ writeTranscript(ID_PLAN, [
     ],
   },
   { type: 'user', content: [answer('p1', 'Plan on screen: 1/3 done.')] },
+  // E lo stesso piano riscritto male: due passi accesi insieme. Succede — il modello
+  // riscrive la lista intera a ogni giro e gliene sfugge uno acceso di troppo — e il
+  // pannello ci si spacca: tutta la sua grammatica dice "uno" (una riga accesa, un
+  // indice attivo, una stima), e con quattro accesi diventava un muro d'arancione in
+  // cui non si capiva piu' dove fosse arrivato. Vale il primo.
+  {
+    type: 'assistant',
+    content: [
+      call('p2', 'mcp__editor__plan', {
+        steps: [
+          { content: 'Leggere il modulo', activeForm: 'Leggendo il modulo', status: 'completed' },
+          {
+            content: 'Portare i totali su interi',
+            activeForm: 'Portando i totali su interi',
+            status: 'in_progress',
+          },
+          { content: 'Sistemare i test', activeForm: 'Sistemando i test', status: 'in_progress' },
+        ],
+      }),
+    ],
+  },
+  { type: 'user', content: [answer('p2', 'Plan on screen: 1/3 done.')] },
 ]);
 
 // The old tool, still spoken by older CLIs: one call, the whole list.
@@ -571,6 +593,10 @@ async function live(tab, side) {
   t(
     plan && typeof plan.expectedMs === 'number' && plan.expectedMs > 0,
     'non c’e’ nessuna attesa su cui stimare: ' + (plan && plan.expectedMs)
+  );
+  t(
+    (plan?.items ?? []).filter((i) => i.status === 'in_progress').length === 1,
+    'due passi accesi insieme arrivano accesi tutti e due al pannello: ' + line(plan)
   );
 
   // ---- started before it had a number ----

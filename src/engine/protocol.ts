@@ -324,8 +324,14 @@ export type Wire =
   // gia' partiti. Finche' e' in coda non entra nel discorso, sta sopra la barra di
   // scrittura; quando parte davvero arriva il suo 'user' come per tutti gli altri.
   | { k: 'queued'; id: string; text: string; images?: Pasted[]; files?: SentFile[] }
-  /** Uscito dalla coda: o e' partito, o l'hai ritirato. */
-  | { k: 'unqueued'; id: string }
+  /**
+   * Uscito dalla coda. E `sent` dice quale delle due cose e' successa, che non e' un
+   * dettaglio: partito e ritirato sono opposti, e finche' la riga usciva con la stessa
+   * animazione in tutti e due i casi non c'era modo di sapere se il messaggio era stato
+   * preso in carico o buttato via — con la × li' accanto, che e' il posto peggiore in cui
+   * avere un dubbio del genere.
+   */
+  | { k: 'unqueued'; id: string; sent?: boolean }
   /**
    * Una task della CLI, come la racconta il motore.
    *

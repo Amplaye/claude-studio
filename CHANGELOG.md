@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.19.2
+
+- **Partito e ritirato erano indistinguibili.** Un messaggio usciva dalla coda con la
+  stessa animazione tutte e due le volte: che fosse stato preso in carico o che
+  l'avessi buttato via, la riga scivolava via uguale. Guardando non c'era modo di
+  sapere quale delle due — con la × li' accanto, che e' il posto peggiore in cui avere
+  un dubbio del genere. Adesso il motore dice quale delle due e' successa, e chi parte
+  lo dice: la riga diventa verde, si spunta, e i suoi bottoni spariscono subito, che
+  da li' non si torna indietro. La frase in testa smette di contarlo nello stesso
+  istante — se e' partito non e' piu' in attesa.
+
+- **I passi non sono piu' incollati uno all'altro.** Un pixel di distacco fra righe
+  che hanno tutte un fondo colorato non e' distacco: otto passi diventavano un blocco
+  unico in cui bisognava cercare dove finiva uno e cominciava l'altro. Quattro pixel,
+  un po' piu' di respiro dentro, e un letto appena accennato anche sotto i passi che
+  devono ancora arrivare — senza, in un elenco misto le righe col fondo sembravano
+  schede e quelle senza sembravano il vuoto in mezzo.
+
+- **Uno in corso, non quattro.** Il piano lo riscrive il modello intero a ogni giro, e
+  gliene sfugge facilmente piu' d'uno acceso insieme: quattro righe si accendevano
+  tutte e la lista diventava un muro d'arancione in cui non si capiva piu' dove fosse
+  arrivato. Tutta la grammatica del pannello dice "uno" — una riga accesa, una stima —
+  quindi vale il primo e gli altri tornano a essere quello che sono, cioe' da fare. E
+  l'orologio della stima parte solo su quello vero: uno degli scartati che lo prendesse
+  adesso, quando poi tocca a lui davvero, ripartirebbe da mezz'ora fa.
+
 ## 0.19.1
 
 - **Un messaggio in attesa si puo' correggere.** C'era la ×, che lo ritira, e da li'
