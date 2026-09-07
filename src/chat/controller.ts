@@ -16,7 +16,7 @@ import type {
   Wire,
 } from '../engine/protocol';
 import { needsThinking } from '../engine/protocol';
-import { pickFiles, stashFile } from './attach';
+import { pickFiles, previewFile, stashFile } from './attach';
 import { type CommandHost, runLocalCommand } from './commands';
 import { Checkpoints } from './checkpoints';
 import { DEFAULT_PREFS } from '../engine/protocol';
@@ -425,6 +425,16 @@ export class ChatController {
   async stashAttachment(s: Surface, name: string, data: string) {
     const one = await stashFile(this.ctx, name, data);
     if (one) s.post({ k: 'attached', items: [one] });
+  }
+
+  /**
+   * "Fammi vedere cosa ho attaccato". Immagini e testo tornano indietro e si aprono
+   * sopra la chat; tutto il resto lo apre il programma di sistema, e da qui non torna
+   * niente perche' non c'e' niente da disegnare (vedi chat/attach.ts).
+   */
+  async preview(s: Surface, path: string) {
+    const p = await previewFile(path);
+    if (p) s.post({ k: 'preview', ...p });
   }
 
   /** L'elenco per il menu che si apre scrivendo "@". */
@@ -1010,12 +1020,18 @@ export class ChatController {
         tasks.created(this.key, e.id, e.input);
       } else if (e.name === 'TaskUpdate') {
         tasks.updated(this.key, e.input);
+      } else if (e.name === 'TaskList') {
+        // L'unica volta in cui la CLI dice tutte le task insieme. Quello che risponde
+        // vale piu' di quello che ci siamo ricostruiti a pezzi: se per qualsiasi
+        // motivo il pannello era andato fuori sincrono, e' qui che torna a posto.
+        tasks.listing(this.key, e.id);
       }
     }
     // Il numero della task ("#3") non sta nella chiamata che la crea: torna indietro
     // nella risposta del tool, ed e' quello che poi le TaskUpdate useranno per dire di
-    // quale stanno parlando.
-    if (e.k === 'tool_end') tasks.named(this.key, e.id, e.text);
+    // quale stanno parlando. Nella risposta di una TaskList c'e' invece l'elenco
+    // intero, ed e' quello che rimette in riga tutto il resto.
+    if (e.k === 'tool_end') tasks.answered(this.key, e.id, e.text);
     this.broadcast(e);
   }
 

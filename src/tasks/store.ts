@@ -50,6 +50,16 @@ interface List {
   steps: Step[];
   /** Le TaskCreate in volo, sotto l'id della chiamata: aspettano il loro numero. */
   waiting: Map<string, Step>;
+  /** Le TaskList in volo: la loro risposta e' l'elenco vero, e rimette tutto in riga. */
+  asked: Set<string>;
+  /**
+   * Il numero piu' alto visto in questa conversazione. La CLI numera da 1 e non
+   * riusa mai un numero, nemmeno dopo una cancellazione: contarlo qui e' l'unico
+   * modo di indovinare il numero di una task appena creata prima che la risposta
+   * del tool lo dica — e "prima" e' una finestra vera, dentro la quale arrivavano
+   * TaskUpdate che non trovavano nessuno e sparivano senza dire niente.
+   */
+  next: number;
   busy: boolean;
   data: TaskData;
 }
@@ -58,6 +68,8 @@ const blank = (): List => ({
   source: 'todo',
   steps: [],
   waiting: new Map(),
+  asked: new Set(),
+  next: 0,
   busy: false,
   data: EMPTY,
 });
@@ -66,6 +78,20 @@ const blank = (): List => ({
 function numberIn(text: string): string {
   const m = /#(\d+)/.exec(text || '');
   return m ? m[1] : '';
+}
+
+/**
+ * Una riga dell'elenco che stampa TaskList: `#2 [pending] Contare le righe`.
+ * Gli stati che non conosciamo valgono "da fare": una task che esiste e non e'
+ * ne' in corso ne' finita e' esattamente quello.
+ */
+const LINE = /^#(\d+)\s*\[([a-z_]+)\]\s*(.+)$/i;
+
+function statusOf(word: string): TaskItem['status'] {
+  const w = word.toLowerCase();
+  if (w === 'completed' || w === 'done') return 'completed';
+  if (w === 'in_progress' || w === 'running' || w === 'active') return 'in_progress';
+  return 'pending';
 }
 
 export class TaskStore {
@@ -125,7 +151,11 @@ export class TaskStore {
       l.waiting.clear();
     }
     const step: Step = {
-      id: '',
+      // Il numero se lo prende subito, contando. La risposta del tool lo confermera'
+      // (o lo correggera') fra un istante, ma fino a li' la task era senza numero e
+      // una TaskUpdate arrivata nel frattempo non trovava niente da aggiornare: la
+      // spunta non compariva, e sembrava che il pannello si fosse perso un passo.
+      id: String(++l.next),
       content,
       activeForm: o.activeForm ? String(o.activeForm) : undefined,
       status: 'pending',
@@ -136,16 +166,70 @@ export class TaskStore {
   }
 
   /**
-   * La risposta di una TaskCreate: dentro c'e' il numero della task. Senza, si ripiega
-   * sulla posizione — la CLI numera da 1 nell'ordine in cui le crea, ed e' l'unica
-   * cosa che si puo' dire con certezza di una lista costruita in ordine.
+   * "Sto chiedendo l'elenco". La risposta di TaskList e' l'unica cosa che la CLI dice
+   * su tutte le task insieme, ed e' la rete di sicurezza di questo file: qualunque
+   * cosa si sia persa per strada — un tool_end mai arrivato, una task creata prima
+   * che la conversazione fosse agganciata — li' dentro c'e' scritta com'e' davvero.
    */
-  named(key: string, callId: string, text: string) {
+  listing(key: string, callId: string) {
+    this.of(key).asked.add(callId);
+  }
+
+  /**
+   * La risposta di una TaskCreate o di una TaskList, che e' l'unico posto dove la CLI
+   * dice i numeri delle task.
+   *
+   * Dalla TaskCreate arriva il numero di quella appena creata; dalla TaskList arriva
+   * l'elenco intero, e allora si prende quello e si butta via quello che avevamo —
+   * e' l'unica versione che non puo' essere andata fuori sincrono.
+   */
+  answered(key: string, callId: string, text: string) {
     const l = this.lists.get(key);
-    const step = l?.waiting.get(callId);
-    if (!l || !step) return;
+    if (!l) return;
+    if (l.asked.delete(callId)) {
+      this.fromList(key, l, text);
+      return;
+    }
+    const step = l.waiting.get(callId);
+    if (!step) return;
     l.waiting.delete(callId);
-    step.id = numberIn(text) || String(l.steps.indexOf(step) + 1);
+    const n = numberIn(text);
+    if (!n) return; // il numero indovinato alla creazione resta il migliore che abbiamo
+    step.id = n;
+    l.next = Math.max(l.next, Number(n));
+  }
+
+  /**
+   * L'elenco stampato da TaskList, preso per buono.
+   *
+   *   #1 [completed] Leggere il README
+   *   #2 [pending] Contare le righe
+   *
+   * L'unica cosa che non c'e' dentro e' l'`activeForm` ("Leggendo il README"): quella
+   * la sa solo la TaskCreate, quindi si porta dietro dalla task che aveva lo stesso
+   * numero, se c'era.
+   *
+   * "No tasks found" su una lista scritta con TodoWrite non e' una notizia su quella
+   * lista: sono due contabilita' diverse, e cancellarla sarebbe un pannello che si
+   * svuota da solo mentre Claude lavora.
+   */
+  private fromList(key: string, l: List, text: string) {
+    const rows = String(text || '')
+      .split(/\r?\n/)
+      .map((r) => LINE.exec(r.trim()))
+      .filter((m): m is RegExpExecArray => !!m);
+    if (!rows.length && l.source !== 'task') return;
+    const before = new Map(l.steps.map((s) => [s.id, s]));
+    l.source = 'task';
+    l.waiting.clear();
+    l.steps = rows.map(([, id, state, subject]) => ({
+      id,
+      content: subject.trim(),
+      activeForm: before.get(id)?.activeForm,
+      status: statusOf(state),
+    }));
+    for (const [, id] of rows) l.next = Math.max(l.next, Number(id));
+    this.settle(key, l);
   }
 
   /** Una TaskUpdate: cambia stato, testo, o toglie la task di mezzo. */

@@ -126,9 +126,20 @@
   color: var(--ok, #5dbf8a);
 }
 
-/* The one being worked on is the only one that should catch the eye. */
+/* Done is also said by the bed the row sits on. Nine steps in a narrow column are a
+   wall of white sentences, and telling them apart meant reading every line to find the
+   struck-through ones. A tint you can see from across the room does that in a glance —
+   and it is a background, not dimmed text, so nothing gets harder to read. */
+.tk-row.completed {
+  background: color-mix(in srgb, var(--ok, #5dbf8a) 9%, transparent);
+}
+
+/* The one being worked on is the only one that should catch the eye. The bar down the
+   left edge is the part that survives a list too long for the panel: colour and weight
+   both wash out at a glance, an edge does not. */
 .tk-row.in_progress {
-  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 16%, transparent);
+  box-shadow: inset 2px 0 0 var(--claude-2);
   font-weight: 600;
   transform: translateX(2px);
 }
@@ -179,7 +190,8 @@
   left: 0;
   top: 50%;
   width: 100%;
-  height: 1px;
+  height: 1.5px;
+  border-radius: 1px;
   background: currentColor;
   transform-origin: left center;
 }

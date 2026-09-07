@@ -70,6 +70,39 @@ export interface SessionOptions {
  */
 const THINK_BUDGET = 31999;
 
+/**
+ * Come si chiude un turno.
+ *
+ * Il preset di Claude Code non dice niente sulla lunghezza della chiusura, e il
+ * risultato e' il muro di testo che ti tocca leggere ogni volta: il riassunto del
+ * codice che hai gia' visto scorrere, file per file, piu' il resoconto del
+ * ragionamento. La riga che conta — cosa e' cambiato, e cosa manca ancora — sta in
+ * fondo a tutto, se c'e'.
+ *
+ * Si aggiunge in coda al preset, non al posto suo: `append` lascia intatte le
+ * istruzioni di Claude Code e ci mette sotto queste. Sta nel prompt di sistema,
+ * quindi si paga una volta per sessione e poi si rilegge dalla cache.
+ *
+ * L'ultima riga non e' una gentilezza: senza, un "spiegami com'e' fatto" o un
+ * "scrivimi il piano" tornerebbero in cinque punti, cioe' questa regola romperebbe
+ * proprio le risposte che devono essere lunghe.
+ */
+const CLOSING = [
+  '## Closing a turn',
+  '',
+  'Close every turn with a short recap, not a report. At most five lines, one fact each:',
+  '',
+  '- what actually changed (files, behaviour), not how you got there;',
+  "- what is left, blocked, or needs a decision from the user — say it plainly, don't bury it;",
+  '- nothing else: no walkthrough of the code you just wrote, no restating the request,',
+  '  no summary of your own reasoning, no list of what you considered and skipped.',
+  '',
+  'If nothing changed, one line saying so is the whole answer.',
+  '',
+  'This governs the closing recap only. When the user asks for an explanation, a plan,',
+  'a review or a report, that *is* the answer: give it in full, at whatever length it needs.',
+].join('\n');
+
 type Outgoing = { text: string; images?: { mime: string; data: string }[] };
 
 export class Session {
@@ -257,7 +290,7 @@ export class Session {
       // Il preset e' la strada documentata per dire "voglio Claude Code": si paga
       // pieno una volta per sessione — sta in testa alla richiesta, dentro la cache
       // del prompt — e da li' in poi si rilegge, che costa una frazione.
-      systemPrompt: { type: 'preset', preset: 'claude_code' },
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: CLOSING },
       // Vuoto vuol dire "non dire niente": la CLI usa quello che useresti da
       // terminale. Si passa solo cio' che hai scelto apposta.
       ...(this.o.model ? { model: this.o.model } : {}),

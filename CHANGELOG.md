@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.15.6
+
+- **Ogni allegato si guarda prima di mandarlo, non solo le immagini.** Una foto aveva
+  la sua miniatura da cliccare; tutto il resto era un nome e un peso, quindi l'unica
+  domanda che ti fai davvero — "e' questo il contratto giusto?" — si risolveva
+  mandandolo e sperando. Ora la pastiglia si apre: un'immagine si vede grande, un file
+  di testo (un log, un .csv, un .env, del codice — qualunque cosa non abbia un byte
+  zero in testa) si legge li' dentro col suo nome sopra, e un PDF, un foglio di
+  calcolo o un video li apre il programma che sul computer li apre gia', che e' un
+  lettore migliore di qualunque cosa una webview abbia il permesso di disegnare. Vale
+  anche per gli allegati dei messaggi gia' spediti: tre messaggi dopo il file si
+  riapre da li'.
+
+- **Esc chiude l'anteprima e basta.** Chiudeva l'anteprima *e* fermava il turno: la
+  scorciatoia di pagina era registrata per prima, quindi leggeva il tasto prima di
+  tutti e lo prendeva per "ferma tutto". Uscivi da un'occhiata a un file e ammazzavi
+  il lavoro che stavi guardando. Adesso l'anteprima intercetta Esc in cattura, prima
+  di chiunque altro; con niente di aperto Esc ferma il turno come sempre.
+
+- **La chiusura di un turno e' un riassunto, non un tema.** Il muro di testo alla fine
+  — il codice ricapitolato file per file, il resoconto del ragionamento, e in fondo,
+  se c'era, la riga che volevi — arrivava perche' nessuno aveva mai detto il
+  contrario. Ora le istruzioni di sistema lo dicono: al massimo cinque righe, cosa e'
+  cambiato e cosa manca, niente altro. Le risposte lunghe che chiedi apposta (una
+  spiegazione, un piano, una revisione) restano lunghe: la regola vale solo per la
+  chiusura.
+
+- **I passi non si perdono piu' per strada.** Una task creata e avviata dentro lo
+  stesso messaggio — cioe' ogni volta che Claude sa gia' da dove comincia — restava
+  disegnata come "da fare": il numero glielo dava la risposta del tool, che arriva
+  dopo, e la TaskUpdate che nel frattempo la nominava non trovava nessuno e spariva
+  senza dire niente. Adesso il numero se lo prende alla nascita, contando, e la
+  risposta del tool semmai lo corregge. E quando Claude chiede l'elenco (TaskList) —
+  l'unico momento in cui la CLI dice tutte le task insieme — quello che risponde
+  vince: se il pannello si era sfasato per qualsiasi altro motivo, li' torna a posto.
+
+- **Fatto e in corso si vedono da lontano.** Le task finite hanno la riga sopra le
+  parole piu' marcata e un letto verde appena accennato, cosi' in una colonna stretta
+  si contano con un'occhiata invece di leggerle una per una; quella al lavoro ha una
+  barra sul bordo sinistro, che e' la sola cosa che sopravvive quando la lista e' piu'
+  lunga del pannello.
+
 ## 0.15.5
 
 - **Le tre manopole le giri tu.** Modello, impegno e ragionamento avevano tutti e tre

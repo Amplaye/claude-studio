@@ -102,6 +102,7 @@
     'composer.dropSelection': "Don't attach the selection",
     'composer.removeImage': 'Remove',
     'composer.removeFile': 'Remove this attachment',
+    'composer.previewFile': 'Open {name}',
     'composer.attachedImage': 'Attached image',
     'composer.attach':
       'Attach any file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, logs, source code. Images too.',
@@ -240,6 +241,7 @@
 
     // ---- lightbox ----
     'lightbox.close': 'Close (Esc)',
+    'lightbox.clipped': 'first 200 KB',
 
     // ---- the context panel (sidebar, and the column inside the tab) ----
     'ctx.account': 'Account',
@@ -336,6 +338,7 @@
     'composer.dropSelection': 'Non allegare la selezione',
     'composer.removeImage': 'Togli',
     'composer.removeFile': 'Togli questo allegato',
+    'composer.previewFile': 'Apri {name}',
     'composer.attachedImage': 'Immagine allegata',
     'composer.attach':
       'Allega qualunque file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, log, codice. Anche immagini.',
@@ -459,6 +462,7 @@
     'ago.days': '{n} giorni fa',
 
     'lightbox.close': 'Chiudi (Esc)',
+    'lightbox.clipped': 'primi 200 KB',
 
     'ctx.account': 'Account',
     'ctx.session': 'Sessione · 5h',

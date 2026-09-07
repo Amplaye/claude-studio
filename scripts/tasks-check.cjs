@@ -57,6 +57,8 @@ const t = (cond, msg) => !cond && fails.push(msg);
 // ---- two transcripts, one per dialect ---------------------------------------
 const ID_TASK = 'aaaaaaaa-2222-4222-8333-444444444444';
 const ID_TODO = 'bbbbbbbb-2222-4222-8333-444444444444';
+const ID_EARLY = 'dddddddd-2222-4222-8333-444444444444';
+const ID_LIST = 'eeeeeeee-2222-4222-8333-444444444444';
 
 const projects = path.join(home, '.claude', 'projects', work.replace(/[^a-zA-Z0-9]/g, '-'));
 if (!LIVE) fs.mkdirSync(projects, { recursive: true });
@@ -138,6 +140,55 @@ writeTranscript(ID_TASK, [
   { type: 'assistant', content: [call('u3', 'TaskUpdate', { taskId: '2', status: 'in_progress' })] },
   { type: 'user', content: [answer('u3', 'Updated task #2 status')] },
   { type: 'assistant', content: [{ type: 'text', text: 'Renamed it.' }] },
+]);
+
+// Two tasks created and one of them started inside the *same* assistant message, which
+// is what the CLI does whenever it knows its first step before it has finished writing
+// the list down. The three answers only arrive afterwards, together — so for the length
+// of that message the tasks had no number yet, and a TaskUpdate that names one found
+// nobody home and was dropped without a word. The step stayed drawn as "to do" while
+// Claude was working on it, and nothing on screen said why.
+writeTranscript(ID_EARLY, [
+  { type: 'user', content: 'start on it while you write the list' },
+  {
+    type: 'assistant',
+    content: [
+      call('e1', 'TaskCreate', {
+        subject: 'Read the file',
+        description: '...',
+        activeForm: 'Reading the file',
+      }),
+      call('e2', 'TaskCreate', { subject: 'Write the patch', description: '...' }),
+      call('e3', 'TaskUpdate', { taskId: '1', status: 'in_progress' }),
+    ],
+  },
+  {
+    type: 'user',
+    content: [
+      answer('e1', 'Task #1 created successfully: Read the file'),
+      answer('e2', 'Task #2 created successfully: Write the patch'),
+      answer('e3', 'Updated task #1 status'),
+    ],
+  },
+]);
+
+// TaskList: the one call where the CLI says all the tasks at once. Here it contradicts
+// what watching the calls go by would have built — a task nobody saw being created, and
+// one already ticked off — and the answer it gives is the one that has to win.
+writeTranscript(ID_LIST, [
+  { type: 'user', content: 'where were we?' },
+  { type: 'assistant', content: [call('l0', 'TaskUpdate', { taskId: '7', status: 'completed' })] },
+  { type: 'user', content: [answer('l0', 'Updated task #7 status')] },
+  { type: 'assistant', content: [call('l1', 'TaskList', {})] },
+  {
+    type: 'user',
+    content: [
+      answer(
+        'l1',
+        '#6 [completed] Move the parser out\n#7 [in_progress] Rename the column\n#8 [pending] Run the tests'
+      ),
+    ],
+  },
 ]);
 
 // The old tool, still spoken by older CLIs: one call, the whole list.
@@ -358,6 +409,31 @@ async function live(tab, side) {
   t(
     old && old.total === 2 && old.done === 1 && old.active === 1,
     'the counts of a TodoWrite list are wrong: ' + JSON.stringify(old && { ...old, items: undefined })
+  );
+
+  // ---- started before it had a number ----
+  tab.webview._onMsg({ cmd: 'open', id: ID_EARLY });
+  await settle();
+  const early = board(tab)[ID_EARLY];
+  t(
+    line(early) === 'i:Read the file | p:Write the patch',
+    'a step Claude started in the same message that created it is still drawn as to-do: ' +
+      line(early)
+  );
+  t(early && early.active === 0, 'the panel does not know which step is running: ' + (early && early.active));
+
+  // ---- TaskList has the last word ----
+  tab.webview._onMsg({ cmd: 'open', id: ID_LIST });
+  await settle();
+  const listed = board(tab)[ID_LIST];
+  t(
+    line(listed) === 'c:Move the parser out | i:Rename the column | p:Run the tests',
+    'the list TaskList printed did not reach the panel: ' + line(listed)
+  );
+  t(
+    listed && listed.total === 3 && listed.done === 1 && listed.active === 1,
+    'the counts do not match the list the CLI printed: ' +
+      JSON.stringify(listed && { ...listed, items: undefined })
   );
 
   // ---- a new conversation leaves nothing behind ----

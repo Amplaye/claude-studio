@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code but, a better IDE! The same Claude Code, in a panel you can actually watch. It keeps the Claude Code CLI updated on its own, so you're never behind on models or features. Live progress, diffs you open when you want, one-click permissions, and attach any file, not just images.",
-  "version": "0.15.5",
+  "version": "0.15.6",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -300,7 +300,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.228",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.237",
     "ionicons": "^8.1.0",
     "zod": "^4.4.3"
   }

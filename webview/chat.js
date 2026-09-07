@@ -1458,6 +1458,12 @@
         for (const a of m.items || []) addAttachment(a);
         paintAttach();
         break;
+      // The contents of an attachment, come back to be looked at. Only what a page can
+      // really draw arrives here — everything else the extension has already opened in
+      // the program that handles it, and sends nothing.
+      case 'preview':
+        openLightbox(m);
+        break;
       case 'selection':
         selection = m.file ? { file: m.file, lines: m.lines } : null;
         // every new selection starts out attached: that's what you'd expect
@@ -1510,11 +1516,18 @@
         if (m.files && m.files.length) {
           const box = el('div', 'ufiles');
           for (const f of m.files) {
-            const chip = el('span', 'att att-file');
-            chip.title = f.path || f.name;
+            const chip = el('span', 'att att-file' + (f.path ? ' att-open' : ''));
+            chip.title = f.path ? t('composer.previewFile', { name: f.name }) : f.name;
             const info = el('span', 'att-info');
             info.append(el('span', 'att-name', f.name));
             if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
+            // Sent is not gone: the chip stays the way in, so three messages later
+            // you can still open the file you attached without going to find it.
+            if (f.path) {
+              chip.addEventListener('click', () =>
+                vscode.postMessage({ cmd: 'preview', path: f.path })
+              );
+            }
             chip.append(icon(fileIcon(f.name)), info);
             box.append(chip);
           }
@@ -1827,11 +1840,41 @@
   }
 
   // ---------- lightbox ----------
-  function openLightbox(src) {
+  //
+  // Whatever you attached, looked at without leaving the chat. An image opens big; a
+  // file that turns out to be text — a log, a .csv, an .env, a source file: anything
+  // without a zero byte in its head — opens as text, with its name on top. A PDF, a
+  // spreadsheet, a video never reach here at all: the extension hands those to the
+  // program that already opens them on this computer, which is a better reader than
+  // anything a webview is allowed to draw (see chat/attach.ts).
+  //
+  // `item` is either a data: URL (the images already in the page) or the preview the
+  // extension sent back.
+  function openLightbox(item) {
+    const it = typeof item === 'string' ? { kind: 'image', src: item } : item;
     const overlay = el('div', 'lightbox');
-    const img = document.createElement('img');
-    img.src = src;
-    overlay.appendChild(img);
+    const box = el('div', 'lb-box' + (it.kind === 'text' ? ' lb-text' : ''));
+
+    // The name of what you're looking at. An image opened from the chat has none —
+    // it's the one already in front of you — and then the bar simply isn't there.
+    if (it.name) {
+      const bar = el('div', 'lb-head');
+      bar.append(icon(fileIcon(it.name), 'lb-ico'), el('span', 'lb-name', it.name));
+      if (it.clipped) bar.append(el('span', 'lb-clip', t('lightbox.clipped')));
+      box.append(bar);
+    }
+
+    let body;
+    if (it.kind === 'text') {
+      // textContent, never innerHTML: this is a file off the disk, and the house rule
+      // is that data never becomes markup.
+      body = el('pre', 'lb-pre', it.text || '');
+    } else {
+      body = document.createElement('img');
+      body.src = it.src || `data:${it.mime};base64,${it.data}`;
+    }
+    box.append(body);
+    overlay.appendChild(box);
 
     // The X at the top right: clicking the backdrop already closes it, but without a
     // visible button nobody knows that. Esc does the same thing.
@@ -1844,7 +1887,7 @@
 
     const close = () => {
       overlay.remove();
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('keydown', onKey, true);
     };
     function onKey(e) {
       if (e.key === 'Escape') {
@@ -1856,10 +1899,17 @@
       e.stopPropagation();
       close();
     });
-    // Clicking the image doesn't close it: sometimes you just want to look at it
-    img.addEventListener('click', (e) => e.stopPropagation());
+    // Clicking what you're looking at doesn't close it: sometimes you just want to
+    // look, or select a line of the file.
+    box.addEventListener('click', (e) => e.stopPropagation());
     overlay.addEventListener('click', close);
-    document.addEventListener('keydown', onKey);
+    // In capture, and that is the whole point. The page-wide Escape handler is
+    // registered first (it goes up at start-up, this one only when a preview opens),
+    // so on the way out it would run first and take Escape as "stop what Claude is
+    // doing" — you closed a preview and killed the turn with it. Capture runs before
+    // any of the bubbling listeners, marks the key as handled with preventDefault,
+    // and the shortcut below stands down on `defaultPrevented`.
+    document.addEventListener('keydown', onKey, true);
     document.body.appendChild(overlay);
   }
 
@@ -1939,8 +1989,8 @@
       stagger(chip);
     });
     files.forEach((f, n) => {
-      const chip = el('span', 'att att-file');
-      chip.title = f.path;
+      const chip = el('span', 'att att-file att-open');
+      chip.title = t('composer.previewFile', { name: f.name });
       const info = el('span', 'att-info');
       info.append(el('span', 'att-name', f.name));
       if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
@@ -1948,10 +1998,17 @@
       x.type = 'button';
       x.title = t('composer.removeFile');
       x.append(icon('close'));
-      x.addEventListener('click', () => {
+      x.addEventListener('click', (e) => {
+        // Otherwise removing a file would also open it: the × sits inside the chip,
+        // and the chip is now the button that shows you what you attached.
+        e.stopPropagation();
         files.splice(n, 1);
         paintAttach();
       });
+      // An image gets a thumbnail you can click; everything else used to be a name
+      // and nothing more, so the one thing you actually want — "is this the right
+      // file?" — meant sending it and hoping. Same click, same preview.
+      chip.addEventListener('click', () => vscode.postMessage({ cmd: 'preview', path: f.path }));
       chip.append(icon(fileIcon(f.name)), info, x);
       stagger(chip);
     });

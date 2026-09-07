@@ -2745,6 +2745,12 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-size: 9px;
   letter-spacing: 0.03em;
 }
+/* A chip that opens: an image already had a thumbnail you could click, and every
+   other file was a name you had to send before you could tell it was the right one.
+   Same cursor as the thumbnail, because it's the same gesture. */
+.att.att-open {
+  cursor: zoom-in;
+}
 /* Every chip arrives instead of appearing: with several files picked at once you
    see them land one after another, so you can count them. */
 .att {
@@ -2832,12 +2838,83 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   cursor: zoom-out;
   animation: cs-pop-in 0.22s ease both;
 }
-.lightbox img {
+/* What you're looking at, image or file, sits in one box: the name bar on top has to
+   travel with it rather than float somewhere over the backdrop. */
+.lb-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   max-width: 92%;
   max-height: 92%;
+  cursor: default;
+}
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  min-height: 0;
   border-radius: 8px;
   box-shadow: 0 20px 60px -20px #000;
   cursor: default;
+}
+/* The name of the file. On an image opened from the chat there is none — you already
+   know what you clicked — and the bar simply isn't built. */
+.lb-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0 2px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lb-ico {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+/* Said once, where you'd otherwise wonder why the file ends mid-sentence. */
+.lb-clip {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* A file read as text: the same sheet a diff would be on, scrolling on its own, with
+   the lines left exactly as they are on disk. */
+.lb-text {
+  width: min(980px, 92vw);
+}
+.lb-pre {
+  margin: 0;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #14110f;
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  tab-size: 2;
+  text-align: left;
+  cursor: text;
+  user-select: text;
 }
 /* The X: always visible at the top right, so you know how to get out. */
 .lbx {

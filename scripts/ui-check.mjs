@@ -635,6 +635,63 @@ for (const surface of ['view', 'panel']) {
     'the chip does not say how big the file is: ' +
       (await page.locator('.attach .att-file .att-size').first().textContent())
   );
+  // ---- looking at what you attached, and getting back out ----
+  //
+  // An image had a thumbnail you could click; every other file was a name and a size,
+  // so "is this the right contract.pdf?" meant sending it and finding out. The chip is
+  // the way in now, whatever the file is.
+  await page.click('.attach .att-file');
+  const spv = await lastSent();
+  t(
+    spv?.cmd === 'preview' && /contract\.pdf$/.test(spv.path || ''),
+    'clicking an attached file does not ask for its preview: ' + JSON.stringify(spv)
+  );
+  await post({
+    k: 'preview',
+    kind: 'text',
+    name: 'contract.pdf',
+    path: 'C:/work/shop/docs/contract.pdf',
+    text: 'FIRST LINE\nsecond line',
+    clipped: true,
+  });
+  await page.waitForTimeout(160);
+  const lb = await page.evaluate(() => {
+    const o = document.querySelector('.lightbox');
+    return {
+      open: !!o,
+      name: o?.querySelector('.lb-name')?.textContent || '',
+      text: o?.querySelector('.lb-pre')?.textContent || '',
+      clipped: !!o?.querySelector('.lb-clip'),
+    };
+  });
+  t(lb.open, 'the preview of a file does not open');
+  t(lb.name === 'contract.pdf', 'the preview does not say which file it is: ' + lb.name);
+  t(/FIRST LINE/.test(lb.text), 'the preview shows no contents: ' + lb.text.slice(0, 40));
+  t(lb.clipped, 'a preview cut short does not say so');
+
+  // Esc closes the preview and nothing else. It used to do both: the page-wide
+  // shortcut is registered before this one, so it read the key first and took it as
+  // "stop" — you shut a preview and killed the turn you were watching.
+  await post({ k: 'busy', value: true });
+  await page.waitForTimeout(80);
+  const mark = await page.evaluate(() => (window.__sent || []).length);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(120);
+  const after = await page.evaluate((n) => (window.__sent || []).slice(n), mark);
+  t((await page.locator('.lightbox').count()) === 0, 'Esc does not close the preview');
+  t(
+    !after.some((m) => m?.cmd === 'interrupt'),
+    'Esc on a preview also stopped the session: ' + JSON.stringify(after)
+  );
+  // And with nothing open it still stops the turn: the fix must not have cost the
+  // shortcut its day job.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(120);
+  const sesc = await lastSent();
+  t(sesc?.cmd === 'interrupt', 'Esc no longer stops a running turn: ' + JSON.stringify(sesc));
+  await post({ k: 'busy', value: false });
+  await page.waitForTimeout(80);
+
   // A file with nothing written: attaching one and pressing send has to work — it
   // is a perfectly good message on its own ("look at this").
   await page.fill('#input', '');

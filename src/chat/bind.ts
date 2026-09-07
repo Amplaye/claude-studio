@@ -81,6 +81,9 @@ export function bindWebview(
       case 'stashFile':
         void chat.stashAttachment(surface, m.name, m.data);
         return;
+      case 'preview':
+        void chat.preview(surface, m.path);
+        return;
       case 'interrupt':
         chat.interrupt();
         return;

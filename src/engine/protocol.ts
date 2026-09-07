@@ -240,6 +240,24 @@ export type Wire =
   // extension found them on disk: images come back with their bytes so the chip can
   // show a thumbnail, everything else with a path Claude opens itself.
   | { k: 'attached'; items: Attachment[] }
+  // Il contenuto di un allegato, per guardarlo senza uscire dalla chat. Solo quello
+  // che una pagina sa davvero disegnare: un'immagine, o del testo. Tutto il resto —
+  // un PDF, un foglio di calcolo, un video — non arriva qui affatto: lo apre il
+  // programma che sul computer lo apre gia' (vedi chat/attach.ts).
+  | {
+      k: 'preview';
+      name: string;
+      path: string;
+      kind: 'image' | 'text';
+      /** immagini */
+      mime?: string;
+      /** immagini: base64 senza il prefisso data: */
+      data?: string;
+      /** testo */
+      text?: string;
+      /** Il file era piu' lungo di quanto se ne guarda: si vede l'inizio. */
+      clipped?: boolean;
+    }
   // empty `file` = there's nothing selected in the editor any more
   | { k: 'selection'; file: string; lines: string }
   | {
@@ -341,6 +359,8 @@ export type Cmd =
   | { cmd: 'open'; id: string; fork?: boolean }
   | { cmd: 'files'; q: string }
   | { cmd: 'openFile'; path: string; line?: number }
+  // "Fammelo vedere": l'anteprima di un allegato, di qualunque tipo sia.
+  | { cmd: 'preview'; path: string }
   // "My audio is awake": a page can only make a sound once you've touched it, and
   // the chime has to go to one that can actually be heard. See chat/sound.ts.
   | { cmd: 'audio'; ok: boolean }
