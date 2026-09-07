@@ -857,7 +857,9 @@ for (const surface of ['view', 'panel']) {
       squashed: [...log.querySelectorAll('.msg')]
         .filter((n) => n.scrollHeight > n.clientHeight + 2 && !n.querySelector('.plan, .out, .detail'))
         .map((n) => n.className),
-      logWidth: Math.round(box.width),
+      // The thread and the map of the turn beside it: together they are the column
+      // that isn't the context, and it's their sum that has to fill the window.
+      logWidth: Math.round(document.querySelector('.logwrap').getBoundingClientRect().width),
       railWidth: Math.round(document.getElementById('rail').getBoundingClientRect().width),
       winWidth: document.documentElement.clientWidth,
     };

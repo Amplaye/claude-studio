@@ -2,6 +2,7 @@
 // aperta insieme nel pannello laterale e come scheda a tutto schermo: chi si attacca
 // dopo si riprende la storia e vede esattamente quello che vede l'altra faccia.
 import * as vscode from 'vscode';
+import * as nodePath from 'node:path';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli } from '../engine/cli';
 import type {
@@ -23,7 +24,15 @@ import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
 import { setChatBadge } from './badge';
 import { owned } from '../context/owned';
-import { currentSelection, findFiles, workspaceRoot } from './editor';
+import {
+  currentSelection,
+  diagnosticsSettled,
+  errorSnapshot,
+  findFiles,
+  follow,
+  newErrors,
+  workspaceRoot,
+} from './editor';
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
@@ -108,6 +117,46 @@ let keySeq = 0;
  * *quella* conversazione, e per farlo serve il controller in mano. Le schede le trova
  * ChatPanel.byKey; la chat della sidebar non e' una scheda e li' non c'e'.
  */
+/** Gli strumenti che scrivono davvero su un file. Gli altri non sporcano niente. */
+const WRITERS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
+
+/** Un percorso puo' arrivare relativo o gia' intero: qui diventa sempre intero. */
+function absolute(p: string): string {
+  return /^([a-zA-Z]:[\\/]|\/)/.test(p) ? p : nodePath.join(workspaceRoot(), p);
+}
+
+/**
+ * Quante volte l'autofix puo' riprovare su uno stesso messaggio.
+ *
+ * Due, e non e' un numero scelto a caso: il primo giro sistema gli errori veri, il
+ * secondo quelli che ha introdotto sistemando i primi. Da li' in poi, se non ne e'
+ * venuto fuori, non ne verra' fuori — e ogni giro in piu' e' un turno intero pagato
+ * per vedere lo stesso errore. Al terzo si ferma e te lo dice.
+ */
+const FIX_ROUNDS = 2;
+
+/**
+ * Il passo in corso, in tre parole, per la card del contesto.
+ *
+ * Il nome dello strumento piu' la sola cosa che dice qualcosa: il file, il comando,
+ * il motivo di ricerca. Un percorso si riduce al nome del file — nella colonna del
+ * contesto ci stanno quaranta caratteri, e i primi trenta di un percorso assoluto
+ * sono sempre gli stessi.
+ */
+function stepLabel(name: string, input: unknown): string {
+  const i = (input ?? {}) as Record<string, unknown>;
+  for (const k of ['file_path', 'path', 'command', 'pattern', 'query', 'description', 'url']) {
+    const v = i[k];
+    if (typeof v !== 'string' || !v.trim()) continue;
+    const short =
+      k === 'file_path' || k === 'path' ? v.split(/[\\/]/).pop() || v : v.replace(/\s+/g, ' ');
+    // Tagliato coi puntini, sempre: un comando troncato a meta' di un percorso,
+    // senza puntini, sembra un comando sbagliato invece che uno accorciato.
+    return `${name} ${short.length > 58 ? short.slice(0, 57) + String.fromCharCode(8230) : short}`;
+  }
+  return name;
+}
+
 export const chats = new Map<string, ChatController>();
 
 export class ChatController {
@@ -117,6 +166,22 @@ export class ChatController {
   private readonly checkpoints = new Checkpoints();
   private surfaces = new Set<Surface>();
   private busy = false;
+  /**
+   * I file che questo turno ha scritto, e cosa ci ha scritto dentro.
+   *
+   * Serve a due cose che si somigliano solo di sbieco: far seguire l'editor a Claude
+   * (si apre il file e si illuminano le righe appena scritte) e sapere, a fine turno,
+   * dove andare a cercare gli errori che prima non c'erano. Chiave = il `tool_use_id`,
+   * perche' il nome del file lo dice la chiamata e l'esito la risposta, e fra le due
+   * possono passarne altre tre.
+   */
+  private writing = new Map<string, { file: string; wrote?: string }>();
+  /** I file toccati dal turno in corso, per nome intero. Si azzera a ogni messaggio tuo. */
+  private touched = new Set<string>();
+  /** Gli errori che c'erano gia' prima che questo messaggio partisse. */
+  private errorsBefore = new Map<string, Set<string>>();
+  /** Quante volte l'autofix e' gia' ripartito su questo messaggio. */
+  private fixRound = 0;
   private mode: Mode = 'bypassPermissions';
   /** Conversazione da riprendere alla prossima accensione del motore. */
   private resume?: { id: string; fork: boolean };
@@ -409,6 +474,13 @@ export class ChatController {
     // Da qui in poi le modifiche appartengono a questo messaggio: e' il punto a
     // cui "/rewind" sa tornare.
     this.checkpoints.begin(text);
+    // Un messaggio tuo apre una partita nuova per l'autofix: i file toccati tornano a
+    // zero, i giri pure, e si fotografa com'erano gli errori *prima*, che e' l'unico
+    // modo per distinguere quelli che nascono adesso da quelli di ieri.
+    this.touched.clear();
+    this.writing.clear();
+    this.fixRound = 0;
+    this.errorsBefore = errorSnapshot();
     // I file viaggiano a parte dall'eco: nel messaggio vero sono gia' dentro `full`
     // come percorsi, qui servono solo perche' la chat possa disegnarli attaccati al
     // messaggio, esattamente come fa con le immagini.
@@ -444,6 +516,64 @@ export class ChatController {
     else this.broadcast(e);
   }
 
+  /**
+   * Gli errori introdotti da questo turno, rimandati indietro perche' li sistemi.
+   *
+   * L'idea e' la sola cosa che un IDE puo' dare a un agente e un terminale no: le
+   * sottolineature rosse esistono gia', le ha calcolate TypeScript mentre il turno
+   * finiva, e chiederle non costa niente. Nel terminale la stessa risposta vuol dire
+   * rilanciare una build e aspettare mezzo minuto.
+   *
+   * Il guinzaglio, che e' la meta' importante di questa funzione. Un giro che riparte
+   * da solo puo' andare avanti per sempre, spendere, e "sistemare" cancellando —
+   * quindi passa solo se sono vere tutte queste:
+   *
+   *   - l'hai lasciato acceso (una levetta nelle impostazioni);
+   *   - il turno e' andato a buon fine: uno interrotto l'hai fermato tu, e ripartire
+   *     da soli sopra un tuo stop e' esattamente il contrario di quello che hai detto;
+   *   - questo turno ha scritto su qualche file — se non ha toccato niente, gli
+   *     errori del progetto non sono affar suo;
+   *   - non hai gia' scritto tu il messaggio dopo: quello che dici tu passa avanti;
+   *   - siamo sotto i due giri (vedi FIX_ROUNDS);
+   *   - e ci sono davvero errori *nuovi* in quei file: non avvisi, non errori che
+   *     stavano li' da ieri (vedi newErrors).
+   *
+   * Finiti i giri con gli errori ancora li', non si insiste: si dice quanti sono e ci
+   * si ferma, che e' un'informazione utile, mentre il quarto tentativo identico no.
+   */
+  private async autofix(ok: boolean) {
+    if (!this.prefs.autofix || !ok) return;
+    if (!this.touched.size) return;
+    if (this.session?.hasQueued()) return;
+
+    await diagnosticsSettled();
+    // Nel frattempo puo' essere cambiato il mondo: un nuovo messaggio tuo, o un altro
+    // turno gia' partito. In tutti e due i casi questo giro non ha piu' senso.
+    if (this.busy || this.session?.hasQueued()) return;
+
+    const found = newErrors(this.touched, this.errorsBefore);
+    if (!found.count) return;
+
+    if (this.fixRound >= FIX_ROUNDS) {
+      this.emit({ k: 'autofix', n: found.count, files: found.files, round: this.fixRound, gaveUp: true });
+      return;
+    }
+    this.fixRound++;
+    this.emit({ k: 'autofix', n: found.count, files: found.files, round: this.fixRound });
+    this.session?.send(
+      'The editor reports these errors in the files this turn just changed. They were ' +
+        'not there before it ran, so they came from these changes.\n\n' +
+        found.text +
+        '\n\nFix them. Change only what is needed to clear these errors: do not delete ' +
+        'code or tests to silence them, and do not start anything else. If an error is ' +
+        'not really yours to fix, say so in one line and stop.',
+      undefined,
+      undefined,
+      undefined,
+      true
+    );
+  }
+
   /** Cambia la selezione nell'editor: la chat lo fa sapere, non lo indovina. */
   pushSelection() {
     const sel = currentSelection();
@@ -452,6 +582,15 @@ export class ChatController {
 
   interrupt() {
     void this.session?.interrupt();
+  }
+
+  /**
+   * Un messaggio ritirato dalla fila. Non e' un'interruzione: quello che la CLI ha
+   * gia' in mano lo ferma il bottone di stop, questo toglie di mezzo solo quello che
+   * non e' ancora partito.
+   */
+  unqueue(id: string) {
+    this.session?.cancelQueued(id);
   }
 
   newSession() {
@@ -1004,6 +1143,12 @@ export class ChatController {
     // ancora stato fatto deve continuare a vedersi (vedi tasks/store.ts).
     if (e.k === 'user') tasks.newTurn(this.key);
     if (e.k === 'busy') tasks.setBusy(this.key, e.value);
+    // Cosa sta facendo, adesso. E' la riga che la card mostra quando di task non ce
+    // ne sono — cioe' quasi sempre, perche' le task della CLI sono i sub-agent e un
+    // turno normale non ne apre nessuno. Solo il filo principale: i passi di un
+    // sub-agent li racconta la sua riga nella lista.
+    if (e.k === 'tool_start' && !e.parent) tasks.doing(this.key, stepLabel(e.name, e.input));
+    if (e.k === 'turn_end') tasks.doing(this.key, '');
     // I passi che Claude si segna. TodoWrite era l'unico ascoltato qui, e la CLI ha
     // smesso di averlo: adesso scrive una task per volta con TaskCreate e la muove con
     // TaskUpdate — motivo per cui questo pannello e' rimasto sul "sto capendo cosa
@@ -1032,6 +1177,45 @@ export class ChatController {
     // quale stanno parlando. Nella risposta di una TaskList c'e' invece l'elenco
     // intero, ed e' quello che rimette in riga tutto il resto.
     if (e.k === 'tool_end') tasks.answered(this.key, e.id, e.text);
+    // La sorgente viva. I tre strumenti qui sopra la CLI non ce li ha piu' — restano
+    // per chi gira una versione vecchia — e le task di adesso arrivano da qui.
+    if (e.k === 'task') {
+      tasks.fromCli(this.key, e.id, {
+        description: e.description,
+        doing: e.doing,
+        status: e.status,
+      });
+    }
+    // ---- l'editor che segue Claude, e gli errori che tornano indietro da soli ----
+    //
+    // Il nome del file lo dice la chiamata, l'esito la risposta, e in mezzo possono
+    // passarne altre tre: si tiene da parte sotto il `tool_use_id` e si riprende di
+    // la'. Solo il filo principale: quello che scrive un sub-agent lo racconta la sua
+    // card, e far saltare l'editor per ognuna delle sue modifiche sarebbe una
+    // giostra.
+    if (e.k === 'tool_start' && !e.parent && WRITERS.has(e.name)) {
+      const i = (e.input ?? {}) as { file_path?: unknown; path?: unknown; new_string?: unknown; content?: unknown };
+      const file = String(i.file_path || i.path || '');
+      if (file) {
+        this.writing.set(e.id, {
+          file,
+          wrote: typeof i.new_string === 'string' ? i.new_string : undefined,
+        });
+      }
+    }
+    if (e.k === 'tool_end') {
+      const w = this.writing.get(e.id);
+      if (w) {
+        this.writing.delete(e.id);
+        if (e.ok) {
+          this.touched.add(absolute(w.file));
+          if (this.prefs.follow) void follow(w.file, w.wrote);
+        }
+      }
+    }
+
+    if (e.k === 'turn_end') void this.autofix(e.ok);
+
     this.broadcast(e);
   }
 

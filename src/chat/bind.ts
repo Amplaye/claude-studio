@@ -87,6 +87,9 @@ export function bindWebview(
       case 'interrupt':
         chat.interrupt();
         return;
+      case 'unqueue':
+        chat.unqueue(m.id);
+        return;
       case 'newSession':
         chat.newSession();
         return;

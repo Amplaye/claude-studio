@@ -78,6 +78,42 @@
   /** Tools that already speak for themselves: on success there's nothing to add. */
   const QUIET = { Write: 1, Edit: 1, NotebookEdit: 1, TodoWrite: 1 };
 
+  /**
+   * Tools that leave nothing behind them.
+   *
+   * A turn is a stack of cards all the same size, and a Read that changed nothing
+   * takes exactly as much room as an Edit that rewrote a module. Forty steps of that
+   * is half a kilometre of identical rectangles you have to read one by one to find
+   * the two that matter.
+   *
+   * These get a single line, a third of the height, and consecutive ones close ranks
+   * into one block (see .tool.slim in chat.css). Everything else — anything that
+   * writes, a permission, a sub-agent — keeps its full card. The names stay: "Read ×4"
+   * would be shorter and would throw away exactly the thing you look for, which is
+   * *which* files it opened.
+   *
+   * Nothing is hidden: a slim card opens like any other, and one that fails gets its
+   * full weight back the moment it does (see toolEnd), because a failure is never
+   * background noise.
+   */
+  const SLIM = {
+    Read: 1,
+    Glob: 1,
+    Grep: 1,
+    LS: 1,
+    NotebookRead: 1,
+    WebFetch: 1,
+    WebSearch: 1,
+    ToolSearch: 1,
+    TaskCreate: 1,
+    TaskUpdate: 1,
+    TaskList: 1,
+    ListAgents: 1,
+  };
+  /** Anche il ponte con l'editor: leggere gli errori o sapere quali file sono aperti
+      non cambia niente sul disco. */
+  const slimTool = (name) => !!SLIM[name] || /^mcp__editor__(open_files|editor_errors)$/.test(name);
+
   let cwd = '';
   /** Absolute paths fill the line without saying anything: keep the useful part. */
   function shortPath(p) {
@@ -119,11 +155,78 @@
     if (stick) log.scrollTop = log.scrollHeight;
   }
 
+  // ---------- the map of the turn ----------
+  //
+  // A long answer has a shape — read for two minutes, then wrote three files in a
+  // row, then got stuck on a red command — and the only way to see it was to scroll
+  // through it. One tick per step down the left edge, coloured by what the step was,
+  // and the shape is there in one glance. Click a tick and you are at that step.
+  //
+  // The ticks share the height between them (flex: 1 1 0), so a turn of six and a
+  // turn of two hundred both fit without any arithmetic in here.
+  const tmap = $('tmap');
+
+  /** What colour a step is. It is asked again at the end: a failure changes it. */
+  function mapKind(node) {
+    const c = node.classList;
+    if (c.contains('user')) return 'user';
+    if (c.contains('ask')) return 'ask';
+    if (c.contains('recap')) return c.contains('bad') ? 'fail' : 'recap';
+    if (c.contains('err')) return 'fail';
+    if (c.contains('think')) return 'think';
+    if (c.contains('tool')) {
+      if (c.contains('fail')) return 'fail';
+      const n = node.dataset.tool || '';
+      if (DIFF_TOOLS[n]) return 'write';
+      if (n === 'Bash' || n === 'PowerShell') return 'run';
+      if (slimTool(n)) return 'read';
+      return 'tool';
+    }
+    if (c.contains('assistant')) return 'say';
+    return 'other';
+  }
+
+  function mapPaint(node) {
+    const tick = node._tick;
+    if (!tick) return;
+    tick.className = 'tm tm-' + mapKind(node);
+    const head = node.querySelector('.head') || node;
+    tick.title = (head.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+
+  function mapAdd(node) {
+    const tick = el('button', 'tm');
+    tick.type = 'button';
+    tick.tabIndex = -1; // the conversation itself is what you tab through, not this
+    tick.addEventListener('click', () => {
+      stick = false; // you asked to be somewhere: don't get dragged back to the end
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    node._tick = tick;
+    tmap.append(tick);
+    mapPaint(node);
+    // Under four steps there is no shape to see, and a rail beside three cards is
+    // just a stripe nobody asked for.
+    tmap.classList.toggle('few', tmap.childElementCount < 4);
+  }
+
+  function mapClear() {
+    tmap.replaceChildren();
+    tmap.classList.add('few');
+  }
+
   // Infinite loops stop when off screen: twenty halos pulsing where you aren't
   // looking heat up the laptop for nothing.
+  //
+  // The same pass says which ticks are the ones you're looking at: the observer is
+  // already running, and a second one — or a listener on every scroll — would be
+  // paying twice for an answer we are being handed.
   const seen = new IntersectionObserver(
     (entries) => {
-      for (const e of entries) e.target.classList.toggle('offscreen', !e.isIntersecting);
+      for (const e of entries) {
+        e.target.classList.toggle('offscreen', !e.isIntersecting);
+        if (e.target._tick) e.target._tick.classList.toggle('here', e.isIntersecting);
+      }
     },
     { root: log, rootMargin: '160px' }
   );
@@ -145,6 +248,9 @@
     }
     log.appendChild(node);
     seen.observe(node);
+    // Solo quello che sta nel discorso vero: i passi di un sub-agent sono dentro la
+    // card del Task che li ha lanciati, e nella mappa conta quella.
+    mapAdd(node);
     toBottom();
     return node;
   }
@@ -715,7 +821,7 @@
 
   function toolStart(id, name, inp, parent) {
     const node = document.createElement('details');
-    node.className = 'msg tool running';
+    node.className = 'msg tool running' + (slimTool(name) ? ' slim' : '');
     node.dataset.tool = name;
     const i = inp && typeof inp === 'object' ? inp : {};
 
@@ -774,7 +880,11 @@
     const node = tools.get(id);
     if (!node) return;
     node.classList.remove('running');
+    // Una lettura andata storta non e' rumore di fondo: la riga sottile torna carta
+    // piena, con la sua altezza e il suo stacco dalle vicine.
+    if (!ok) node.classList.remove('slim');
     node.classList.add(ok ? 'done' : 'fail');
+    mapPaint(node); // andata storta, cambia colore anche nella mappa
     const fresh = ok ? drawnCheck('tool-ico') : icon('alert-circle', 'tool-ico');
     node._ico.replaceWith(fresh);
     node._ico = fresh;
@@ -1173,6 +1283,47 @@
   }
 
   /**
+   * "Ha rotto qualcosa e lo sta chiudendo."
+   *
+   * L'estensione guarda le sottolineature rosse che l'editor ha gia' calcolato sui
+   * soli file che il turno ha toccato, tiene quelle che prima non c'erano, e le
+   * rimanda indietro. Il turno riparte da solo: e' comodo finche' si vede, quindi si
+   * vede — con quante ne restano, in quali file, e a che giro siamo.
+   *
+   * `gaveUp`: i giri sono finiti e gli errori no. Si smette e si dice, invece di
+   * riprovare la stessa correzione a spese tue.
+   */
+  function autofixCard(m) {
+    const node = el('div', 'msg fixcard' + (m.gaveUp ? ' bad' : ''));
+    node.append(icon(m.gaveUp ? 'alert-circle' : 'refresh', 'fix-ico'));
+    const body = el('div', 'fix-body');
+    body.append(
+      el(
+        'div',
+        'fix-head',
+        t(m.gaveUp ? 'fix.gaveup' : 'fix.on', { n: m.n, round: m.round, max: 2 })
+      )
+    );
+    const files = (m.files || []).slice(0, 4);
+    if (files.length) {
+      const row = el('div', 'fix-files');
+      for (const p of files) {
+        const b = el('button', 'recap-file', p.split(/[\\/]/).pop() || p);
+        b.type = 'button';
+        b.title = p;
+        b.addEventListener('click', () => vscode.postMessage({ cmd: 'openFile', path: p }));
+        row.append(b);
+      }
+      if ((m.files || []).length > files.length) {
+        row.append(el('span', 'recap-more', t('recap.more', { n: m.files.length - files.length })));
+      }
+      body.append(row);
+    }
+    node.append(body);
+    return node;
+  }
+
+  /**
    * The line that closes a turn: it went well or it didn't, how long it took,
    * how many steps, how much context it's carrying now. Four facts on one line —
    * the answer above says what was done, this says what it cost.
@@ -1408,6 +1559,9 @@
         waiting = null;
         stepsN = 0;
         filesTouched.clear();
+        // Con la conversazione se ne va anche la fila: quei messaggi erano per lei.
+        clearQueued();
+        mapClear();
         // A new conversation is a new empty screen, so it earns a new tip.
         if (m.tip) currentTip = m.tip;
         // the previous conversation scrolls out while the new one takes its place
@@ -1537,6 +1691,20 @@
         add(n);
         break;
       }
+      // Scritto mentre Claude lavorava: aspetta sopra la barra di scrittura invece
+      // di entrare nel discorso come se fosse gia' partito.
+      case 'queued':
+        addQueued(m);
+        break;
+      case 'unqueued':
+        dropQueued(m.id);
+        break;
+      // Il turno che riparte da solo per chiudere gli errori che ha appena aperto.
+      // Ha una card sua e non entra come un messaggio tuo: un turno che riparte in
+      // silenzio e' la cosa piu' inquietante che un pannello possa fare.
+      case 'autofix':
+        add(autofixCard(m));
+        break;
       case 'turn_start':
         hideWaiting();
         activity('act.thinking');
@@ -1911,6 +2079,62 @@
     // and the shortcut below stands down on `defaultPrevented`.
     document.addEventListener('keydown', onKey, true);
     document.body.appendChild(overlay);
+  }
+
+  // ---------- the queue ----------
+  //
+  // Enter while Claude is working has always queued the message — the engine lines
+  // them up — but the chat drew it as if it had gone out. You could not tell it was
+  // waiting, could not take it back, and two of them looked exactly like two already
+  // sent. They live here until they really leave, and then they take their place in
+  // the conversation like any other message.
+  const queuedBox = $('queued');
+  const queued = new Map(); // id -> the pill
+
+  function paintQueued() {
+    queuedBox.hidden = !queued.size;
+  }
+
+  function addQueued(m) {
+    if (queued.has(m.id)) return;
+    const pill = el('div', 'qmsg');
+    pill.style.setProperty('--i', queued.size);
+    pill.append(icon('time', 'qico'));
+    // One line, never a wall: what you wrote is right above in the box you wrote it
+    // in, and this is a reminder, not a copy.
+    const what =
+      (m.text || '').trim() ||
+      (m.files && m.files.length
+        ? m.files.map((f) => f.name).join(', ')
+        : t('composer.attachedImage'));
+    pill.append(el('span', 'qtext', what));
+    const x = el('button', 'qx');
+    x.type = 'button';
+    x.title = t('queue.drop');
+    x.append(icon('close'));
+    x.addEventListener('click', () => vscode.postMessage({ cmd: 'unqueue', id: m.id }));
+    pill.append(x);
+    queued.set(m.id, pill);
+    queuedBox.append(pill);
+    paintQueued();
+  }
+
+  function dropQueued(id) {
+    const pill = queued.get(id);
+    if (!pill) return;
+    queued.delete(id);
+    // It leaves the way it came: gone at once would look like a click that missed.
+    pill.classList.add('going');
+    setTimeout(() => {
+      pill.remove();
+      paintQueued();
+    }, 200);
+  }
+
+  function clearQueued() {
+    queued.clear();
+    queuedBox.replaceChildren();
+    paintQueued();
   }
 
   // ---------- attachments: editor selection, images and files of any kind ----------
@@ -2823,6 +3047,8 @@
     paintLang();
     paintSound();
     paintVol();
+    $('cfgFollow').checked = !!prefs.follow;
+    $('cfgAutofix').checked = !!prefs.autofix;
     $('cfgAway').checked = !!prefs.onlyWhenAway;
     $('cfgAsk').checked = !!prefs.soundOnAsk;
     $('cfgToast').checked = !!prefs.toast;
@@ -2898,6 +3124,8 @@
     push({ volume: Number(e.target.value) / 100 });
     previewSound();
   });
+  $('cfgFollow').addEventListener('change', (e) => push({ follow: e.target.checked }));
+  $('cfgAutofix').addEventListener('change', (e) => push({ autofix: e.target.checked }));
   $('cfgAway').addEventListener('change', (e) => push({ onlyWhenAway: e.target.checked }));
   $('cfgAsk').addEventListener('change', (e) => push({ soundOnAsk: e.target.checked }));
   $('cfgToast').addEventListener('change', (e) => push({ toast: e.target.checked }));

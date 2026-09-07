@@ -76,7 +76,9 @@ body.wide {
   --gutter: max(16px, calc((100% - 860px) / 2));
 }
 body.wide .log {
-  padding-left: var(--gutter);
+  /* la mappa del turno si prende `--pad` di questo margine: sommati restano il
+     `--gutter` di prima, e la colonna resta allineata alla barra di scrittura */
+  padding-left: calc(var(--gutter) - var(--pad));
   /* the scrollbar's width comes off this side, same as in the narrow face */
   padding-right: calc(var(--gutter) - var(--sbw));
   padding-top: 22px;
@@ -1076,13 +1078,97 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
    is now always reserved (`stable`, so nothing jumps when the thread grows past
    one screen) and the padding on that side is docked by the same amount: the
    cards end where the composer ends, scrollbar or no scrollbar. */
+/* The log and the map of the turn beside it, in one row that owns the height. */
+.logwrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ---------- the map of the turn ----------
+   One tick per step down the left edge, coloured by what the step was: you see the
+   shape of a long answer without scrolling it, and a click puts you at that step.
+   The ticks share the height between them, so six steps and two hundred both fit. */
+/* It lives in the gutter the thread already had: `--pad` moves from the log to here,
+   so the boxes still start exactly where the writing field does. The column stays put
+   even when there is nothing to draw in it — a layout that shifts sideways at the
+   fourth step of every turn would be worse than no map at all. */
+.tmap {
+  flex: 0 0 var(--pad);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 15px 0 9px;
+  overflow: hidden;
+}
+.tmap.few .tm {
+  visibility: hidden;
+}
+.tm {
+  flex: 1 1 0;
+  min-height: 3px;
+  max-height: 26px;
+  width: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--fg) 22%, transparent);
+  transition: width 0.16s ease, background 0.2s ease, opacity 0.2s ease;
+}
+/* Wider under the pointer, and wider for the piece you are looking at: the block of
+   ticks that has your attention is a shape you can see without reading anything. */
+.tm:hover,
+.tm.here {
+  width: 7px;
+}
+.tmap:hover .tm:not(.here) {
+  opacity: 0.75;
+}
+/* Reading and looking around: the background hum of a turn. */
+.tm-read,
+.tm-tool,
+.tm-think {
+  background: color-mix(in srgb, var(--fg) 20%, transparent);
+}
+/* Something happened to a file. */
+.tm-write {
+  background: var(--claude-1);
+}
+/* A command ran. */
+.tm-run {
+  background: #6aa9d8;
+}
+/* You said something, or it answered you. */
+.tm-user {
+  background: color-mix(in srgb, var(--fg) 72%, transparent);
+}
+.tm-say {
+  background: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+/* It is waiting for you. */
+.tm-ask {
+  background: var(--warn);
+}
+.tm-fail {
+  background: var(--bad);
+}
+.tm-recap {
+  background: var(--ok);
+}
+
 .log {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding: 14px calc(var(--pad) - var(--sbw)) 8px var(--pad);
+  /* La gutter di sinistra ce l'ha la mappa (.tmap), che sta li' dentro: sommate
+     fanno lo stesso `--pad` di prima, e le carte partono dove parte la barra di
+     scrittura come hanno sempre fatto. */
+  padding: 14px calc(var(--pad) - var(--sbw)) 8px 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1610,6 +1696,57 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .tool > .body {
   margin-top: 9px;
+}
+
+/* ---------- the quiet steps ----------
+   A Read that changed nothing used to take exactly as much room as an Edit that
+   rewrote a module: a turn was a stack of identical rectangles, and finding the two
+   that mattered meant reading all forty. These get one line and a third of the
+   height, and consecutive ones close ranks into a single block — one bar of quiet
+   work you skim past, instead of eight cards you have to dismiss one by one.
+
+   Nothing is hidden: they open like any other card, and one that fails gets its full
+   card back the moment it does (see toolEnd). The file names stay on screen — "Read
+   ×4" would be shorter and would throw away the one thing you actually look for. */
+.tool.slim {
+  padding: 3px 11px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+.tool.slim .tool-ico {
+  font-size: 13px;
+}
+.tool.slim .name {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.tool.slim .arg {
+  font-size: 11px;
+}
+.tool.slim .head {
+  gap: 7px;
+}
+.tool.slim .chev {
+  font-size: 11px;
+  opacity: 0.5;
+}
+/* The log is a flex column with a 12px gap; pulling exactly that back is what makes
+   two quiet steps touch. The hairline is drawn once, at the seam, by the one below. */
+.tool.slim + .tool.slim {
+  margin-top: -12px;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 9%, transparent);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.tool.slim:has(+ .tool.slim) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* Open, it stops being one of the block: it needs its own room again. */
+.tool.slim[open] {
+  padding-bottom: 9px;
+  background: var(--card);
+  border-color: var(--line);
 }
 
 /* diff: colour is carried by the sign and the bar, the text stays full white */
@@ -2674,6 +2811,141 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   gap: 6px;
   width: 100%;
   margin-bottom: 7px;
+}
+
+/* ---------- la card dell'autofix ----------
+   Il turno che riparte da solo per chiudere gli errori che ha appena aperto. Ha una
+   card sua, e non entra come un messaggio tuo: un turno che riparte in silenzio e' la
+   cosa piu' inquietante che un pannello possa fare. Sottile, perche' non e' un
+   risultato: e' l'estensione che lavora per conto suo, e lo dice. */
+.fixcard {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 12px;
+  border-radius: var(--r);
+  border: 1px dashed color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 6%, transparent);
+  font-size: 12px;
+}
+.fixcard.bad {
+  border-color: color-mix(in srgb, var(--bad) 60%, var(--line));
+  background: color-mix(in srgb, var(--bad) 7%, transparent);
+}
+.fix-ico {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 1px;
+  color: var(--claude-2);
+  animation: cs-spin 2.6s linear infinite;
+}
+.fixcard.bad .fix-ico {
+  color: var(--bad);
+  animation: none;
+}
+.fix-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fix-head {
+  font-weight: 600;
+}
+.fix-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fix-ico {
+    animation: none;
+  }
+}
+
+/* ---------- the queue: what you wrote while it was working ----------
+   Above the box you wrote it in, not inside the conversation: it hasn't happened
+   yet. The clock says what it is waiting for, the × takes it back while there is
+   still time. */
+.queued {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 7px;
+}
+.queued[hidden] {
+  display: none;
+}
+.qmsg {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 5px 5px 9px;
+  border-radius: 9px;
+  border: 1px dashed color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 7%, transparent);
+  font-size: 12px;
+  animation: cs-enter 0.26s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+/* Dashed while it waits, and the clock turns: the two things that say "not yet". */
+.qico {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  color: var(--claude-2);
+  animation: cs-spin 3.4s linear infinite;
+}
+@keyframes cs-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+.qtext {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qx {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+.qx:hover {
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+}
+.qx .ico {
+  width: 13px;
+  height: 13px;
+}
+/* On its way out — either it left for the conversation, or you took it back. */
+.qmsg.going {
+  animation: q-out 0.2s ease both;
+}
+@keyframes q-out {
+  to {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qico {
+    animation: none;
+  }
 }
 .att {
   display: inline-flex;

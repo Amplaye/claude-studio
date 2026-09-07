@@ -49,6 +49,9 @@
     'cfg.model': 'Model',
     'cfg.effort': 'Effort',
     'cfg.thinking': 'Thinking',
+    'cfg.auto': 'While it works',
+    'cfg.follow': 'The editor follows it: files open and the changed lines light up',
+    'cfg.autofix': 'Fix on its own the errors it introduces (at most twice)',
     'cfg.done': "When it's done",
     'cfg.language': 'Language',
     'cfg.language.hint': 'Changes the whole interface straight away',
@@ -103,6 +106,9 @@
     'composer.removeImage': 'Remove',
     'composer.removeFile': 'Remove this attachment',
     'composer.previewFile': 'Open {name}',
+    'queue.drop': 'Take this message back',
+    'fix.on': '{n} new errors in what it just changed — fixing them ({round}/{max})',
+    'fix.gaveup': '{n} errors still there after {max} tries: this one is yours',
     'composer.attachedImage': 'Attached image',
     'composer.attach':
       'Attach any file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, logs, source code. Images too.',
@@ -142,8 +148,8 @@
     'empty.commands.wait': 'Loading the commands…',
 
     // ---- the task panel ----
-    'tasks.none': 'No tasks yet. Ask for something and the list appears here.',
-    'tasks.thinking': 'Working out what to do…',
+    'tasks.none': 'Nothing on the list right now.',
+    'tasks.thinking': 'Working…',
     'tasks.count': '{done} of {total} done',
     'tasks.left': '{n} to go',
     'tasks.working': 'working',
@@ -289,6 +295,9 @@
     'cfg.model': 'Modello',
     'cfg.effort': 'Impegno',
     'cfg.thinking': 'Ragionamento',
+    'cfg.auto': 'Mentre lavora',
+    'cfg.follow': "L'editor lo segue: i file si aprono e le righe cambiate si accendono",
+    'cfg.autofix': 'Sistema da solo gli errori che introduce (al massimo due volte)',
     'cfg.done': 'Quando ha finito',
     'cfg.language': 'Lingua',
     'cfg.language.hint': "Cambia subito tutta l'interfaccia",
@@ -339,6 +348,9 @@
     'composer.removeImage': 'Togli',
     'composer.removeFile': 'Togli questo allegato',
     'composer.previewFile': 'Apri {name}',
+    'queue.drop': 'Ritira questo messaggio',
+    'fix.on': '{n} errori nuovi in quello che ha appena cambiato — li sta sistemando ({round}/{max})',
+    'fix.gaveup': 'Dopo {max} tentativi restano {n} errori: questo tocca a te',
     'composer.attachedImage': 'Immagine allegata',
     'composer.attach':
       'Allega qualunque file — PDF, Word, Excel, PowerPoint, CSV, JSON, zip, video, audio, log, codice. Anche immagini.',
@@ -373,8 +385,8 @@
     'empty.commands.wait': 'Carico i comandi…',
 
     // ---- il pannello delle task ----
-    'tasks.none': 'Ancora nessuna task. Chiedi qualcosa e la lista compare qui.',
-    'tasks.thinking': 'Sto capendo cosa fare…',
+    'tasks.none': 'Per ora niente in lista.',
+    'tasks.thinking': 'Al lavoro…',
     'tasks.count': '{done} di {total} fatte',
     'tasks.left': 'ne restano {n}',
     'tasks.working': 'in corso',

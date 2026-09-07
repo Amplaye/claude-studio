@@ -166,6 +166,35 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   });
   await turns(4);
 
+  // ---- the queue: two messages, the second written while the first is running ----
+  //
+  // The engine has lined them up since forever, but the chat drew the second one as
+  // if it had already gone out: nothing said it was waiting, and there was no way to
+  // take it back. It stays out of the conversation until it really leaves — and then
+  // it takes its place there like any other message.
+  const qFrom = got.length;
+  const since = () => got.slice(qFrom);
+  onMsg({ cmd: 'send', text: 'Reply with the single word: uno.' });
+  onMsg({ cmd: 'send', text: 'Reply with the single word: NEVER.' });
+  onMsg({ cmd: 'send', text: 'Reply with the single word: due.' });
+  // Straight away, before the CLI has had time to answer anything: the first is in
+  // the conversation, the other two are waiting their turn.
+  await new Promise((r) => setTimeout(r, 200));
+  const queueNow = {
+    user: since().filter((m) => m.k === 'user').length,
+    queued: since().filter((m) => m.k === 'queued').length,
+  };
+  // The middle one is taken back before it ever runs. Nothing has to be interrupted:
+  // it never left, which is the whole difference between this and the stop button.
+  const dropped = since().find((m) => m.k === 'queued' && /NEVER/.test(m.text || ''));
+  if (dropped) onMsg({ cmd: 'unqueue', id: dropped.id });
+  await turns(6);
+  const queueAfter = {
+    user: since().filter((m) => m.k === 'user').length,
+    unqueued: since().filter((m) => m.k === 'unqueued').length,
+    ran: since().some((m) => m.k === 'user' && /NEVER/.test(m.text || '')),
+  };
+
   const sessionId = (got.find((m) => m.k === 'session') || {}).id;
 
   // ---- the context bar sees the conversation we just had ----
@@ -210,6 +239,16 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   const kinds = got.map((m) => m.k);
   const fails = [...pageFails];
   const t = (c, m) => !c && fails.push(m);
+
+  t(
+    queueNow.user === 1,
+    'a message written while it was working entered the conversation instead of the queue: ' +
+      queueNow.user + ' of them'
+  );
+  t(queueNow.queued === 2, 'nothing says the messages behind are waiting their turn');
+  t(queueAfter.unqueued === 2, 'the queue never emptied: ' + queueAfter.unqueued);
+  t(queueAfter.user === 2, 'the queued message never took its place in the conversation');
+  t(!queueAfter.ran, 'a message taken back out of the queue was sent anyway');
 
   t(!!ctxProvider, 'the context panel is not registered');
   t(!!ctxData, 'the context panel receives no data');

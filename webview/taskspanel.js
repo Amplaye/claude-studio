@@ -27,7 +27,12 @@
     return svg;
   }
 
-  const ICON = { completed: 'checkmark-circle', in_progress: 'play', pending: 'time' };
+  const ICON = {
+    completed: 'checkmark-circle',
+    in_progress: 'play',
+    pending: 'time',
+    failed: 'alert-circle',
+  };
 
   window.TaskPanel = function mount(root) {
     root.classList.add('taskroot');
@@ -61,7 +66,13 @@
       const done = (d && d.done) || 0;
 
       // Nothing to show: one line, and the rest of the panel gets out of the way.
-      empty.textContent = d && d.busy ? t('tasks.thinking') : t('tasks.none');
+      // Al lavoro: si dice il passo che sta facendo adesso, non una frase fissa. Le
+      // task esistono solo quando apre un sub-agent, e un turno normale non ne apre
+      // nessuno — la card restava con "sto capendo cosa fare" addosso per l'intera
+      // sessione, che dopo il primo minuto non e' piu' un'informazione.
+      const doing = (d && d.busy && d.doing) || '';
+      empty.textContent = doing || (d && d.busy ? t('tasks.thinking') : t('tasks.none'));
+      empty.classList.toggle('live', !!doing);
       empty.hidden = total > 0;
       head.hidden = barWrap.hidden = total === 0;
 

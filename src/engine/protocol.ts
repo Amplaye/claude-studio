@@ -100,6 +100,26 @@ export interface Prefs {
   toast: boolean;
   /** The language of the interface: it changes on the spot, nothing reloads. */
   lang: Lang;
+  /**
+   * L'editor segue Claude: ogni file che tocca si apre di fianco, scorre alle righe
+   * cambiate e le illumina per un attimo.
+   *
+   * Il fuoco non si sposta mai (`preserveFocus`), che e' l'unico motivo per cui questa
+   * puo' stare accesa di serie: vedi il codice muoversi mentre continui a scrivere
+   * nella chat. Spegnibile lo stesso — con dieci modifiche di fila in un file solo
+   * c'e' chi preferisce leggere il diff a lavoro finito.
+   */
+  follow: boolean;
+  /**
+   * Gli errori che l'editor gia' conosce, rimandati indietro da soli.
+   *
+   * A fine turno si guardano le diagnostiche dei soli file toccati; quelle che prima
+   * del turno non c'erano sono roba di questo turno, e vanno sistemate. Il giro si
+   * chiude da se' al massimo `FIX_ROUNDS` volte, poi si ferma e te lo dice: un
+   * modello che sbaglia due volte di fila la stessa correzione non la indovina alla
+   * decima, e nel frattempo spende.
+   */
+  autofix: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -112,6 +132,8 @@ export const DEFAULT_PREFS: Prefs = {
   soundOnAsk: true,
   toast: true,
   lang: 'en',
+  follow: true,
+  autofix: true,
 };
 
 /**
@@ -290,6 +312,49 @@ export type Wire =
       /** Il livello d'impegno in vigore per questo turno. '' = quello della CLI. */
       effort: string;
     }
+  // Un messaggio scritto mentre Claude lavora. Il motore li mette in fila da sempre,
+  // ma la chat lo disegnava come un messaggio gia' spedito: non si capiva che stava
+  // aspettando, non lo si poteva togliere, e due in fila erano indistinguibili da due
+  // gia' partiti. Finche' e' in coda non entra nel discorso, sta sopra la barra di
+  // scrittura; quando parte davvero arriva il suo 'user' come per tutti gli altri.
+  | { k: 'queued'; id: string; text: string; images?: Pasted[]; files?: SentFile[] }
+  /** Uscito dalla coda: o e' partito, o l'hai ritirato. */
+  | { k: 'unqueued'; id: string }
+  /**
+   * Una task della CLI, come la racconta il motore.
+   *
+   * Non e' piu' un tool. TodoWrite, TaskCreate e TaskUpdate — i tre strumenti che
+   * questo pannello ascoltava — dalla CLI sono spariti: chiedendoglieli, il modello
+   * risponde che non ce l'ha, e infatti l'elenco restava vuoto per sessioni intere.
+   * Quello che oggi la CLI chiama task sono i sub-agent, e non li annuncia con una
+   * chiamata a un tool: li annuncia con dei messaggi di sistema suoi —
+   * `task_started`, `task_progress`, `task_updated` — che e' la sorgente che il suo
+   * pannello usa e che qui non ascoltava nessuno.
+   */
+  | {
+      k: 'task';
+      id: string;
+      /** Come si chiama: "Count .ts files in src". */
+      description?: string;
+      /** Cosa sta facendo proprio adesso: "Running find …". */
+      doing?: string;
+      status?: 'pending' | 'running' | 'completed' | 'failed' | 'killed' | 'paused';
+    }
+  /**
+   * Gli errori che l'editor gia' conosceva, rimandati indietro da soli.
+   *
+   * A fine turno si guardano le diagnostiche dei soli file che quel turno ha toccato,
+   * e solo quelle che prima non c'erano: quelle sono roba di adesso, e vanno chiuse
+   * prima che tu debba accorgertene tu. Non e' un messaggio tuo — non entra nel
+   * discorso come se l'avessi scritto — ed e' una card che si vede, perche' un turno
+   * che riparte da solo senza dire niente e' la cosa piu' inquietante che un pannello
+   * possa fare.
+   *
+   * `gaveUp`: i giri sono finiti e gli errori no. Meglio dirlo che riprovare per
+   * sempre — un modello che sbaglia due volte la stessa correzione non la indovina
+   * alla decima, e nel frattempo spende.
+   */
+  | { k: 'autofix'; n: number; files: string[]; round: number; gaveUp?: boolean }
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
   // A new conversation draws the empty screen again, so it gets a new tip with it.
@@ -361,6 +426,9 @@ export type Cmd =
   | { cmd: 'openFile'; path: string; line?: number }
   // "Fammelo vedere": l'anteprima di un allegato, di qualunque tipo sia.
   | { cmd: 'preview'; path: string }
+  // "Quello che ho scritto mentre lavoravi, lascia perdere": toglie dalla fila un
+  // messaggio che non e' ancora partito.
+  | { cmd: 'unqueue'; id: string }
   // "My audio is awake": a page can only make a sound once you've touched it, and
   // the chime has to go to one that can actually be heard. See chat/sound.ts.
   | { cmd: 'audio'; ok: boolean }

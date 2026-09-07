@@ -7,7 +7,12 @@ export interface TaskItem {
   content: string;
   /** "Renaming the column" — how it reads while it is the one being done. */
   activeForm?: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  /**
+   * `failed` c'e' perche' una task puo' andare storta, e disegnarla come "fatta"
+   * sarebbe una bugia: la CLI dice `failed` e `killed` per i sub-agent che non sono
+   * arrivati in fondo, e sono esattamente quelli che devi vedere.
+   */
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
 /** The list plus the counts, ready to be drawn. */
@@ -19,6 +24,15 @@ export interface TaskData {
   active: number;
   /** True while the turn is running: the panel says "working", not "finished". */
   busy: boolean;
+  /**
+   * Cosa sta facendo proprio adesso: "Read package.json", "Bash npm test".
+   *
+   * Le task esistono solo quando Claude apre un sub-agent, e un turno normale — legge,
+   * modifica, lancia i test — non ne apre nessuno: la card restava con una frase fissa
+   * addosso per tutta la sessione. Questa riga c'e' sempre, perche' un passo in corso
+   * c'e' sempre, ed e' la risposta alla sola domanda che si fa guardando quella card.
+   */
+  doing?: string;
 }
 
 /**

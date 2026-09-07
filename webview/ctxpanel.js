@@ -315,6 +315,9 @@ window.CtxPanel = (() => {
       for (const [id, c] of cards) {
         const d = board[id] || null;
         const total = (d && d.total) || 0;
+        // Sempre visibile mentre lavora, anche senza task: li' dentro c'e' la riga
+        // che dice cosa sta facendo, ed e' la sola cosa che si guarda una card per
+        // sapere (vedi taskspanel.js).
         c._p.steps.hidden = !(total > 0 || (d && d.busy));
         c._p.stepsPanel?.render(d);
       }

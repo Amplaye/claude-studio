@@ -103,7 +103,25 @@ const CLOSING = [
   'a review or a report, that *is* the answer: give it in full, at whatever length it needs.',
 ].join('\n');
 
-type Outgoing = { text: string; images?: { mime: string; data: string }[] };
+/**
+ * Un messaggio in attesa di partire. `echo` e' quello che si vede in chat — il
+ * messaggio vero puo' portarsi dietro anche il codice selezionato, che nella chat
+ * sarebbe un muro — e `files` sono le pastiglie degli allegati, che si disegnano
+ * uguali sia in coda che nel discorso.
+ */
+type Outgoing = {
+  id: string;
+  text: string;
+  images?: { mime: string; data: string }[];
+  echo?: string;
+  files?: SentFile[];
+  /** Era in fila dietro a un turno in corso: allora la sua uscita va annunciata. */
+  queued: boolean;
+  /** Mandato dall'estensione, non da te: nel discorso non ci va. */
+  silent?: boolean;
+};
+
+let seq = 0;
 
 export class Session {
   private pending: Outgoing[] = [];
@@ -150,24 +168,70 @@ export class Session {
    */
   private usedBefore: Record<string, any> = {};
 
+  /**
+   * Un turno e' partito e non e' ancora finito. Non e' `busy`: quello si accende gia'
+   * quando scrivi, ed e' quello che fa comparire il bottone di stop. Questo si accende
+   * quando il messaggio esce davvero verso la CLI, ed e' cio' che tiene fermi in fila
+   * quelli dietro (vedi `input`).
+   */
+  private turning = false;
+
   sessionId?: string;
   model = '';
   busy = false;
 
   constructor(private o: SessionOptions) {}
 
-  /** Manda un messaggio. La prima volta accende anche il processo. */
-  send(text: string, images?: { mime: string; data: string }[], echo?: string, files?: SentFile[]) {
+  /**
+   * Manda un messaggio. La prima volta accende anche il processo.
+   *
+   * Con un turno gia' in corso il messaggio non parte: si mette in fila, e la CLI lo
+   * prendera' quando avra' finito. Prima entrava lo stesso nel discorso, disegnato
+   * come se fosse partito — non c'era modo di capire che stava aspettando, ne' di
+   * ritirarlo. Ora finche' aspetta e' una pastiglia sopra la barra di scrittura, e il
+   * suo posto nel discorso se lo prende quando parte davvero.
+   */
+  send(
+    text: string,
+    images?: { mime: string; data: string }[],
+    echo?: string,
+    files?: SentFile[],
+    /** Non e' roba tua: non entra nel discorso come se l'avessi scritto tu. Chi lo
+        manda si disegna la sua card (vedi l'autofix in chat/controller.ts). */
+    silent?: boolean
+  ) {
     if (this.disposed) return;
-    // `files` non entra in `pending`: i percorsi sono gia' dentro `text`, rimandarli
-    // al motore vorrebbe dire scriverli due volte nello stesso messaggio.
-    this.pending.push({ text, images });
-    // `echo` e' quello che si vede nella chat: il messaggio vero puo' portarsi
-    // dietro anche il codice selezionato, che nella chat sarebbe un muro.
-    this.o.emit({ k: 'user', text: echo ?? text, images, files });
+    // `files` non viaggia verso il motore: i percorsi sono gia' dentro `text`,
+    // rimandarli vorrebbe dire scriverli due volte nello stesso messaggio. Resta qui
+    // solo per le pastiglie, che sono roba da guardare.
+    const queued = this.busy;
+    const one: Outgoing = { id: `q${++seq}`, text, images, echo, files, queued, silent: !!silent };
+    this.pending.push(one);
+    if (silent) {
+      /* niente eco: chi l'ha mandato lo racconta a modo suo */
+    } else if (queued) this.o.emit({ k: 'queued', id: one.id, text: echo ?? text, images, files });
+    else this.o.emit({ k: 'user', text: echo ?? text, images, files });
     this.setBusy(true);
     if (!this.running) this.running = this.run();
     this.wake?.();
+  }
+
+  /**
+   * Un messaggio ritirato prima che partisse. Solo quelli fermi in fila: quello che
+   * la CLI ha gia' in mano si ferma con l'interrupt, che e' un'altra cosa e ha il suo
+   * bottone.
+   */
+  /** C'e' qualcosa di tuo in fila? L'autofix non passa mai davanti a una tua richiesta. */
+  hasQueued(): boolean {
+    return this.pending.some((p) => !p.silent);
+  }
+
+  cancelQueued(id: string): boolean {
+    const at = this.pending.findIndex((p) => p.id === id);
+    if (at < 0) return false;
+    this.pending.splice(at, 1);
+    this.o.emit({ k: 'unqueued', id });
+    return true;
   }
 
   async interrupt() {
@@ -231,7 +295,15 @@ export class Session {
 
   private async *input(): AsyncGenerator<SDKUserMessage> {
     while (!this.disposed) {
-      if (!this.pending.length) {
+      // Un messaggio per volta, e il prossimo solo a turno finito.
+      //
+      // L'SDK tira da questo generatore appena puo': senza questa condizione il
+      // secondo messaggio partiva nello stesso istante in cui lo scrivevi, e la fila
+      // la faceva la CLI per conto suo. Il risultato era una coda vera per mezzo
+      // secondo — impossibile da vedere, impossibile da ritirare, e soprattutto non
+      // nostra. Tenendocela qui il messaggio resta a portata di mano finche' non tocca
+      // davvero a lui: si vede, si toglie, e l'ordine e' quello che hai scritto.
+      if (!this.pending.length || this.turning) {
         await new Promise<void>((r) => {
           this.wake = r;
         });
@@ -239,6 +311,16 @@ export class Session {
         continue;
       }
       const out = this.pending.shift()!;
+      // Da qui il turno e' suo, e nessun altro messaggio passa finche' non finisce.
+      this.turning = true;
+      // Adesso parte davvero: la pastiglia sopra la barra di scrittura lascia il posto
+      // al messaggio nel discorso. Quello che non era in fila l'ha gia' fatto in
+      // `send`, ed e' il caso normale — la chat non deve aspettare il motore per
+      // mostrarti quello che hai appena scritto.
+      if (out.queued && !out.silent) {
+        this.o.emit({ k: 'unqueued', id: out.id });
+        this.o.emit({ k: 'user', text: out.echo ?? out.text, images: out.images, files: out.files });
+      }
       // Le immagini incollate viaggiano come blocchi, prima del testo: e' l'ordine
       // in cui si guardano.
       const content: any = out.images?.length
@@ -256,6 +338,42 @@ export class Session {
         parent_tool_use_id: null,
         session_id: this.sessionId ?? '',
       };
+    }
+  }
+
+  /**
+   * I messaggi di sistema con cui la CLI racconta le sue task.
+   *
+   *   task_started   e' nata, e si chiama cosi'
+   *   task_progress  sta facendo questo, adesso
+   *   task_updated   e' cambiata: quasi sempre "completed" o "failed"
+   *
+   * Le `skip_transcript` sono faccende interne che nel discorso non si vedono — ma
+   * in un pannello delle task ci vanno eccome, e la documentazione dell'SDK lo dice
+   * a chiare lettere. Quindi non si filtrano.
+   */
+  private onTask(m: {
+    subtype?: string;
+    task_id?: string;
+    description?: string;
+    patch?: { status?: string; description?: string };
+  }) {
+    const id = String(m.task_id || '');
+    if (!id) return;
+    if (m.subtype === 'task_started') {
+      this.o.emit({ k: 'task', id, description: m.description, status: 'running' });
+    } else if (m.subtype === 'task_progress') {
+      // Qui `description` non e' il nome della task: e' cosa sta facendo in questo
+      // momento ("Running find …"), che e' la riga che il pannello mostra al posto
+      // del nome finche' la task e' quella in corso.
+      this.o.emit({ k: 'task', id, doing: m.description });
+    } else if (m.subtype === 'task_updated') {
+      this.o.emit({
+        k: 'task',
+        id,
+        description: m.patch?.description,
+        status: m.patch?.status as never,
+      });
     }
   }
 
@@ -435,6 +553,9 @@ export class Session {
         // La lista degli slash command puo' cambiare a meta' sessione (skill trovate
         // per strada): quando cambia si rilegge, non si tiene quella vecchia.
         if ((m as any).subtype === 'commands_changed') void this.publishCommands();
+        // Le task, come le racconta la CLI di oggi. Tre messaggi, tre notizie:
+        // e' nata, sta facendo questo, e' finita cosi'. Vedi il wire 'task'.
+        this.onTask(m as any);
         return;
 
       case 'stream_event':
@@ -490,6 +611,9 @@ export class Session {
           if (typeof msg === 'string' && msg) this.o.emit({ k: 'error', message: msg });
         }
         this.setBusy(false);
+        // Turno chiuso — bene o male, interrotto compreso: tocca a chi e' in fila.
+        this.turning = false;
+        this.wake?.();
         return;
       }
     }

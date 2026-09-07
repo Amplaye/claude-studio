@@ -80,6 +80,96 @@ export async function openFile(rel: string, line?: number) {
   }
 }
 
+// ---- l'editor che segue Claude ---------------------------------------------
+//
+// Guardare una chat che racconta modifiche a un codice che non vedi e' il modo piu'
+// scomodo di stare dentro un IDE: il codice vero e' li' di fianco, fermo. Con questo
+// acceso ogni file toccato si apre, scorre alle righe cambiate e le illumina per un
+// paio di secondi.
+//
+// `preserveFocus` e' la riga che rende tutto questo sopportabile: la scheda si apre,
+// scorre e si accende senza mai portarsi via il cursore da dove stai scrivendo.
+// Senza, sarebbe l'editor che ti strappa la tastiera di mano dieci volte per turno.
+
+/** Il colore resta uno solo per tutta la vita dell'estensione: crearne uno per ogni
+    modifica lascia in giro decorazioni che non si spengono piu'. */
+let touchDeco: vscode.TextEditorDecorationType | undefined;
+function deco(): vscode.TextEditorDecorationType {
+  if (!touchDeco) {
+    touchDeco = vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
+      backgroundColor: new vscode.ThemeColor('diffEditor.insertedLineBackground'),
+      overviewRulerColor: new vscode.ThemeColor('editorOverviewRuler.addedForeground'),
+      overviewRulerLane: vscode.OverviewRulerLane.Left,
+    });
+  }
+  return touchDeco;
+}
+
+/** Ogni file ha il suo timer: due modifiche in fila non devono spegnersi a vicenda. */
+const fading = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * In quale colonna aprire. Mai "quella attiva": se la chat e' aperta come scheda a
+ * schermo intero, quella attiva e' la chat, e il file le prenderebbe il posto. Si
+ * usa la colonna di un editor di testo gia' aperto, e solo se non ce n'e' nessuno si
+ * apre di fianco.
+ */
+function column(): vscode.ViewColumn {
+  const ed = vscode.window.visibleTextEditors.find((e) => e.viewColumn != null);
+  return ed?.viewColumn ?? vscode.ViewColumn.Beside;
+}
+
+/**
+ * Mostra il file che Claude ha appena toccato e accende le righe.
+ *
+ * `needle` e' il testo appena scritto: si cerca nel documento perche' gli strumenti
+ * di modifica non dicono a che riga hanno scritto — dicono cosa. Se non si trova
+ * (riscritture grandi, indentazioni normalizzate) il file si apre lo stesso, in cima:
+ * vedere il file giusto senza l'evidenziazione e' meglio che non vedere niente.
+ */
+export async function follow(rel: string, needle?: string) {
+  try {
+    const doc = await vscode.workspace.openTextDocument(toUri(rel));
+    const ed = await vscode.window.showTextDocument(doc, {
+      preview: true,
+      preserveFocus: true,
+      viewColumn: column(),
+    });
+    const text = doc.getText();
+    const at = needle && needle.length > 2 ? text.indexOf(needle) : -1;
+    const range =
+      at >= 0
+        ? new vscode.Range(doc.positionAt(at), doc.positionAt(at + needle!.length))
+        : new vscode.Range(0, 0, 0, 0);
+    ed.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+    if (at < 0) return; // niente da illuminare: almeno il file giusto e' davanti
+    ed.setDecorations(deco(), [range]);
+    const key = doc.uri.toString();
+    clearTimeout(fading.get(key));
+    fading.set(
+      key,
+      setTimeout(() => {
+        fading.delete(key);
+        // L'editor puo' essere stato chiuso nel frattempo: si spegne quello che c'e'.
+        for (const e of vscode.window.visibleTextEditors) {
+          if (e.document.uri.toString() === key) e.setDecorations(deco(), []);
+        }
+      }, 2200)
+    );
+  } catch {
+    /* file sparito, binario, o su un disco che non risponde: non e' un errore da mostrare */
+  }
+}
+
+/** Alla chiusura: i timer in volo non devono accendere niente su un editor morto. */
+export function stopFollowing() {
+  for (const tmr of fading.values()) clearTimeout(tmr);
+  fading.clear();
+  touchDeco?.dispose();
+  touchDeco = undefined;
+}
+
 // ---- native diff -----------------------------------------------------------
 // The "before" isn't on disk (the disk already holds the "after"), so it's served
 // from a fake read-only in-memory document.
@@ -127,6 +217,96 @@ export function diagnostics(rel?: string): string {
     }
   }
   return rows.length ? rows.slice(0, 200).join('\n') : 'No open errors or warnings in the editor.';
+}
+
+// ---- gli errori che l'editor gia' conosce ----------------------------------
+//
+// TypeScript, l'ESLint, il linter di turno: le sottolineature rosse le hanno gia'
+// calcolate loro. Nel terminale, per sapere se ha rotto qualcosa, un agente deve
+// rilanciare una build e aspettare; qui la risposta e' gia' pronta e non costa niente
+// andarla a prendere. E' la sola cosa che un IDE puo' dare a un agente e un terminale
+// no.
+
+/**
+ * La firma di un errore: file, messaggio, codice. **Senza la riga**, ed e' il punto —
+ * una modifica sposta tutto quello che c'e' sotto, e con la riga dentro ogni errore
+ * di prima sembrerebbe nuovo di zecca.
+ */
+function sigOf(rel: string, d: vscode.Diagnostic): string {
+  const code = typeof d.code === 'object' ? d.code.value : d.code;
+  return `${rel} ${code ?? ''} ${d.message}`;
+}
+
+/** Solo gli errori veri: un avviso non e' qualcosa per cui svegliare nessuno. */
+const isError = (d: vscode.Diagnostic) => d.severity === vscode.DiagnosticSeverity.Error;
+
+/** Com'erano le cose prima. Si scatta su tutto: quali file verranno toccati non si sa ancora. */
+export function errorSnapshot(): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const [uri, list] of vscode.languages.getDiagnostics()) {
+    const rel = vscode.workspace.asRelativePath(uri, false);
+    const sigs = new Set(list.filter(isError).map((d) => sigOf(rel, d)));
+    if (sigs.size) out.set(uri.fsPath, sigs);
+  }
+  return out;
+}
+
+/**
+ * Gli errori comparsi *adesso* nei file che questo turno ha toccato.
+ *
+ * Due filtri, e servono tutti e due. Solo i file toccati: un progetto con duecento
+ * errori suoi non e' una cosa che ti e' stata chiesta di sistemare. E solo le firme
+ * che prima non c'erano: un errore che stava li' da ieri, in un file che oggi e'
+ * stato modificato per altro, resta roba di ieri.
+ */
+export function newErrors(
+  files: Iterable<string>,
+  before: Map<string, Set<string>>
+): { text: string; count: number; files: string[] } {
+  const rows: string[] = [];
+  const hit = new Set<string>();
+  for (const fsPath of files) {
+    const uri = vscode.Uri.file(fsPath);
+    const rel = vscode.workspace.asRelativePath(uri, false);
+    const was = before.get(fsPath) ?? new Set<string>();
+    for (const d of vscode.languages.getDiagnostics(uri)) {
+      if (!isError(d)) continue;
+      const sig = sigOf(rel, d);
+      if (was.has(sig)) continue;
+      hit.add(rel);
+      rows.push(`${rel}:${d.range.start.line + 1}:${d.range.start.character + 1} ${d.message}`);
+    }
+  }
+  // Un tetto c'e' perche' una modifica sbagliata in un file di tipi ne accende
+  // trecento, e trecento righe dentro un prompt sono solo soldi.
+  return { text: rows.slice(0, 40).join('\n'), count: rows.length, files: [...hit] };
+}
+
+/**
+ * Aspetta che i linguaggi abbiano finito di ricalcolare.
+ *
+ * Chiedere le diagnostiche appena finisce il turno vuol dire quasi sempre chiederle a
+ * un TypeScript che sta ancora masticando: si sta zitti finche' non passano `quiet`
+ * millisecondi senza che nessuno cambi piu' niente, con un tetto perche' un progetto
+ * grande, o un watcher rumoroso, non ci arriva mai.
+ */
+export function diagnosticsSettled(quiet = 1200, cap = 8000): Promise<void> {
+  return new Promise((done) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      clearTimeout(timer);
+      clearTimeout(hard);
+      sub.dispose();
+      done();
+    };
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(finish, quiet);
+    };
+    const sub = vscode.languages.onDidChangeDiagnostics(arm);
+    const hard = setTimeout(finish, cap);
+    arm();
+  });
 }
 
 /** The files open right now, marking which one is active. */

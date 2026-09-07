@@ -102,6 +102,20 @@
           </div>
           <p class="phint" data-i18n="cfg.language.hint">Changes the whole interface straight away</p>
 
+          <!-- Le due cose che l'estensione fa da se' mentre Claude lavora. Stanno
+               sopra i suoni perche' cambiano quello che succede, non come te lo si
+               dice, e perche' una cosa che parte da sola deve avere il suo
+               interruttore dove lo trovi. -->
+          <div class="pop-sec" data-i18n="cfg.auto">While it works</div>
+          <label class="pcheck">
+            <input type="checkbox" id="cfgFollow" />
+            <span data-i18n="cfg.follow">The editor follows it: files open and the changed lines light up</span>
+          </label>
+          <label class="pcheck">
+            <input type="checkbox" id="cfgAutofix" />
+            <span data-i18n="cfg.autofix">Fix on its own the errors it introduces (at most twice)</span>
+          </label>
+
           <div class="pop-sec" data-i18n="cfg.done">When it's done</div>
           <!-- The list of sounds isn't a <select> any more: that one opens a menu
                drawn by the operating system, in the middle of a panel where
@@ -132,10 +146,20 @@
           </button>
         </div>
 
-        <main class="log" id="log"></main>
+        <!-- La mappa del turno: una tacca per passo, colorata per tipo. Serve a
+             vedere la forma di una risposta lunga senza scorrerla, e a saltare al
+             terzo file che ha toccato senza andarlo a cercare. -->
+        <div class="logwrap">
+          <nav class="tmap few" id="tmap" aria-hidden="true"></nav>
+          <main class="log" id="log"></main>
+        </div>
 
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
+          <!-- Quello che hai scritto mentre Claude lavorava. Non entra nel discorso
+               finche' non parte davvero: qui si vede che sta aspettando, e la × lo
+               ritira finche' e' ancora in tempo. -->
+          <div class="queued" id="queued" hidden></div>
           <div class="attach" id="attach" hidden></div>
           <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
           <!-- Attachments. The picker is VS Code's own and it filters nothing:

@@ -33,7 +33,7 @@ import * as vscode from 'vscode';
 import { owned } from '../context/owned';
 import type { TaskBoard, TaskData, TaskItem } from './protocol';
 
-const EMPTY: TaskData = { items: [], done: 0, total: 0, active: -1, busy: false };
+const EMPTY: TaskData = { items: [], done: 0, total: 0, active: -1, busy: false, doing: '' };
 
 /** Una task com'e' tenuta qui: quella che va a schermo piu' il numero per ritrovarla. */
 interface Step extends TaskItem {
@@ -46,12 +46,25 @@ interface List {
    * Chi l'ha scritta. TodoWrite riscrive tutto a ogni giro ed e' roba del singolo
    * messaggio; le Task* si accumulano e restano per tutta la conversazione.
    */
-  source: 'todo' | 'task';
+  /**
+   * Chi l'ha scritta.
+   *
+   *   'todo'  TodoWrite: riscrive tutto a ogni giro, ed e' roba del singolo messaggio
+   *   'task'  TaskCreate/TaskUpdate: si accumulano e restano per tutta la conversazione
+   *   'cli'   i messaggi di sistema della CLI di oggi — l'unica sorgente ancora viva
+   *
+   * Le prime due esistono ancora qui dentro solo per le CLI vecchie: nella CLI di
+   * adesso quei tre strumenti non ci sono piu' affatto (provato: il modello risponde
+   * che non li ha), ed e' il motivo per cui questo pannello e' rimasto vuoto.
+   */
+  source: 'todo' | 'task' | 'cli';
   steps: Step[];
   /** Le TaskCreate in volo, sotto l'id della chiamata: aspettano il loro numero. */
   waiting: Map<string, Step>;
   /** Le TaskList in volo: la loro risposta e' l'elenco vero, e rimette tutto in riga. */
   asked: Set<string>;
+  /** L'ultimo passo annunciato: "Read package.json". Vuoto = fermo. */
+  doing: string;
   /**
    * Il numero piu' alto visto in questa conversazione. La CLI numera da 1 e non
    * riusa mai un numero, nemmeno dopo una cancellazione: contarlo qui e' l'unico
@@ -69,6 +82,7 @@ const blank = (): List => ({
   steps: [],
   waiting: new Map(),
   asked: new Set(),
+  doing: '',
   next: 0,
   busy: false,
   data: EMPTY,
@@ -86,6 +100,28 @@ function numberIn(text: string): string {
  * ne' in corso ne' finita e' esattamente quello.
  */
 const LINE = /^#(\d+)\s*\[([a-z_]+)\]\s*(.+)$/i;
+
+/**
+ * Gli stati che dice la CLI, tradotti nei quattro che il pannello sa disegnare.
+ * `undefined` vuol dire "questo messaggio non parlava di stato": chi chiama non deve
+ * toccare quello che c'era.
+ */
+function cliStatus(s?: string): TaskItem['status'] | undefined {
+  switch (s) {
+    case 'running':
+      return 'in_progress';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+    case 'killed':
+      return 'failed';
+    case 'pending':
+    case 'paused':
+      return 'pending';
+    default:
+      return undefined;
+  }
+}
 
 function statusOf(word: string): TaskItem['status'] {
   const w = word.toLowerCase();
@@ -261,6 +297,46 @@ export class TaskStore {
     this.settle(key, l);
   }
 
+  // ---- la CLI di oggi: le task arrivano come messaggi di sistema ------------
+
+  /**
+   * Una notizia su una task, da `task_started` / `task_progress` / `task_updated`.
+   *
+   * Ognuno dei tre dice un pezzo — il nome, cosa sta facendo adesso, com'e' finita —
+   * quindi qui si fondono invece di sostituirsi: una `task_progress` che arriva senza
+   * stato non deve spegnere lo stato che c'era.
+   */
+  fromCli(
+    key: string,
+    id: string,
+    d: { description?: string; doing?: string; status?: string }
+  ) {
+    if (!id) return;
+    const l = this.of(key);
+    // La prima task della CLI butta via una lista dei vecchi strumenti rimasta li':
+    // sono due contabilita' diverse e mescolarle darebbe passi doppi.
+    if (l.source !== 'cli') {
+      l.source = 'cli';
+      l.steps = [];
+      l.waiting.clear();
+      l.asked.clear();
+    }
+    let s = l.steps.find((x) => x.id === id);
+    if (!s) {
+      // Senza un nome non c'e' niente da disegnare: una `task_progress` che arriva
+      // prima della sua `task_started` aspetta, invece di aprire una riga vuota.
+      if (!d.description) return;
+      s = { id, content: d.description, status: 'pending' };
+      l.steps.push(s);
+    }
+    if (d.description) s.content = d.description;
+    // "Running find …" e' la riga che si legge mentre e' quella in corso.
+    if (d.doing) s.activeForm = d.doing;
+    const st = cliStatus(d.status);
+    if (st) s.status = st;
+    this.settle(key, l);
+  }
+
   // ---- quando la lista va azzerata ----------------------------------------
 
   /**
@@ -273,7 +349,10 @@ export class TaskStore {
    */
   newTurn(key: string) {
     const l = this.lists.get(key);
-    if (!l || l.source === 'task') return;
+    // Le liste dei due sistemi a task (quello vecchio e quello della CLI di oggi) se
+    // le tiene il motore per tutta la sessione, e quello che hai chiesto due messaggi
+    // fa e non e' ancora finito deve continuare a vedersi. Solo TodoWrite se ne va.
+    if (!l || l.source !== 'todo') return;
     this.clear(key);
   }
 
@@ -283,6 +362,21 @@ export class TaskStore {
     const l = blank();
     l.busy = busy;
     this.lists.set(key, l);
+    this.settle(key, l);
+  }
+
+  /**
+   * Il passo in corso, come lo si legge nella card.
+   *
+   * Una lista che non c'e' non e' una notizia; un passo che sta succedendo lo e'
+   * sempre. Questa riga e' quello che rispondeva la frase fissa "sto capendo cosa
+   * fare", tranne che questa e' vera.
+   */
+  doing(key: string, text: string) {
+    const l = this.of(key);
+    const v = String(text || '').slice(0, 90);
+    if (l.doing === v) return;
+    l.doing = v;
     this.settle(key, l);
   }
 
@@ -319,10 +413,14 @@ export class TaskStore {
     }));
     l.data = {
       items,
-      done: items.filter((i) => i.status === 'completed').length,
+      // Una task andata storta e' chiusa quanto una finita bene: nella barra conta
+      // come "non ci si torna piu' sopra", altrimenti resterebbe li' a promettere
+      // un avanzamento che non arrivera'.
+      done: items.filter((i) => i.status === 'completed' || i.status === 'failed').length,
       total: items.length,
       active: items.findIndex((i) => i.status === 'in_progress'),
       busy: l.busy,
+      doing: l.busy ? l.doing : '',
     };
     this.lists.set(key, l);
     this.emit();

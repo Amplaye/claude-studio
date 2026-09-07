@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.16.0
+
+- **Il pannello delle task era agganciato a tre strumenti che non esistono piu'.**
+  Ascoltava `TodoWrite`, `TaskCreate` e `TaskUpdate`. La CLI di oggi non ne ha
+  nessuno dei tre: chiedendoglieli, il modello risponde per iscritto che non li ha —
+  provato, non dedotto. Per questo la card diceva "sto capendo cosa fare" per
+  sessioni intere: non c'era niente da ascoltare. Quelle che la CLI chiama task
+  adesso sono i sub-agent, e non passano da nessuna chiamata a un tool: li annuncia
+  lei con dei messaggi di sistema suoi (`task_started`, `task_progress`,
+  `task_updated`), che e' la sorgente che usa il suo pannello e che qui non ascoltava
+  nessuno. Ora si ascolta quella. I due dialetti vecchi restano per chi gira una CLI
+  di prima.
+
+- **La card dice sempre cosa sta facendo.** Le task esistono solo quando apre un
+  sub-agent, e un turno normale — legge, modifica, lancia i test — non ne apre
+  nessuno: anche riparato il pannello, la card sarebbe rimasta muta quasi sempre.
+  Adesso quando non c'e' una lista c'e' il passo in corso, per nome — `Read
+  tax.ts`, `Bash npm test` — con un pallino che pulsa. E' la sola domanda che si fa
+  guardando quella card, e per la prima volta ha una risposta.
+
+- **Fallita non e' fatta.** Un sub-agent che non arriva in fondo aveva la stessa
+  spunta verde di uno riuscito. Adesso ha il suo colore e il suo segno.
+
+- **Un turno si legge a colpo d'occhio.** Sette carte identiche alte 64 pixel per
+  dire "ha letto due file e ne ha scritto uno": una `Read` che non ha cambiato
+  niente occupava esattamente lo spazio di un `Edit` che ti ha riscritto un modulo, e
+  trovare i due passi che contano voleva dire leggerli tutti e quaranta. I passi che
+  non lasciano niente dietro (letture, ricerche, sguardi in rete) ora sono una riga
+  alta un terzo, e quelli di fila si stringono in un blocco solo. I nomi dei file
+  restano tutti — "Read ×4" sarebbe stato piu' corto e avrebbe buttato via proprio
+  la cosa che si cerca. Chi scrive tiene la sua carta piena, e una lettura andata
+  storta se la riprende all'istante.
+
+- **La mappa del turno.** Una tacca per passo lungo il bordo sinistro, colorata per
+  tipo: letture grigie, scritture arancioni, comandi blu, errori rossi, permessi
+  gialli. Si vede la forma di una risposta lunga senza scorrerla — "ha letto per due
+  minuti, poi ha scritto tre file, poi si e' impantanato su un comando rosso" — e un
+  click ti porta a quel passo. Sta nella gutter che la colonna aveva gia': non ha
+  tolto un pixel a niente.
+
+- **Quello che scrivi mentre lavora si vede che sta aspettando.** Il motore li
+  metteva in fila da sempre, ma la chat li disegnava come gia' spediti: non capivi che
+  aspettavano, non li potevi ritirare, e due erano indistinguibili da due partiti. Ora
+  stanno sopra la barra di scrittura, con la ×. E la fila e' davvero nostra: l'SDK
+  tirava il messaggio successivo nello stesso istante in cui lo scrivevi, quindi a
+  fare la coda era la CLI e la pastiglia sarebbe durata mezzo secondo. Adesso il
+  prossimo parte a turno finito, non prima.
+
+- **L'editor segue Claude.** Ogni file che tocca si apre di fianco, scorre alle righe
+  appena scritte e le illumina per un paio di secondi. Il fuoco non si sposta mai:
+  continui a scrivere nella chat mentre il codice si muove nell'editor, che e' l'unico
+  motivo per cui questa cosa puo' stare accesa di serie. Si spegne dalle impostazioni.
+
+- **Gli errori che introduce se li sistema da solo.** A fine turno l'estensione
+  guarda le sottolineature rosse che l'editor ha gia' calcolato — TypeScript, il
+  linter, quello che c'e' — sui **soli file che quel turno ha toccato, e solo quelle
+  che prima non c'erano. Se ce ne sono, il turno riparte da solo per chiuderle, con
+  una card che lo dice: un turno che riparte in silenzio sarebbe la cosa piu'
+  inquietante che un pannello possa fare. Il guinzaglio e' la meta' importante della
+  funzione: due giri al massimo, mai sopra un turno che hai fermato tu, mai davanti a
+  un messaggio che hai gia' scritto, mai su errori che non sono nati adesso. Finiti i
+  tentativi si ferma e ti dice quanti ne restano, invece di riprovare la stessa
+  correzione a spese tue. C'e' un controllo apposta che prova tutte queste regole
+  contro la CLI vera (`npm run autofix-check`), ed e' in `npm run verify`.
+
+- **L'anteprima e la chiusura dei turni** sono quelle della 0.15.6, che non e' mai
+  stata pubblicata: sono qui dentro.
+
 ## 0.15.6
 
 - **Ogni allegato si guarda prima di mandarlo, non solo le immagini.** Una foto aveva

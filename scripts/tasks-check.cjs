@@ -295,16 +295,21 @@ async function live(tab, side) {
     return ended >= want;
   }
 
-  // Gli strumenti vanno nominati. Chiedendo "scriviti una lista" Claude risponde con
-  // un elenco puntato dentro al messaggio — che per lui e' aver ubbidito, e per questo
-  // test e' un panello vuoto e un fallimento che non significa niente. Quello che qui
-  // si sta provando e' il filo che parte da TaskCreate: se quel tool non viene chiamato
-  // non si sta provando nulla.
+  // Quello che la CLI sa davvero fare, oggi.
+  //
+  // Questo test chiedeva TaskCreate e TaskUpdate. Quei due strumenti la CLI non ce li
+  // ha piu': chiedendoglieli il modello risponde, per iscritto, che non esistono — e
+  // il test falliva accusando il pannello di una cosa che era vera altrove. TodoWrite
+  // idem. Le task della CLI di adesso sono i sub-agent, e non passano da nessun tool
+  // che si possa spiare: le annuncia lei, con dei messaggi di sistema suoi.
+  //
+  // Quindi qui si chiede la cosa che le task le crea davvero. Due sub-agent, corti,
+  // che non toccano niente: devono comparire nel pannello mentre lavorano e spuntarsi
+  // quando finiscono.
   const ok1 = await turn(
-    'Usa lo strumento TaskCreate (una chiamata per voce, non scriverle nel messaggio) ' +
-      'per creare tre task: "Leggere il README", "Contare le righe", "Scrivere il risultato". ' +
-      'Poi con TaskUpdate metti la prima in_progress e la seconda completed. ' +
-      'Non leggere e non toccare nessun file: servono solo le chiamate ai due strumenti.'
+    'Lancia due sub-agent con lo strumento Task (subagent_type "Explore"): il primo ' +
+      'conta i file .ts sotto src/, il secondo dice quante righe ha README.md. ' +
+      'Poi riporta i due numeri. Non modificare nessun file.'
   );
 
   const frames = seen().filter(Boolean);
@@ -312,7 +317,7 @@ async function live(tab, side) {
   console.log('  turn 1: ' + frames.length + ' list(s) handed over; the last one: ' + line(d));
   t(ok1, 'the turn never finished: no CLI, no login, or no network');
   t(frames.length > 0, 'the panel was handed no list at all while Claude was writing one');
-  t((d?.total ?? 0) >= 3, 'the steps Claude wrote down did not reach the panel: ' + line(d));
+  t((d?.total ?? 0) >= 2, 'the tasks the CLI opened did not reach the panel: ' + line(d));
   t(
     (d?.items ?? []).some((i) => i.status === 'completed'),
     'a step Claude ticked off is still drawn as pending: ' + line(d)
@@ -334,22 +339,48 @@ async function live(tab, side) {
   // one arrives; a Task* list belongs to the conversation and must not. Get that
   // wrong and the panel empties itself the moment you say "go on".
   const before = seen().length;
-  const ok2 = await turn(
-    'Adesso con TaskUpdate metti completed anche la terza task. Nient\'altro, nessun file.'
-  );
+  const ok2 = await turn('Lancia un altro sub-agent Explore che dica quante righe ha LICENSE.');
   const after = seen().slice(before).filter(Boolean);
   const d2 = after[after.length - 1] ?? only(tab);
   console.log('  turn 2: ' + line(d2));
   t(ok2, 'the second turn never finished');
-  t((d2?.total ?? 0) >= 3, 'the list emptied itself on the second message: ' + line(d2));
+  t((d2?.total ?? 0) > (d?.total ?? 0), 'the new task did not join the list: ' + line(d2));
   t(
     (d2?.items ?? []).filter((i) => i.status === 'completed').length >= 2,
-    'the step ticked off in the second turn did not reach the panel: ' + line(d2)
+    'the tasks that finished are not ticked off: ' + line(d2)
   );
   t(
     line(only(side)) === line(d2),
     'after a second message the sidebar and the tab disagree: ' + line(only(side))
   );
+
+  // ---- un turno normale, senza sub-agent: la card deve dire cosa sta facendo ----
+  //
+  // Le task della CLI sono i sub-agent, e un turno qualunque — legge un file,
+  // risponde — non ne apre nessuno. La card restava con una frase fissa addosso per
+  // tutta la sessione, che e' il motivo per cui questo pannello sembrava rotto anche
+  // quando non lo era. Questa riga c'e' sempre, perche' un passo in corso c'e' sempre.
+  const mark3 = seen().length;
+  const ok3 = await turn('Leggi package.json e dimmi il campo "name" in una riga. Nient\'altro.');
+  const steps = tab.webview.got
+    .filter((m) => m && m.k === 'tasks')
+    .map((m) => Object.values(m.d || {})[0])
+    .filter(Boolean)
+    .map((v) => v.doing)
+    .filter(Boolean);
+  console.log('  turn 3, what it was doing: ' + (steps.join(' → ') || '(nothing)'));
+  t(ok3, 'the third turn never finished');
+  t(steps.length > 0, 'the card never said what it was doing in a turn without sub-agents');
+  // Un passo del filo principale, non solo quelli dei sub-agent di prima: e' la
+  // differenza fra una card che racconta questo turno e una che ricorda quello prima.
+  // Con quale strumento lo faccia — Read, un grep da Bash — lo sceglie lui, e va bene
+  // cosi': la domanda a cui questa riga risponde e' "sta facendo qualcosa?".
+  const own = steps.filter((s) => !/^Agent /.test(s));
+  t(
+    own.length > 0,
+    'the card only ever showed the sub-agents of the earlier turns: ' + steps.join(' | ')
+  );
+  void mark3;
   clearInterval(watch);
 }
 

@@ -126,6 +126,15 @@
   color: var(--ok, #5dbf8a);
 }
 
+/* Andata storta. Non e' "fatta" e non e' "da fare": e' finita male, e sono proprio
+   quelle che devi vedere per prime. */
+.tk-row.failed .ico {
+  color: var(--bad);
+}
+.tk-row.failed {
+  background: color-mix(in srgb, var(--bad) 10%, transparent);
+}
+
 /* Done is also said by the bed the row sits on. Nine steps in a narrow column are a
    wall of white sentences, and telling them apart meant reading every line to find the
    struck-through ones. A tint you can see from across the room does that in a glance —
@@ -213,6 +222,32 @@
   margin: 2px 0 0;
   font-size: 11.5px;
   color: var(--fg);
+}
+/* Il passo in corso, quando di task non ce ne sono. Il pallino che pulsa e' l'unica
+   differenza fra "sta succedendo questo adesso" e una frase stampata li' sopra. */
+.tk-empty.live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tk-empty.live::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--claude-2);
+  animation: tk-beat 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-empty.live::before {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

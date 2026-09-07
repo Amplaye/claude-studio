@@ -162,7 +162,13 @@ function makeVscode({ workspaceRoot, registered }) {
         onDidChangeTabGroups: () => ({ dispose() {} }),
       },
     },
-    languages: { getDiagnostics: () => [] },
+    languages: {
+      // Senza argomento: tutte, a coppie [uri, elenco]. Con un uri: solo il suo
+      // elenco. Sono due firme diverse dello stesso nome, come nel VSCode vero, e
+      // l'autofix le usa tutte e due.
+      getDiagnostics: (u) => (u ? [] : []),
+      onDidChangeDiagnostics: () => ({ dispose() {} }),
+    },
     commands: {
       registerCommand: (id, fn) => {
         registered.commands.set(id, fn);
