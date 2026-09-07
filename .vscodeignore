@@ -26,3 +26,8 @@ docs/**
 .publish-*.png
 .az-shot.png
 .env*
+# Le foto e le pagine di prova nascono in dist/ mentre si lavora, e da li' finivano
+# dentro il pacchetto: uno screenshot di una bozza spedito a chi installa
+# l'estensione. I fogli di sprite stanno in dist/webview/ e non li tocca.
+dist/*.png
+dist/*.html
