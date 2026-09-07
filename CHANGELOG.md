@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.18.0
+
+- **La coda dei messaggi era tre cose che nessuno puo' indovinare.** Un riquadro
+  tratteggiato, un orologio che gira, quello che avevi scritto su una riga troncata,
+  e una ×. Niente diceva *perche'* stesse li', niente diceva *quando* sarebbe
+  partito — un orologio dice "aspetta", non "parte a turno finito" — e con due in
+  fila non si capiva quale dei due andasse prima. Adesso e' un posto, non una
+  pastiglia: un riquadro con una frase in testa che dice cosa sta succedendo e
+  quando smette (`2 in attesa — partono appena finisce questo turno`), e le righe si
+  numerano da due in su.
+
+- **Quello che alleghi a un messaggio in coda si vede.** Era il difetto piu' facile
+  da pagare: attacchi una foto e un foglio di calcolo, il messaggio si mette in fila,
+  e da quel momento e' una riga di testo senza nessun modo di ricordarti cosa si sta
+  portando dietro. Ora la miniatura e le pastiglie stanno li' dentro — le stesse
+  identiche che vedrai nel discorso quando sara' partito, cliccabili allo stesso
+  modo per riaprire il file. Il testo si legge su due righe invece di una troncata,
+  perche' un messaggio in attesa lo rileggi per decidere se tenerlo.
+
+- **Ritirarlo non vuol dire perderlo.** La × toglieva il messaggio dalla coda e
+  buttava via quello che avevi scritto. Adesso il testo torna nel campo di scrittura
+  — a meno che nel frattempo tu non abbia cominciato a scrivere altro li' dentro, e
+  allora quello che vale e' l'altro. La coda ha anche un tetto d'altezza: quattro
+  messaggi con le foto spingevano la barra di scrittura fuori dalla finestra, e
+  adesso scorre invece di schiacciare la cosa che serve per svuotarla.
+
 ## 0.17.1
 
 - **La mappa del turno era ancora un codice a barre, e l'idea sbagliata era la

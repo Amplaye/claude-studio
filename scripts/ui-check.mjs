@@ -341,6 +341,69 @@ for (const surface of ['view', 'panel']) {
     'the arrow does not ask to go back to its own checkpoint: ' + JSON.stringify(rw)
   );
 
+  // ---- what you write while it is still working ----
+  //
+  // It has to say three things a turning clock cannot: that it is waiting, when it
+  // stops waiting, and what it is carrying. That last one is the one that was
+  // missing — the photo and the spreadsheet you hung on it are exactly the things
+  // you forget you attached, and a message that shows a line of text and nothing
+  // else gives you no way of remembering.
+  const PNG =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await page.fill('#input', '');
+  await post({
+    k: 'queued',
+    id: 'q1',
+    text: 'e poi controlla il foglio dei conti',
+    images: [{ mime: 'image/png', data: PNG }],
+    files: [{ path: 'C:/proj/conti.xlsx', name: 'conti.xlsx', size: 48210 }],
+  });
+  await post({ k: 'queued', id: 'q2', text: 'infine committa tutto' });
+  await page.waitForTimeout(200);
+  const q = await page.evaluate(() => {
+    const box = document.getElementById('queued');
+    const rows = [...box.querySelectorAll('.qmsg')];
+    return {
+      shown: !box.hidden,
+      rows: rows.length,
+      head: (box.querySelector('.qhead-text') || {}).textContent || '',
+      // quello che si porta dietro, disegnato come lo disegnera' il discorso
+      imgs: rows[0] ? rows[0].querySelectorAll('.uimg').length : -1,
+      chip: rows[0] ? (rows[0].querySelector('.att-name') || {}).textContent : null,
+      // il posto in fila si vede solo quando una fila c'e' davvero
+      numbered: rows.map((r) => getComputedStyle(r.querySelector('.qn')).display),
+      nums: rows.map((r) => r.querySelector('.qn').textContent),
+    };
+  });
+  t(q.shown && q.rows === 2, 'the queued messages are not there: ' + JSON.stringify(q));
+  t(/\b2\b/.test(q.head), 'the queue does not say in words what is happening: ' + q.head);
+  t(q.imgs === 1, 'an image attached to a queued message is not shown: ' + q.imgs);
+  t(q.chip === 'conti.xlsx', 'a file attached to a queued message is not shown: ' + q.chip);
+  t(q.numbered.every((d) => d !== 'none') && q.nums.join('') === '12', 'two queued messages are not numbered: ' + q.nums.join(','));
+
+  // taking one back must not throw away what you wrote in it
+  // .nth(1), non :nth-of-type(2): la frase in testa e' un div anche lei, e il
+  // selettore CSS conta i fratelli dello stesso tipo, non quelli con la stessa classe.
+  await page.locator('.qmsg .qx').nth(1).click();
+  const un = await lastSent();
+  t(un?.cmd === 'unqueue' && un.id === 'q2', 'the × does not take the message back: ' + JSON.stringify(un));
+  t(
+    (await page.inputValue('#input')) === 'infine committa tutto',
+    'what you had written is lost when you take it back: ' + (await page.inputValue('#input'))
+  );
+  await post({ k: 'unqueued', id: 'q2' });
+  await page.waitForTimeout(320);
+  const q1 = await page.evaluate(() => {
+    const box = document.getElementById('queued');
+    const n = box.querySelector('.qmsg .qn');
+    return { rows: box.querySelectorAll('.qmsg').length, num: n ? getComputedStyle(n).display : '?' };
+  });
+  t(q1.rows === 1 && q1.num === 'none', 'the last one in the queue is still numbered: ' + JSON.stringify(q1));
+  await post({ k: 'unqueued', id: 'q1' });
+  await page.fill('#input', '');
+  await page.waitForTimeout(320);
+  t(await page.locator('#queued').isHidden(), 'the empty queue leaves its box behind');
+
   // ---- permissions: the three kinds of question, really clicked ----
   await post({
     k: 'ask',
@@ -1283,6 +1346,7 @@ for (const surface of ['view', 'panel']) {
       userText: at('.msg.user .utext', 'color'),
       mode: at('.modeseg-btn', 'color'),
       mapName: at('.tm .tm-name', 'color'),
+      queue: at('.qhead', 'color'),
       // …and the lines that draw the boxes have to be there at all
       iconBorder: at('.iconbtn', 'borderTopColor'),
       // non .slim: quelle il bordo non ce l'hanno per scelta, e' il loro sfondo a dirle
@@ -1293,6 +1357,7 @@ for (const surface of ['view', 'panel']) {
   t(light.userText > 4.5, 'your own message is unreadable on a light theme: ' + light.userText);
   t(light.mode > 4.5, 'the mode switch is unreadable on a light theme: ' + light.mode);
   t(light.mapName > 4.5, 'the map bands are unreadable on a light theme: ' + light.mapName);
+  t(light.queue > 4.5, 'the line that explains the queue is unreadable on a light theme: ' + light.queue);
   t(light.iconBorder > 1.2, 'the header buttons have no edge on a light theme: ' + light.iconBorder);
   t(light.cardBorder > 1.2, 'the cards have no edge on a light theme: ' + light.cardBorder);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-light.png`), fullPage: true });

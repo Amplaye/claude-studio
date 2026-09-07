@@ -165,9 +165,11 @@
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
           <!-- Quello che hai scritto mentre Claude lavorava. Non entra nel discorso
-               finche' non parte davvero: qui si vede che sta aspettando, e la × lo
-               ritira finche' e' ancora in tempo. -->
-          <div class="queued" id="queued" hidden></div>
+               finche' non parte davvero: qui c'e' scritto che sta aspettando e
+               quando partira', in che ordine, e con cosa — le immagini e i file che
+               si porta dietro si vedono qui come si vedranno nel discorso. La × lo
+               ritira finche' e' ancora in tempo, e il testo torna nel campo. -->
+          <div class="queued" id="queued" role="region" data-i18n-label="queue.title" aria-label="Messages waiting to be sent" hidden></div>
           <div class="attach" id="attach" hidden></div>
           <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
           <!-- Attachments. The picker is VS Code's own and it filters nothing:

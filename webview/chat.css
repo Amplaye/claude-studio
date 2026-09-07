@@ -3159,34 +3159,72 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
    Above the box you wrote it in, not inside the conversation: it hasn't happened
    yet. The clock says what it is waiting for, the × takes it back while there is
    still time. */
+/* La sala d'attesa: uno spazio dichiarato, non tre pastiglie appoggiate sopra la
+   barra di scrittura. Ha un bordo suo e una frase in testa, perche' la domanda a cui
+   deve rispondere — "questo cos'e' e quando parte?" — non ha risposta in un'icona. */
 .queued {
   display: flex;
   flex-direction: column;
   gap: 4px;
   width: 100%;
   margin-bottom: 7px;
+  padding: 7px;
+  border-radius: var(--r);
+  border: 1px dashed color-mix(in srgb, var(--claude-1) 45%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 5%, transparent);
+  /* Quattro messaggi in coda, ognuno con una foto e due allegati, e la barra di
+     scrittura finirebbe fuori dalla finestra: la sala d'attesa scorre invece di
+     spingere via la cosa che serve per svuotarla. */
+  max-height: 34vh;
+  overflow-y: auto;
 }
 .queued[hidden] {
   display: none;
 }
+/* La riga che spiega. E' la sola cosa che rende la coda leggibile a chi non l'ha
+   mai vista: dice cosa sta succedendo, quanti sono e quando finisce l'attesa. */
+.qhead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 2px 1px;
+  /* Una frase, non un'etichetta: il maiuscoletto spaziato e' per le due parole di
+     un'intestazione, e su una riga intera la allarga fino a farla troncare — che e'
+     il modo piu' sicuro di buttare via proprio la meta' che spiega. */
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  /* Inchiostro, non argilla: una frase da leggere va scritta col colore del testo.
+     Il pesca su carta bianca sta a un rapporto di due a uno, cioe' la riga che
+     spiega tutto sarebbe l'unica illeggibile su meta' dei temi. Il colore ce
+     l'hanno il bordo tratteggiato e l'orologio, che e' dove serve. */
+  color: var(--fg);
+}
+.qhead .qico {
+  align-self: center;
+  color: var(--claude-1);
+}
+.qhead-text {
+  min-width: 0;
+}
 .qmsg {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
-  padding: 5px 5px 5px 9px;
+  padding: 5px 5px 6px 6px;
   border-radius: 9px;
-  border: 1px dashed color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--claude-1) 28%, transparent);
   background: color-mix(in srgb, var(--claude-1) 7%, transparent);
   font-size: 12px;
   animation: cs-enter 0.26s cubic-bezier(0.2, 0.9, 0.25, 1) both;
   animation-delay: calc(var(--i, 0) * 40ms);
 }
-/* Dashed while it waits, and the clock turns: the two things that say "not yet". */
+/* Il turno gira: l'unico movimento in tutto il riquadro, e sta accanto alla frase
+   che dice cosa si sta aspettando invece che al posto di quella. */
 .qico {
   flex: 0 0 auto;
   width: 13px;
   height: 13px;
-  color: var(--claude-2);
   animation: cs-spin 3.4s linear infinite;
 }
 @keyframes cs-spin {
@@ -3194,12 +3232,60 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
     rotate: 360deg;
   }
 }
-.qtext {
+/* Il posto in fila. Compare da due in su: un "1" sull'unica cosa in coda e'
+   l'etichetta di un ordine che non esiste. */
+.qn {
+  display: none;
+  flex: 0 0 auto;
+  min-width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--claude-1) 26%, transparent);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+.queued.many .qn {
+  display: block;
+}
+.qbody {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 1px;
+}
+/* Due righe, non una troncata: un messaggio in attesa lo rileggi per decidere se
+   tenerlo, e mezza frase non basta a deciderlo. */
+.qtext {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+}
+/* Le miniature e le pastiglie sono le stesse del discorso — cosi' quello che vedi
+   aspettare e' identico a quello che vedrai partito — solo piu' piccole: qui sopra
+   lo spazio e' quello che togli alla barra di scrittura. */
+.qmsg .uimgs,
+.qmsg .ufiles {
+  margin-bottom: 0;
+  gap: 5px;
+}
+.qmsg .uimg {
+  height: 44px;
+  border-radius: 6px;
+}
+.qmsg .att {
+  font-size: 11px;
 }
 .qx {
   flex: 0 0 auto;
@@ -3208,6 +3294,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   justify-content: center;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
   padding: 0;
   border: 0;
   border-radius: 50%;

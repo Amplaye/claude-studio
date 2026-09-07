@@ -137,6 +137,10 @@ Switch any time, even halfway through a conversation.
   Point at it and it opens into a list that says it all in words.
 - **A way back beside every message you sent.** It puts the files back the way they
   were just before Claude touched them, and asks first.
+- **Type while it works and nothing is lost.** What you write waits in a tray above
+  the box that says how many there are and when they go — showing the photos and
+  files each one is carrying, so you don't forget. Take one back and your words
+  return to the box.
 - **Paste an image**, **drop a file**, or use the paperclip — any format, any size.
 - **A chime and a notification** when it's done, if you've wandered off — and a
   mark on the conversation that finished, so you know which one.

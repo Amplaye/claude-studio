@@ -1802,6 +1802,57 @@
     }
   }
 
+  /**
+   * The images and the files that travel with a message.
+   *
+   * Drawn once and used in both the places a message can be: down in the thread once
+   * it has gone, and up above the writing field while it is still queued. Same
+   * shapes, same clicks — a PDF you attached has to look like the same PDF in both,
+   * or you are left wondering whether it really went with it.
+   *
+   * Images go on top, above the words, exactly where they sat in the composer while
+   * you were writing. Everything else travelled as a path, so without a chip the
+   * message would show nothing at all: a PDF simply disappeared on Enter while a PNG
+   * stayed put. The chip is the way back in, too — three messages later you can still
+   * open what you attached without going to look for it.
+   */
+  function attachRows(images, files) {
+    const out = [];
+    if (images && images.length) {
+      const box = el('div', 'uimgs');
+      for (const im of images) {
+        const src = `data:${im.mime};base64,${im.data}`;
+        const thumb = document.createElement('img');
+        thumb.className = 'uimg';
+        thumb.src = src;
+        thumb.alt = window.I18N.t('composer.attachedImage');
+        thumb.addEventListener('click', () => openLightbox(src));
+        box.append(thumb);
+      }
+      out.push(box);
+    }
+    if (files && files.length) {
+      const box = el('div', 'ufiles');
+      for (const f of files) {
+        const chip = el('span', 'att att-file' + (f.path ? ' att-open' : ''));
+        chip.title = f.path ? t('composer.previewFile', { name: f.name }) : f.name;
+        const info = el('span', 'att-info');
+        info.append(el('span', 'att-name', f.name));
+        if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
+        if (f.path) {
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            vscode.postMessage({ cmd: 'preview', path: f.path });
+          });
+        }
+        chip.append(icon(fileIcon(f.name)), info);
+        box.append(chip);
+      }
+      out.push(box);
+    }
+    return out;
+  }
+
   // ---------- messages from the extension ----------
   window.addEventListener('message', (ev) => {
     const m = ev.data;
@@ -1933,46 +1984,7 @@
         break;
       case 'user': {
         const n = el('div', 'msg user');
-        // The attached images go on top, above the words — exactly where they sat
-        // in the composer while you were writing. Sent, the message keeps the shape
-        // you'd built: they're the proof they went out, and one click opens them big.
-        if (m.images && m.images.length) {
-          const box = el('div', 'uimgs');
-          for (const im of m.images) {
-            const src = `data:${im.mime};base64,${im.data}`;
-            const t = document.createElement('img');
-            t.className = 'uimg';
-            t.src = src;
-            t.alt = window.I18N.t('composer.attachedImage');
-            t.addEventListener('click', () => openLightbox(src));
-            box.append(t);
-          }
-          n.append(box);
-        }
-        // Everything that isn't an image travelled as a path, so the message would
-        // otherwise show nothing at all: a PDF you'd just attached simply disappeared
-        // on Enter while a PNG stayed. The same chip as the composer's goes here, minus
-        // the remove button — the message is already gone, there is nothing to undo.
-        if (m.files && m.files.length) {
-          const box = el('div', 'ufiles');
-          for (const f of m.files) {
-            const chip = el('span', 'att att-file' + (f.path ? ' att-open' : ''));
-            chip.title = f.path ? t('composer.previewFile', { name: f.name }) : f.name;
-            const info = el('span', 'att-info');
-            info.append(el('span', 'att-name', f.name));
-            if (f.size) info.append(el('span', 'att-size', humanSize(f.size)));
-            // Sent is not gone: the chip stays the way in, so three messages later
-            // you can still open the file you attached without going to find it.
-            if (f.path) {
-              chip.addEventListener('click', () =>
-                vscode.postMessage({ cmd: 'preview', path: f.path })
-              );
-            }
-            chip.append(icon(fileIcon(f.name)), info);
-            box.append(chip);
-          }
-          n.append(box);
-        }
+        n.append(...attachRows(m.images, m.files));
         if (m.text) n.append(el('div', 'utext', m.text));
         // Torna a prima di questo messaggio.
         //
@@ -2413,45 +2425,85 @@
   // waiting, could not take it back, and two of them looked exactly like two already
   // sent. They live here until they really leave, and then they take their place in
   // the conversation like any other message.
+  // It used to be a dashed pill with a turning clock, your words on one truncated
+  // line, and an ×. Three things nobody can be expected to work out. Nothing said
+  // *why* it was sitting there or *when* it would leave — the clock says "wait", not
+  // "goes out when this turn ends". Nothing said which of two went first. And the
+  // photo or the PDF you had attached was simply not drawn, so a message you queued
+  // ten minutes ago was a line of text with no way of telling what was riding on it.
+  //
+  // So it is a place now, not a pill: a tray with a sentence at the top that says in
+  // words what is happening and when it stops, numbered rows once there is more than
+  // one, and each message showing everything it carries — the same thumbnails and
+  // the same chips it will show in the thread once it has gone.
   const queuedBox = $('queued');
-  const queued = new Map(); // id -> the pill
+  const queued = new Map(); // id -> the row
+  const qhead = el('div', 'qhead');
+  const qheadText = el('span', 'qhead-text');
+  qhead.append(icon('time', 'qico'), qheadText);
 
   function paintQueued() {
     queuedBox.hidden = !queued.size;
+    if (!queued.size) return;
+    qheadText.textContent = t('queue.head', { n: String(queued.size) });
+    // Numbered only from two up: a "1" on the only thing in the queue is a label
+    // for an order that isn't there.
+    queuedBox.classList.toggle('many', queued.size > 1);
+    let i = 0;
+    for (const row of queued.values()) {
+      const n = row.querySelector('.qn');
+      if (n) n.textContent = String(++i);
+    }
   }
 
   function addQueued(m) {
     if (queued.has(m.id)) return;
-    const pill = el('div', 'qmsg');
-    pill.style.setProperty('--i', queued.size);
-    pill.append(icon('time', 'qico'));
-    // One line, never a wall: what you wrote is right above in the box you wrote it
-    // in, and this is a reminder, not a copy.
-    const what =
-      (m.text || '').trim() ||
-      (m.files && m.files.length
-        ? m.files.map((f) => f.name).join(', ')
-        : t('composer.attachedImage'));
-    pill.append(el('span', 'qtext', what));
+    const row = el('div', 'qmsg');
+    row.style.setProperty('--i', queued.size);
+    row.append(el('span', 'qn'));
+
+    const body = el('div', 'qbody');
+    // Everything it carries, drawn the way the thread will draw it in a moment.
+    body.append(...attachRows(m.images, m.files));
+    const said = (m.text || '').trim();
+    if (said) body.append(el('div', 'qtext', said));
+    row.append(body);
+
     const x = el('button', 'qx');
     x.type = 'button';
     x.title = t('queue.drop');
+    x.setAttribute('aria-label', t('queue.drop'));
     x.append(icon('close'));
-    x.addEventListener('click', () => vscode.postMessage({ cmd: 'unqueue', id: m.id }));
-    pill.append(x);
-    queued.set(m.id, pill);
-    queuedBox.append(pill);
+    x.addEventListener('click', () => {
+      // Taking it back should not mean losing it. What you wrote goes back into the
+      // box you wrote it in — unless you have started something else in there, in
+      // which case that is the thing worth keeping and this one just goes.
+      if (!input.value.trim() && said) {
+        input.value = said;
+        grow();
+        saveDraft();
+        input.focus();
+        input.setSelectionRange(said.length, said.length);
+      }
+      vscode.postMessage({ cmd: 'unqueue', id: m.id });
+    });
+    row.append(x);
+
+    queued.set(m.id, row);
+    if (!qhead.isConnected) queuedBox.append(qhead);
+    queuedBox.append(row);
     paintQueued();
+    say(t('queue.head', { n: String(queued.size) }));
   }
 
   function dropQueued(id) {
-    const pill = queued.get(id);
-    if (!pill) return;
+    const row = queued.get(id);
+    if (!row) return;
     queued.delete(id);
     // It leaves the way it came: gone at once would look like a click that missed.
-    pill.classList.add('going');
+    row.classList.add('going');
     setTimeout(() => {
-      pill.remove();
+      row.remove();
       paintQueued();
     }, 200);
   }
