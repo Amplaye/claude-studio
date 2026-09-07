@@ -228,109 +228,6 @@ for (const surface of ['view', 'panel']) {
   t((await page.locator(bigSel + ' .more-btn').count()) === 0, 'the button stays once there is nothing left');
   t(await page.isVisible(bigSel), 'opening the rest folded the card shut');
 
-  // ---- the map of the turn: a ruler, not a barcode ----
-  //
-  // The failure this guards against is the one that happened twice. A mark whose
-  // position means "how many steps came before me" turns a real turn into confetti
-  // and disagrees with the scrollbar about where everything is. So: every mark has
-  // to sit where its card really sits, they have to go down the rail in order, and
-  // the ones you would scroll back to have to be drawn heavier than the hum.
-  for (const f of ['src/one.ts', 'src/two.ts', 'src/three.ts']) {
-    await post({ k: 'tool_start', id: 'tu_R_' + f, name: 'Read', input: { file_path: f } });
-    await post({ k: 'tool_end', id: 'tu_R_' + f, ok: true, text: 'ok' });
-  }
-  await page.waitForTimeout(300);
-  const map = await page.evaluate(() => {
-    const rail = document.getElementById('tmap');
-    const bands = [...rail.querySelectorAll('.tm')];
-    const num = (b, p) => parseFloat(getComputedStyle(b).getPropertyValue(p));
-    const last = bands[bands.length - 1];
-    const view = rail.querySelector('.tm-view');
-    const log = document.getElementById('log');
-    // dove il discorso dice davvero che sta l'ultimo passo
-    const real =
-      last && log.scrollHeight
-        ? (last._nodes[0].getBoundingClientRect().top -
-            (log.getBoundingClientRect().top - log.scrollTop)) /
-          log.scrollHeight
-        : -1;
-    return {
-      bands: bands.length,
-      steps: document.querySelectorAll('#log > .msg').length,
-      lastKind: last ? last.className : '',
-      lastCount: last?.querySelector('.tm-n')?.textContent || '',
-      tops: bands.map((b) => num(b, '--t')),
-      heights: bands.map((b) => num(b, '--h')),
-      lastTop: last ? num(last, '--t') : -1,
-      real,
-      // il nastro sottile e le tacche che ne escono non sono larghi uguale
-      quietW: bands.filter((b) => !b.classList.contains('loud')).map((b) => b.offsetWidth)[0],
-      loudW: bands.filter((b) => b.classList.contains('loud')).map((b) => b.offsetWidth)[0],
-      loudN: bands.filter((b) => b.classList.contains('loud')).length,
-      viewShown: view ? !view.hidden : false,
-      viewH: view ? num(view, '--vh') : -1,
-      named: bands.every((b) => (b.querySelector('.tm-name')?.textContent || '').trim().length > 0),
-      labelled: bands.every((b) => !!b.getAttribute('aria-label')),
-      hidden: rail.getAttribute('aria-hidden'),
-    };
-  });
-  t(map.steps > 4, 'not enough steps to have a shape: ' + map.steps);
-  t(/tm-read/.test(map.lastKind), 'three reads in a row are not one read band: ' + map.lastKind);
-  t(map.lastCount === '3', 'the band does not say how many steps it holds: ' + map.lastCount);
-  // the ruler and the thread have to agree about where things are
-  t(
-    map.tops.every((v, i, a) => i === 0 || v >= a[i - 1] - 0.001),
-    'the marks do not go down the rail in order: ' + map.tops.join(',')
-  );
-  t(
-    map.heights.every((h) => h > 0) && map.tops.every((v) => v >= 0 && v <= 1),
-    'the marks are not placed against the scroll height: ' + map.tops.join(',')
-  );
-  t(
-    Math.abs(map.lastTop - map.real) < 0.01,
-    'the last mark is not where its card is: ' + map.lastTop + ' vs ' + map.real
-  );
-  t(map.loudN > 0 && map.loudW > map.quietW, 'the steps that matter are drawn like the hum: ' + map.loudW + ' vs ' + map.quietW);
-  t(map.viewShown && map.viewH > 0 && map.viewH < 1, 'the slice you are looking at is not marked: ' + map.viewH);
-  t(map.named, 'the bands have no name to read when the rail opens');
-  t(map.labelled, 'the bands say nothing to a screen reader');
-  t(map.hidden !== 'true', 'the map is still hidden from assistive tech');
-
-  // …and opening it turns the colours into words. This is the answer to "a coloured
-  // stripe with no key anywhere", so it is the half worth guarding.
-  const railClosed = await page.evaluate(
-    () => Math.round(document.getElementById('tmap').getBoundingClientRect().width)
-  );
-  await page.hover('#tmap .tm');
-  await page.waitForTimeout(900); // half a second of delay before it opens, then the slide
-  const open = await page.evaluate(() => {
-    const rail = document.getElementById('tmap');
-    const first = rail.querySelector('.tm .tm-name');
-    return {
-      w: Math.round(rail.getBoundingClientRect().width),
-      nameShown: first ? getComputedStyle(first).display !== 'none' : false,
-      nameWidth: first ? Math.round(first.getBoundingClientRect().width) : 0,
-      // aperte sono righe, non piu' bande: l'altezza proporzionale ha finito il suo
-      // lavoro, e una riga di testo tre volte piu' alta di quella sopra non e' un elenco
-      grows: [...rail.querySelectorAll('.tm')].map((b) => getComputedStyle(b).flexGrow),
-    };
-  });
-  t(open.w > railClosed + 80, 'the map does not open when you point at it: ' + railClosed + ' -> ' + open.w);
-  t(open.nameShown && open.nameWidth > 0, 'the map opens but still says nothing in words');
-  t(
-    open.grows.every((g) => g === '0'),
-    'the open rows still stretch with the run they hold: ' + open.grows.join(',')
-  );
-  await page.screenshot({ path: path.join(outDir, `preview-${surface}-map.png`) });
-  // and it has to shut again, or it would sit on top of the thread for good
-  await page.hover('#input');
-  await page.waitForTimeout(400);
-  t(
-    (await page.evaluate(() => Math.round(document.getElementById('tmap').getBoundingClientRect().width))) ===
-      railClosed,
-    'the map stays open once you have left it'
-  );
-
   // ---- back to just before a message ----
   const back = await page.locator('.msg.user .rewind').first();
   t((await page.locator('.msg.user .rewind').count()) === 1, 'the message with a checkpoint has no way back');
@@ -1190,16 +1087,16 @@ for (const surface of ['view', 'panel']) {
       squashed: [...log.querySelectorAll('.msg')]
         .filter((n) => n.scrollHeight > n.clientHeight + 2 && !n.querySelector('.plan, .out, .detail'))
         .map((n) => n.className),
-      // The thread and the map of the turn beside it: together they are the column
-      // that isn't the context, and it's their sum that has to fill the window.
-      logWidth: Math.round(document.querySelector('.logwrap').getBoundingClientRect().width),
+      // Il discorso e' la colonna che non e' il contesto: la loro somma deve
+      // riempire la finestra.
+      logWidth: Math.round(document.getElementById('log').getBoundingClientRect().width),
       railWidth: Math.round(document.getElementById('rail').getBoundingClientRect().width),
       winWidth: document.documentElement.clientWidth,
     };
   });
 
   t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
-  t(r.tools.length === 11, 'expected 11 top-level tools, found ' + r.tools.length);
+  t(r.tools.length === 8, 'expected 8 top-level tools, found ' + r.tools.length);
   t(r.tools[0]?.name === 'Read' && r.tools[0]?.out === 'RESULT-OF-A', 'Read took the wrong result: ' + r.tools[0]?.out);
   t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RESULT-OF-B', 'Bash took the wrong result: ' + r.tools[1]?.out);
   t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read is not marked as completed');
@@ -1436,7 +1333,6 @@ for (const surface of ['view', 'panel']) {
       // text has to be readable…
       userText: at('.msg.user .utext', 'color'),
       mode: at('.modeseg-btn', 'color'),
-      mapName: at('.tm .tm-name', 'color'),
       queue: at('.qhead', 'color'),
       // …and the lines that draw the boxes have to be there at all
       iconBorder: at('.iconbtn', 'borderTopColor'),
@@ -1448,7 +1344,6 @@ for (const surface of ['view', 'panel']) {
   t(light.accent > 4.5, 'the clay accent is a smear on a light theme: ' + light.accent);
   t(light.userText > 4.5, 'your own message is unreadable on a light theme: ' + light.userText);
   t(light.mode > 4.5, 'the mode switch is unreadable on a light theme: ' + light.mode);
-  t(light.mapName > 4.5, 'the map bands are unreadable on a light theme: ' + light.mapName);
   t(light.queue > 4.5, 'the line that explains the queue is unreadable on a light theme: ' + light.queue);
   t(light.iconBorder > 1.2, 'the header buttons have no edge on a light theme: ' + light.iconBorder);
   t(light.cardBorder > 1.2, 'the cards have no edge on a light theme: ' + light.cardBorder);

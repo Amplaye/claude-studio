@@ -170,299 +170,16 @@
   let stick = true;
   log.addEventListener('scroll', () => {
     stick = log.scrollHeight - log.scrollTop - log.clientHeight < 64;
-    mapViewSoon();
   });
   function toBottom() {
     if (stick) log.scrollTop = log.scrollHeight;
-    // The thread grows under a streaming answer without anyone scrolling: the thumb
-    // has to follow that too, or it drifts off the bottom of its own rail.
-    mapViewSoon();
-  }
-
-  // ---------- the map of the turn ----------
-  //
-  // A long answer has a shape — read for two minutes, then wrote three files in a
-  // row, then got stuck on a red command — and the only way to see it was to scroll
-  // through it.
-  //
-  // Two goes at this were wrong in the same way, so the wrong idea is worth writing
-  // down: **the step is not the unit.**
-  //
-  // One tick per step gave a column of confetti. Grouping runs of the same kind was
-  // supposed to fix it and barely helped, because a real turn alternates — text,
-  // tool, text, tool — so almost nothing merged and it was confetti again. And under
-  // both, a tick's *position* meant "how many steps came before it", which has
-  // nothing to do with where that step actually sits in what you are scrolling: a
-  // forty-line recap was one tick and forty one-line reads were forty. The rail and
-  // the scrollbar beside it disagreed about where everything was.
-  //
-  // So it is not a list of steps drawn down the edge. It is a **ruler of the
-  // document**: every mark sits where its card really is, and is as tall as its card
-  // really is, measured against the same scroll height the scrollbar uses. Which
-  // means two things fall out for free. Quiet stretches — reading, thinking, writing
-  // an answer — abut each other and read as one faint continuous ribbon instead of
-  // forty separate ticks, without any merging logic at all. And the things that
-  // matter (your messages, a file written, a command run, a question, a failure) are
-  // drawn heavier and stand out of that ribbon, in the exact place you would scroll
-  // to. A thumb shows the slice you are looking at, so it reads as what it is.
-  //
-  // Hovering it (or tabbing in) still opens the column into a list that says the
-  // same things in words, because a colour with no key anywhere is decoration.
-  const tmap = $('tmap');
-
-  /**
-   * Steps you would scroll back to, and steps that are just the sound of working.
-   * This is the whole difference between a ruler and a barcode: everything is drawn,
-   * but only these are drawn loud.
-   */
-  const MAP_LOUD = new Set(['user', 'write', 'run', 'ask', 'fail', 'recap']);
-
-  /** What kind a step is. It is asked again at the end: a failure changes it. */
-  function mapKind(node) {
-    const c = node.classList;
-    if (c.contains('user')) return 'user';
-    if (c.contains('ask')) return 'ask';
-    if (c.contains('recap')) return c.contains('bad') ? 'fail' : 'recap';
-    if (c.contains('err')) return 'fail';
-    if (c.contains('think')) return 'think';
-    if (c.contains('tool')) {
-      if (c.contains('fail')) return 'fail';
-      const n = node.dataset.tool || '';
-      if (DIFF_TOOLS[n]) return 'write';
-      if (n === 'Bash' || n === 'PowerShell') return 'run';
-      if (slimTool(n)) return 'read';
-      return 'tool';
-    }
-    if (c.contains('assistant')) return 'say';
-    return 'other';
-  }
-
-  /** The glyph for each kind: this is the legend, and it is drawn where you look. */
-  const MAP_ICON = {
-    read: 'eye',
-    write: 'create',
-    run: 'terminal',
-    think: 'sparkles',
-    tool: 'flash',
-    user: 'chatbubble-ellipses',
-    say: 'document-text',
-    ask: 'shield-checkmark',
-    fail: 'alert-circle',
-    recap: 'checkmark-circle',
-    other: 'ellipsis-horizontal',
-  };
-
-  /**
-   * What the row says after the name: the file, the command, the first words.
-   *
-   * The one that has to be picked on purpose is the piece of the card that is the
-   * content and not the chrome. A reasoning block opens with the word "Reasoning" in
-   * its summary, and taking the card whole gives you "ReasoningI need to open both…"
-   * — the label of the box glued to the front of what is in it.
-   */
-  function mapDetail(node) {
-    const part =
-      node.querySelector('.head .arg') || node.querySelector('.utext') || node.querySelector('.body');
-    const text = (part || node).textContent || '';
-    return text.replace(/\s+/g, ' ').trim().slice(0, 60);
-  }
-
-  // One rebuild per frame, whatever happened. The rail is a handful of elements and
-  // deriving it from the thread each time is what keeps it honest: a tool that turns
-  // red at the end splits the run it was merged into, and there is no incremental
-  // version of that which does not eventually drift from what is on screen.
-  let mapDirty = false;
-  function mapPaint() {
-    if (mapDirty) return;
-    mapDirty = true;
-    requestAnimationFrame(mapBuild);
-  }
-
-  function mapBuild() {
-    mapDirty = false;
-    const nodes = [];
-    for (const n of log.children) if (n.classList.contains('msg')) nodes.push(n);
-
-    // Consecutive steps of the same kind are one band.
-    const runs = [];
-    for (const n of nodes) {
-      const kind = mapKind(n);
-      const last = runs[runs.length - 1];
-      if (last && last.kind === kind) last.nodes.push(n);
-      else runs.push({ kind, nodes: [n] });
-    }
-
-    // Il turno va avanti e la mappa si rifa': se stavi dentro con la tastiera, il
-    // fuoco non deve finire nel vuoto — e con lui si porterebbe via anche il pannello
-    // aperto, che sta in piedi grazie a :focus-within.
-    const hadFocus = tmap.contains(document.activeElement)
-      ? [...tmap.children].indexOf(document.activeElement)
-      : -1;
-
-    tmap.replaceChildren(view);
-    for (const r of runs) {
-      const band = el('button', 'tm tm-' + r.kind + (MAP_LOUD.has(r.kind) ? ' loud' : ''));
-      band.type = 'button';
-      // Una sola fermata di Tab per tutta la mappa, poi le frecce dentro. Quindici
-      // bottoni tabbabili fra il discorso e la barra di scrittura sarebbero quindici
-      // pressioni di Tab per arrivare a scrivere, che e' peggio di non averla.
-      band.tabIndex = tmap.querySelector('.tm') ? -1 : 0;
-      const name = t('map.' + r.kind);
-      const detail = mapDetail(r.nodes[0]);
-      const count = r.nodes.length > 1 ? ' ×' + r.nodes.length : '';
-      // Closed it is a coloured band with a tooltip; open it is a row that reads.
-      band.title = name + count + (detail ? ' — ' + detail : '');
-      band.setAttribute('aria-label', band.title);
-      band.append(
-        icon(MAP_ICON[r.kind] || 'flash', 'tm-ico'),
-        el('span', 'tm-name', name),
-        el('span', 'tm-detail', detail),
-        el('span', 'tm-n', r.nodes.length > 1 ? String(r.nodes.length) : '')
-      );
-      band._nodes = r.nodes;
-      band.addEventListener('click', () => {
-        stick = false; // you asked to be somewhere: don't get dragged back to the end
-        r.nodes[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
-      });
-      tmap.append(band);
-    }
-    const bands = mapBands();
-    if (hadFocus >= 0 && bands.length) {
-      const back = bands[Math.min(hadFocus, bands.length - 1)];
-      for (const b of bands) b.tabIndex = b === back ? 0 : -1;
-      back.focus();
-    }
-    // Under four steps there is no shape to see, and a rail beside three cards is
-    // just a stripe nobody asked for.
-    tmap.classList.toggle('few', nodes.length < 4);
-    mapGeometry();
-    mapHere();
-  }
-
-  /** The marks, without the viewport thumb that lives among them. */
-  function mapBands() {
-    return [...tmap.querySelectorAll('.tm')];
-  }
-
-  /**
-   * Where every mark goes: the same arithmetic the scrollbar does.
-   *
-   * Read every rectangle first and only then write the styles. Interleaving the two
-   * makes the browser re-lay-out the page between each pair, which on a turn of two
-   * hundred cards is the difference between one reflow and two hundred.
-   */
-  function mapGeometry() {
-    const bands = mapBands();
-    if (!bands.length) return;
-    const total = log.scrollHeight;
-    if (total <= 0) return;
-    const top = log.getBoundingClientRect().top - log.scrollTop;
-    const boxes = bands.map((b) => {
-      const first = b._nodes[0].getBoundingClientRect();
-      const last = b._nodes[b._nodes.length - 1].getBoundingClientRect();
-      return { t: first.top - top, h: Math.max(1, last.bottom - first.top) };
-    });
-    bands.forEach((b, i) => {
-      b.style.setProperty('--t', (boxes[i].t / total).toFixed(5));
-      b.style.setProperty('--h', (boxes[i].h / total).toFixed(5));
-    });
-    mapView();
-  }
-
-  /**
-   * The slice of the thread in front of you. Three numbers, so it can be redone on
-   * every scroll event without thinking about it — unlike the marks, which need a
-   * rectangle per card and only move when the thread itself changes.
-   */
-  const view = el('div', 'tm-view');
-  function mapView() {
-    const total = log.scrollHeight;
-    const seen = log.clientHeight;
-    // Nothing to scroll: a thumb the height of the whole rail says nothing at all.
-    view.hidden = !total || seen >= total - 4 || tmap.classList.contains('few');
-    if (view.hidden) return;
-    view.style.setProperty('--vt', (log.scrollTop / total).toFixed(5));
-    view.style.setProperty('--vh', (seen / total).toFixed(5));
-  }
-
-  let viewSoon = false;
-  function mapViewSoon() {
-    if (viewSoon) return;
-    viewSoon = true;
-    requestAnimationFrame(() => {
-      viewSoon = false;
-      mapView();
-    });
-  }
-
-  function mapClear() {
-    tmap.replaceChildren();
-    tmap.classList.add('few');
-    onscreen.clear();
-  }
-
-  // Opening a card changes every height below it, and nothing else here would
-  // notice: `toggle` doesn't bubble, so it is caught on the way down.
-  log.addEventListener('toggle', () => mapPaint(), true);
-  addEventListener('resize', () => mapPaint());
-
-  // Dentro la mappa le frecce spostano il fuoco di banda in banda (e la tengono a
-  // una sola fermata di Tab), Invio ci salta, Esc riporta alla barra di scrittura.
-  tmap.addEventListener('keydown', (e) => {
-    const bands = mapBands();
-    const at = bands.indexOf(document.activeElement);
-    if (at < 0) return;
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      input.focus();
-      return;
-    }
-    const d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-    if (!d) return;
-    e.preventDefault();
-    const next = bands[Math.min(bands.length - 1, Math.max(0, at + d))];
-    if (!next || next === bands[at]) return;
-    bands[at].tabIndex = -1;
-    next.tabIndex = 0;
-    next.focus();
-  });
-
-  /** Jump to the band before or after the one you are looking at. */
-  function mapStep(d) {
-    const bands = mapBands();
-    if (!bands.length) return;
-    const at = bands.findIndex((b) => b.classList.contains('here'));
-    const next = bands[Math.min(bands.length - 1, Math.max(0, (at < 0 ? 0 : at) + d))];
-    if (!next) return;
-    stick = false;
-    next._nodes[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
-    say(next.title);
-  }
-
-  // Which bands are the ones you are looking at. A band counts as "here" if any of
-  // its steps is on screen, which is what makes the bracket in the collapsed rail
-  // line up with the slice of the thread in front of you.
-  const onscreen = new Set();
-  function mapHere() {
-    for (const band of mapBands()) {
-      band.classList.toggle('here', band._nodes.some((n) => onscreen.has(n)));
-    }
   }
 
   // Infinite loops stop when off screen: twenty halos pulsing where you aren't
   // looking heat up the laptop for nothing.
-  //
-  // The same pass says which steps are the ones you're looking at: the observer is
-  // already running, and a second one — or a listener on every scroll — would be
-  // paying twice for an answer we are being handed.
   const seen = new IntersectionObserver(
     (entries) => {
-      for (const e of entries) {
-        e.target.classList.toggle('offscreen', !e.isIntersecting);
-        if (e.isIntersecting) onscreen.add(e.target);
-        else onscreen.delete(e.target);
-      }
-      mapHere();
+      for (const e of entries) e.target.classList.toggle('offscreen', !e.isIntersecting);
     },
     { root: log, rootMargin: '160px' }
   );
@@ -484,9 +201,6 @@
     }
     log.appendChild(node);
     seen.observe(node);
-    // Solo quello che sta nel discorso vero: i passi di un sub-agent sono dentro la
-    // card del Task che li ha lanciati, e nella mappa conta quella.
-    mapPaint();
     toBottom();
     return node;
   }
@@ -1147,7 +861,6 @@
     // piena, con la sua altezza e il suo stacco dalle vicine.
     if (!ok) node.classList.remove('slim');
     node.classList.add(ok ? 'done' : 'fail');
-    mapPaint(); // andata storta, cambia colore anche nella mappa
     const fresh = ok ? drawnCheck('tool-ico') : icon('alert-circle', 'tool-ico');
     node._ico.replaceWith(fresh);
     node._ico = fresh;
@@ -1918,7 +1631,6 @@
         filesTouched.clear();
         // Con la conversazione se ne va anche la fila: quei messaggi erano per lei.
         clearQueued();
-        mapClear();
         // A new conversation is a new empty screen, so it earns a new tip.
         if (m.tip) currentTip = m.tip;
         // the previous conversation scrolls out while the new one takes its place
@@ -3737,18 +3449,6 @@
       case 'h':
         e.preventDefault();
         toggleHistory();
-        return;
-      // Su e giu' per la mappa: si salta da un gruppo di passi al successivo senza
-      // toccare il mouse, che e' l'unico modo in cui una barra alta trecento pixel
-      // e' davvero raggiungibile. La freccia senza Alt resta quella che ripesca
-      // l'ultimo messaggio.
-      case 'arrowup':
-        e.preventDefault();
-        mapStep(-1);
-        return;
-      case 'arrowdown':
-        e.preventDefault();
-        mapStep(1);
         return;
       case 'i':
         e.preventDefault();

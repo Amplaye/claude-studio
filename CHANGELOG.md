@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.20.0
+
+- **Via la mappa del turno.** La colonna di bande colorate lungo il bordo sinistro del
+  discorso non c'e' piu': come si usava non convinceva, e una barra che sta li' sempre
+  e si apre addosso alle carte quando ci passi accanto costa piu' attenzione di quanta
+  ne facesse risparmiare. Restano lo scorrimento e la barra di sistema, che dicono la
+  stessa cosa senza chiedere niente. Se ne vanno con lei anche Alt+Su e Alt+Giu, che
+  saltavano da un gruppo di passi al successivo.
+
 ## 0.19.3
 
 - **I passi finivano prima della barra sopra di loro.** La lista dentro la card si
