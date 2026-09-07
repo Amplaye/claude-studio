@@ -213,6 +213,34 @@ t(
 // Il generatore esiste proprio per questo: prima erano otto scrivanie con otto
 // volte lo stesso omino, e da lontano l'ufficio non diceva piu' niente.
 t(new Set(room.facce).size === room.facce.length, 'due conversazioni hanno la stessa faccia');
+
+// ---- e l'ufficio non sta mai fermo ----
+//
+// La stanza deve muoversi anche quando non la stai usando: chi lavora batte a
+// macchina, tutti gli altri respirano. Non basta guardare che il CSS ci sia —
+// una striscia da un fotogramma solo, o un'animazione che non parte, danno
+// esattamente lo stesso foglio di stile e una stanza imbalsamata. Quindi si
+// guarda il disegno: quanti fotogrammi ha la striscia, e se la posizione di
+// sfondo cambia davvero da sola.
+const anim = await page.evaluate(() => {
+  const n = document.querySelector('.of-guy .of-body');
+  const c = getComputedStyle(n);
+  return { fotogrammi: Number(c.getPropertyValue('--nf')), animazione: c.animationName };
+});
+t(anim.fotogrammi > 1, "la striscia di chi lavora ha un fotogramma solo: l'ufficio e' imbalsamato");
+t(anim.animazione !== 'none', "nessuna animazione sulla figura: l'ufficio e' imbalsamato");
+
+// Si campiona fitto e si contano i valori distinti. Due letture sole non
+// bastano: con `steps(2)` su un ciclo lungo cascano spesso nella stessa meta',
+// e sembrerebbe fermo mentre invece sta girando.
+const sfondi = new Set();
+for (let i = 0; i < 14; i++) {
+  sfondi.add(
+    await page.evaluate(() => getComputedStyle(document.querySelector('.of-guy .of-body')).backgroundPositionX)
+  );
+  await page.waitForTimeout(120);
+}
+t(sfondi.size > 1, 'la figura non cambia mai fotogramma: ' + [...sfondi].join(' '));
 t(room.busy === 1, 'chi sta lavorando sono ' + room.busy + ', dovrebbe essere una');
 t(room.done === 1, 'la spunta verde sta su ' + room.done + ' persone, ne vuole una');
 t(room.focused === 1, 'il faretto sta su ' + room.focused + ' persone, ne vuole una');

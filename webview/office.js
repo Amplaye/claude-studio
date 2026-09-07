@@ -110,10 +110,36 @@ window.OFFICE = (() => {
    * e il seme e' l'id della conversazione: la stessa conversazione ritrova
    * sempre la sua faccia, anche fra una sessione e l'altra.
    *
-   * Il generatore restituisce un PNG come data URL, e se lo tiene da parte per
-   * seme: richiamarlo a ogni ridipintura non ridisegna niente.
+   * Le pose, e quanto ci mette un giro di ciclo. Chi lavora batte a macchina in
+   * fretta, tutti gli altri respirano piano: sono i due estremi, e in mezzo non
+   * serve niente.
    */
-  const faccia = (id) => 'url("' + window.NPC.sprite(id) + '")';
+  const DURATA = { fermo: 1700, digita: 420 };
+
+  /**
+   * Veste una figura con la posa che le tocca.
+   *
+   * Il generatore da' una striscia di fotogrammi affiancati, e il CSS la fa
+   * scorrere a scatti interi: nessun timer in JavaScript, e una stanza che si
+   * muove anche mentre nessuno la guarda. Se il generatore non sa fare le
+   * strisce si ripiega sul disegno fermo — meglio un ufficio immobile che otto
+   * scrivanie vuote.
+   */
+  function vesti(node, id, posa) {
+    if (node.dataset.posa === posa) return;
+    node.dataset.posa = posa;
+    const s = window.NPC.strip && window.NPC.strip(id, posa);
+    if (s && s.frames > 1) {
+      node.style.setProperty('--npc', 'url("' + s.url + '")');
+      node.style.setProperty('--nf', s.frames);
+      node.style.setProperty('--nw', s.frames * 16 + 'px');
+      node.style.setProperty('--nd', DURATA[posa] + 'ms');
+    } else {
+      node.style.setProperty('--npc', 'url("' + window.NPC.sprite(id) + '")');
+      node.style.setProperty('--nf', 1);
+      node.style.setProperty('--nw', '16px');
+    }
+  }
 
   // ---------- la pianta, in mattonelle ----------
   //
@@ -404,7 +430,7 @@ window.OFFICE = (() => {
     // neutra — si vedeva a colpo d'occhio chi era ospite. Il generatore veste
     // dal seme e basta, quindi per adesso quella divisa non c'e' piu'. La classe
     // `own` resta sul bottone: il giorno che serve, la dice il CSS.
-    who.style.setProperty('--npc', faccia(s.id));
+    vesti(who, s.id, s.busy ? 'digita' : 'fermo');
 
     const bubble = el('span', 'of-bubble');
     const dots = el('span', 'of-dots');
@@ -425,7 +451,7 @@ window.OFFICE = (() => {
 
     b.append(el('span', 'of-ring'), who, bubble, plate);
     b.onclick = () => send({ cmd: 'focus', id: s.id });
-    b._p = { pname, pfill };
+    b._p = { pname, pfill, who };
     return b;
   }
 
@@ -441,6 +467,7 @@ window.OFFICE = (() => {
     b.classList.toggle('done', !s.busy && !!s.done);
     b.classList.toggle('recent', !s.busy && !s.done && !!s.recent);
     b.classList.toggle('focused', !!s.focused);
+    vesti(b._p.who, s.id, s.busy ? 'digita' : 'fermo');
     b._p.pname.textContent = s.name;
     b._p.pfill.style.width = (s.pct == null ? 0 : Math.max(0, Math.min(100, s.pct))) + '%';
     b._p.pfill.style.background = barColor(s.pct);
@@ -512,7 +539,7 @@ window.OFFICE = (() => {
     const head = list.find((s) => s.focused) || list.find((s) => s.busy) || list[0];
     boss.hidden = !head;
     if (head) {
-      bossFace.style.setProperty('--npc', faccia(head.id));
+      vesti(bossFace, head.id, head.busy ? 'digita' : 'fermo');
       bossName.textContent = head.name;
       bossWhat.textContent = head.busy
         ? t('ctx.busy')

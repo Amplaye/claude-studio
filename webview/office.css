@@ -158,8 +158,11 @@ body.inoffice .rail {
   inset: 0;
   width: auto;
   height: auto;
-  background-position: center top;
-  background-size: 48px auto;
+  /* Stessa striscia, ingrandita di tre. Ridefinendo `--nw` qui i keyframes non
+     vanno riscritti: scorrono di 48 invece che di 16 da soli. */
+  --nw: calc(var(--nf, 1) * 48px);
+  background-position-y: top;
+  background-size: var(--nw) auto;
   filter: none;
 }
 .of-boss-text {
@@ -511,42 +514,41 @@ body.inoffice .rail {
   height: 24px;
   /* Il ripiego a fasce serve solo se il generatore non ha ancora risposto:
      meglio un impiegato squadrato che otto scrivanie vuote. */
-  background:
-    var(
-        --npc,
-        linear-gradient(180deg, transparent 0 5px, #33261a 5px 8px, #dcb187 8px 13px, #5c6c4b 13px 24px)
-      )
-      center bottom / contain no-repeat;
+  background-image: var(
+    --npc,
+    linear-gradient(180deg, transparent 0 5px, #33261a 5px 8px, #dcb187 8px 13px, #5c6c4b 13px 24px)
+  );
+  background-repeat: no-repeat;
+  /* Il disegno non e' un fotogramma solo: e' una striscia di fotogrammi
+     affiancati, e quanto e' larga lo dice il JS perche' lo decide il generatore.
+     `contain` schiaccerebbe tutta la striscia dentro una casella sola. */
+  background-size: var(--nw, 16px) 24px;
   image-rendering: pixelated;
   filter: drop-shadow(2px 2px 0 rgba(34, 20, 8, 0.42));
+  animation: of-passo var(--nd, 1700ms) steps(var(--nf, 1)) infinite;
 }
 
-.of-guy.recent .of-body {
-  animation: of-breathe 3s ease-in-out infinite;
+/* L'ufficio non sta mai fermo, nemmeno quando non lo stai guardando: chi respira
+   respira sempre. Lo scatto e' intero — `steps()` — perche' un fotogramma
+   intermedio su pixel art e' solo un fotogramma sfocato. */
+@keyframes of-passo {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: calc(-1 * var(--nw, 16px));
+  }
 }
-.of-guy.busy .of-body {
-  animation: of-type 0.62s ease-in-out infinite;
-}
+
+/* Respiro e battitura adesso sono fotogrammi veri, disegnati dal generatore:
+   le due imitazioni a transform non servono piu' e si pestavano con la striscia.
+   Il saltello di chi ha finito resta finto, e puo' restarlo — muove il transform
+   mentre la striscia muove lo sfondo — ma vanno elencate tutte e due, o la
+   seconda scalza la prima. */
 .of-guy.done .of-body {
-  animation: of-cheer 1.8s cubic-bezier(0.3, 0.8, 0.4, 1) infinite;
-}
-@keyframes of-breathe {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-0.5px);
-  }
-}
-@keyframes of-type {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-1px) rotate(-3deg);
-  }
+  animation:
+    of-passo var(--nd, 1700ms) steps(var(--nf, 1)) infinite,
+    of-cheer 1.8s cubic-bezier(0.3, 0.8, 0.4, 1) infinite;
 }
 @keyframes of-cheer {
   0%,

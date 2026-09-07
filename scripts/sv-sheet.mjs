@@ -52,16 +52,16 @@ const CUT = {
   // --- piani d'appoggio ---
   desk: ['a', 433, 209, 47, 27], // tavolo coi cassetti: la scrivania, 3 caselle
   meetTable: ['a', 433, 177, 47, 26], // tavolo lungo liscio: le riunioni
-  tableThin: ['a', 433, 243, 47, 14], // tavolo alto e stretto
-  tableSmall: ['a', 193, 176, 32, 13], // tavolino da due caselle
-  counter: ['a', 1, 208, 47, 50], // bancone grosso: il bar
-  bench: ['a', 1, 270, 47, 13], // panca lunga: il divano dell'ingresso
 
   // --- sedute ---
-  chairDown: ['a', 50, 260, 13, 25], // sedia di fronte
-  chairUp: ['a', 50, 226, 13, 23], // sedia di spalle
-  stoolTall: ['a', 81, 214, 13, 28], // sgabello alto
-  stoolRound: ['a', 66, 261, 14, 20], // sgabello tondo
+  //
+  // Misurate col righello sul foglio, non a occhio: i primi ritagli tagliavano
+  // le gambe a meta' e da lontano le sedie sembravano cassette. Il bordo di
+  // sotto e' quello vero — e' da li' che la pagina le appoggia per terra —
+  // mentre sopra e ai lati c'e' un pixel di margine, che non costa niente e
+  // perdona un pixel di errore.
+  chairB: ['a', 48, 259, 19, 30], // sedia a doghe, piu' bassa
+  stoolRound: ['a', 65, 258, 20, 30], // sgabello tondo: quello delle scrivanie
 
   // --- muro e ripiani ---
   board: ['a', 195, 55, 44, 37], // asse di legno liscia: la lavagna
@@ -76,11 +76,6 @@ const CUT = {
   // --- verde ---
   plantPurple: ['a', 273, 164, 15, 21], // cespuglio nel vaso viola
   plantBlue: ['a', 288, 164, 16, 21], // cespuglio nel vaso azzurro
-
-  // --- per terra ---
-  rugOlive: ['a', 1, 288, 47, 48],
-  rugGreen: ['a', 48, 288, 47, 48],
-  rugRed: ['a', 96, 288, 47, 48],
 };
 
 const b64 = (p) => 'data:image/png;base64,' + fs.readFileSync(p).toString('base64');
