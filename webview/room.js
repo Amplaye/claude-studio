@@ -81,6 +81,7 @@ window.ROOM = (() => {
     //     tavolo, e in una stanza vista dall'alto era l'unico mobile di
     //     traverso. ---
     { s: 'cork', x: 67, b: 36 },
+    { s: 'board', x: 112, b: 36 },
     { s: 'stoolRound', x: 81, b: 62 },
     { s: 'meetTable', x: 64, b: 84 },
     { s: 'stoolRound', x: 81, b: 100 },
@@ -136,6 +137,32 @@ window.ROOM = (() => {
      pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
      due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
      tavolino la fascia libera e' due pixel e la stanza sigillata. */
+  /* La bacheca, e il tavolo dove finisce quello che e' fatto.
+   *
+   * Un foglietto e' cinque per quattro con la puntina sopra, e non ci sta scritto
+   * niente: a questa misura il testo non c'e' e il colore basta. Giallo da fare,
+   * azzurro in mano a qualcuno, rosso andato storto, verde archiviato — sono
+   * quattro colori e quattro stati, ed e' tutto quello che una bacheca dice
+   * davvero anche quando i foglietti sono scritti.
+   *
+   * Una sola, non tre. Le rosse in cima e le gialle sotto stanno benissimo sullo
+   * stesso legno: e' il colore a dividerle, e tre bacheche per una manciata di
+   * foglietti sono tre bacheche quasi vuote. La bacheca di sughero li' accanto
+   * resta quello che era, cioe' arredamento — ci sono gia' disegnati sopra i suoi
+   * fogli, e altri fogli veri sopra quelli finti non si leggerebbero.
+   *
+   * `griglia` e' l'angolo in alto a sinistra del primo foglietto: da li' in poi
+   * quattro per riga, passo otto in orizzontale e sei in verticale. `posto` e'
+   * dove ci si ferma davanti, e ci si arriva camminando come dappertutto. `z` e'
+   * la profondita' del mobile a cui il foglio e' appeso, piu' uno: la stanza
+   * ordina tutto sul bordo di sotto, e un foglio che non lo rispetta finisce
+   * dietro al tavolo su cui dovrebbe stare.
+   */
+  const BACHECHE = {
+    muro: { griglia: [117, 10], posto: [134, 56], z: 37 },
+    archivio: { griglia: [80, 66], posto: [88, 98], z: 85 },
+  };
+
   const METE = {
     caffe: [280, 62],
     spuntino: [320, 62],
@@ -627,6 +654,7 @@ window.ROOM = (() => {
     PROPS,
     DESKS,
     METE,
+    BACHECHE,
     PORTA,
     SW,
     SH,

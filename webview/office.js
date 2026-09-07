@@ -142,8 +142,11 @@ window.OFFICE = (() => {
     seats = new Array(scrivanie.length).fill(null);
 
     crowd = el('div', 'of-crowd');
+    // I foglietti stanno appesi ai muri, quindi sotto la gente: uno che passa
+    // davanti alla bacheca la copre, ed e' giusto cosi'.
+    bacheche = el('div', 'of-bacheche');
     empty = el('div', 'of-nobody');
-    stage.append(crowd, empty);
+    stage.append(bacheche, crowd, empty);
 
     wrap.append(stage);
     root.append(bar, wrap);
@@ -280,13 +283,15 @@ window.OFFICE = (() => {
     bubble.append(dots);
     b.append(el('span', 'of-ring'), who, bubble);
     crowd.append(b);
-    // Nasce sulla porta: da li' entra. La porta e' il muro in fondo in mezzo, ed
-    // e' l'unico punto della pianta che non e' di nessuno.
-    const [px, py] = window.ROOM.PORTA;
+    // Nasce davanti alla bacheca, non sulla porta: un sub-agent non arriva da
+    // fuori, viene fuori da una cosa da fare — e quella cosa da fare e' li'
+    // appesa. Il primo gesto e' staccarla.
+    const [px, py] = window.ROOM.BACHECHE.muro.posto;
     b.style.left = px - 8 + 'px';
     b.style.top = py - 24 + 'px';
     b.style.zIndex = py;
-    const chi = { chiave, el: b, fig: who, seme: capo.seme + '/' + (it.id || it.content) };
+    const nome = it.id || it.content;
+    const chi = { chiave, capoId: capo.id, nome, el: b, fig: who, seme: capo.seme + '/' + nome };
     window.ROOM.vesti(who, chi.seme, 'cammina');
     return chi;
   }
@@ -315,20 +320,144 @@ window.OFFICE = (() => {
     return out;
   }
 
+  /** Il tempo che ci vuole a staccare un foglietto da una bacheca. */
+  const GESTO = 900;
+  const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /**
+   * Stacca il suo foglietto dalla bacheca e va a mettersi al lavoro.
+   *
+   * Il gesto non e' scenografia: il foglietto che uno stacca dal muro e si porta
+   * dietro e' il modo in cui una bacheca dice a chi tocca. Senza, la nota
+   * salterebbe da una parte all'altra da sola, e una bacheca dove i foglietti si
+   * spostano per conto loro non e' una bacheca, e' un grafico.
+   */
   async function entra(chi, capo, i) {
     chi.va = true;
-    if (await window.ROOM.viaggio(chi.el, ...postoStaff(capo, i))) {
-      window.ROOM.vesti(chi.fig, chi.seme, 'digita');
+    try {
+      if (!chi.foglio) {
+        await attesa(GESTO);
+        // Da qui in poi il foglietto e' suo: sta appeso addosso e cammina con
+        // lui. E finche' ce l'ha in mano dalla bacheca sparisce — se no lo stesso
+        // foglio sarebbe appeso al muro e in mano a qualcuno nello stesso momento.
+        if (!chi.el.isConnected) return;
+        chi.foglio = el('span', 'of-note mano');
+        chi.el.append(chi.foglio);
+        paintBacheche();
+      }
+      window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
+      if (await window.ROOM.viaggio(chi.el, ...postoStaff(capo, i))) {
+        window.ROOM.vesti(chi.fig, chi.seme, 'digita');
+      }
+    } finally {
+      // Qualunque cosa succeda per strada, "sta arrivando" deve smettere di
+      // essere vero: chi resta in arrivo per sempre non se ne va piu'.
+      chi.va = false;
     }
-    chi.va = false;
   }
 
+  /**
+   * Finito: porta il suo foglietto dov'e' andato a finire, e se ne va.
+   *
+   * Sul tavolo dell'archivio se e' andata bene, di nuovo sulla bacheca — rosso —
+   * se e' andata storta. Ed e' li' che il foglio ricompare dove deve stare: non
+   * c'e' nessuna copia in ritardo da tenere in pari con nessun registro, perche'
+   * il foglio e' uno solo e sta dove sta la persona che lo porta.
+   */
   async function esce(chi) {
     chi.esce = true;
+    // Prima si aspetta che abbia finito di arrivare. Un sub-agent puo' chiudersi
+    // mentre chi lo porta e' ancora per strada, e due tragitti sullo stesso
+    // elemento se lo litigano un tratto per uno: la persona rimbalza e non arriva
+    // piu' da nessuna parte.
+    await chi.andata;
     window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
-    await window.ROOM.viaggio(chi.el, ...window.ROOM.PORTA);
+    // Dove finisce il foglio lo dice com'e' andata, e com'e' andata si legge
+    // adesso: quando e' entrato non si sapeva ancora.
+    const items = (board[chi.capoId] && board[chi.capoId].items) || [];
+    const it = items.find((x) => (x.id || x.content) === chi.nome);
+    const dove = it && it.status === 'failed' ? 'muro' : 'archivio';
+    if (await window.ROOM.viaggio(chi.el, ...window.ROOM.BACHECHE[dove].posto)) {
+      await attesa(GESTO);
+    }
     chi.el.remove();
     staff.delete(chi.chiave);
+    paintBacheche();
+  }
+
+  // ---------- le bacheche ----------
+  //
+  // Quello che c'e' da fare, quello che e' andato storto, e la pila di quello che
+  // e' fatto. I foglietti non hanno testo — a cinque pixel per quattro non ce ne
+  // sta — e il colore e' tutto quello che dicono, che poi e' tutto quello che una
+  // bacheca dice davvero anche quando i foglietti sono scritti.
+  //
+  // Quelli in mano a qualcuno non ci sono: un foglio e' uno solo, e se sta
+  // camminando per la stanza non e' anche appeso al muro.
+
+  /** Quanti ne stanno su una bacheca prima di impilarsi nell'angolo. */
+  const PER_BACHECA = 12;
+  /** Quanti fogli si vedono nella pila dell'archivio. Oltre, e' un mucchio. */
+  const PILA = 6;
+  let bacheche;
+
+  /* Un foglietto sta appeso a un mobile, e la profondita' e' quella del mobile
+     piu' uno: la stanza ordina tutto sul bordo di sotto, e un foglio che non lo
+     rispetta finisce dietro al tavolo su cui dovrebbe stare. */
+  function foglio(cls, x, y, z) {
+    const n = el('span', 'of-note ' + cls);
+    n.style.left = x + 'px';
+    n.style.top = y + 'px';
+    n.style.zIndex = z;
+    return n;
+  }
+
+  /** Ne appende `quanti`, a partire dalla casella `da`: quattro per riga. */
+  function appendi(out, cls, quanti, gx, gy, z, da) {
+    for (let i = da; i < Math.min(da + quanti, PER_BACHECA); i++) {
+      out.push(foglio(cls, gx + (i % 4) * 8, gy + Math.floor(i / 4) * 6, z));
+    }
+    // Oltre dodici non ci stanno: da li' in poi si impilano nell'angolo, che e'
+    // quello che succede a una bacheca vera.
+    if (da + quanti > PER_BACHECA) out.push(foglio(cls + ' pila', gx + 26, gy + 14, z));
+  }
+
+  function paintBacheche() {
+    if (!bacheche) return;
+    // Solo le conversazioni che in ufficio ci sono davvero: una lista rimasta nel
+    // quadro di una scheda chiusa e' una bacheca che parla di gente che non c'e'.
+    let fare = 0;
+    let storte = 0;
+    let fatte = 0;
+    for (const id of Object.keys(board)) {
+      if (!people.has(id)) continue;
+      for (const it of board[id].items || []) {
+        if (staff.has(id + '/' + (it.id || it.content))) continue;
+        if (it.status === 'pending') fare++;
+        else if (it.status === 'failed') storte++;
+        else if (it.status === 'completed') fatte++;
+      }
+    }
+    const B = window.ROOM.BACHECHE;
+    const [gx, gy] = B.muro.griglia;
+    // Le storte in cima: sono quelle da guardare, e la prima riga e' quella che
+    // si guarda. Le gialle riempiono da dove finiscono loro.
+    const out = [];
+    appendi(out, 'storta', storte, gx, gy, B.muro.z, 0);
+    appendi(out, 'fare', fare, gx, gy, B.muro.z, storte);
+    // L'archivio non e' una griglia: e' una pila, e una pila si legge perche' i
+    // fogli non sono allineati.
+    for (let i = 0; i < Math.min(fatte, PILA); i++) {
+      out.push(
+        foglio(
+          'fatta',
+          B.archivio.griglia[0] + (i % 2),
+          B.archivio.griglia[1] - i * 2,
+          B.archivio.z + i
+        )
+      );
+    }
+    bacheche.replaceChildren(...out);
   }
 
   function paintStaff() {
@@ -345,18 +474,20 @@ window.OFFICE = (() => {
       if (!chi) {
         chi = buildStaff(chiave, capo, it);
         staff.set(chiave, chi);
-        entra(chi, capo, i);
+        chi.andata = entra(chi, capo, i);
       } else if (!chi.va && !chi.esce) {
         // Il posto puo' cambiare sotto i piedi: un fratello che finisce fa
         // scalare tutti gli altri di uno. Ci si sposta camminando, che a questa
         // misura sono venti pixel e non si nota, invece di teletrasportarsi.
         const [fx, fy] = postoStaff(capo, i);
-        if (Math.abs(parseFloat(chi.el.style.left) + 8 - fx) > 2) entra(chi, capo, i);
+        if (Math.abs(parseFloat(chi.el.style.left) + 8 - fx) > 2) chi.andata = entra(chi, capo, i);
       }
       const cosa = it.activeForm || it.content || '';
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
     }
+
+    paintBacheche();
   }
 
   /** Colore della barra: lo stesso semaforo del pannello. */

@@ -358,6 +358,62 @@
   }
 }
 
+/* ---- i foglietti ----
+   Cinque per quattro con la puntina sopra, e niente scritto sopra: a questa
+   misura il testo non c'e', e il colore dice quello che una bacheca dice
+   davvero. Giallo da fare, azzurro in mano a qualcuno, rosso andato storto,
+   verde archiviato.
+
+   Sono figli della stanza quando stanno su una bacheca e figli della persona
+   quando qualcuno se li porta: cosi' il foglietto in mano segue chi cammina
+   senza una riga di JavaScript per fotogramma. */
+.of-note {
+  position: absolute;
+  width: 5px;
+  height: 4px;
+  pointer-events: none;
+  background: #f2eddc;
+  box-shadow: inset 0 0 0 1px rgba(46, 42, 38, 0.35);
+}
+/* La puntina. Un pixel, in mezzo in cima: e' quella a far leggere il rettangolo
+   come un foglio appeso invece che come una mattonella. */
+.of-note::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  background: #4a3b52;
+}
+.of-note.fare {
+  background: #f2df8a;
+}
+.of-note.mano {
+  background: #9ecbf0;
+}
+.of-note.storta {
+  background: #f0a3a3;
+}
+.of-note.fatta {
+  background: #a8e0b0;
+}
+/* Quello che uno si porta dietro: appeso alla spalla, e sopra la testa di chi ha
+   davanti — un foglio che passa dietro a una scrivania non e' in mano a nessuno. */
+.of-guy > .of-note {
+  left: 13px;
+  top: 2px;
+  z-index: 20;
+}
+/* Piu' di dodici su una bacheca non ci stanno: da li' in poi si impilano
+   nell'angolo, che e' quello che succede a una bacheca vera. */
+.of-note.pila {
+  box-shadow:
+    inset 0 0 0 1px rgba(46, 42, 38, 0.35),
+    1px -1px 0 0 #f7f2e6,
+    1px -1px 0 1px rgba(46, 42, 38, 0.35);
+}
+
 /* ---- la gente ---- */
 
 .of-guy {

@@ -272,6 +272,17 @@ body.inoffice .top .activity {
   inset: 0;
 }
 
+/* I foglietti delle bacheche. Il contenitore non ha profondita' sua apposta —
+   niente `z-index`, cosi' non fa contesto — perche' ogni foglio si prende quella
+   del mobile a cui e' appeso: la bacheca sta al muro, la pila sta sul tavolo, e
+   sono due profondita' diverse. Con una sola per tutti, la pila finiva dietro al
+   tavolo su cui doveva stare. */
+.of-bacheche {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* La figura la disegna room.css: qui c'e' solo quello che ne fa un bottone. */
 .of-guy {
   color: var(--ink);

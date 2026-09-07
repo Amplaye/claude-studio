@@ -27,9 +27,11 @@
 //    tutte se ne vanno da sole quando sono atterrate;
 //  - i capi e i loro impiegati: ogni conversazione e' un capo, i sub-agent che
 //    apre sono i suoi, e ognuno deve stare accanto AL SUO — due capi vicini con
-//    gli impiegati mescolati sono due capi senza nessuno. Arrivano dalla porta e
-//    se ne vanno dalla porta, che e' l'unica cosa che fa vedere che un sub-agent
-//    e' finito invece che sparito.
+//    gli impiegati mescolati sono due capi senza nessuno;
+//  - la bacheca: un foglietto per cosa da fare, e il colore dice quale. Quello
+//    che conta e' che il foglio sia UNO — quello che sta camminando in mano a
+//    qualcuno non deve stare anche appeso al muro, se no la bacheca conta due
+//    volte lo stesso lavoro.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -534,9 +536,17 @@ await ctx(
 await page.waitForTimeout(300);
 await tasks({
   'capo-a': {
-    items: [T('1', 'Leggere', 'in_progress'), T('2', 'Cercare', 'in_progress'), T('3', 'Poi', 'pending')],
-    done: 0,
-    total: 3,
+    items: [
+      T('1', 'Leggere', 'in_progress'),
+      T('2', 'Cercare', 'in_progress'),
+      T('3', 'Poi', 'pending'),
+      T('4', 'Dopo', 'pending'),
+      T('5', 'Andata male', 'failed'),
+      T('6', 'Fatta', 'completed'),
+      T('7', 'Fatta anche questa', 'completed'),
+    ],
+    done: 3,
+    total: 7,
     active: 0,
     busy: true,
   },
@@ -571,19 +581,62 @@ const fuoriStaff = await page.evaluate(() => {
 });
 t(!fuoriStaff, 'ci sono ' + fuoriStaff + ' impiegati fuori dai muri');
 
+// ---- la bacheca ----
+//
+// Un foglietto per ogni cosa da fare, e il colore dice quale: giallo da fare,
+// rosso andato storto, verde archiviato, azzurro in mano a chi la sta facendo.
+//
+// La cosa che conta e' che il foglio sia UNO: quello che sta camminando per la
+// stanza in mano a qualcuno non deve stare anche appeso al muro, se no la
+// bacheca conta due volte lo stesso lavoro. E' l'unica ragione per cui il
+// registro e quello che si vede possono divergere, ed e' anche il motivo per cui
+// qui non serve tenerli in pari: il foglio sta dove sta chi lo porta.
+const fogli = async () => ({
+  muro: await page.locator('.of-bacheche .of-note').count(),
+  fare: await page.locator('.of-bacheche .of-note.fare').count(),
+  storte: await page.locator('.of-bacheche .of-note.storta').count(),
+  fatte: await page.locator('.of-bacheche .of-note.fatta').count(),
+  mano: await page.locator('.of-guy > .of-note').count(),
+});
+const f = await fogli();
+t(f.fare === 2, 'i foglietti da fare sono ' + f.fare + ' invece di 2');
+t(f.storte === 1, 'i foglietti andati storti sono ' + f.storte + ' invece di 1');
+t(f.fatte === 2, 'la pila dell’archivio e’ di ' + f.fatte + ' invece di 2');
+t(f.mano === 3, 'i foglietti in mano sono ' + f.mano + ' invece di 3');
+t(
+  f.muro === f.fare + f.storte + f.fatte,
+  'sulla bacheca c’e’ un foglietto che non e’ di nessuno stato: ' + f.muro
+);
+
 // E chi ha finito se ne va: per la porta, e ci mette il tempo di arrivarci.
 await tasks({
   'capo-a': {
-    items: [T('1', 'Leggere', 'completed'), T('2', 'Cercare', 'completed'), T('3', 'Poi', 'pending')],
-    done: 2,
-    total: 3,
+    items: [
+      T('1', 'Leggere', 'completed'),
+      T('2', 'Cercare', 'completed'),
+      T('3', 'Poi', 'pending'),
+      T('4', 'Dopo', 'pending'),
+      T('5', 'Andata male', 'failed'),
+      T('6', 'Fatta', 'completed'),
+      T('7', 'Fatta anche questa', 'completed'),
+    ],
+    done: 5,
+    total: 7,
     active: -1,
     busy: false,
   },
   'capo-b': { items: [T('9', 'Impaginare', 'in_progress')], done: 0, total: 1, active: 0, busy: true },
 });
-await page.waitForTimeout(11000);
+// Ventidue secondi e non undici: chi se ne va passa dal tavolo dell'archivio, e
+// il tavolo sta nella stanza in cima, dall'altra parte dell'unica porta. Da una
+// scrivania in fondo a sinistra sono trecentosettanta pixel di strada.
+await page.waitForTimeout(22000);
 t((await staff()) === 1, 'chi ha finito non se n’e’ andato: restano ' + (await staff()) + ' invece di 1');
+// E il foglio che portava e' finito dov'e' andato a finire: due in piu' nella
+// pila, e nessuno rimasto in mano a un fantasma.
+const g = await fogli();
+t(g.fatte === 4, 'i foglietti archiviati sono ' + g.fatte + ' invece di 4');
+t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
@@ -594,4 +647,6 @@ if (fails.length) {
   console.error('office-check FAIL\n - ' + fails.join('\n - '));
   process.exit(1);
 }
-console.log('office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta e gli impiegati');
+console.log(
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati e la bacheca'
+);
