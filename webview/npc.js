@@ -10,6 +10,7 @@
 
      window.NPC.traits(seme)  -> i tratti scelti
      window.NPC.sprite(seme)  -> data URL PNG 64x96 (pixel, 4x)
+     window.NPC.strip(seme, andatura) -> una striscia di fotogrammi affiancati
      window.NPC.vector(seme)  -> data URL SVG viewBox 0 0 16 24
 
    Nessuna dipendenza, nessuna rete: si apre da file://.
@@ -292,6 +293,62 @@
                  '....Cccccccv....'] },
   };
 
+  /* -- i pezzi che si muovono ----------------------------------------------
+     Le mani, alla riga 18. Il braccio finisce alla 17, e sotto c'e' solo aria:
+     far scendere la mano di un pixel non cancella niente, e rialzarla vuol dire
+     semplicemente non disegnarla. Il polsino resta dov'e' — muovere la manica
+     insieme al braccio voleva dire ridisegnarla per tutti e sei i vestiti, e un
+     braccio che esce dalla manica si vede molto piu' di una manica ferma. La
+     mano che scende prende il tono d'ombra del suo lato: e' un pixel piu' in
+     basso, non un pixel piu' in luce. */
+  const MANI = {
+    sinistra: ['..sd............'],
+    destra:   ['............dd..'],
+    ferme:    ['................'],
+  };
+
+  /* Le gambe. Il ciclo e' quello di sempre: contatto, sospensione, contatto
+     specchiato, sospensione. Nel contatto una gamba esce di un pixel (quella
+     avanti) e l'altra alza il tallone — la scarpa sale di una riga e sotto
+     resta il pavimento. Nella sospensione le gambe tornano unite e quella che
+     passa resta alzata.
+     A gambe aperte le anche sono piu' basse: il contatto e' di quattro righe e
+     non di cinque, ed e' il corpo che scende di un pixel a fare il saltello.
+     Dove cominciano lo dicono le righe stesse — i piedi stanno sempre in fondo.
+     La scarpa alzata non ha il pixel in luce: un piede per aria non prende la
+     luce sulla punta. */
+  const GAMBE = {
+    contattoSx:    ['...Ppn...Ppn....',
+                    '...Ppn...oooo...',
+                    '..Oooo...kkkk...',
+                    '..kkkk..........'],
+    sospensioneSx: ['....Ppn..Ppn....',
+                    '....Ppn..Ppn....',
+                    '....Ppn..oooo...',
+                    '...Oooo..kkkk...',
+                    '...kkkk.........'],
+    contattoDx:    ['....Ppn...Ppn...',
+                    '...Oooo...Ppn...',
+                    '...kkkk...Oooo..',
+                    '..........kkkk..'],
+    sospensioneDx: ['....Ppn..Ppn....',
+                    '....Ppn..Ppn....',
+                    '...oooo..Ppn....',
+                    '...kkkk..Oooo...',
+                    '.........kkkk...'],
+  };
+
+  /* Il passo, gambe e braccia insieme. Le braccia vanno in controtempo — gamba
+     destra avanti, braccio sinistro avanti — se no e' la camminata del pupazzo
+     di neve. A meta' passo le braccia sono ferme perche' passano davanti al
+     corpo: e' li' che non si vedono. */
+  const PASSO = [
+    { gambe: GAMBE.contattoSx,    mano: MANI.destra,   giu: true },
+    { gambe: GAMBE.sospensioneSx, mano: MANI.ferme },
+    { gambe: GAMBE.contattoDx,    mano: MANI.sinistra, giu: true },
+    { gambe: GAMBE.sospensioneDx, mano: MANI.ferme },
+  ];
+
   const ACCESSORI = {
     tazza:  { y: 15, righe: ['.............UUU',
                              '.............uuk',
@@ -324,6 +381,8 @@
     for (const k in VESTITI) tutti.push(VESTITI[k].righe);
     for (const k in BARBE) tutti.push(BARBE[k].righe);
     for (const k in ACCESSORI) tutti.push(ACCESSORI[k].righe);
+    for (const k in MANI) tutti.push(MANI[k]);
+    for (const k in GAMBE) tutti.push(GAMBE[k]);
     for (const gruppo of tutti)
       for (const riga of gruppo)
         if (riga.length !== L) throw new Error('npc.js: riga da ' + riga.length + ' invece di 16: "' + riga + '"');
@@ -337,7 +396,7 @@
   const BARBE_PESATE = ['no', 'no', 'no', 'no', 'baffi', 'pizzetto', 'corta', 'corta', 'piena', 'piena'];
   const ACCESSORI_PESATI = ['nessuno', 'nessuno', 'nessuno', 'tazza', 'tazza', 'badge', 'cuffie'];
 
-  const memoT = new Map(), memoP = new Map(), memoV = new Map();
+  const memoT = new Map(), memoP = new Map(), memoV = new Map(), memoS = new Map();
 
   function tratti(seme) {
     let t = memoT.get(seme);
@@ -415,7 +474,33 @@
     for (const [y, x] of bordo) g[y][x] = 'K';
   }
 
-  function componi(t) {
+  /* Il respiro: per un fotogramma la testa scende di un pixel dentro le spalle
+     e il collo sparisce sotto il mento. Di piu' non e' un respiro, e' un tic —
+     e questa e' l'andatura che gira su tutti quanti, tutto il tempo. */
+  function respiro(g) {
+    for (let y = 11; y > 0; y--) g[y] = g[y - 1].slice();
+    g[0].fill('.');
+  }
+
+  /* Il passo ridisegna le gambe da zero invece di sovrapporsi: una gamba
+     spostata sopra quella ferma fa una persona con tre gambe.
+     Il saltello e' il corpo che scende di un pixel sul contatto, non che sale
+     sulla sospensione: e' lo stesso movimento, ma verso il basso non c'e'
+     niente da tagliare — verso l'alto la testa di chi ha i ricci o le cuffie e'
+     gia' contro il bordo, e ci lascerebbe una riga a ogni passo. */
+  function passo(g, p) {
+    if (p.giu) {
+      for (let y = 19; y > 0; y--) g[y] = g[y - 1].slice();
+      g[0].fill('.');
+    }
+    const y0 = A - p.gambe.length;   // i piedi stanno in fondo comunque vada
+    for (let y = y0; y < A; y++) g[y].fill('.');
+    posa(g, p.gambe, y0);
+  }
+
+  /* `andatura` e `f` sono per le strisce: senza, esce la figura ferma di sempre
+     — ed e' quella che pretende sprite(), che non deve cambiare di un byte. */
+  function componi(t, andatura, f) {
     const g = tela();
     const v = VESTITI[t.vestito];
     posa(g, CORPO, 0);
@@ -440,7 +525,16 @@
       posa(g, OCCHIALI.righe, OCCHIALI.y);
     }
     if (t.accessorio) posa(g, ACCESSORI[t.accessorio].righe, ACCESSORI[t.accessorio].y);
+    // Le mani prima della stazza: allarga() lavora fino alla riga 18, e se la
+    // mano arriva dopo la corporatura robusta si ferma al polso.
+    if (andatura === 'digita') posa(g, f ? MANI.destra : MANI.sinistra, 18);
+    if (andatura === 'cammina') posa(g, PASSO[f].mano, 18);
     if (t.corporatura === 'robusta') allarga(g);
+    // Testa e gambe dopo: allarga() allarga per riga, e dopo il respiro alla 11
+    // c'e' la testa — una testa allargata di un pixel a fotogrammi alterni non
+    // e' un respiro, e' una smorfia.
+    if (andatura === 'fermo' && f) respiro(g);
+    if (andatura === 'cammina') passo(g, PASSO[f]);
     contorno(g);
     return g;
   }
@@ -461,25 +555,63 @@
     };
   }
 
-  function sprite(seme) {
-    let url = memoP.get(seme);
-    if (url) return url;
-    const t = tratti(seme), g = componi(t), col = tavolozza(t);
-    const cv = document.createElement('canvas');
-    cv.width = L * ZOOM;
-    cv.height = A * ZOOM;
-    const cx = cv.getContext('2d');
+  /* Un fotogramma sulla tela, un fillRect per pixel: niente drawImage, cosi'
+     non c'e' nessuna interpolazione da spegnere. `dx` e' la casella nella
+     striscia, in pixel logici — per lo sprite singolo e' zero. */
+  function dipingi(cx, g, col, dx) {
     for (let y = 0; y < A; y++) for (let x = 0; x < L; x++) {
       const ch = g[y][x];
       if (ch === '.') continue;
       const c = col[ch];
       if (!c) throw new Error('npc.js: carattere senza colore: "' + ch + '"');
       cx.fillStyle = c;
-      cx.fillRect(x * ZOOM, y * ZOOM, ZOOM, ZOOM);   // niente drawImage: nessuna interpolazione da spegnere
+      cx.fillRect((dx + x) * ZOOM, y * ZOOM, ZOOM, ZOOM);
     }
+  }
+
+  function sprite(seme) {
+    let url = memoP.get(seme);
+    if (url) return url;
+    const t = tratti(seme);
+    const cv = document.createElement('canvas');
+    cv.width = L * ZOOM;
+    cv.height = A * ZOOM;
+    dipingi(cv.getContext('2d'), componi(t), tavolozza(t), 0);
     url = cv.toDataURL('image/png');
     memoP.set(seme, url);
     return url;
+  }
+
+  /* -- l'ufficio che respira -------------------------------------------------
+     Una persona ferma davvero, in una stanza, e' un mobile. Ma otto persone
+     animate a JavaScript sono otto timer che girano per otto figure da sedici
+     pixel: qui i fotogrammi escono affiancati in un PNG solo, e a farli girare
+     ci pensa il CSS con `steps()` su background-position. Zero lavoro per
+     fotogramma, e quando la scheda e' nascosta si ferma da solo.
+     Le andature nascono dagli stessi tratti: uno che si alza e attraversa la
+     stanza resta la persona che era seduta alla scrivania.
+
+       fermo   2 fotogrammi — il respiro, gira su tutti sempre
+       digita  2 fotogrammi — le mani che battono, a turno
+       cammina 4 fotogrammi — contatto, sospensione, e lo stesso specchiato */
+  const ANDATURE = { fermo: 2, digita: 2, cammina: 4 };
+
+  function striscia(seme, andatura) {
+    if (!ANDATURE[andatura]) andatura = 'fermo';
+    const chiave = andatura + '\n' + seme;
+    let s = memoS.get(chiave);
+    if (s) return s;
+    const t = tratti(seme), col = tavolozza(t), n = ANDATURE[andatura];
+    const cv = document.createElement('canvas');
+    cv.width = n * L * ZOOM;
+    cv.height = A * ZOOM;
+    const cx = cv.getContext('2d');
+    for (let f = 0; f < n; f++) dipingi(cx, componi(t, andatura, f), col, f * L);
+    // w e h sono la misura logica di un fotogramma: alla pagina servono per
+    // dire al fondo quanto e' largo il nastro, se no la striscia si vede tutta.
+    s = { url: cv.toDataURL('image/png'), frames: n, w: L, h: A };
+    memoS.set(chiave, s);
+    return s;
   }
 
   /* -- la stessa persona, morbida -------------------------------------------
@@ -625,5 +757,5 @@
     return url;
   }
 
-  window.NPC = { traits: tratti, sprite: sprite, vector: vector };
+  window.NPC = { traits: tratti, sprite: sprite, strip: striscia, vector: vector };
 })();
