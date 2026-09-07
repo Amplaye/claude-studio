@@ -280,9 +280,19 @@
     'ctx.lastActive': ' · last active',
     'ctx.activeNow': ' · active now',
     'ctx.empty': 'No conversations open in this project.',
-    'ctx.office': 'The office',
-    'ctx.officeHint': 'One person per open conversation. Click one to go there.',
-    'ctx.npc': '{name} — {state}',
+    // ---- l'ufficio ----
+    'office.title': 'The office',
+    'office.count': '{n} at their desk',
+    'office.empty': 'Nobody in yet. Open a conversation and someone sits down.',
+    'office.who': '{name} — {state} · {pct} of the context used',
+    'office.session': 'session {pct}',
+    'office.week': 'week {pct}',
+    'office.reception': 'Reception',
+    'office.accounting': 'Accounting',
+    'office.annex': 'The annex',
+    'office.conference': 'Conference room',
+    'office.boss': "Boss's office",
+    'office.kitchen': 'Break room',
   };
 
   const IT = {
@@ -517,9 +527,19 @@
     'ctx.lastActive': ' · ultima attiva',
     'ctx.activeNow': ' · attiva adesso',
     'ctx.empty': 'Nessuna conversazione aperta in questo progetto.',
-    'ctx.office': "L'ufficio",
-    'ctx.officeHint': 'Una persona per conversazione aperta. Clicca per andarci.',
-    'ctx.npc': '{name} — {state}',
+    // ---- l'ufficio ----
+    'office.title': "L'ufficio",
+    'office.count': '{n} alla scrivania',
+    'office.empty': 'Non c’e’ ancora nessuno. Apri una conversazione e qualcuno si siede.',
+    'office.who': '{name} — {state} · {pct} di contesto usato',
+    'office.session': 'sessione {pct}',
+    'office.week': 'settimana {pct}',
+    'office.reception': 'Reception',
+    'office.accounting': 'Contabilita’',
+    'office.annex': 'L’annesso',
+    'office.conference': 'Sala riunioni',
+    'office.boss': 'Ufficio del capo',
+    'office.kitchen': 'Cucina',
   };
 
   const DICT = { en: EN, it: IT };

@@ -33,3 +33,5 @@ function build(page, out) {
 // l'ultima card del pannello del contesto, e si guarda in preview-context.html.
 build('chat.html', 'preview.html');
 build('context.html', 'preview-context.html');
+// E l'ufficio, che e' una scheda a tutto schermo e si guarda tutto insieme.
+build('office.html', 'preview-office.html');

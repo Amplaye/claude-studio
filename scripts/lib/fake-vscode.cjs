@@ -18,6 +18,8 @@ const newRegistry = () => ({
   commands: new Map(),
   panels: [],
   provider: null,
+  /** Uno per tipo di scheda: le schede della chat e l'ufficio. */
+  serializers: new Map(),
   serializer: null,
   statusBar: null,
 });
@@ -147,7 +149,12 @@ function makeVscode({ workspaceRoot, registered }) {
         return { dispose() {} };
       },
       registerWebviewPanelSerializer: (type, ser) => {
-        registered.serializer = { type, ser };
+        registered.serializers.set(type, ser);
+        // Stessa regola delle view: la mappa li tiene tutti, e questo resta quello
+        // delle schede della chat. Da quando c'e' anche l'ufficio le iscrizioni sono
+        // due, e un campo solo teneva l'ultima arrivata — cioe' reload-check chiedeva
+        // le schede della chat indietro all'ufficio.
+        if (type === 'claudeStudio.panel') registered.serializer = { type, ser };
         return { dispose() {} };
       },
       createWebviewPanel: (type, title, column, opts) => {

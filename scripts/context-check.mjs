@@ -210,91 +210,6 @@ for (const width of [320, 620]) {
   t(!done.onTheOneYouAreIn, 'the one you are looking at is marked as "you missed this"');
   t(done.ring === 1, 'the card that finished is not marked out from the others');
 
-  // ---- l'ufficio: le stesse conversazioni, viste come persone in una stanza ----
-  // Le card rispondono a "quanto contesto le resta", e per saperlo devi leggerle. La
-  // stanza risponde a "chi c'e' e chi sta lavorando" senza leggere niente, ed e' la
-  // domanda che fai al pannello di sfuggita. Due cose devono reggere: che una persona
-  // porti alla sua conversazione come ci porta la sua card, e che nessuno finisca
-  // addosso a un altro o dentro il muro — due persone nello stesso punto sono una
-  // persona, e la stanza ha appena smesso di dire quante ne hai aperte.
-  const room = await page.evaluate(() => {
-    const ns = [...document.querySelectorAll('.npc')];
-    return {
-      n: ns.length,
-      hidden: document.querySelector('.office').hidden,
-      done: ns.filter((n) => n.classList.contains('done')).length,
-      focused: ns.filter((n) => n.classList.contains('focused')).length,
-      labels: ns.map((n) => n.getAttribute('aria-label')),
-    };
-  });
-  t(!room.hidden, "la stanza non c'e' con due conversazioni aperte");
-  t(room.n === 2, 'una persona per conversazione aperta, ce ne sono ' + room.n);
-  t(room.done === 1, 'la spunta verde sta su ' + room.done + ' persone, ne vuole una');
-  t(room.focused === 1, 'il faretto sta su ' + room.focused + ' persone, ne vuole una');
-  t(
-    room.labels.every((l) => / — /.test(l || '')),
-    'una persona non dice a voce chi e’ e come sta: ' + room.labels.join(' | ')
-  );
-
-  await page.locator('.npc').first().click();
-  const goRoom = await lastSent();
-  t(
-    goRoom?.cmd === 'focus',
-    'cliccare una persona non porta alla sua conversazione: ' + JSON.stringify(goRoom)
-  );
-
-  // ---- la stanza piena ----
-  const crowd = (busy) =>
-    data({
-      cards: Array.from({ length: 6 }, (_, i) =>
-        card({ id: 'npc-' + i, name: 'Conversazione ' + i, focused: i === 0, busy: busy && i < 2 })
-      ),
-    });
-  await post(crowd(false));
-  await page.waitForTimeout(150);
-  await page.evaluate(() => document.querySelectorAll('.npc').forEach((n) => (n.dataset.stamp = 'first')));
-  await post(crowd(true));
-  await page.waitForTimeout(150);
-
-  const full = await page.evaluate(() => {
-    const floor = document.querySelector('.floor').getBoundingClientRect();
-    const gs = [...document.querySelectorAll('.npc .guy')].map((g) => g.getBoundingClientRect());
-    let gap = Infinity;
-    for (let i = 0; i < gs.length; i++)
-      for (let j = i + 1; j < gs.length; j++) {
-        const a = (gs[i].left + gs[i].right) / 2;
-        const b = (gs[j].left + gs[j].right) / 2;
-        gap = Math.min(gap, Math.abs(a - b));
-      }
-    return {
-      n: gs.length,
-      gap,
-      out: gs.filter((g) => g.left < floor.left - 1 || g.right > floor.right + 1).length,
-      above: gs.filter((g) => g.top < floor.top - 1 || g.bottom > floor.bottom + 1).length,
-      stamps: [...document.querySelectorAll('.npc')].filter((n) => n.dataset.stamp === 'first').length,
-      busy: document.querySelectorAll('.npc.busy').length,
-    };
-  });
-  t(full.n === 6, 'la stanza non tiene sei persone: ' + full.n);
-  t(full.gap > 10, 'due persone si sovrappongono, ' + Math.round(full.gap) + 'px di distanza');
-  t(!full.out, full.out + ' persone finiscono fuori dai muri');
-  t(!full.above, full.above + ' persone non hanno i piedi sul pavimento');
-  // Stessa regola delle card: si ridipingono, non si rifanno. Rifatte a ogni giro, la
-  // camminata verso il posto nuovo non parte mai e ognuno si teletrasporta.
-  t(full.stamps === 6, 'le persone vengono rifatte a ogni giro invece che ridipinte: ' + full.stamps);
-  t(full.busy === 2, 'chi ha ripreso a lavorare non lo dice: ' + full.busy);
-
-  // Le due di prima, che sono quelle su cui premono le prove qui sotto.
-  await post(
-    data({
-      cards: [
-        card({ id: 'bbbb', shortId: 'bbbbbbbb', name: 'CRM — reminder', own: true, busy: false, focused: true }),
-        card({ name: 'Fattura, arrotondamenti', busy: false, focused: false, done: true }),
-      ],
-    })
-  );
-  await page.waitForTimeout(150);
-
   // ---- clicks, rename, header buttons ----
   await page.locator('.ctxcard').nth(1).locator('.ren').click();
   const ren = await lastSent();
@@ -333,9 +248,6 @@ for (const width of [320, 620]) {
   }));
   t(/No conversations/.test(empty.empty || ''), 'the empty state is missing: ' + empty.empty);
   t(/API limit/.test(empty.wait || ''), 'you cannot tell waiting from the API limit: ' + empty.wait);
-  // Una stanza vuota che resta accesa e' cento pixel che dicono "non c'e' nessuno" —
-  // cosa che dice gia' la riga sotto, con le parole.
-  t(await page.locator('.office').isHidden(), 'la stanza resta accesa senza nessuno dentro');
 
   // and going back the cards rebuild without leaving holes
   await post(data());

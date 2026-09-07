@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.22.0
+
+- **L'ufficio.** Un comando nuovo — *Claude Studio: The Office*, e il bottone in cima al
+  pannello del contesto — apre una scheda a tutto schermo con la pianta di un ufficio
+  visto dall'alto: moquette, finestre sul muro in fondo, reception, contabilita', la
+  sala riunioni coi vetri, l'ufficio del capo, la cucina, la fotocopiatrice che
+  lampeggia in fondo all'annesso. Dentro c'e' una persona per ogni conversazione
+  aperta, seduta alla sua scrivania, con la targhetta davanti che dice il nome e quanto
+  contesto le resta. Chi sta lavorando batte a macchina e ha il monitor acceso — che e'
+  la cosa che si vede per prima da dall'altra parte della stanza; chi ha finito mentre
+  guardavi altrove alza una spunta verde; chi e' ferma da un pezzo sbiadisce; quella
+  dove sei ha il faretto sotto la sedia. Le nostre sono color creta e le schede
+  dell'estensione ufficiale azzurre, come sulle card. Cliccare una persona porta alla
+  sua conversazione, esattamente come cliccare la sua card; quando una conversazione si
+  chiude la sua scrivania si libera, e la prossima che arriva ci si siede.
+- **Via la striscia nel pannello laterale.** Era la stessa idea in trecento pixel di
+  larghezza, ed era il difetto: un ufficio in trecento pixel e' una fila di sagome. Il
+  pannello torna com'era — le card, i numeri, i passi — e l'ufficio ha una scheda tutta
+  sua, che e' la misura in cui si guarda una stanza.
+
 ## 0.21.0
 
 - **L'ufficio.** Sopra le card del contesto adesso c'e' una stanza, e dentro una

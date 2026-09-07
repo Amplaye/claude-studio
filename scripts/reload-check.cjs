@@ -104,6 +104,7 @@ const reset = () => {
   registered.commands.clear();
   registered.panels.length = 0;
   registered.provider = null;
+  registered.serializers.clear();
   registered.serializer = null;
 };
 const vscode = makeVscode({ workspaceRoot: work, registered });

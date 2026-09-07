@@ -6,6 +6,7 @@ import { ChatView, stayInSidebar } from './chat/view';
 import { ContextMonitor } from './context/monitor';
 import { owned } from './context/owned';
 import { ContextView } from './context/view';
+import { OfficePanel } from './office/panel';
 import { tasks } from './tasks/store';
 import { tips } from './chat/tips';
 import { checkForUpdates, startAutoUpdate } from './update/updater';
@@ -43,6 +44,7 @@ export function activate(ctx: vscode.ExtensionContext) {
       webviewOptions: { retainContextWhenHidden: true },
     }),
     ChatPanel.register(ctx, chat, monitor),
+    OfficePanel.register(ctx, monitor),
     // "Open" opens the tab: that's the main face. The sidebar panel stays within
     // reach, but behind its own command.
     // "Apri Claude Studio" apre una conversazione nuova. Chiedere Studio e' chiedere di
@@ -105,6 +107,9 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('claudeStudio.context.show', () =>
       vscode.commands.executeCommand('claudeStudio.context.focus')
     ),
+    // L'ufficio: le stesse conversazioni del pannello, ma a tutto schermo e come
+    // gente seduta alle scrivanie. Vedi office/panel.ts.
+    vscode.commands.registerCommand('claudeStudio.office', () => OfficePanel.open(ctx, monitor)),
     vscode.commands.registerCommand('claudeStudio.context.refresh', () => monitor.tick()),
     vscode.commands.registerCommand('claudeStudio.context.diagnose', () => monitor.diagnose()),
     // Updates arrive on their own; this command only exists so you don't have to
