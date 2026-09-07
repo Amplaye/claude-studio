@@ -50,8 +50,13 @@ const SRC = {
  */
 const CUT = {
   // --- piani d'appoggio ---
-  desk: ['a', 433, 209, 47, 27], // tavolo coi cassetti: la scrivania, 3 caselle
-  meetTable: ['a', 433, 177, 47, 26], // tavolo lungo liscio: le riunioni
+  //
+  // Misurati contando i pixel pieni sul foglio, non a caselle: tutti e due
+  // cominciano a 432, e a 433 si perdeva la colonna del contorno di sinistra —
+  // il piano finiva di netto come tagliato col coltello, e il piede sinistro
+  // restava largo quattro pixel invece di cinque.
+  desk: ['a', 432, 209, 48, 26], // tavolo coi cassetti: la scrivania, 3 caselle
+  meetTable: ['a', 432, 177, 48, 26], // tavolo lungo liscio: le riunioni
 
   // --- sedute ---
   //
@@ -60,8 +65,11 @@ const CUT = {
   // sotto e' quello vero — e' da li' che la pagina le appoggia per terra —
   // mentre sopra e ai lati c'e' un pixel di margine, che non costa niente e
   // perdona un pixel di errore.
-  chairB: ['a', 48, 259, 19, 30], // sedia a doghe, piu' bassa
-  stoolRound: ['a', 65, 258, 20, 30], // sgabello tondo: quello delle scrivanie
+  // Il bordo di sotto e' quello vero: e' da li' che la pagina appoggia per
+  // terra. Lo sgabello ne aveva sette di righe vuote sotto, e sette righe vuote
+  // vogliono dire uno sgabello che galleggia sette pixel sopra il pavimento.
+  chairB: ['a', 49, 260, 14, 28], // sedia a doghe, piu' bassa
+  stoolRound: ['a', 65, 261, 14, 20], // sgabello tondo: quello delle scrivanie
 
   // --- muro e ripiani ---
   board: ['a', 195, 55, 44, 37], // asse di legno liscia: la lavagna

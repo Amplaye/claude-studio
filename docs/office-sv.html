@@ -14,17 +14,20 @@
      Quindi qui uno sprite non e' "grande quanto la sua casella": ha la sua
      misura vera e si appoggia per terra dal basso.
 
-  2. Chi sta piu' in basso copre chi sta piu' in alto. Con i mobili alti serve
-     per forza — senza, una sedia davanti al tavolo ci finisce dentro — e serve
-     ancora di piu' adesso che la gente cammina: l'ordine cambia mentre si
-     muove, quindi si ricalcola a ogni tratto invece di scriverlo a mano.
+  2. Chi sta piu' in basso copre chi sta piu' in alto, e dove c' e' un mobile non
+     ci si passa. Le due cose vanno insieme: la profondita' da sola faceva
+     gente che attraversava i tavoli passandoci ordinatamente sopra o sotto,
+     che e' peggio di gente che ci passa dentro e basta — sembra un fantasma.
+     L'ordine si ricalcola a ogni tratto perche' cambia mentre uno cammina; il
+     dove-si-passa e' una griglia da otto pixel costruita dalla pianta stessa,
+     quindi si aggiorna da sola quando si sposta un mobile.
 
   3. La stanza non sta mai ferma. Tutti respirano, chi lavora batte a macchina,
-     e ogni tanto qualcuno si alza e va davvero da qualche parte — al bar, alla
-     fotocopiatrice, al cestino, in sala riunioni — poi torna al suo posto. Non
-     e' un ciclo finto in un punto solo: e' un tragitto per corridoi che
-     esistono, ed e' per quello che il corridoio centrale e' largo sei caselle e
-     le scrivanie gli lasciano una corsia libera a sinistra.
+     e ogni tanto qualcuno si alza e va davvero da qualche parte — al bar o in
+     sala riunioni — poi torna al suo posto. Non e' un ciclo finto in un punto
+     solo: la meta' e' un punto per terra, e la strada per arrivarci se la trova
+     lui girando attorno ai mobili. Prima erano catene di tappe scritte a mano,
+     e reggevano finche' nessuno spostava niente.
 
      Il giro tocca a tutti e le mete girano insieme a lui: tocca sempre a chi e'
      tornato al posto per primo, e la meta' successiva e' la prossima della
@@ -274,7 +277,8 @@
   alto e' un passaggio, non una terza stanza, ed e' largo apposta: e' di li' che
   si va al bar e in sala riunioni. Nessuno sta fermo — tutti respirano, chi
   lavora batte a macchina, e a turno qualcuno si alza, va a prendersi un caffe'
-  e ogni tanto dice la sua. A ogni apertura tocca a un altro giro di facce.
+  e ogni tanto dice la sua. Nei mobili non ci si passa dentro: la strada se la
+  cercano. A ogni apertura tocca a un altro giro di facce.
 </p>
 <p class="lede">
   <label class="tog"><input type="checkbox" id="numeri" checked /> numeri sui mobili</label>
@@ -291,10 +295,11 @@ const WALLS = [
   // 4, ed e' da li' che si entra al bar e in riunione.
   { c:10, r:1, w:1, h:2 }, { c:10, r:5, w:1, h:3 },
   { c:15, r:1, w:1, h:2 }, { c:15, r:5, w:1, h:3 },
-  // Il muro che divide le due stanze dal salone. Si ferma a colonna 9 da una
-  // parte e riparte a 15 dall'altra: il passaggio in mezzo e' largo sei caselle
-  // perche' ci deve passare la gente, non solo l'occhio.
-  { c:1, r:7, w:8, h:1 }, { c:15, r:7, w:8, h:1 },
+  // Il muro che divide le due stanze dal salone. Arriva fino a colonna 10, dove
+  // trova lo spigolo della sala riunioni: prima si fermava a 9 e in quell'angolo
+  // restava un buco di una casella, il pezzo di muro che manca in una pianta
+  // disegnata a mano. Il passaggio e' quello fra le due stanze, colonne 11-14.
+  { c:1, r:7, w:9, h:1 }, { c:15, r:7, w:8, h:1 },
 ];
 
 /* Un mobile: `s` il ritaglio, `x` il bordo sinistro e `b` il bordo di sotto, in
@@ -304,15 +309,14 @@ const WALLS = [
    numero intero di caselle, e allinearli alla griglia li lasciava sbilenchi in
    mezzo alle stanze. Cosi' invece si centrano davvero. */
 const PROPS = [
-  // --- sala riunioni: tavolo centrato, sei posti, la bacheca sul muro.
-  //     Si siede su sgabelli e basta: la sedia di SeasonVale ha uno schienale
-  //     alto che dal davanti copre mezzo tavolo, e in una stanza dove tutto e'
-  //     visto dall'alto era l'unico mobile che si metteva di traverso. ---
+  // --- sala riunioni: due posti uno di fronte all'altro sul lato lungo del
+  //     tavolo, e la bacheca sul muro. Si siede su sgabelli e basta: la sedia
+  //     di SeasonVale ha uno schienale alto che dal davanti copre mezzo tavolo,
+  //     e in una stanza vista dall'alto era l'unico mobile di traverso. ---
   { s:'cork',        x:67,  b:36 },
-  { s:'stoolRound',  x:72,  b:66 },  { s:'stoolRound', x:91,  b:66 },
+  { s:'stoolRound',  x:81,  b:62 },   // dietro il tavolo
   { s:'meetTable',   x:64,  b:84 },
-  { s:'stoolRound',  x:44,  b:96 },  { s:'stoolRound', x:113, b:96 },
-  { s:'plantBlue',   x:136, b:46 },
+  { s:'stoolRound',  x:81,  b:100 },  // e davanti, faccia a faccia
   { s:'plantPurple', x:22,  b:110 },
 
   // --- in mezzo non c'e' niente: e' il passaggio, e serve libero ---
@@ -322,51 +326,49 @@ const PROPS = [
   { s:'shelfFull',   x:288, b:48 },
   { s:'cabinet',     x:318, b:48 },
   { s:'nightstand',  x:348, b:48 },
-  { s:'stoolRound',  x:266, b:102 },
+  { s:'stoolRound',  x:270, b:96 },
   { s:'meetTable',   x:288, b:96 },
-  { s:'stoolRound',  x:340, b:102 },
-  { s:'barrel',      x:260, b:106 },
+  { s:'stoolRound',  x:340, b:96 },
   { s:'plantBlue',   x:350, b:112 },
 
-  // --- il salone: le cose stanno contro i muri, il mezzo resta camminabile ---
+  // --- il salone: il verde sta contro i muri e negli angoli, il mezzo resta
+  //     camminabile. Gli angoli in fondo sono l'unico posto di una stanza dove
+  //     una pianta non e' mai d'intralcio a nessuno. ---
   { s:'plantPurple', x:22,  b:150 },
   { s:'plantBlue',   x:350, b:150 },
-  { s:'cabinet',     x:330, b:210 },  // l'armadio fa la fotocopiatrice
-  { s:'barrel',      x:24,  b:250 },  // la botte fa il cestino
-  { s:'board',       x:40,  b:314 },
-  { s:'shelfEmpty',  x:300, b:302 },
+  { s:'plantBlue',   x:22,  b:300 },
+  { s:'plantPurple', x:24,  b:278 },
+  { s:'plantPurple', x:351, b:300 },
+  { s:'plantBlue',   x:349, b:278 },
 ];
 
-/* Sei scrivanie, due file da tre, centrate sulla larghezza della stanza. La
-   corsia libera fra la prima e la seconda — x da 115 a 168 — e' quella da cui si
-   sale al passaggio: e' il motivo per cui non sono equidistanti dal muro. */
+/* Sei scrivanie, due file da tre, centrate sulla larghezza della stanza. Le
+   corsie fra una colonna e l'altra sono quelle da cui si sale al passaggio: e'
+   il motivo per cui le scrivanie non sono attaccate fra loro. */
 const DESKS = [
   { x:68, b:176 }, { x:168, b:176 }, { x:268, b:176 },
   { x:68, b:246 }, { x:168, b:246 }, { x:268, b:246 },
 ];
 
-/** Dove si cammina quando si e' alzati, e dove si va. */
-const CORSIA = 282;          // il corridoio in fondo, sotto la seconda fila
-const CORSIA_SU = 150;       // la corsia verticale che porta al passaggio
-const PORTE = 60;            // l'altezza delle due porte, righe 3-4
+/* Dove si va quando ci si alza. Sono punti dove si mettono i piedi, non
+   tragitti: la strada per arrivarci la trova la stanza, che sa dove sono i
+   mobili. Prima erano catene di tappe scritte a mano, e bastava spostare uno
+   scaffale perche' qualcuno ci camminasse dentro senza accorgersene.
 
+   Al bar ci sono due posti separati perche' due che ci vanno insieme sono una
+   pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
+   due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
+   tavolino la fascia libera e' due pixel e la stanza sigillata. */
 const METE = {
-  copiatrice: [[322, CORSIA], [322, 196]],
-  cestino:    [[34, CORSIA], [34, 236]],
-  // Al bar si arriva al bancone, davanti al tavolino e non in mezzo alla
-  // stanza: sono due posti separati perche' due che ci vanno insieme sono una
-  // pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
-  // due volte. Si sta davanti al tavolino e non di fianco agli sgabelli: di
-  // fianco si finiva dietro la botte, che a quel punto copriva le gambe.
-  caffe:      [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [300, PORTE], [284, 86]],
-  spuntino:   [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [300, PORTE], [318, 86]],
-  riunione:   [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [44, PORTE], [44, 92]],
+  caffe:    [280, 62],
+  spuntino: [320, 62],
+  riunione: [52, 100],
 };
-/* Il bar pesa il doppio del resto, ed e' giusto cosi': in un ufficio vero si va
-   piu' spesso a prendere un caffe' che a stampare. Pesare ripetendo il nome e'
-   tutto quello che serve — una tabella di probabilita' sarebbe la stessa cosa
-   scritta in dieci righe. */
-const NOMI_METE = ['caffe', 'spuntino', 'caffe', 'spuntino', 'copiatrice', 'cestino', 'riunione'];
+/* Il bar pesa quattro volte il resto, ed e' giusto cosi': in un ufficio vero si
+   va piu' spesso a prendere un caffe' che in sala riunioni. Pesare ripetendo il
+   nome e' tutto quello che serve — una tabella di probabilita' sarebbe la stessa
+   cosa scritta in dieci righe. */
+const NOMI_METE = ['caffe', 'spuntino', 'caffe', 'spuntino', 'riunione'];
 
 // Cinque conversazioni, i quattro stati che l'ufficio sa dire. Una scrivania
 // resta vuota: un ufficio pieno non dice quante conversazioni potresti aprire.
@@ -436,9 +438,9 @@ const SW = window.SV.desk.w, SH = window.SV.desk.h;
 DESKS.forEach((d, i) => {
   const who = PEOPLE[i];
   const top = d.b - SH;
-  // Lo sgabello si vede solo dove non siede nessuno, ed e' proprio quello che
-  // deve dire: posto libero. Sotto una persona sarebbe comunque coperto.
-  if (!who) stage.append(prop('stoolRound', d.x + 13, d.b + 22));
+  // Il posto libero non ha piu' lo sgabello davanti: la scrivania senza nessuno
+  // e col monitor spento lo dice gia', e uno sgabello solo in mezzo al salone
+  // sembrava un mobile dimenticato li'.
   stage.append(prop('desk', d.x, d.b));
 
   const pc = el('div', 'pc' + (who ? (who.st === 'busy' ? ' on busy' : ' on') : ''));
@@ -521,15 +523,14 @@ PEOPLE.forEach((p, i) => {
 
 /* ---- l'ufficio non sta mai fermo ----
 
-   Ogni tanto uno si alza e va da qualche parte. Il tragitto non e' un'andatura
-   finta sul posto: sono tratti veri fra punti veri, e i punti sono scelti perche'
-   le corsie che li collegano siano libere — giu' fino al corridoio in fondo,
-   lungo il corridoio, su per la corsia fra la prima e la seconda scrivania, e da
-   li' dalle porte.
+   Ogni tanto uno si alza e va da qualche parte, e ci va per davvero: la strada
+   se la trova, mobile per mobile, invece di seguire una catena di tappe scritta
+   a mano. Le tappe a mano reggevano finche' nessuno spostava niente — poi uno
+   attraversava un tavolo e la stanza smetteva di essere una stanza.
 
    Chi e' fermo da un pezzo non si alza: sbiadita e in giro sarebbe una
-   contraddizione. E si muove uno alla volta, che a questa misura due che
-   camminano insieme sembrano solo confusione. */
+   contraddizione. E si va in due al massimo, che a questa misura tre che si
+   incrociano per i corridoi sembrano solo confusione. */
 
 /* Pixel al secondo. Due caselle al secondo: il bar sta in fondo alla stanza e
    dall'altra parte di due porte, e a passo di lumaca la pausa caffe' era tutta
@@ -538,7 +539,128 @@ const VELOCITA = 32;
 const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
 const caso = (a) => a[Math.floor(Math.random() * a.length)];
 
-function muovi(chi, x, y) {
+/* ---- dove si puo' mettere i piedi ----
+
+   Una griglia da otto pixel su tutta la stanza: la casella e' occupata se ci
+   cade dentro un muro, un mobile o una scrivania. I mobili si contano per tutta
+   la loro sagoma e non solo per la base — sono alti perche' si vede il fianco,
+   ma dietro non ci passa nessuno lo stesso: stanno tutti contro un muro.
+
+   Gli ostacoli si gonfiano di otto in orizzontale e di due in verticale prima di
+   marcare le caselle. Non e' un margine di sicurezza: e' la persona. Il conto si
+   fa sui piedi, che sono un punto solo, ma la persona e' larga sedici — quindi il
+   punto deve stare almeno a mezza persona da un mobile, o mezza spalla ci entra
+   dentro. In verticale bastano due perche' i piedi stanno gia' in fondo alla
+   figura: la testa che sfiora uno scaffale, vista dall'alto, e' giusto cosi'. */
+const CELLA = 8;
+const GC = Math.ceil((COLS * TILE) / CELLA);
+const GR = Math.ceil((ROWS * TILE) / CELLA);
+const MEZZA_PERSONA = 8;
+const MEZZO_PASSO = 2;
+const occupata = new Uint8Array(GC * GR);
+
+function blocca(x, y, w, h) {
+  const x0 = x - MEZZA_PERSONA;
+  const x1 = x + w + MEZZA_PERSONA;
+  const y0 = y - MEZZO_PASSO;
+  const y1 = y + h + MEZZO_PASSO;
+  for (let r = 0; r < GR; r++) {
+    const cy = r * CELLA + CELLA / 2;
+    if (cy < y0 || cy > y1) continue;
+    for (let c = 0; c < GC; c++) {
+      const cx = c * CELLA + CELLA / 2;
+      if (cx >= x0 && cx <= x1) occupata[r * GC + c] = 1;
+    }
+  }
+}
+
+for (const w of WALLS) blocca(w.c * TILE, w.r * TILE, w.w * TILE, w.h * TILE);
+for (const p of PROPS) {
+  const d = window.SV[p.s];
+  blocca(p.x, p.b - d.h, d.w, d.h);
+}
+for (const d of DESKS) blocca(d.x, d.b - SH, SW, SH);
+
+const cella = (x, y) =>
+  Math.min(GR - 1, Math.max(0, Math.floor(y / CELLA))) * GC +
+  Math.min(GC - 1, Math.max(0, Math.floor(x / CELLA)));
+const centro = (n) => [(n % GC) * CELLA + CELLA / 2, ((n / GC) | 0) * CELLA + CELLA / 2];
+
+/** Il segmento fila dritto senza prendere niente? Si campiona ogni due pixel. */
+function dritto(x0, y0, x1, y1) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2));
+  for (let i = 0; i <= n; i++) {
+    if (occupata[cella(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n)]) return false;
+  }
+  return true;
+}
+
+/* La strada da un punto all'altro, in punti dove mettere i piedi.
+
+   Onda a quattro direzioni su tutte le caselle libere, poi si sceglie la piu'
+   vicina alla meta' fra quelle a cui si e' arrivati: cosi' una meta' murata — o
+   diventata tale spostando un mobile — porta comunque il piu' vicino possibile,
+   invece di non portare da nessuna parte. Millenovecento caselle non si sentono.
+
+   Il cammino grezzo e' tutto a scalini di otto pixel. Si tira la corda: si va
+   avanti finche' si vede il punto in linea retta, e si tiene solo quello piu'
+   lontano. Restano tre o quattro tratti lunghi, che e' come attraversa una
+   stanza uno che sa dove sta andando. */
+function cammino(x0, y0, x1, y1) {
+  const partenza = cella(x0, y0);
+  const da = new Int32Array(GC * GR).fill(-1);
+  da[partenza] = partenza;
+  const coda = [partenza];
+  for (let i = 0; i < coda.length; i++) {
+    const n = coda[i];
+    const c = n % GC;
+    const r = (n / GC) | 0;
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c2 = c + dc;
+      const r2 = r + dr;
+      if (c2 < 0 || r2 < 0 || c2 >= GC || r2 >= GR) continue;
+      const m = r2 * GC + c2;
+      if (occupata[m] || da[m] >= 0) continue;
+      da[m] = n;
+      coda.push(m);
+    }
+  }
+  let meglio = partenza;
+  let quanto = Infinity;
+  for (const n of coda) {
+    const [cx, cy] = centro(n);
+    const d = Math.hypot(cx - x1, cy - y1);
+    if (d < quanto) {
+      quanto = d;
+      meglio = n;
+    }
+  }
+  const grezzo = [];
+  for (let n = meglio; n !== partenza; n = da[n]) grezzo.unshift(centro(n));
+  // L'ultimo passo e' la meta' vera e non il centro della casella, quando ci si
+  // arriva dritti: se no la gente si ferma sempre sul reticolo.
+  const ultimo = grezzo.length ? grezzo[grezzo.length - 1] : [x0, y0];
+  if (dritto(ultimo[0], ultimo[1], x1, y1)) grezzo.push([x1, y1]);
+
+  const tirato = [];
+  let qui = [x0, y0];
+  let i = 0;
+  while (i < grezzo.length) {
+    let j = grezzo.length - 1;
+    while (j > i && !dritto(qui[0], qui[1], grezzo[j][0], grezzo[j][1])) j--;
+    tirato.push(grezzo[j]);
+    qui = grezzo[j];
+    i = j + 1;
+  }
+  return tirato;
+}
+
+/** Dove ha i piedi adesso: il punto in fondo alla figura, non il suo angolo. */
+const piedi = (chi) => [parseFloat(chi.g.style.left) + 8, parseFloat(chi.g.style.top) + 24];
+
+function muovi(chi, fx, fy) {
+  const x = fx - 8;
+  const y = fy - 24;
   const dx = x - parseFloat(chi.g.style.left);
   const dy = y - parseFloat(chi.g.style.top);
   const ms = (Math.hypot(dx, dy) / VELOCITA) * 1000;
@@ -547,19 +669,19 @@ function muovi(chi, x, y) {
   chi.g.style.top = y + 'px';
   // La profondita' cambia mentre si cammina: chi scende davanti a una scrivania
   // deve passarci davanti, chi risale deve sparirci dietro.
-  depth(chi.g, y + 24);
+  depth(chi.g, fy);
   return attesa(ms);
+}
+
+async function vai(chi, fx, fy) {
+  for (const [x, y] of cammino(...piedi(chi), fx, fy)) await muovi(chi, x, y);
 }
 
 async function giro(chi, meta) {
   chi.fuori = true;
   chi.meta = meta;
   vesti(chi.fig, seme(chi.p), 'cammina');
-  const tappe = METE[meta];
-  // Prima si scende sul corridoio restando sulla propria colonna: uscire in
-  // diagonale da sotto la scrivania la attraversava.
-  await muovi(chi, chi.casa.x, CORSIA);
-  for (const [x, y] of tappe) await muovi(chi, x, y);
+  await vai(chi, ...METE[meta]);
   vesti(chi.fig, seme(chi.p), 'fermo');
   // Al bar ci si ferma quattro volte tanto. Non e' un vezzo: fra andata e
   // ritorno il tragitto e' mezzo minuto, e con una sosta di due secondi al bar
@@ -568,9 +690,7 @@ async function giro(chi, meta) {
   parla(chi);
   await attesa(sosta + Math.random() * 2500);
   vesti(chi.fig, seme(chi.p), 'cammina');
-  for (let i = tappe.length - 2; i >= 0; i--) await muovi(chi, tappe[i][0], tappe[i][1]);
-  await muovi(chi, chi.casa.x, CORSIA);
-  await muovi(chi, chi.casa.x, chi.casa.y);
+  await vai(chi, chi.casa.x + 8, chi.casa.y + 24);
   vesti(chi.fig, seme(chi.p), chi.p.st === 'busy' ? 'digita' : 'fermo');
   chi.fuori = false;
   chi.meta = null;
