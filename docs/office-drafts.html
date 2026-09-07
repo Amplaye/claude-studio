@@ -1,0 +1,429 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>L'ufficio — bozze di stile</title>
+<!--
+  Quattro modi di disegnare la stessa pianta, uno accanto all'altro.
+
+  Non tocca l'ufficio vero: e' una pagina a se', si apre a doppio clic e non ha
+  bisogno di build. Stessa planimetria, stesse otto scrivanie, stesse cinque
+  persone sedute ai loro posti: cambia solo la pelle, cosi' il confronto e'
+  onesto e non si sceglie uno stile per via di un'inquadratura diversa.
+
+  Le tinte sono quelle del CRM BaliFlow: oliva, terracotta, sabbia.
+-->
+<style>
+  :root {
+    --t50:#fff3ec; --t100:#ffe4d2; --t200:#ffc9a9; --t300:#ffa579; --t400:#fb7740;
+    --t500:#f45517; --t600:#e53f0c; --t700:#be2e0b; --t800:#972611; --t900:#7a2211;
+    --o50:#f6f7f4; --o100:#eaede5; --o200:#d6ddcb; --o300:#b8c6a9; --o400:#95a881;
+    --o500:#768a61; --o600:#5c6c4b; --o700:#49563d; --o800:#3c4633; --o900:#333d2c;
+    --s1:#E1CAB2; --s2:#ECD7BF; --s3:#F4E4CD; --s4:#F7EEE0; --s5:#FCF6ED;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px;
+    background: #14180f; color: var(--o100);
+    font: 14px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px; letter-spacing: .02em; }
+  .lede { margin: 0 0 20px; opacity: .6; font-size: 13px; max-width: 70ch; }
+  .grid { display: grid; grid-template-columns: repeat(2, max-content); gap: 26px; }
+  .card h2 { font-size: 14px; margin: 0 0 2px; color: var(--t300); }
+  .card p { font-size: 12px; margin: 0 0 8px; opacity: .62; max-width: 62ch; min-height: 48px; }
+  .pane {
+    width: 768px; height: 640px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 10px;
+  }
+  .stage { position: relative; width: 384px; height: 320px; flex: 0 0 auto; transform: scale(2); }
+
+  /* Ogni cosa sulla pianta e' una casella (o un blocco di caselle) in unita' da
+     16: il JS scrive solo left/top/width/height, la pelle fa tutto il resto. */
+  .wall, .prop, .desk, .mon, .guy, .stool { position: absolute; }
+  .floor { position: absolute; inset: 0; }
+  .prop i, .desk i { display: block; width: 16px; height: 16px; float: left; }
+  .plate { position: absolute; left: 50%; top: -30px; width: 50px; margin-left: -25px;
+           padding: 1px 2px 2px; border-radius: 2px; pointer-events: none; z-index: 4; }
+  .plate b { display: block; font-weight: 700; font-size: 6px; line-height: 1.35;
+             text-align: center; white-space: nowrap; overflow: hidden;
+             text-overflow: ellipsis; }
+  .plate s { display: block; height: 2px; margin-top: 1px; text-decoration: none; }
+  .plate s i { display: block; height: 100%; }
+
+  /* ============================================================
+     1 — KENNEY, RIVESTITO BALIFLOW   (quello che c'e' adesso)
+     ============================================================ */
+  .k .pane { background: var(--o700); }
+  .k .floor {
+    background-color: #b8c6a9;
+    background-image:
+      radial-gradient(circle at 0 0, rgba(255,255,255,.22) 1.4px, transparent 1.5px),
+      linear-gradient(rgba(51,61,44,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(51,61,44,.07) 1px, transparent 1px),
+      linear-gradient(160deg, #a9b998, #b8c6a9);
+    background-size: 32px 32px, 16px 16px, 16px 16px, 100% 100%;
+  }
+  .k .stage { outline: 2px solid var(--o900); }
+  .k .wall { background: var(--s5); box-shadow: inset 0 -2px 0 var(--s1), 0 2px 3px -1px rgba(0,0,0,.35); }
+  .k .prop i, .k .desk i, .k .stool {
+    background-image: url("../webview/sprites-room.png");
+    background-repeat: no-repeat; image-rendering: pixelated;
+  }
+  .k .desk { width: 32px; height: 16px; }
+  .k .stool { width: 16px; height: 16px; }
+  .k .mon { width: 14px; height: 11px; margin-left: 1px; border: 2px solid var(--o900);
+            border-radius: 1px; background: #46503f; }
+  .k .mon.on { background: #6d7a5f; }
+  .k .mon.busy { background: linear-gradient(180deg, var(--t300), var(--t500));
+                 box-shadow: 0 0 7px rgba(244,85,23,.75); }
+  .k .guy { width: 16px; height: 16px; }
+  .k .fig { position: absolute; inset: 0; filter: drop-shadow(0 2px 0 rgba(0,0,0,.22)); }
+  .k .fig i { position: absolute; inset: 0; width: 16px; height: 16px; float: none;
+              background-image: url("../webview/sprites-folk.png");
+              background-repeat: no-repeat; image-rendering: pixelated; }
+  .k .plate { border: 1px solid var(--o900); background: var(--s5); color: var(--o800); }
+
+  /* ============================================================
+     2 — VETTORIALE PIATTO   (niente sprite: e' tutto CSS)
+     ============================================================ */
+  .f .pane { background: var(--o800); }
+  .f .stage { box-shadow: 0 8px 34px -10px rgba(0,0,0,.7); }
+  .f .floor {
+    background-color: var(--o300);
+    background-image:
+      linear-gradient(rgba(60,70,51,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(60,70,51,.05) 1px, transparent 1px);
+    background-size: 16px 16px, 16px 16px;
+    border-radius: 3px;
+  }
+  .f .wall { background: var(--s5); box-shadow: 0 1px 0 var(--s1), 0 2px 4px -1px rgba(51,61,44,.3); }
+  .f .prop i, .f .desk i { display: none; }
+  .f .prop { border-radius: 3px; }
+  .f .prop[data-k=table]  { background: var(--s3); box-shadow: inset 0 -2px 0 var(--s1); border-radius: 4px; }
+  .f .prop[data-k=chair],
+  .f .prop[data-k=stool]  { background: var(--t200); border-radius: 4px; box-shadow: inset 0 0 0 2px var(--t300); }
+  .f .prop[data-k=sofa]   { background: var(--t400); border-radius: 5px; box-shadow: inset 0 -3px 0 var(--t600); }
+  .f .prop[data-k=rug]    { background: var(--t100); border-radius: 6px; box-shadow: inset 0 0 0 2px var(--t200); }
+  .f .prop[data-k=board]  { background: var(--o600); border-radius: 2px; box-shadow: 0 0 0 2px var(--s5); }
+  .f .prop[data-k=green]  { background: var(--o500); border-radius: 2px; box-shadow: 0 0 0 2px var(--s5); }
+  .f .prop[data-k=shelf],
+  .f .prop[data-k=bar]    { background: var(--s2); border-radius: 3px; box-shadow: inset 0 -3px 0 var(--s1); }
+  .f .prop[data-k=sink],
+  .f .prop[data-k=fridge],
+  .f .prop[data-k=copier] { background: var(--o300); border-radius: 3px; box-shadow: inset 0 -2px 0 var(--o400); }
+  .f .prop[data-k=bin]    { background: var(--o400); border-radius: 50%; }
+  /* La pianta di una pianta e' un cerchio verde: da qui sopra e' tutto quello
+     che se ne vede, e bastano dieci pixel per riconoscerla. */
+  .f .prop[data-k=plant]  { background: none; }
+  .f .prop[data-k=plant]::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, var(--o400), var(--o600));
+    box-shadow: 0 0 0 2px var(--t200);
+  }
+  .f .desk { width: 32px; height: 16px; background: var(--s3); border-radius: 4px;
+             box-shadow: inset 0 -3px 0 var(--s1), 0 1px 3px -1px rgba(51,61,44,.45); }
+  .f .stool { width: 16px; height: 16px; background: var(--t200); border-radius: 4px;
+              box-shadow: inset 0 0 0 2px var(--t300); }
+  .f .mon { width: 14px; height: 9px; margin-left: 1px; margin-top: 2px;
+            border-radius: 2px; background: var(--o700); }
+  .f .mon.on { background: var(--o500); }
+  .f .mon.busy { background: linear-gradient(180deg, var(--t300), var(--t500));
+                 box-shadow: 0 0 8px rgba(244,85,23,.8); }
+  .f .guy { width: 16px; height: 16px; }
+  .f .fig { position: absolute; left: 2px; top: 2px; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--shirt);
+            box-shadow: 0 2px 4px -1px rgba(51,61,44,.55); }
+  .f .fig::after { content: ""; position: absolute; left: 3px; top: 3px;
+                   width: 6px; height: 6px; border-radius: 50%; background: var(--s3);
+                   box-shadow: inset 0 -1px 0 rgba(51,61,44,.18); }
+  .f .fig i { display: none; }
+  .f .plate { background: var(--s5); border-radius: 4px; color: var(--o800);
+              box-shadow: 0 2px 5px -1px rgba(51,61,44,.5); }
+
+  /* ============================================================
+     3 — ISOMETRICO 2.5D   (stesse forme piatte, ma la stanza si alza)
+     ============================================================ */
+  .i .pane { background: linear-gradient(180deg, #202718, var(--o900));
+              perspective: 1500px; perspective-origin: 50% 42%; }
+  .i .stage { transform: rotateX(54deg) scale(1.9);
+              transform-style: preserve-3d; transform-origin: center center; }
+  .i .floor { background-color: var(--o200);
+    background-image: linear-gradient(rgba(60,70,51,.06) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(60,70,51,.06) 1px, transparent 1px);
+    background-size: 16px 16px, 16px 16px; }
+  /* L'altezza e' una pila di ombre verso l'alto: in una proiezione inclinata
+     "in su" e' "verso di te", e una pila di copie e' un muro. Niente facce,
+     niente WebGL — una riga di CSS per quanto e' alta la cosa. */
+  .i .wall { background: var(--s5);
+    box-shadow: 0 -1px 0 var(--s3), 0 -2px 0 var(--s3), 0 -3px 0 var(--s2),
+                0 -4px 0 var(--s2), 0 -5px 0 var(--s1), 0 -6px 0 var(--s1),
+                0 -7px 0 #d4b596, 0 -8px 0 #c9a888, 2px 3px 6px -2px rgba(0,0,0,.5); }
+  .i .prop i, .i .desk i { display: none; }
+  .i .prop { border-radius: 2px;
+    box-shadow: 0 -1px 0 var(--lo, var(--s1)), 0 -2px 0 var(--lo, var(--s1)),
+                1px 2px 3px -1px rgba(0,0,0,.45); }
+  .i .prop[data-k=table]  { background: var(--s3); --lo: var(--s1); }
+  .i .prop[data-k=chair],
+  .i .prop[data-k=stool]  { background: var(--s1); --lo: #c9a888; border-radius: 3px; }
+  .i .prop[data-k=sofa]   { background: var(--t400); --lo: var(--t700); border-radius: 3px; }
+  .i .prop[data-k=rug]    { background: var(--t100); --lo: var(--t100); box-shadow: none; border-radius: 4px; }
+  .i .prop[data-k=board]  { background: var(--o600); --lo: var(--o800); }
+  .i .prop[data-k=green]  { background: var(--o500); --lo: var(--o700); }
+  .i .prop[data-k=shelf],
+  .i .prop[data-k=bar]    { background: var(--s2); --lo: var(--s1); }
+  .i .prop[data-k=sink],
+  .i .prop[data-k=fridge],
+  .i .prop[data-k=copier] { background: var(--o300); --lo: var(--o500); }
+  .i .prop[data-k=bin]    { background: var(--o400); --lo: var(--o600); border-radius: 50%; }
+  .i .prop[data-k=plant]  { background: var(--o500); --lo: var(--o700); border-radius: 50%; }
+  .i .prop[data-k=plant]::after { content:""; position:absolute; inset:1px; border-radius:50%;
+    background: radial-gradient(circle at 38% 30%, var(--o300), var(--o600)); }
+  .i .desk { width: 32px; height: 16px; background: var(--s2); border-radius: 3px;
+    box-shadow: 0 -1px 0 var(--s1), 0 -2px 0 var(--s1), 0 -3px 0 #d4b596,
+                1px 3px 5px -1px rgba(0,0,0,.5); }
+  .i .stool { width: 16px; height: 16px; background: var(--s1); border-radius: 3px;
+    box-shadow: 0 -1px 0 #c9a888, 0 -2px 0 #c9a888, 1px 2px 3px -1px rgba(0,0,0,.45); }
+  .i .mon { width: 14px; height: 3px; margin-left: 1px; margin-top: 1px; border-radius: 1px;
+    background: var(--o700);
+    box-shadow: 0 -1px 0 var(--o700), 0 -2px 0 var(--o700), 0 -3px 0 var(--o600),
+                0 -4px 0 var(--o600), 0 -5px 0 var(--o500), 0 -6px 0 var(--o500); }
+  .i .mon.on { box-shadow: 0 -1px 0 var(--o600), 0 -2px 0 var(--o600), 0 -3px 0 var(--o400),
+                           0 -4px 0 var(--o400), 0 -5px 0 var(--o300), 0 -6px 0 var(--o300); }
+  .i .mon.busy { box-shadow: 0 -1px 0 var(--t600), 0 -2px 0 var(--t600), 0 -3px 0 var(--t500),
+                             0 -4px 0 var(--t500), 0 -5px 0 var(--t300), 0 -6px 0 var(--t300),
+                             0 -3px 9px rgba(244,85,23,.9); }
+  /* La gente si rialza in piedi: e' l'unica cosa nella stanza che non e' un
+     mobile, e sdraiata sul pavimento tornerebbe a esserlo. */
+  .i .guy { width: 16px; height: 16px; transform-style: preserve-3d;
+           transform: rotateX(-54deg); transform-origin: bottom center; }
+  /* L'ombra ai piedi resta a terra: senza, la persona in piedi galleggia. */
+  .i .guy::before { content: ""; position: absolute; left: 3px; bottom: -1px;
+                    width: 10px; height: 4px; border-radius: 50%;
+                    background: rgba(0,0,0,.35); filter: blur(1px);
+                    transform: rotateX(54deg); transform-origin: bottom center; }
+  .i .fig { position: absolute; left: 2px; bottom: 0; width: 12px; height: 15px;
+            border-radius: 6px 6px 2px 2px; background: var(--shirt);
+            box-shadow: 0 0 0 1px rgba(51,61,44,.55), 0 3px 6px -2px rgba(0,0,0,.8); }
+  .i .fig::after { content: ""; position: absolute; left: 1px; top: -10px; width: 10px; height: 10px;
+                   border-radius: 50%; background: var(--s3);
+                   box-shadow: 0 0 0 1.5px rgba(51,61,44,.7); }
+  .i .fig i { display: none; }
+  .i .plate { top: -36px; background: var(--s5); border-radius: 3px; color: var(--o800);
+              box-shadow: 0 3px 6px -2px rgba(0,0,0,.65); }
+
+  /* ============================================================
+     4 — PLANIMETRIA   (la stanza come la disegnerebbe un architetto)
+     ============================================================ */
+  .p .pane { background: var(--o100); }
+  .p .stage { background: var(--s5); box-shadow: 0 6px 26px -8px rgba(51,61,44,.45); }
+  .p .floor {
+    background-image: linear-gradient(rgba(60,70,51,.10) .5px, transparent .5px),
+                      linear-gradient(90deg, rgba(60,70,51,.10) .5px, transparent .5px);
+    background-size: 16px 16px, 16px 16px;
+  }
+  /* Il muro pieno: in una pianta e' il tratto piu' nero della tavola, e da solo
+     racconta le stanze senza bisogno di colore. */
+  .p .wall { background: var(--o800); }
+  .p .prop i, .p .desk i { display: none; }
+  .p .prop { border: 1px solid var(--o600); background: rgba(118,138,97,.10); border-radius: 1px; }
+  .p .prop[data-k=plant] { border-radius: 50%; background: rgba(118,138,97,.28); }
+  .p .prop[data-k=bin]   { border-radius: 50%; }
+  .p .prop[data-k=rug]   { border-style: dashed; background: rgba(244,85,23,.07); }
+  .p .prop[data-k=sofa],
+  .p .prop[data-k=board] { background: rgba(118,138,97,.28); }
+  .p .desk { width: 32px; height: 16px; border: 1px solid var(--o700);
+             background: rgba(244,85,23,.09); border-radius: 1px; }
+  .p .stool { width: 16px; height: 16px; border: 1px solid var(--o600);
+              border-radius: 50%; background: transparent; }
+  .p .mon { width: 12px; height: 4px; margin-left: 2px; margin-top: 3px;
+            border: 1px solid var(--o700); border-radius: 1px; background: transparent; }
+  .p .mon.on { background: var(--o400); border-color: var(--o700); }
+  .p .mon.busy { background: var(--t500); border-color: var(--t700); }
+  .p .guy { width: 16px; height: 16px; }
+  .p .fig { position: absolute; left: 2px; top: 2px; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--shirt);
+            box-shadow: 0 0 0 1.5px var(--s5); }
+  .p .fig::after { content: attr(data-i); position: absolute; inset: 0;
+                   display: flex; align-items: center; justify-content: center;
+                   font: 800 7px/1 ui-sans-serif, system-ui, sans-serif; color: var(--s5); }
+  .p .fig i { display: none; }
+  .p .plate { top: -28px; background: transparent; color: var(--o800); }
+  .p .plate b { font-size: 7px; }
+</style>
+
+<h1>L'ufficio — quattro pelli sulla stessa pianta</h1>
+<p class="lede">
+  Stessa planimetria, stesse otto scrivanie, stesse cinque conversazioni sedute
+  ai loro posti: cambia solo il disegno. Tinte del CRM BaliFlow.
+</p>
+<div class="grid" id="grid"></div>
+
+<script>
+const TILE = 16, COLS = 24, ROWS = 20, STEP = 17;
+
+const SPR = {
+  deskL:[0,17], deskR:[2,17],
+  tableTL:[0,0], tableTM:[1,0], tableTR:[2,0], tableBL:[0,1], tableBM:[1,1], tableBR:[2,1],
+  stool:[0,2], chairUp:[1,2], chairL:[2,2], chairR:[3,2],
+  plantA:[16,0], plantB:[17,0], copier:[14,16], fridgeT:[11,15], fridgeB:[11,16],
+  sinkT:[8,12], shelfA:[16,17], shelfB:[17,17], shelfC:[18,17], greenA:[16,16],
+  boardL:[19,12], boardM:[20,12], boardR:[21,12],
+  sofaL:[0,9], sofaM:[1,9], sofaR:[2,9], rugL:[19,10], rugR:[20,10], binB:[22,5],
+  barA:[4,17], barB:[5,17], barC:[6,17], barD:[7,17],
+};
+
+const WALLS = [
+  {c:0,r:0,w:COLS,h:1}, {c:0,r:ROWS-1,w:COLS,h:1},
+  {c:0,r:0,w:1,h:ROWS}, {c:COLS-1,r:0,w:1,h:ROWS},
+  {c:10,r:1,w:1,h:2}, {c:10,r:5,w:1,h:3},
+  {c:15,r:1,w:1,h:2}, {c:15,r:5,w:1,h:3},
+  {c:1,r:7,w:9,h:1}, {c:14,r:7,w:9,h:1},
+];
+
+const PROPS = [
+  // sala riunioni
+  {k:'board', c:3, r:1, w:3, t:['boardL','boardM','boardR']},
+  {k:'plant', c:8, r:1, t:['plantA']},
+  {k:'table', c:3, r:3, w:5, h:2,
+   t:['tableTL','tableTM','tableTM','tableTM','tableTR','tableBL','tableBM','tableBM','tableBM','tableBR']},
+  {k:'chair', c:4, r:2, t:['chairUp']}, {k:'chair', c:6, r:2, t:['chairUp']},
+  {k:'stool', c:4, r:5, t:['stool']},  {k:'stool', c:6, r:5, t:['stool']},
+  {k:'chair', c:2, r:3, t:['chairL']}, {k:'chair', c:8, r:3, t:['chairR']},
+  {k:'plant', c:1, r:5, t:['plantB']},
+  // ingresso
+  {k:'sofa', c:11, r:1, w:3, t:['sofaL','sofaM','sofaR']},
+  {k:'rug',  c:11, r:3, w:2, t:['rugL','rugR']},
+  {k:'plant',c:11, r:5, t:['plantA']},
+  // bar
+  {k:'shelf', c:16, r:1, w:3, t:['shelfA','shelfB','shelfC']},
+  {k:'green', c:20, r:1, t:['greenA']},
+  {k:'bar',   c:16, r:2, w:4, t:['barA','barB','barC','barD']},
+  {k:'sink',  c:20, r:2, t:['sinkT']},
+  {k:'fridge',c:22, r:1, h:2, t:['fridgeT','fridgeB']},
+  {k:'chair', c:17, r:3, t:['chairUp']}, {k:'chair', c:19, r:3, t:['chairUp']},
+  {k:'table', c:17, r:4, w:3, t:['tableTL','tableTM','tableTR']},
+  {k:'stool', c:17, r:5, t:['stool']},  {k:'stool', c:19, r:5, t:['stool']},
+  {k:'plant', c:16, r:5, t:['plantB']}, {k:'plant', c:22, r:5, t:['plantA']},
+  // salone
+  {k:'plant', c:1, r:8, t:['plantA']},  {k:'plant', c:22, r:8, t:['plantB']},
+  {k:'copier',c:20, r:9, t:['copier']}, {k:'plant', c:22, r:12, t:['plantA']},
+  {k:'shelf', c:20, r:18, w:3, t:['shelfA','shelfB','shelfC']},
+  {k:'bin',   c:1, r:12, t:['binB']},   {k:'plant', c:1, r:18, t:['plantB']},
+];
+
+const DESKS = [
+  {c:2,r:9},{c:7,r:9},{c:12,r:9},{c:17,r:9},
+  {c:2,r:14},{c:7,r:14},{c:12,r:14},{c:17,r:14},
+];
+const SEAT_DR = 1.1, STOOL_DR = 1.8;
+
+// Cinque conversazioni, i quattro stati che l'ufficio sa dire.
+const PEOPLE = [
+  {name:"Ufficio, palette", pct:40, st:'busy',   sh:'#f45517'},
+  {name:"Sito di Susan",    pct:66, st:'done',   sh:'#5c6c4b'},
+  {name:"CRM BaliFlow",     pct:12, st:'recent', sh:'#be2e0b'},
+  {name:"Vecchia sessione", pct:78, st:'idle',   sh:'#95a881'},
+  {name:"Release 0.22",     pct:55, st:'recent', sh:'#e53f0c'},
+];
+const FOLK = [
+  {b:[0,0], s:[8,1],  h:[20,0]},
+  {b:[0,1], s:[12,1], h:[21,0]},
+  {b:[0,2], s:[16,1], h:[24,0]},
+  {b:[1,0], s:[8,6],  h:[25,0]},
+  {b:[1,1], s:[12,6], h:[20,4]},
+];
+const barColor = (p) => (p >= 80 ? '#cf222e' : p >= 60 ? '#e3b341' : '#4c9a2a');
+
+const SKINS = [
+  {cls:'k', title:'1 — Kenney, rivestito BaliFlow',
+   note:"Gli sprite di adesso con la tinta nuova: e' esattamente quello che hai gia' in mano. Zero lavoro, zero rischio."},
+  {cls:'f', title:'2 — Vettoriale piatto',
+   note:"Via il foglio di sprite: i mobili sono disegnati in CSS. Nitido a ogni ingrandimento, colore tutto tuo, stessa faccia del CRM. In cambio si perde il dettaglio del pixel art."},
+  {cls:'i', title:'3 — Isometrico 2.5D',
+   note:"Le stesse forme piatte, ma la stanza si alza: muri, scrivanie e monitor hanno un'altezza e la gente sta in piedi. Solo trasformazioni CSS, nessuna libreria 3D da imbarcare."},
+  {cls:'p', title:'4 — Planimetria',
+   note:"La stanza come una tavola d'architetto: muri pieni, mobili a contorno, persone come pallini con l'iniziale. La piu' leggibile da lontano, la meno giocosa."},
+];
+
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+const at = (n, c, r) => { n.style.left = c * TILE + 'px'; n.style.top = r * TILE + 'px'; return n; };
+const cell = (name, cls) => {
+  const i = el('i', cls);
+  const [sc, sr] = SPR[name];
+  i.style.backgroundPosition = -sc * STEP + 'px ' + -sr * STEP + 'px';
+  return i;
+};
+
+function stage() {
+  const st = el('div', 'stage');
+  st.append(el('div', 'floor'));
+
+  for (const w of WALLS) {
+    const n = at(el('div', 'wall'), w.c, w.r);
+    n.style.width = w.w * TILE + 'px';
+    n.style.height = w.h * TILE + 'px';
+    st.append(n);
+  }
+
+  for (const p of PROPS) {
+    const n = at(el('div', 'prop'), p.c, p.r);
+    n.dataset.k = p.k;
+    n.style.width = (p.w || 1) * TILE + 'px';
+    n.style.height = (p.h || 1) * TILE + 'px';
+    for (const name of p.t) n.append(cell(name));
+    st.append(n);
+  }
+
+  DESKS.forEach((d, i) => {
+    const who = PEOPLE[i];
+    st.append(at(cell('stool', 'stool'), d.c + 0.5, d.r + STOOL_DR));
+    const desk = at(el('div', 'desk'), d.c, d.r);
+    desk.append(cell('deskL'), cell('deskR'));
+    const mon = at(el('div', 'mon' + (who ? (who.st === 'busy' ? ' on busy' : ' on') : '')),
+                   d.c + 0.5, d.r + 0.05);
+    st.append(desk, mon);
+  });
+
+  PEOPLE.forEach((p, i) => {
+    const d = DESKS[i];
+    const g = at(el('div', 'guy'), d.c + 0.5, d.r + SEAT_DR);
+    // Ferma da un pezzo: sbiadita, come nell'ufficio vero.
+    if (p.st === 'idle') g.style.filter = 'grayscale(.65) opacity(.5)';
+    const fig = el('div', 'fig');
+    fig.style.setProperty('--shirt', p.sh);
+    fig.dataset.i = p.name.charAt(0);
+    const f = FOLK[i];
+    for (const xy of [f.b, f.s, f.h]) {
+      const l = el('i');
+      l.style.backgroundPosition = -xy[0] * STEP + 'px ' + -xy[1] * STEP + 'px';
+      fig.append(l);
+    }
+    const plate = el('div', 'plate');
+    const b = el('b');
+    b.textContent = p.name;
+    const s = el('s');
+    const fill = el('i');
+    fill.style.width = p.pct + '%';
+    fill.style.background = barColor(p.pct);
+    s.style.background = 'rgba(51,61,44,.22)';
+    s.append(fill);
+    plate.append(b, s);
+    g.append(fig, plate);
+    st.append(g);
+  });
+  return st;
+}
+
+const grid = document.getElementById('grid');
+for (const sk of SKINS) {
+  const card = el('div', 'card ' + sk.cls);
+  const h = el('h2');
+  h.textContent = sk.title;
+  const note = el('p');
+  note.textContent = sk.note;
+  const pane = el('div', 'pane');
+  pane.append(stage());
+  card.append(h, note, pane);
+  grid.append(card);
+}
+</script>

@@ -93,10 +93,6 @@ window.OFFICE = (() => {
     sofaR: [2, 9],
     rugL: [19, 10],
     rugR: [20, 10],
-    rackT: [25, 8],
-    rackB: [25, 9],
-    printT: [23, 8],
-    printB: [23, 9],
     binA: [22, 4],
     binB: [22, 5],
     // Il bancone del bar: gli stessi mobili della cucina, ma con la roba sopra —
@@ -237,8 +233,6 @@ window.OFFICE = (() => {
     { s: 'sofaR', c: 13, r: 1 },
     { s: 'rugL', c: 11, r: 3 },
     { s: 'rugR', c: 12, r: 3 },
-    { s: 'printT', c: 13, r: 4 },
-    { s: 'printB', c: 13, r: 5 },
     { s: 'plantA', c: 11, r: 5 },
 
     // --- la zona bar: il bancone con sopra la roba, il frigo, e il tavolino dove
@@ -268,8 +262,7 @@ window.OFFICE = (() => {
     { s: 'plantA', c: 1, r: 8 },
     { s: 'plantB', c: 22, r: 8 },
     { s: 'copier', c: 20, r: 9 },
-    { s: 'rackT', c: 22, r: 12 },
-    { s: 'rackB', c: 22, r: 13 },
+    { s: 'plantA', c: 22, r: 12 },
     { s: 'shelfA', c: 20, r: 18 },
     { s: 'shelfB', c: 21, r: 18 },
     { s: 'shelfC', c: 22, r: 18 },

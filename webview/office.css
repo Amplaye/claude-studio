@@ -18,13 +18,23 @@
    dentro, senza una riga in piu'. */
 
 .office {
-  --of-floor: #93a98e;
-  --of-floor-2: #8ba187;
-  --of-line: rgba(0, 0, 0, 0.055);
-  --of-dot: rgba(255, 255, 255, 0.14);
-  --of-wall: #f1ece0;
-  --of-wall-b: #cdc6b6;
-  --of-edge: #2b2723;
+  /* Le tinte sono quelle del CRM BaliFlow: oliva e terracotta su crema. Di la'
+     sono due scale Tailwind (`--color-olive-*`, `--color-terracotta-*`) e un
+     gradiente sabbia sul body; qui stanno a mano, perche' un foglio Tailwind non
+     attraversa una webview e copiare sei valori costa meno che portarsi dietro
+     il generatore. */
+  --of-floor: #b8c6a9; /* olive-300 */
+  --of-floor-2: #a9b998;
+  --of-line: rgba(51, 61, 44, 0.07);
+  --of-dot: rgba(255, 255, 255, 0.22);
+  --of-wall: #fcf6ed; /* la cima del gradiente sabbia */
+  --of-wall-b: #e1cab2; /* e il suo fondo, che qui fa l'ombra sotto il muro */
+  --of-edge: #333d2c; /* olive-900 */
+  /* Terracotta e inchiostro oliva: l'accento e il nero-che-non-e'-nero del CRM. */
+  --of-clay: #f45517; /* terracotta-500 */
+  --of-clay-2: #ffa579; /* terracotta-300 */
+  --of-ink: #3c4633; /* olive-800 */
+  --of-paper: #fcf6ed;
 
   display: none;
   flex-direction: column;
@@ -194,7 +204,7 @@ body.inoffice .rail {
   justify-content: center;
   overflow: hidden;
   padding: 10px;
-  background: #6f7f6c;
+  background: #49563d; /* olive-700: il buio fuori dai muri */
 }
 
 /* Misure fisse in mattonelle, e tutto si ingrandisce insieme: vedi fit(). */
@@ -270,19 +280,19 @@ body.inoffice .rail {
   width: 14px;
   height: 11px;
   margin-left: 1px;
-  border: 2px solid #22262b;
+  border: 2px solid var(--of-edge);
   border-radius: 1px;
-  background: #3a4048;
+  background: #46503f;
   transition: background 0.3s ease;
 }
 .of-mon.on {
-  background: #5b6672;
+  background: #6d7a5f;
 }
 /* Il monitor acceso e' la cosa che si vede per prima da lontano: prima ancora
    di capire chi c'e' seduto, si vede quali schermi stanno lavorando. */
 .of-mon.working {
-  background: linear-gradient(180deg, #b6e2ff, #63a8de);
-  box-shadow: 0 0 7px rgba(110, 190, 255, 0.85);
+  background: linear-gradient(180deg, var(--of-clay-2), var(--of-clay));
+  box-shadow: 0 0 7px rgba(244, 85, 23, 0.75);
   animation: of-screen 2.6s ease-in-out infinite;
 }
 @keyframes of-screen {
@@ -445,9 +455,9 @@ body.inoffice .rail {
   align-items: center;
   gap: 1px;
   padding: 1px 2px;
-  border: 1px solid #2b2723;
+  border: 1px solid var(--of-edge);
   border-radius: 2px;
-  background: #f6f2e6;
+  background: var(--of-paper);
   pointer-events: none;
   z-index: 5;
 }
@@ -466,7 +476,7 @@ body.inoffice .rail {
   width: 2px;
   height: 2px;
   border-radius: 50%;
-  background: #2f7d43;
+  background: var(--of-clay);
   animation: of-dot 1.1s ease-in-out infinite;
 }
 .of-dots i:nth-child(2) {
@@ -490,7 +500,7 @@ body.inoffice .rail {
   display: none;
   width: 6px;
   height: 6px;
-  color: #2f7d43;
+  color: #49563d;
   stroke-width: 3;
 }
 .of-guy.done .of-tick {
@@ -509,10 +519,10 @@ body.inoffice .rail {
   width: 50px;
   margin-left: -25px;
   padding: 1px 2px 2px;
-  border: 1px solid #2b2723;
+  border: 1px solid var(--of-edge);
   border-radius: 2px;
-  background: #f6f2e6;
-  color: #2b2723;
+  background: var(--of-paper);
+  color: var(--of-ink);
   pointer-events: none;
   z-index: 4;
 }
@@ -534,7 +544,7 @@ body.inoffice .rail {
   display: block;
   height: 2px;
   margin-top: 1px;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(51, 61, 44, 0.22);
   overflow: hidden;
 }
 .of-fill {
@@ -557,7 +567,7 @@ body.inoffice .rail {
   padding: 3px 8px;
   font-size: 8px;
   font-weight: 700;
-  color: #2b2723;
+  color: var(--of-ink);
   text-align: center;
   pointer-events: none;
 }
