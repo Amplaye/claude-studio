@@ -130,9 +130,11 @@ Switch any time, even halfway through a conversation.
 
 - **`@` for a file *or a function*, `/` for a command** — type `@parseToken` and you
   get the file it lives in, with the line. Your skills and plugins are in the `/` menu.
-- **The shape of a long answer, down the left edge.** One band per run of steps, as
-  tall as the run is long — you see "read for a while, wrote one file, got stuck on
-  red" without scrolling. Point at it and it opens into a list that says it in words.
+- **A ruler of the answer, down the left edge.** Every mark sits where its card
+  really is, so reading and thinking blur into one quiet ribbon and the things you'd
+  scroll back to — a file written, a command run, a question, a failure — stand out
+  of it at exactly the height you'd scroll to. A box shows the slice you're on.
+  Point at it and it opens into a list that says it all in words.
 - **A way back beside every message you sent.** It puts the files back the way they
   were just before Claude touched them, and asks first.
 - **Paste an image**, **drop a file**, or use the paperclip — any format, any size.

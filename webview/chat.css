@@ -1094,16 +1094,18 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 
 /* ---------- the map of the turn ----------
 
-   One band per run of steps of the same kind, as tall as the run is long. Closed it
-   is the shape of the answer — a long grey stretch of reading, one orange write, a
-   red patch where it got stuck — in the gutter the thread already had, so it costs
-   the layout nothing. Open it is the same thing in words.
+   A ruler of the thread, not a list of its steps. Every mark sits where its card
+   really is and is as tall as its card really is, measured against the same scroll
+   height the scrollbar uses — so quiet stretches abut into one faint ribbon on their
+   own, and the marks that matter stand out of it in the exact place you would scroll
+   to. The thumb is the slice you are looking at. See chat.js for why two earlier
+   versions of this, both drawn one-tick-per-step, came out as a barcode.
 
-   Two states, one element list. Closed, everything but the coloured bar is folded
-   away by `overflow: hidden` on a column eleven pixels wide; open, the column lifts
-   out over the thread (`position: absolute`, which is why .logwrap is relative) and
-   the rows are allowed to be rows. Nothing is rebuilt to open it — a second DOM tree
-   for the same data is a second DOM tree to keep in step. */
+   Two states, one element list. Closed, the marks are placed absolutely and
+   everything else about them is folded away by `overflow: hidden` on a column eleven
+   pixels wide; open, the column lifts out over the thread and they fall back into
+   normal flow as rows. Nothing is rebuilt to open it — a second DOM tree for the
+   same data is a second DOM tree to keep in step. */
 .tmap {
   position: absolute;
   left: 0;
@@ -1115,7 +1117,10 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 15px 0 9px;
+  /* Nessun padding da chiusa: le percentuali di un figlio assoluto si misurano sul
+     riquadro interno, e un padding qui vorrebbe dire che il righello e il discorso
+     non parlano piu' della stessa altezza. */
+  padding: 0;
   overflow: hidden;
   border-radius: 0 var(--r) var(--r) 0;
   background: transparent;
@@ -1125,6 +1130,13 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
      non se la trova spalancata addosso. */
   transition: width 0.2s cubic-bezier(0.2, 0.9, 0.25, 1), background 0.2s ease,
     border-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* Una traccia sotto le tacche, appena accennata. Senza, le tacche galleggiano nel
+   nulla e non si capisce che stanno *su* qualcosa lungo tutto il discorso; con, la
+   colonna si legge per quello che e' — una barra di scorrimento che sa cosa c'e'
+   scritto dentro. Sparisce da aperta, dove il fondo lo fa il pannello. */
+.tmap:not(.few):not(:hover):not(:focus-within) {
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 /* Sotto i quattro passi non c'e' una forma da vedere, e una striscia di fianco a tre
    carte e' solo una striscia che nessuno ha chiesto. */
@@ -1159,16 +1171,22 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   transition-delay: 0s;
 }
 
+/* `--t` e `--h`: dove comincia e quanto e' alto, in frazioni dell'altezza totale
+   del discorso. Le scrive il JS misurando le carte vere (vedi mapGeometry). */
 .tm {
-  /* `--n` = quanti passi tiene questa banda, scritto dal JS. E' l'altezza. */
-  flex: var(--n, 1) 1 0;
-  min-height: 3px;
-  /* Un gruppo lungo non si prende tutta la colonna: oltre questo la differenza fra
-     "quaranta letture" e "sessanta" non la vede nessuno, e le bande sotto sparirebbero. */
-  max-height: 90px;
-  /* Chiusa e' una barretta, non una colonna piena: la gutter e' larga undici pixel
-     e riempirla di colore farebbe di una mappa un bordo. */
-  width: 4px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(var(--t, 0) * 100%);
+  height: calc(var(--h, 0) * 100%);
+  /* Sotto i due pixel una carta di una riga sparirebbe: meglio una tacca sottile
+     che un buco dove qualcosa e' successo davvero. */
+  min-height: 2px;
+  /* Il fondo del turno: leggere, ragionare, scrivere una risposta. Sono contigue,
+     quindi si toccano e si leggono come un nastro solo — che e' esattamente cosa
+     sono, il rumore del lavoro. */
+  width: 3px;
+  opacity: 0.5;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1183,30 +1201,56 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   background: color-mix(in srgb, var(--fg) 22%, transparent);
   transition: opacity 0.2s ease, background 0.2s ease, width 0.16s ease;
 }
+/* Quello a cui torneresti: un tuo messaggio, un file scritto, un comando, una
+   domanda, un guasto. Esce dal nastro invece di starci dentro. */
+.tm.loud {
+  width: 6px;
+  min-height: 4px;
+  opacity: 1;
+  border-radius: 3px;
+}
+
+/* La fetta che hai davanti. E' la stessa aritmetica della barra di scorrimento —
+   `--vt` e `--vh` sono scrollTop e clientHeight sull'altezza totale — ed e' quello
+   che fa leggere la colonna come un righello invece che come una decorazione. */
+.tm-view {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--vt, 0) * 100%);
+  height: calc(var(--vh, 0) * 100%);
+  min-height: 14px;
+  pointer-events: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+}
+.tmap:hover .tm-view,
+.tmap:focus-within .tm-view {
+  display: none;
+}
 /* Chiusa, la banda *e'* il colore: icona, nome e conteggio esistono ma non hanno
    spazio in cui stare. */
 .tmap:not(:hover):not(:focus-within) .tm > * {
   display: none;
 }
-/* Dove stai guardando adesso. Chiusa la banda si allarga e si accende — la
-   parentesi che dice quale fetta del discorso hai davanti — aperta e' la riga
-   evidenziata. */
-.tmap:not(:hover):not(:focus-within) .tm.here {
-  width: 9px;
-  border-radius: 3px;
-}
-.tmap:not(:hover):not(:focus-within) .tm:not(.here) {
-  opacity: 0.62;
-}
+/* Dove stai guardando adesso lo dice il riquadro, non le singole tacche: da chiusa
+   quello che conta e' la forma del turno, e accendere anche le bande dentro la
+   finestra vorrebbe dire dire due volte la stessa cosa. Aperta, invece, la riga in
+   cui ti trovi si evidenzia (piu' in basso). */
 
 /* Aperta: righe che si leggono. L'altezza proporzionale ha finito il suo lavoro —
    qui si legge una parola, e una parola vuole la stessa riga delle altre. */
 .tmap:hover .tm,
 .tmap:focus-within .tm {
+  position: static;
+  transform: none;
+  height: auto;
   flex: 0 0 auto;
   min-height: 26px;
   max-height: none;
   width: auto;
+  opacity: 1;
   align-self: stretch;
   padding: 3px 8px;
   border-radius: 7px;

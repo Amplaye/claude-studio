@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.17.1
+
+- **La mappa del turno era ancora un codice a barre, e l'idea sbagliata era la
+  stessa di prima: il passo non e' l'unita'.** La 0.17.0 raggruppava i passi *dello
+  stesso tipo consecutivi*, e sulla carta bastava. Su un turno vero no: un turno
+  alterna — testo, tool, testo, tool — quindi non si fondeva quasi niente e a
+  ottanta passi la colonna tornava ad essere confetti. E sotto tutte e due le
+  versioni la posizione di una tacca voleva dire "quanti passi sono venuti prima di
+  me", che non ha niente a che vedere con dove quel passo sta davvero in quello che
+  stai scorrendo: un recap di quaranta righe era una tacca, e quaranta letture da
+  una riga erano quaranta. La mappa e la barra di scorrimento accanto non erano
+  d'accordo su dove fosse niente.
+
+  Adesso non e' un elenco di passi disegnato sul bordo, e' un **righello del
+  documento**: ogni tacca sta dove sta davvero la sua carta ed e' alta quanto e'
+  alta davvero, misurate sulla stessa altezza che usa la barra di scorrimento. Da
+  li' vengono due cose da sole. Le parti tranquille — leggere, ragionare, scrivere
+  una risposta — si toccano e si leggono come un nastro solo, senza nessuna logica
+  di raggruppamento; e quello a cui torneresti (un tuo messaggio, un file scritto,
+  un comando, una domanda, un guasto) e' disegnato piu' spesso e esce dal nastro,
+  esattamente all'altezza a cui scorreresti. Un riquadro segna la fetta che hai
+  davanti, cosi' la colonna si legge per quello che e'. Il pannello che si apre col
+  puntatore sopra — icona, nome, conteggio — resta com'era, perche' quella meta'
+  funzionava.
+
+  C'e' anche `npm run map-shot`: recita un turno da ottanta passi e ne salva lo
+  scatto, stretto e largo, chiuso e aperto. I controlli girano su una quindicina di
+  passi, ed e' con quindici passi che questa colonna e' sembrata a posto due volte
+  di fila.
+
 ## 0.17.0
 
 - **La mappa del turno dice a parole quello che diceva a colori.** Era una tacca per

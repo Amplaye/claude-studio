@@ -228,34 +228,70 @@ for (const surface of ['view', 'panel']) {
   t((await page.locator(bigSel + ' .more-btn').count()) === 0, 'the button stays once there is nothing left');
   t(await page.isVisible(bigSel), 'opening the rest folded the card shut');
 
-  // ---- the map of the turn: runs, not steps ----
-  // Three reads in a row are one band that says how many, not three ticks nobody
-  // can tell apart — and every band says in words what it is, because a colour with
-  // no key anywhere is decoration.
+  // ---- the map of the turn: a ruler, not a barcode ----
+  //
+  // The failure this guards against is the one that happened twice. A mark whose
+  // position means "how many steps came before me" turns a real turn into confetti
+  // and disagrees with the scrollbar about where everything is. So: every mark has
+  // to sit where its card really sits, they have to go down the rail in order, and
+  // the ones you would scroll back to have to be drawn heavier than the hum.
   for (const f of ['src/one.ts', 'src/two.ts', 'src/three.ts']) {
     await post({ k: 'tool_start', id: 'tu_R_' + f, name: 'Read', input: { file_path: f } });
     await post({ k: 'tool_end', id: 'tu_R_' + f, ok: true, text: 'ok' });
   }
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(300);
   const map = await page.evaluate(() => {
-    const bands = [...document.querySelectorAll('#tmap .tm')];
+    const rail = document.getElementById('tmap');
+    const bands = [...rail.querySelectorAll('.tm')];
+    const num = (b, p) => parseFloat(getComputedStyle(b).getPropertyValue(p));
     const last = bands[bands.length - 1];
+    const view = rail.querySelector('.tm-view');
+    const log = document.getElementById('log');
+    // dove il discorso dice davvero che sta l'ultimo passo
+    const real =
+      last && log.scrollHeight
+        ? (last._nodes[0].getBoundingClientRect().top -
+            (log.getBoundingClientRect().top - log.scrollTop)) /
+          log.scrollHeight
+        : -1;
     return {
       bands: bands.length,
       steps: document.querySelectorAll('#log > .msg').length,
       lastKind: last ? last.className : '',
       lastCount: last?.querySelector('.tm-n')?.textContent || '',
-      lastGrow: last ? getComputedStyle(last).flexGrow : '',
+      tops: bands.map((b) => num(b, '--t')),
+      heights: bands.map((b) => num(b, '--h')),
+      lastTop: last ? num(last, '--t') : -1,
+      real,
+      // il nastro sottile e le tacche che ne escono non sono larghi uguale
+      quietW: bands.filter((b) => !b.classList.contains('loud')).map((b) => b.offsetWidth)[0],
+      loudW: bands.filter((b) => b.classList.contains('loud')).map((b) => b.offsetWidth)[0],
+      loudN: bands.filter((b) => b.classList.contains('loud')).length,
+      viewShown: view ? !view.hidden : false,
+      viewH: view ? num(view, '--vh') : -1,
       named: bands.every((b) => (b.querySelector('.tm-name')?.textContent || '').trim().length > 0),
       labelled: bands.every((b) => !!b.getAttribute('aria-label')),
-      hidden: document.getElementById('tmap').getAttribute('aria-hidden'),
+      hidden: rail.getAttribute('aria-hidden'),
     };
   });
   t(map.steps > 4, 'not enough steps to have a shape: ' + map.steps);
-  t(map.bands < map.steps, 'the map still draws one tick per step: ' + map.bands + ' vs ' + map.steps);
   t(/tm-read/.test(map.lastKind), 'three reads in a row are not one read band: ' + map.lastKind);
   t(map.lastCount === '3', 'the band does not say how many steps it holds: ' + map.lastCount);
-  t(map.lastGrow === '3', 'the band is not as tall as its run is long: ' + map.lastGrow);
+  // the ruler and the thread have to agree about where things are
+  t(
+    map.tops.every((v, i, a) => i === 0 || v >= a[i - 1] - 0.001),
+    'the marks do not go down the rail in order: ' + map.tops.join(',')
+  );
+  t(
+    map.heights.every((h) => h > 0) && map.tops.every((v) => v >= 0 && v <= 1),
+    'the marks are not placed against the scroll height: ' + map.tops.join(',')
+  );
+  t(
+    Math.abs(map.lastTop - map.real) < 0.01,
+    'the last mark is not where its card is: ' + map.lastTop + ' vs ' + map.real
+  );
+  t(map.loudN > 0 && map.loudW > map.quietW, 'the steps that matter are drawn like the hum: ' + map.loudW + ' vs ' + map.quietW);
+  t(map.viewShown && map.viewH > 0 && map.viewH < 1, 'the slice you are looking at is not marked: ' + map.viewH);
   t(map.named, 'the bands have no name to read when the rail opens');
   t(map.labelled, 'the bands say nothing to a screen reader');
   t(map.hidden !== 'true', 'the map is still hidden from assistive tech');

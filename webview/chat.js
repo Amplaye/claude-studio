@@ -150,9 +150,13 @@
   let stick = true;
   log.addEventListener('scroll', () => {
     stick = log.scrollHeight - log.scrollTop - log.clientHeight < 64;
+    mapViewSoon();
   });
   function toBottom() {
     if (stick) log.scrollTop = log.scrollHeight;
+    // The thread grows under a streaming answer without anyone scrolling: the thumb
+    // has to follow that too, or it drifts off the bottom of its own rail.
+    mapViewSoon();
   }
 
   // ---------- the map of the turn ----------
@@ -161,22 +165,37 @@
   // row, then got stuck on a red command — and the only way to see it was to scroll
   // through it.
   //
-  // It used to be one tick per step, coloured by what the step was. Two things were
-  // wrong with that. A colour is a code you have to be taught, and nothing here ever
-  // taught it: grey, orange, blue and red down the edge of the screen with no key
-  // anywhere is decoration you learn to ignore. And one tick per step does not
-  // survive a real turn — with a floor of three pixels and a gap of two, a hundred
-  // and forty steps fill the column and everything after them is clipped away, so
-  // the map lost exactly the part you were looking at.
+  // Two goes at this were wrong in the same way, so the wrong idea is worth writing
+  // down: **the step is not the unit.**
   //
-  // So the unit is no longer the step, it's the **run**: reads in a row are one
-  // band, and its height says how many. Fifteen bands instead of two hundred ticks,
-  // and the height differences are the shape — "read for a long time, wrote once,
-  // got stuck on red". Then, when you put the pointer on it (or tab into it), the
-  // column opens into a list that says the same thing in words: an icon, a name, a
-  // count. The colour stops being something to decode, because the legend is the
-  // thing itself.
+  // One tick per step gave a column of confetti. Grouping runs of the same kind was
+  // supposed to fix it and barely helped, because a real turn alternates — text,
+  // tool, text, tool — so almost nothing merged and it was confetti again. And under
+  // both, a tick's *position* meant "how many steps came before it", which has
+  // nothing to do with where that step actually sits in what you are scrolling: a
+  // forty-line recap was one tick and forty one-line reads were forty. The rail and
+  // the scrollbar beside it disagreed about where everything was.
+  //
+  // So it is not a list of steps drawn down the edge. It is a **ruler of the
+  // document**: every mark sits where its card really is, and is as tall as its card
+  // really is, measured against the same scroll height the scrollbar uses. Which
+  // means two things fall out for free. Quiet stretches — reading, thinking, writing
+  // an answer — abut each other and read as one faint continuous ribbon instead of
+  // forty separate ticks, without any merging logic at all. And the things that
+  // matter (your messages, a file written, a command run, a question, a failure) are
+  // drawn heavier and stand out of that ribbon, in the exact place you would scroll
+  // to. A thumb shows the slice you are looking at, so it reads as what it is.
+  //
+  // Hovering it (or tabbing in) still opens the column into a list that says the
+  // same things in words, because a colour with no key anywhere is decoration.
   const tmap = $('tmap');
+
+  /**
+   * Steps you would scroll back to, and steps that are just the sound of working.
+   * This is the whole difference between a ruler and a barcode: everything is drawn,
+   * but only these are drawn loud.
+   */
+  const MAP_LOUD = new Set(['user', 'write', 'run', 'ask', 'fail', 'recap']);
 
   /** What kind a step is. It is asked again at the end: a failure changes it. */
   function mapKind(node) {
@@ -260,19 +279,14 @@
       ? [...tmap.children].indexOf(document.activeElement)
       : -1;
 
-    tmap.replaceChildren();
+    tmap.replaceChildren(view);
     for (const r of runs) {
-      const band = el('button', 'tm tm-' + r.kind);
+      const band = el('button', 'tm tm-' + r.kind + (MAP_LOUD.has(r.kind) ? ' loud' : ''));
       band.type = 'button';
       // Una sola fermata di Tab per tutta la mappa, poi le frecce dentro. Quindici
       // bottoni tabbabili fra il discorso e la barra di scrittura sarebbero quindici
       // pressioni di Tab per arrivare a scrivere, che e' peggio di non averla.
-      band.tabIndex = tmap.childElementCount === 0 ? 0 : -1;
-      // Proportional to how many steps it holds: that is the whole point of a shape.
-      // Through a custom property, not `style.flexGrow`: inline wins over any class,
-      // so setting it directly would keep the bands growing after the rail opens —
-      // and a row of text three times taller than the one above it is not a list.
-      band.style.setProperty('--n', String(r.nodes.length));
+      band.tabIndex = tmap.querySelector('.tm') ? -1 : 0;
       const name = t('map.' + r.kind);
       const detail = mapDetail(r.nodes[0]);
       const count = r.nodes.length > 1 ? ' ×' + r.nodes.length : '';
@@ -292,15 +306,73 @@
       });
       tmap.append(band);
     }
-    if (hadFocus >= 0 && tmap.children.length) {
-      const back = tmap.children[Math.min(hadFocus, tmap.children.length - 1)];
-      for (const b of tmap.children) b.tabIndex = b === back ? 0 : -1;
+    const bands = mapBands();
+    if (hadFocus >= 0 && bands.length) {
+      const back = bands[Math.min(hadFocus, bands.length - 1)];
+      for (const b of bands) b.tabIndex = b === back ? 0 : -1;
       back.focus();
     }
     // Under four steps there is no shape to see, and a rail beside three cards is
     // just a stripe nobody asked for.
     tmap.classList.toggle('few', nodes.length < 4);
+    mapGeometry();
     mapHere();
+  }
+
+  /** The marks, without the viewport thumb that lives among them. */
+  function mapBands() {
+    return [...tmap.querySelectorAll('.tm')];
+  }
+
+  /**
+   * Where every mark goes: the same arithmetic the scrollbar does.
+   *
+   * Read every rectangle first and only then write the styles. Interleaving the two
+   * makes the browser re-lay-out the page between each pair, which on a turn of two
+   * hundred cards is the difference between one reflow and two hundred.
+   */
+  function mapGeometry() {
+    const bands = mapBands();
+    if (!bands.length) return;
+    const total = log.scrollHeight;
+    if (total <= 0) return;
+    const top = log.getBoundingClientRect().top - log.scrollTop;
+    const boxes = bands.map((b) => {
+      const first = b._nodes[0].getBoundingClientRect();
+      const last = b._nodes[b._nodes.length - 1].getBoundingClientRect();
+      return { t: first.top - top, h: Math.max(1, last.bottom - first.top) };
+    });
+    bands.forEach((b, i) => {
+      b.style.setProperty('--t', (boxes[i].t / total).toFixed(5));
+      b.style.setProperty('--h', (boxes[i].h / total).toFixed(5));
+    });
+    mapView();
+  }
+
+  /**
+   * The slice of the thread in front of you. Three numbers, so it can be redone on
+   * every scroll event without thinking about it — unlike the marks, which need a
+   * rectangle per card and only move when the thread itself changes.
+   */
+  const view = el('div', 'tm-view');
+  function mapView() {
+    const total = log.scrollHeight;
+    const seen = log.clientHeight;
+    // Nothing to scroll: a thumb the height of the whole rail says nothing at all.
+    view.hidden = !total || seen >= total - 4 || tmap.classList.contains('few');
+    if (view.hidden) return;
+    view.style.setProperty('--vt', (log.scrollTop / total).toFixed(5));
+    view.style.setProperty('--vh', (seen / total).toFixed(5));
+  }
+
+  let viewSoon = false;
+  function mapViewSoon() {
+    if (viewSoon) return;
+    viewSoon = true;
+    requestAnimationFrame(() => {
+      viewSoon = false;
+      mapView();
+    });
   }
 
   function mapClear() {
@@ -309,10 +381,15 @@
     onscreen.clear();
   }
 
+  // Opening a card changes every height below it, and nothing else here would
+  // notice: `toggle` doesn't bubble, so it is caught on the way down.
+  log.addEventListener('toggle', () => mapPaint(), true);
+  addEventListener('resize', () => mapPaint());
+
   // Dentro la mappa le frecce spostano il fuoco di banda in banda (e la tengono a
   // una sola fermata di Tab), Invio ci salta, Esc riporta alla barra di scrittura.
   tmap.addEventListener('keydown', (e) => {
-    const bands = [...tmap.children];
+    const bands = mapBands();
     const at = bands.indexOf(document.activeElement);
     if (at < 0) return;
     if (e.key === 'Escape') {
@@ -332,7 +409,7 @@
 
   /** Jump to the band before or after the one you are looking at. */
   function mapStep(d) {
-    const bands = [...tmap.children];
+    const bands = mapBands();
     if (!bands.length) return;
     const at = bands.findIndex((b) => b.classList.contains('here'));
     const next = bands[Math.min(bands.length - 1, Math.max(0, (at < 0 ? 0 : at) + d))];
@@ -347,7 +424,7 @@
   // line up with the slice of the thread in front of you.
   const onscreen = new Set();
   function mapHere() {
-    for (const band of tmap.children) {
+    for (const band of mapBands()) {
       band.classList.toggle('here', band._nodes.some((n) => onscreen.has(n)));
     }
   }
