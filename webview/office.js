@@ -120,7 +120,12 @@ window.OFFICE = (() => {
     bossText.append(bossName, bossWhat);
     boss.append(face, bossText);
 
-    bar.append(title, count, el('span', 'of-grow'), boss, chips, back);
+    // Due gruppi e niente in mezzo: a sinistra dove sei e chi c'e', a destra i
+    // consumi e la via d'uscita. Il vuoto stava fra il conteggio e il ritratto,
+    // e lasciava il ritratto a galleggiare in mezzo alla fascia attaccato a
+    // niente. Il ritratto e' la conversazione che hai davanti, quindi sta con il
+    // resto di "chi c'e'", non da solo.
+    bar.append(title, count, boss, el('span', 'of-grow'), chips, back);
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');

@@ -129,6 +129,52 @@ t(
     ' contro ' +
     Math.round(split.office)
 );
+// ---- e la testata della chat, adesso che e' una colonna stretta ----
+//
+// Con l'ufficio aperto la scheda e' larga ma la colonna della chat no: sta fra
+// 340 e 520 pixel, la stessa misura della barra laterale. La scaletta del "si fa
+// da parte" in chat.css era scritta per la barra laterale e si riconosceva da
+// `body:not(.wide)`, quindi qui non scattava: la pillola dell'attivita' — l'unica
+// cosa della riga che puo' stringersi — si stringeva fino all'orologio, mentre
+// l'interruttore delle modalita' teneva tutte e tre le parole. Qui si guarda che
+// la riga stia dentro a ogni larghezza e che la pillola dica ancora qualcosa.
+//
+// E che non ripeta l'ufficio: dentro l'ufficio il bottone dell'ufficio non serve,
+// e quello del contesto accende una colonna che qui e' spenta per scelta.
+t(
+  await page.locator('.top .brand-t').isHidden(),
+  "la testata ripete il nome della scheda accanto a quello dell'ufficio"
+);
+for (const b of ['#btnOffice', '#btnCtx']) {
+  t(
+    await page.locator('.top ' + b).isHidden(),
+    "la testata ripete un comando che l'ufficio ha gia': " + b
+  );
+}
+await post({ k: 'busy', value: true });
+const strette = [];
+for (const w of [1100, 1300, 1500, 1800]) {
+  await page.setViewportSize({ width: w, height: 940 });
+  await page.waitForTimeout(160);
+  const r = await page.evaluate(() => {
+    const top = document.querySelector('.top');
+    const pill = document.getElementById('activity');
+    const time = document.getElementById('actTime');
+    return {
+      overflow: top.scrollWidth - top.clientWidth,
+      pill: Math.round(pill.getBoundingClientRect().width),
+      clock: Math.round(time.getBoundingClientRect().width),
+    };
+  });
+  if (r.overflow > 1) strette.push(w + 'px: la testata sborda di ' + r.overflow);
+  if (r.pill < 110) strette.push(w + "px: la pillola si e' ridotta a " + r.pill + "px");
+  if (r.clock < 20) strette.push(w + "px: l'orologio e' stato schiacciato via");
+}
+await page.setViewportSize({ width: 1500, height: 940 });
+await post({ k: 'busy', value: false });
+await page.waitForTimeout(160);
+t(!strette.length, "la testata della chat non ci sta accanto all'ufficio: " + strette.join(' | '));
+
 await page.click('.office .of-back');
 await page.waitForTimeout(200);
 t(!(await inOffice()), "dall'ufficio non si torna alla chat");
@@ -302,19 +348,36 @@ t(
 t(!room.emptyShown, "l'ufficio dice di essere vuoto con quattro persone dentro");
 
 // ---- si ridipingono, e il posto resta il loro ----
-const before = await page.evaluate(() =>
-  [...document.querySelectorAll('.of-guy')].map((p) => p.style.left + ',' + p.style.top)
-);
+//
+// Chi e' in corridoio non ha una posizione da confrontare: la sua cambia da sola
+// a ogni tratto, e nel mezzo di una prova di due minuti prima o poi qualcuno al
+// bar c'e'. Quindi si guarda dov'e' chi e' seduto, e in piu' la mappa dei posti,
+// che sono gli schermi accesi: quella non dipende da chi in quel momento e' in
+// piedi, e se qualcuno cambiasse davvero scrivania cambierebbe anche lei.
+const posti = () =>
+  page.evaluate(() => ({
+    spots: [...document.querySelectorAll('.of-guy')].map((p) =>
+      p.classList.contains('fuori') ? 'fuori' : p.style.left + ',' + p.style.top
+    ),
+    banchi: [...document.querySelectorAll('.of-mon')].map((m) => (m.classList.contains('on') ? 1 : 0)).join(''),
+  }));
+/** Uguali se ogni persona seduta sta dov'era: chi cammina non si conta. */
+const stessiPosti = (a, b) =>
+  a.banchi === b.banchi &&
+  a.spots.length === b.spots.length &&
+  a.spots.every((s, i) => s === 'fuori' || b.spots[i] === 'fuori' || s === b.spots[i]);
+
+const before = await posti();
 await ctx(data(four.map((c) => card({ ...c, busy: false, pct: (c.pct + 5) % 100 }))));
 await page.waitForTimeout(200);
-const after = await page.evaluate(() => ({
-  spots: [...document.querySelectorAll('.of-guy')].map((p) => p.style.left + ',' + p.style.top),
-  stamps: [...document.querySelectorAll('.of-guy')].filter((p) => p.dataset.stamp === 'first').length,
-  working: document.querySelectorAll('.of-mon.working').length,
-}));
-t(after.stamps === 4, 'le persone vengono rifatte a ogni giro invece che ridipinte: ' + after.stamps);
-t(after.spots.join(' ') === before.join(' '), 'qualcuno ha cambiato scrivania senza motivo');
-t(!after.working, 'un monitor resta acceso dopo che ha smesso di lavorare');
+const after = await posti();
+const stamps = await page.evaluate(
+  () => [...document.querySelectorAll('.of-guy')].filter((p) => p.dataset.stamp === 'first').length
+);
+const working = await page.evaluate(() => document.querySelectorAll('.of-mon.working').length);
+t(stamps === 4, 'le persone vengono rifatte a ogni giro invece che ridipinte: ' + stamps);
+t(stessiPosti(before, after), 'qualcuno ha cambiato scrivania senza motivo');
+t(!working, 'un monitor resta acceso dopo che ha smesso di lavorare');
 
 // ---- cliccare una persona porta alla sua conversazione ----
 await page.locator('.of-guy').first().click();
@@ -322,20 +385,26 @@ const go = await lastSent();
 t(go?.cmd === 'focus' && go.id === 'a', "cliccare una persona non porta di la': " + JSON.stringify(go));
 
 // ---- chi se ne va libera la scrivania ----
-const spotOfB = await page.evaluate(() => {
-  const p = [...document.querySelectorAll('.of-guy')][1];
-  return p.style.left + ',' + p.style.top;
-});
+//
+// La mappa degli schermi accesi dice quali posti sono occupati. Se ne esce una e
+// ne entra un'altra la mappa deve restare identica: vuol dire che la nuova si e'
+// seduta dove sedeva quella andata via, invece di lasciare il buco e prendersi
+// una scrivania in fondo. Si guarda la mappa e non la posizione delle persone
+// perche' chi in quel momento e' al bar sta camminando, e la sua posizione
+// cambia da sola.
+const banchiPrima = (await posti()).banchi;
 await ctx(data([four[0], four[2], four[3], card({ id: 'e', name: 'Appena arrivata', recent: true })]));
 await page.waitForTimeout(200);
 const reseat = await page.evaluate(() => ({
   n: document.querySelectorAll('.of-guy').length,
   names: [...document.querySelectorAll('.of-name')].map((n) => n.textContent),
-  spots: [...document.querySelectorAll('.of-guy')].map((p) => p.style.left + ',' + p.style.top),
 }));
 t(reseat.n === 4, 'dopo il cambio le persone sono ' + reseat.n);
-t(!reseat.names.includes('Ha finito'), 'chi ha chiuso la conversazione e\' rimasto seduto');
-t(reseat.spots.includes(spotOfB), "la scrivania di chi se n'e' andato resta vuota per sempre");
+t(!reseat.names.includes("Ha finito"), "chi ha chiuso la conversazione e' rimasto seduto");
+t(
+  (await posti()).banchi === banchiPrima,
+  "la scrivania di chi se n'e' andato resta vuota per sempre"
+);
 
 // ---- piu' conversazioni che scrivanie ----
 await ctx(

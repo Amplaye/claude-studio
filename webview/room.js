@@ -561,6 +561,11 @@ window.ROOM = (() => {
   async function giro(chi, meta) {
     chi.fuori = true;
     chi.meta = meta;
+    // Detto anche addosso all'elemento, non solo dentro l'oggetto: da fuori —
+    // il foglio di stile, gli attrezzi del browser, i controlli — "e' in
+    // corridoio" e' una cosa che si vede, e la posizione di chi cammina non
+    // vuol dire niente finche' non e' tornato a sedersi.
+    chi.el.classList.add('fuori');
     vesti(chi.fig, chi.seme, 'cammina');
     if (await vai(chi, ...METE[meta])) {
       vesti(chi.fig, chi.seme, 'fermo');
@@ -577,6 +582,7 @@ window.ROOM = (() => {
     // il posto non sia piu' suo.
     if (chi.el.isConnected && chi.casa) await vai(chi, chi.casa.x + 8, chi.casa.y + 24, true);
     vesti(chi.fig, chi.seme, chi.posa);
+    chi.el.classList.remove('fuori');
     chi.fuori = false;
     chi.meta = null;
     chi.ultimo = Date.now();

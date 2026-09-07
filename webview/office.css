@@ -69,6 +69,37 @@ body.inoffice .rail {
   display: none;
 }
 
+/* Con l'ufficio aperto la testata della chat lascia cadere tre cose, e sono
+   tutte e tre roba che di la' c'e' gia' o che li' non fa piu' niente. La colonna
+   e' larga un terzo della scheda: quello che resta ha finalmente il posto per
+   scriversi per esteso invece di stringersi fino a tagliare le parole.
+
+   - la parola del marchio: la fascia dell'ufficio dice gia' in che scheda sei, e
+     due nomi a mezzo metro l'uno dall'altro sono due nomi per una cosa sola. Il
+     segno resta: e' l'appiglio a sinistra della colonna, e senza la testata
+     comincia con un buco;
+   - il bottone del contesto: la colonna del contesto qui e' spenta per scelta
+     (la stanza dice le stesse cose a figure), quindi era un interruttore
+     attaccato a niente;
+   - il bottone dell'ufficio: nell'ufficio ci sei gia', e la via d'uscita e' il
+     "Chat" della fascia, sessanta pixel piu' in la'. Torna appena esci. */
+body.inoffice .top .brand-t,
+body.inoffice .top #btnCtx,
+body.inoffice .top #btnOffice {
+  display: none;
+}
+/* Quello che Claude sta facendo passa a sinistra, subito dopo il segno: e' la
+   riga che cambia da sola mentre guardi la stanza, e in fondo a destra fra i
+   bottoni si stringeva fino a mostrare solo l'orologio. Il segno tiene la testa
+   della fila — l'ordine si scrive tutto, se no basta che la pillola passi
+   davanti e il marchio finisce in mezzo. */
+body.inoffice .top .brand {
+  order: -2;
+}
+body.inoffice .top .activity {
+  order: -1;
+}
+
 /* Scheda stretta: non c'e' spazio per due colonne, e spezzare la chat a 200
    pixel non aiuta nessuno. L'ufficio si prende tutto, come faceva prima. */
 @media (max-width: 1000px) {
@@ -91,7 +122,10 @@ body.inoffice .rail {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: var(--surface);
+  /* Lo stesso fondo della testata della chat, non il piatto `--surface`: le due
+     fasce sono appaiate e con due tinte diverse si vedeva la giuntura come una
+     macchia, invece che come la riga che divide due colonne. */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 92%, var(--claude-1)) 0%, var(--surface) 100%);
   border-bottom: 1px solid var(--line);
 }
 .of-bar > * {
@@ -188,7 +222,10 @@ body.inoffice .rail {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 11px;
+  /* Alto come i bottoni della testata accanto: e' l'unica cosa delle due fasce
+     che si trova in fila con qualcos'altro, e tre pixel di scarto si vedono. */
+  height: var(--ctl);
+  padding: 0 11px;
   border: 1px solid var(--line);
   border-radius: var(--pill);
   background: transparent;

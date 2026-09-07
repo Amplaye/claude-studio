@@ -156,16 +156,26 @@ body.wide .composer {
    there's no room for a name and a state at the same time. While it's working the
    wordmark folds away — the sparkle stays, so the panel is still recognisably
    ours — and comes straight back the moment the turn ends. The wide tab has room
-   for both and keeps both. */
-body:not(.wide) .top.busy .brand {
+   for both and keeps both.
+
+   `body.inoffice` is the second narrow header, and it arrived after these rules
+   were written: in the office face the tab is wide but the chat column isn't — it
+   is 340 to 520px, the same band as the sidebar. The condition these three rules
+   are really about is "narrow header, and it's working", and `:not(.wide)` was
+   only ever a stand-in for it. Under 456px the container queries below take over
+   on their own, because there the container really is this column. */
+body:not(.wide) .top.busy .brand,
+body.inoffice .top.busy .brand {
   display: none;
 }
 /* and the pill closes up its own spacing to earn the last few characters */
-body:not(.wide) .top.busy .activity {
+body:not(.wide) .top.busy .activity,
+body.inoffice .top.busy .activity {
   gap: 6px;
   padding: 0 9px;
 }
-body:not(.wide) .top.busy .grow {
+body:not(.wide) .top.busy .grow,
+body.inoffice .top.busy .grow {
   flex: 0 1 auto;
 }
 /* And the two modes you're *not* in keep their icon and drop their word. The mode
@@ -173,7 +183,8 @@ body:not(.wide) .top.busy .grow {
    two are still there, still clickable, still in the same order. Between a switch
    that says everything three times and knowing what Claude is doing right now, in
    a 460px sidebar, the second one wins. */
-body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
+body:not(.wide) .top.busy .modeseg-btn:not(.on) span,
+body.inoffice .top.busy .modeseg-btn:not(.on) span {
   display: none;
 }
 
