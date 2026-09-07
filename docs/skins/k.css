@@ -1,32 +1,153 @@
 /* ============================================================
-     1 — KENNEY, RIVESTITO BALIFLOW   (quello che c'e' adesso)
+     1 — LA TERRAZZA, IN PIXEL ART   (la stessa stanza della 7)
      ============================================================ */
-  .k .pane { background: var(--o700); }
-  .k .floor {
-    background-color: #b8c6a9;
-    background-image:
-      radial-gradient(circle at 0 0, rgba(255,255,255,.22) 1.4px, transparent 1.5px),
-      linear-gradient(rgba(51,61,44,.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(51,61,44,.07) 1px, transparent 1px),
-      linear-gradient(160deg, #a9b998, #b8c6a9);
-    background-size: 32px 32px, 16px 16px, 16px 16px, 100% 100%;
+
+  /* Stessi materiali della pelle `b`, e quindi gli stessi colori: cambia come
+     sono messi giu', non di che cosa sono fatti. In piu' servono i toni di
+     scarto (`-jo` la fuga, `-hi` il pixel che prende luce) perche' a pixel un
+     passaggio si fa con due righe di colore pieno, non con una sfumatura. */
+  .k .pane {
+    --teak: #a4714a; --teak-hi: #c69061; --teak-lo: #7c5230;
+    --stone: #f2e8d4; --stone-hi: #fffaf0; --stone-lo: #d9c5a3; --stone-jo: #bda57e;
+    --pave: #c1b294; --pave-hi: #d5c8ac; --pave-jo: #998b70;
+    --wood: #63421f;
+    --shade: rgba(38,24,10,.5);
+    /* Il giardino attorno alla terrazza: a scale(2) la pianta riempie la
+       vetrina esatta, quindi questo verde si vede solo se qualcuno cambia
+       l'ingrandimento. Resta scritto per quel caso. */
+    background: #1b2a14;
   }
-  .k .stage { outline: 2px solid var(--o900); }
-  .k .wall { background: var(--s5); box-shadow: inset 0 -2px 0 var(--s1), 0 2px 3px -1px rgba(0,0,0,.35); }
+
+  /* Due, e non 1.8 come nella 7: e' l'unico fattore che non sfoca un pixel.
+     Il prezzo e' che il giardino esce fuori dalla vetrina. */
+  .k .stage { transform: scale(2); }
+
+  /* Doghe di teak, tutte nello stesso verso. Le venature stanno su periodi
+     dispari e primi fra loro perche' il disegno non si richiuda ogni sedici
+     insieme alle fughe: se no l'occhio trova la riga e la insegue. */
+  .k .floor {
+    background-color: var(--teak);
+    background-image:
+      /* la fuga fra due doghe: un pixel d'ombra e sotto il pixel che prende sole */
+      repeating-linear-gradient(180deg, var(--teak-lo) 0 1px, var(--teak-hi) 1px 2px, transparent 2px 16px),
+      repeating-linear-gradient(180deg, rgba(255,228,186,.09) 0 1px, transparent 1px 7px),
+      repeating-linear-gradient(180deg, rgba(60,34,12,.09) 0 1px, transparent 1px 11px),
+      /* Il sole da nord-ovest, a due scalini piatti. Una macchia tonda si
+         legge come una macchia: qui la luce entra dritta dall'angolo, che a
+         stop netti e' l'unica forma che non lascia un alone in mezzo al
+         pavimento. */
+      linear-gradient(135deg, rgba(255,232,176,.10) 0 9%, rgba(255,232,176,.05) 9% 20%, transparent 20%);
+  }
+
+  /* Le tre stanze in alto sono lastricate, il legno resta dove si lavora: il
+     muro di riga 7 cade esatto sul cambio di materiale, 8 caselle da 16. */
+  .k .floor::after {
+    content: ""; position: absolute; left: 0; top: 0; right: 0; height: 128px;
+    background-color: var(--pave);
+    background-image:
+      /* la fuga fra le lastre e' un pixel scuro; il pixel dopo e' quello che
+         guarda il sole, ed e' tutto il rilievo che una lastra ha bisogno */
+      repeating-linear-gradient(90deg, var(--pave-jo) 0 1px, var(--pave-hi) 1px 2px, transparent 2px 32px),
+      repeating-linear-gradient(180deg, var(--pave-jo) 0 1px, var(--pave-hi) 1px 2px, transparent 2px 32px),
+      /* grana: un quadretto di due pixel. Il retino e' il modo pixel di avere
+         mezzo tono senza sfumare niente. */
+      conic-gradient(rgba(255,255,255,.05) 0 25%, transparent 0 50%, rgba(255,255,255,.05) 0 75%, transparent 0),
+      linear-gradient(135deg, rgba(255,232,176,.13) 0 14%, rgba(255,232,176,.06) 14% 30%, transparent 30%);
+    background-size: auto, auto, 4px 4px, auto;
+    /* lo scalino dove la pietra finisce: due righe piene, non una sfumatura */
+    box-shadow: inset 0 -1px 0 var(--pave-jo), inset 0 -2px 0 rgba(60,40,20,.14);
+  }
+
+  /* Muretti bassi di pietra chiara. Il sole sta a nord-ovest per tutti: spigolo
+     illuminato in alto a sinistra, spessore in ombra in basso a destra, e
+     l'ombra per terra sono due gradini pieni invece di una sfocatura. */
+  .k .wall {
+    background-color: var(--stone);
+    background-image:
+      repeating-linear-gradient(180deg, var(--stone-jo) 0 1px, var(--stone-hi) 1px 2px, transparent 2px 8px),
+      repeating-linear-gradient(90deg, var(--stone-jo) 0 1px, transparent 1px 16px),
+      conic-gradient(rgba(140,110,70,.07) 0 25%, transparent 0 50%, rgba(140,110,70,.07) 0 75%, transparent 0);
+    background-size: auto, auto, 4px 4px;
+    box-shadow:
+      inset 1px 1px 0 var(--stone-hi),
+      inset -1px -1px 0 var(--stone-lo),
+      2px 2px 0 rgba(38,24,10,.42),
+      4px 4px 0 rgba(38,24,10,.20);
+  }
+
+  /* I mobili restano gli sprite di Kenney: sono gia' pixel art, e sono gia'
+     nella famiglia di tinte del teak e del rattan. */
   .k .prop i, .k .desk i, .k .stool {
     background-image: url("../../webview/sprites-room.png");
     background-repeat: no-repeat; image-rendering: pixelated;
   }
   .k .desk { width: 32px; height: 16px; }
-  .k .stool { width: 16px; height: 16px; }
-  .k .mon { width: 14px; height: 11px; margin-left: 1px; border: 2px solid var(--o900);
-            border-radius: 1px; background: #46503f; }
-  .k .mon.on { background: #6d7a5f; }
-  .k .mon.busy { background: linear-gradient(180deg, var(--t300), var(--t500));
-                 box-shadow: 0 0 7px rgba(244,85,23,.75); }
-  .k .guy { width: 16px; height: 16px; }
-  .k .fig { position: absolute; inset: 0; filter: drop-shadow(0 2px 0 rgba(0,0,0,.22)); }
-  .k .fig i { position: absolute; inset: 0; width: 16px; height: 16px; float: none;
-              background-image: url("../../webview/sprites-folk.png");
-              background-repeat: no-repeat; image-rendering: pixelated; }
-  .k .plate { border: 1px solid var(--o900); background: var(--s5); color: var(--o800); }
+  .k .stool { width: 16px; height: 16px; margin-top: -.8px; }
+
+  /* Il legno sul legno sparisce: e' l'ombra a staccare un mobile dal pavimento,
+     e a pixel l'ombra e' una copia spostata di due, senza sfocatura. La stuoia
+     e' l'unica cosa appoggiata per terra, e non ne ha una. */
+  .k .prop:not([data-k=rug]), .k .desk, .k .stool {
+    filter: drop-shadow(2px 2px 0 var(--shade));
+  }
+
+  /* Le piante di Kenney stanno in una casella; nella 7 debordano, ed e' proprio
+     quello che le fa sembrare piante invece che pedine. L'unico ingrandimento
+     che non sfoca un pixel e' per due: 16 diventa 32, centrato sulla casella,
+     8 pixel di sbordo per lato. */
+  .k .prop[data-k=plant] { overflow: visible; z-index: 3; }
+  .k .prop[data-k=plant] i { transform: scale(2); }
+
+  /* I vasi di Kenney sono azzurri, e l'azzurro qui dentro non esiste: nella 7
+     una pianta e' solo foglia. Sepia schiaccia tutto su un'unica tinta calda e
+     la rotazione la porta sul verde oliva: restano i chiari e gli scuri del
+     pixel, sparisce il colore che non c'entra. */
+  .k .prop[data-k=plant] i, .k .prop[data-k=green] i {
+    filter: sepia(1) saturate(2.2) hue-rotate(50deg) brightness(.88);
+  }
+
+  .k .mon {
+    width: 14px; height: 9px; margin: 1.2px 0 0 1px;
+    background: #2a3125;
+    box-shadow: inset 0 0 0 1px #161c11, 0 2px 0 rgba(30,18,8,.45);
+  }
+  /* Uno schermo acceso a pixel sono tre fasce piene, non un gradiente. */
+  .k .mon.on {
+    background: linear-gradient(180deg, var(--o200) 0 3px, var(--o400) 3px 6px, var(--o600) 6px);
+  }
+  /* Quella che lavora adesso: il bagliore e' un anello netto attorno al vetro. */
+  .k .mon.busy {
+    background: linear-gradient(180deg, var(--t200) 0 3px, var(--t400) 3px 6px, var(--t600) 6px);
+    box-shadow: 0 0 0 1px var(--t500), 0 0 0 2px rgba(244,85,23,.35), 0 2px 0 rgba(30,18,8,.45);
+  }
+
+  /* La pagina posiziona la gente a 1.1 caselle e lo sgabello a 1.8: numeri con
+     la virgola, che a pixel fanno ondeggiare tutto. Qui si riportano sul pixel
+     intero. */
+  .k .guy { width: 16px; height: 16px; margin-top: -1.6px; }
+
+  /* La persona la disegna il generatore, in pixel art: 16 di larghezza per 24
+     di altezza, i piedi in fondo alla casella e la testa che sborda in alto
+     sul bordo della scrivania, come chi e' seduto al suo posto. I quattro pixel
+     di scarto tengono la capigliatura sotto il monitor invece che dietro: e'
+     dall'altra parte del piano, e il generatore le pettinature le cambia. */
+  .k .fig {
+    position: absolute; left: 0; bottom: -4px; width: 16px; height: 24px;
+    /* Il ripiego a fasce serve solo se il generatore non ha ancora risposto:
+       meglio un impiegato squadrato che otto scrivanie vuote. */
+    background: var(--npc, linear-gradient(180deg, transparent 0 5px, #33261a 5px 8px,
+                #dcb187 8px 13px, var(--shirt) 13px 24px)) center bottom / contain no-repeat;
+    image-rendering: pixelated;
+    filter: drop-shadow(2px 2px 0 rgba(34,20,8,.42));
+  }
+  .k .fig i { display: none; }
+
+  /* Cartellino: carta chiara, cornice di teak spessa un pixel, ombra a gradino.
+     Niente angoli arrotondati — a pixel un angolo o e' pieno o non c'e'. */
+  .k .plate {
+    border-radius: 0;
+    background: var(--stone);
+    color: #3a2917;
+    box-shadow: inset 0 0 0 1px var(--wood), 2px 2px 0 rgba(30,18,8,.5);
+  }
+  .k .plate s, .k .plate s i { border-radius: 0; }

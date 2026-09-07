@@ -71,6 +71,11 @@
 </p>
 <div class="grid" id="grid"></div>
 
+<!-- Gli impiegati. Non sono piu' tre caselle di un foglio di sprite: nascono da
+     un seme, e lo stesso seme rida' sempre la stessa persona. Il generatore li
+     disegna in due modi — pixel art e vettoriale — e ogni pelle si prende quello
+     che le somiglia. -->
+<script src="skins/npc.js"></script>
 <script>
 const TILE = 16, COLS = 24, ROWS = 20, STEP = 17;
 
@@ -148,8 +153,8 @@ const FOLK = [
 const barColor = (p) => (p >= 80 ? '#cf222e' : p >= 60 ? '#e3b341' : '#4c9a2a');
 
 const SKINS = [
-  {cls:'k', title:'1 — Kenney, rivestito BaliFlow',
-   note:"Gli sprite di adesso con la tinta nuova: e' esattamente quello che hai gia' in mano. Zero lavoro, zero rischio."},
+  {cls:'k', title:'1 — La terrazza, in pixel art',
+   note:"La stessa stanza della 7 — teak, pietra, rattan, verde — ma disegnata a pixel invece che sfumata. Mobili di Kenney, tutto il resto a stop netti: e' l'altra resa della stessa idea, non un'altra idea."},
   {cls:'f', title:'2 — Vettoriale piatto',
    note:"Via il foglio di sprite: i mobili sono disegnati in CSS. Nitido a ogni ingrandimento, colore tutto tuo, stessa faccia del CRM. In cambio si perde il dettaglio del pixel art."},
   {cls:'i', title:'3 — Isometrico 2.5D',
@@ -160,8 +165,8 @@ const SKINS = [
    note:"L'ufficio di notte: la stanza si spegne e restano accesi i monitor. Sta dentro un editor scuro senza fare da faro."},
   {cls:'c', title:'6 — Carta ritagliata',
    note:"Fogli di carta sovrapposti, ombre morbide, bordi tagliati. Caldo, tattile, la cosa piu' vicina alla sabbia del CRM."},
-  {cls:'b', title:'7 — Terrazza balinese',
-   note:"Il nome preso alla lettera: teak, rattan, pietra e verde. La marca del CRM come stanza, non come palette."},
+  {cls:'b', title:'7 — La terrazza, in vettoriale',
+   note:"Il nome del CRM preso alla lettera: teak, pietra, rattan e verde, disegnati morbidi. Stessa stanza della 1, resa diversa."},
   {cls:'g', title:'8 — Geometrico',
    note:"Blocchi di colore pieni, niente contorni, niente ombre. Il minimo che sappia ancora dire dov'e' una scrivania."},
 ];
@@ -213,6 +218,13 @@ function stage() {
     const fig = el('div', 'fig');
     fig.style.setProperty('--shirt', p.sh);
     fig.dataset.i = p.name.charAt(0);
+    // Il ritratto arriva come immagine di fondo, nelle due rese: la pelle sceglie
+    // quale usare (`var(--npc)` per il pixel, `var(--npc-v)` per il vettoriale) e
+    // quelle che disegnano la gente per conto loro le ignorano tutte e due.
+    if (window.NPC) {
+      fig.style.setProperty('--npc', 'url("' + window.NPC.sprite(p.name) + '")');
+      fig.style.setProperty('--npc-v', 'url("' + window.NPC.vector(p.name) + '")');
+    }
     const f = FOLK[i];
     for (const xy of [f.b, f.s, f.h]) {
       const l = el('i');
