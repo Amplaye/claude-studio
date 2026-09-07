@@ -1667,6 +1667,16 @@
         break;
       case 'ctx':
         rail.render(m.d);
+        // Stessi dati, seconda faccia: la colonna dice quanto contesto resta a
+        // ognuna, l'ufficio dice chi c'e' e chi sta lavorando. Si ridipinge anche
+        // da spento — quando la scheda torna sull'ufficio la stanza e' gia'
+        // giusta, invece di essere ferma al giro prima per un secondo e mezzo.
+        if (window.OFFICE) window.OFFICE.render(m.d);
+        break;
+      // "Claude Studio: L'ufficio" da fuori: dal comando o dalla testata della
+      // barra laterale. Apre la scheda e la mette subito sulla faccia giusta.
+      case 'view':
+        showOffice(m.value === 'office');
         break;
       // I passi stanno nella stessa colonna, sotto l'ultima card: arrivano a parte
       // perche' cambiano al ritmo di Claude, non a quello dei consumi.
@@ -2724,7 +2734,30 @@
   }
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
-  $('btnOffice').addEventListener('click', () => vscode.postMessage({ cmd: 'office' }));
+  // ---------- l'ufficio ----------
+  //
+  // Non e' piu' una scheda a parte: e' l'altra faccia di questa, e il bottone la
+  // gira. Una scheda sola vuol dire una conversazione sola da tenere dietro —
+  // e vuol dire che dall'ufficio si torna dove si stava, non in una finestra
+  // nuova da richiudere.
+  function showOffice(on) {
+    if (on && window.OFFICE) {
+      window.OFFICE.mount($('office'), (m) => {
+        // La sola cosa che l'ufficio sa dire alla pagina invece che
+        // all'estensione: "riportami alla chat".
+        if (m.cmd === 'view') return showOffice(false);
+        vscode.postMessage(m);
+      });
+    }
+    document.body.classList.toggle('inoffice', !!on);
+    $('btnOffice').classList.toggle('on', !!on);
+    // Acceso mentre era spento non aveva misure: il piano si adatta ora che ce le ha.
+    if (on && window.OFFICE) window.OFFICE.resize();
+  }
+
+  $('btnOffice').addEventListener('click', () =>
+    showOffice(!document.body.classList.contains('inoffice'))
+  );
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   // ---------- opening and closing the tab ----------

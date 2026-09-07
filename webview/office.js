@@ -1,28 +1,39 @@
 /* Claude Studio — L'ufficio.
  *
- * Una scheda a tutto schermo con la pianta di un ufficio visto dall'alto, e dentro
- * una persona per ogni conversazione aperta: seduta alla sua scrivania, che batte a
- * macchina mentre Claude lavora, in piedi con la spunta verde quando ha finito,
- * sbiadita quando e' ferma da un pezzo.
+ * La pianta di un ufficio vista dall'alto, e dentro una persona per ogni
+ * conversazione aperta: seduta alla sua scrivania, che batte a macchina mentre
+ * Claude lavora, con la spunta verde quando ha finito, sbiadita quando e' ferma
+ * da un pezzo.
  *
- * E' la stessa roba del pannello del contesto — stesse sessioni, stesso filo
- * (`CtxWire`/`CtxCmd`), stesso "clicca e ci vai" — detta nell'unico modo che non
- * chiede di leggere niente. Il pannello risponde a "quanto contesto le resta"; questa
- * risponde a "chi c'e' e chi sta lavorando" dall'altra parte della stanza.
+ * E' la stessa roba del pannello del contesto — stesse sessioni, stesso filo,
+ * stesso "clicca e ci vai" — detta nell'unico modo che non chiede di leggere
+ * niente. Il pannello risponde a "quanto contesto le resta"; questa risponde a
+ * "chi c'e' e chi sta lavorando" dall'altra parte della stanza.
  *
- * Due regole di casa, le stesse delle altre due facce:
+ * I mobili e le persone sono sprite di Kenney (kenney.nl, CC0): due fogli da
+ * 16 pixel, `sprites-room.png` e `sprites-folk.png`. Pavimento e muri no —
+ * quelli sono due gradienti CSS, perche' un pavimento a mattonelle e' una
+ * ripetizione e ripeterla e' quello che il CSS sa fare senza chiedere immagini.
+ *
+ * Tre regole di casa:
  *   - niente innerHTML con dei dati: tutto passa da textContent;
  *   - si costruisce una volta e poi si ridipinge. Rifare i nodi a ogni giro
  *     ammazzerebbe le transizioni, e la camminata verso la scrivania nuova non
- *     partirebbe mai.
+ *     partirebbe mai;
+ *   - la pianta sta qui sotto come dati in unita' di mattonella, non come CSS.
+ *     Spostare una scrivania e' cambiare due numeri.
  *
- * La pianta sta qui sotto come dati, non come CSS: stanze e mobili sono rettangoli
- * con un nome, e il foglio di stile sa disegnare un rettangolo per tipo. Spostare una
- * scrivania e' cambiare due numeri, non riscrivere un selettore.
+ * Non chiama acquireVsCodeApi: vive dentro la pagina della chat, che l'ha gia'
+ * chiamata lei (una volta sola per pagina, e' l'unica che se ne puo' prendere).
+ * Il filo glielo passa chi lo monta.
  */
-(() => {
-  const vscode = acquireVsCodeApi();
-  const SVG = 'http://www.w3.org/2000/svg';
+window.OFFICE = (() => {
+  const TILE = 16;
+  /** Il passo del foglio: 16 di disegno piu' 1 di margine fra una casella e l'altra. */
+  const STEP = 17;
+  const COLS = 44;
+  const ROWS = 27;
+
   const t = (key, vars) => window.I18N.t(key, vars);
 
   const el = (tag, cls, text) => {
@@ -32,188 +43,463 @@
     return e;
   };
 
-  function icon(name, cls) {
-    const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('class', cls ? 'ico ' + cls : 'ico');
-    const use = document.createElementNS(SVG, 'use');
-    use.setAttribute('href', '#ion-' + name);
-    svg.appendChild(use);
-    return svg;
-  }
+  // ---------- il foglio degli sprite ----------
+  //
+  // [colonna, riga] dentro sprites-room.png. I nomi sono quello che la casella
+  // sembra qui, non quello che era nel pacchetto di Kenney: la cucina di una
+  // locanda vista dall'alto e' una scrivania, e la stufa e' la fotocopiatrice.
+  const T = {
+    deskL: [0, 17],
+    deskR: [2, 17],
+    runL: [9, 17],
+    runM: [10, 17],
+    runR: [11, 17],
+    tableTL: [0, 0],
+    tableTM: [1, 0],
+    tableTR: [2, 0],
+    tableBL: [0, 1],
+    tableBM: [1, 1],
+    tableBR: [2, 1],
+    stool: [0, 2],
+    chairUp: [1, 2],
+    chairL: [2, 2],
+    chairR: [3, 2],
+    plantA: [16, 0],
+    plantB: [17, 0],
+    copier: [14, 16],
+    fridgeT: [11, 15],
+    fridgeB: [11, 16],
+    counterL: [8, 15],
+    counterM: [9, 15],
+    counterR: [10, 15],
+    sinkT: [8, 12],
+    sinkB: [8, 13],
+    shelfA: [16, 17],
+    shelfB: [17, 17],
+    shelfC: [18, 17],
+    greenA: [16, 16],
+    greenB: [17, 16],
+    boardL: [19, 12],
+    boardM: [20, 12],
+    boardR: [21, 12],
+    picA: [16, 12],
+    picB: [17, 12],
+    picC: [18, 12],
+    sofaL: [0, 9],
+    sofaM: [1, 9],
+    sofaR: [2, 9],
+    rugL: [19, 10],
+    rugR: [20, 10],
+    rackT: [25, 8],
+    rackB: [25, 9],
+    printT: [23, 8],
+    printB: [23, 9],
+    binA: [22, 4],
+    binB: [22, 5],
+  };
 
-  /** Mette un rettangolo sul pavimento: tutta la pianta e' fatta di questi. */
-  function box(node, x, y, w, h) {
-    node.style.left = x + 'px';
-    node.style.top = y + 'px';
-    if (w != null) node.style.width = w + 'px';
-    if (h != null) node.style.height = h + 'px';
-    return node;
-  }
-
-  // ---------- la pianta ----------
-  // Il piano e' grande cosi' e non cambia mai: si rimpicciolisce tutto insieme per
-  // stare nella scheda (vedi fit), cosi' la stanza e' la stessa su un portatile e su
-  // un monitor grande, invece di riorganizzarsi sotto gli occhi a ogni trascinamento.
-  const STAGE = { w: 1320, h: 820 };
-
-  const ROOMS = [
-    { k: 'reception', x: 36, y: 36, w: 300, h: 200 },
-    { k: 'accounting', x: 36, y: 268, w: 300, h: 300 },
-    { k: 'annex', x: 36, y: 600, w: 300, h: 184 },
-    { k: 'conference', x: 960, y: 36, w: 324, h: 268, glass: true },
-    { k: 'boss', x: 960, y: 336, w: 324, h: 232, glass: true },
-    { k: 'kitchen', x: 960, y: 600, w: 324, h: 184 },
+  /**
+   * Le persone si montano a strati, che e' come il pacchetto di Kenney e' fatto:
+   * corpo, maglietta, capelli, tutti allineati sulla stessa casella da 16. Otto
+   * magliette e otto teste bastano a non vedere due volte la stessa persona in
+   * una stanza — e la scelta la fa l'id della conversazione, quindi la stessa
+   * conversazione ritrova sempre la sua faccia.
+   */
+  const BODY = [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+    [1, 0],
+    [1, 1],
+    [1, 2],
+  ];
+  const SHIRT = [
+    [10, 0],
+    [14, 0],
+    [10, 4],
+    [6, 0],
+    [10, 5],
+    [14, 5],
+    [6, 5],
+    [12, 4],
+  ];
+  const HAIR = [
+    [3, 0],
+    [3, 1],
+    [3, 2],
+    [3, 3],
+    [3, 5],
+    [3, 6],
+    [3, 7],
+    [3, 8],
   ];
 
-  // I mobili che non hanno nessuno seduto: fanno la differenza fra una pianta e un
-  // ufficio. Il tipo dice al foglio di stile come disegnarli.
+  /** Somma dei caratteri: basta a spargere, e la stessa id da' sempre lo stesso. */
+  function hash(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h;
+  }
+
+  /**
+   * Una scelta dall'elenco, diversa per ogni strato.
+   *
+   * Il sale rimescola prima di prendere il resto: con un semplice `h >> 3` due
+   * conversazioni con l'id vicino finivano sulla stessa maglietta, e mezzo
+   * ufficio si vestiva uguale.
+   */
+  function pick(list, h, salt) {
+    const m = Math.imul(h ^ Math.imul(salt, 0x9e3779b1), 0x85ebca6b) >>> 0;
+    return list[(m >>> 13) % list.length];
+  }
+
+  // ---------- la pianta, in mattonelle ----------
+  //
+  // I muri sono bande color panna: `{c, r, w, h}` in mattonelle. I vani delle
+  // porte non sono un tipo a parte — sono il pezzo di muro che non c'e'.
+  const WALLS = [
+    // il muro esterno
+    { c: 0, r: 0, w: COLS, h: 1 },
+    { c: 0, r: ROWS - 1, w: COLS, h: 1 },
+    { c: 0, r: 0, w: 1, h: ROWS },
+    { c: COLS - 1, r: 0, w: 1, h: ROWS },
+
+    // ufficio del capo, in alto a sinistra. Il buco fra i due pezzi e' la porta.
+    { c: 10, r: 1, w: 1, h: 3 },
+    { c: 10, r: 6, w: 1, h: 3 },
+    { c: 1, r: 8, w: 9, h: 1 },
+
+    // sala riunioni, in alto al centro
+    { c: 24, r: 1, w: 1, h: 3 },
+    { c: 24, r: 6, w: 1, h: 3 },
+    { c: 11, r: 8, w: 13, h: 1 },
+
+    // il salone in alto a destra da' sul corridoio: due pezzi di muro e in mezzo
+    // il passaggio, che e' come si esce di la'
+    { c: 25, r: 8, w: 6, h: 1 },
+    { c: 36, r: 8, w: 7, h: 1 },
+
+    // le due stanze a destra: magazzino sopra, cucina sotto
+    { c: 32, r: 11, w: 11, h: 1 },
+    { c: 31, r: 11, w: 1, h: 3 },
+    { c: 31, r: 16, w: 1, h: 4 },
+    { c: 32, r: 19, w: 11, h: 1 },
+    { c: 31, r: 22, w: 1, h: 4 },
+  ];
+
+  /** I mobili che non hanno nessuno seduto: fanno la differenza fra una pianta e un ufficio. */
   const PROPS = [
-    { t: 'table oval', x: 1010, y: 96, w: 224, h: 130 },
-    { t: 'table', x: 1010, y: 676, w: 224, h: 84 },
-    { t: 'counter', x: 1000, y: 634, w: 244, h: 26 },
-    { t: 'cabinet', x: 60, y: 620, w: 60, h: 140 },
-    { t: 'cabinet', x: 140, y: 620, w: 60, h: 140 },
-    { t: 'copier', x: 240, y: 630, w: 76, h: 96 },
-    { t: 'cooler', x: 928, y: 320, w: 32, h: 32 },
-    { t: 'plant', x: 348, y: 56, w: 40, h: 40 },
-    { t: 'plant', x: 348, y: 740, w: 40, h: 40 },
-    { t: 'plant', x: 906, y: 740, w: 40, h: 40 },
-    { t: 'plant', x: 296, y: 244, w: 40, h: 40 },
-    { t: 'sofa', x: 196, y: 48, w: 124, h: 40 },
-    // Le sedie intorno al tavolo della sala riunioni: un tavolo senza sedie e' un
-    // tavolo in un magazzino.
-    { t: 'seat', x: 1237, y: 148, w: 26, h: 26 },
-    { t: 'seat', x: 1173, y: 219, w: 26, h: 26 },
-    { t: 'seat', x: 1045, y: 219, w: 26, h: 26 },
-    { t: 'seat', x: 981, y: 148, w: 26, h: 26 },
-    { t: 'seat', x: 1045, y: 77, w: 26, h: 26 },
-    { t: 'seat', x: 1173, y: 77, w: 26, h: 26 },
-    // Le finestre stanno sul muro in alto, e la luce che entra cade sul salone.
-    { t: 'window', x: 392, y: 3, w: 516, h: 9 },
+    // --- ufficio del capo ---
+    { s: 'boardL', c: 3, r: 1 },
+    { s: 'boardM', c: 4, r: 1 },
+    { s: 'boardR', c: 5, r: 1 },
+    { s: 'plantA', c: 8, r: 1 },
+    { s: 'sofaL', c: 1, r: 6 },
+    { s: 'sofaM', c: 2, r: 6 },
+    { s: 'sofaR', c: 3, r: 6 },
+    { s: 'binA', c: 8, r: 6 },
+
+    // --- sala riunioni: il tavolo lungo e le sedie intorno ---
+    { s: 'tableTL', c: 14, r: 3 },
+    { s: 'tableTM', c: 15, r: 3 },
+    { s: 'tableTM', c: 16, r: 3 },
+    { s: 'tableTM', c: 17, r: 3 },
+    { s: 'tableTM', c: 18, r: 3 },
+    { s: 'tableTR', c: 19, r: 3 },
+    { s: 'tableBL', c: 14, r: 4 },
+    { s: 'tableBM', c: 15, r: 4 },
+    { s: 'tableBM', c: 16, r: 4 },
+    { s: 'tableBM', c: 17, r: 4 },
+    { s: 'tableBM', c: 18, r: 4 },
+    { s: 'tableBR', c: 19, r: 4 },
+    { s: 'chairUp', c: 15, r: 2 },
+    { s: 'chairUp', c: 17, r: 2 },
+    { s: 'chairUp', c: 19, r: 2 },
+    { s: 'stool', c: 15, r: 5 },
+    { s: 'stool', c: 17, r: 5 },
+    { s: 'stool', c: 19, r: 5 },
+    { s: 'chairL', c: 13, r: 3 },
+    { s: 'chairR', c: 20, r: 3 },
+    { s: 'boardL', c: 15, r: 1 },
+    { s: 'boardM', c: 16, r: 1 },
+    { s: 'boardR', c: 17, r: 1 },
+    { s: 'plantB', c: 22, r: 1 },
+    { s: 'plantA', c: 11, r: 6 },
+    { s: 'rugL', c: 16, r: 6 },
+    { s: 'rugR', c: 17, r: 6 },
+
+    // --- il salone in alto a destra ---
+    { s: 'picA', c: 26, r: 1 },
+    { s: 'picB', c: 27, r: 1 },
+    { s: 'picC', c: 28, r: 1 },
+    { s: 'plantA', c: 41, r: 1 },
+    { s: 'plantB', c: 25, r: 6 },
+    { s: 'binB', c: 41, r: 6 },
+
+    // --- magazzino / stampanti, a destra in alto ---
+    { s: 'printT', c: 33, r: 13 },
+    { s: 'printB', c: 33, r: 14 },
+    { s: 'rackT', c: 35, r: 13 },
+    { s: 'rackB', c: 35, r: 14 },
+    { s: 'rackT', c: 36, r: 13 },
+    { s: 'rackB', c: 36, r: 14 },
+    { s: 'shelfA', c: 39, r: 13 },
+    { s: 'shelfB', c: 40, r: 13 },
+    { s: 'shelfC', c: 41, r: 13 },
+    { s: 'copier', c: 33, r: 17 },
+    { s: 'copier', c: 35, r: 17 },
+    { s: 'greenA', c: 39, r: 17 },
+    { s: 'greenB', c: 40, r: 17 },
+
+    // --- cucina, a destra in basso ---
+    { s: 'counterL', c: 33, r: 21 },
+    { s: 'counterM', c: 34, r: 21 },
+    { s: 'counterM', c: 35, r: 21 },
+    { s: 'counterR', c: 36, r: 21 },
+    { s: 'sinkT', c: 38, r: 21 },
+    { s: 'fridgeT', c: 41, r: 21 },
+    { s: 'fridgeB', c: 41, r: 22 },
+    { s: 'tableTL', c: 34, r: 24 },
+    { s: 'tableTM', c: 35, r: 24 },
+    { s: 'tableTR', c: 36, r: 24 },
+    { s: 'stool', c: 34, r: 25 },
+    { s: 'stool', c: 36, r: 25 },
+    { s: 'chairUp', c: 35, r: 23 },
+    { s: 'plantA', c: 41, r: 25 },
+
+    // --- il salone in basso: l'angolo dove ci si ferma, e le piante ai capi ---
+    { s: 'sofaL', c: 2, r: 24 },
+    { s: 'sofaM', c: 3, r: 24 },
+    { s: 'sofaR', c: 4, r: 24 },
+    { s: 'rugL', c: 6, r: 24 },
+    { s: 'rugR', c: 7, r: 24 },
+    { s: 'plantA', c: 1, r: 24 },
+    { s: 'plantB', c: 9, r: 24 },
+    { s: 'plantA', c: 29, r: 12 },
+    { s: 'plantB', c: 29, r: 24 },
+    { s: 'plantA', c: 1, r: 11 },
+    { s: 'binB', c: 25, r: 24 },
+    { s: 'shelfA', c: 21, r: 24 },
+    { s: 'shelfB', c: 22, r: 24 },
+    { s: 'shelfC', c: 23, r: 24 },
   ];
 
   /**
-   * Le postazioni, nell'ordine in cui si riempiono: prima il salone, poi contabilita',
-   * poi la reception, e l'ufficio del capo per ultimo — che e' esattamente l'ordine in
-   * cui si riempie un ufficio vero.
+   * Le postazioni, nell'ordine in cui si riempiono: prima il salone in basso —
+   * che e' dove ci si siede davvero — poi il salone in alto a destra, e
+   * l'ufficio del capo per ultimo. Che e' esattamente l'ordine in cui si riempie
+   * un ufficio vero.
    *
-   * `x`,`y` sono il centro della scrivania; chi ci siede sta sotto, dalla parte
-   * opposta al monitor.
+   * `c`,`r` sono la mattonella in alto a sinistra della scrivania, larga due.
+   * Chi ci lavora sta sotto, e sotto ancora c'e' lo sgabello.
    */
   const DESKS = [
-    { x: 470, y: 180 },
-    { x: 800, y: 180 },
-    { x: 470, y: 400 },
-    { x: 800, y: 400 },
-    { x: 470, y: 620 },
-    { x: 800, y: 620 },
-    { x: 186, y: 340 },
-    { x: 186, y: 470 },
-    { x: 186, y: 140 },
-    { x: 1122, y: 430 },
+    { c: 2, r: 13 },
+    { c: 7, r: 13 },
+    { c: 12, r: 13 },
+    { c: 17, r: 13 },
+    { c: 22, r: 13 },
+    { c: 27, r: 13 },
+    { c: 2, r: 19 },
+    { c: 7, r: 19 },
+    { c: 12, r: 19 },
+    { c: 17, r: 19 },
+    { c: 22, r: 19 },
+    { c: 27, r: 19 },
+    { c: 26, r: 3 },
+    { c: 31, r: 3 },
+    { c: 36, r: 3 },
+    { c: 4, r: 3 },
   ];
-  const DESK_W = 172;
-  const DESK_H = 66;
-  /** Quanto sta sotto la scrivania chi ci lavora. */
-  const SEAT_DY = 58;
+  /** Quanto sta sotto la scrivania chi ci lavora, in mattonelle. */
+  const SEAT_DR = 1.1;
+  /** E lo sgabello sotto di lui. */
+  const STOOL_DR = 1.8;
 
   // ---------- la scena ----------
-  const wrap = el('div', 'wrap');
-  const stage = el('div', 'stage');
-  stage.style.width = STAGE.w + 'px';
-  stage.style.height = STAGE.h + 'px';
-
-  const floor = el('div', 'floor');
-  const lights = el('div', 'lights');
-  for (let i = 0; i < 6; i++) {
-    const l = el('div', 'lamp');
-    box(l, 360 + (i % 3) * 210, 120 + Math.floor(i / 3) * 380, 260, 260);
-    lights.append(l);
-  }
-  stage.append(floor, lights);
-
-  for (const r of ROOMS) {
-    const n = el('div', 'room' + (r.glass ? ' glass' : ''));
-    box(n, r.x, r.y, r.w, r.h);
-    n.append(el('span', 'rname', t('office.' + r.k)));
-    n._key = r.k;
-    stage.append(n);
-  }
-  for (const p of PROPS) {
-    stage.append(box(el('div', 'prop ' + p.t), p.x, p.y, p.w, p.h));
-  }
-
-  // Le scrivanie ci sono anche quando non ci siede nessuno: un ufficio con sette posti
-  // vuoti dice quante conversazioni potresti avere aperte, uno con tre scrivanie e
-  // basta sembra un ufficio da tre persone.
-  for (const d of DESKS) {
-    const n = el('div', 'desk');
-    box(n, d.x - DESK_W / 2, d.y - DESK_H / 2, DESK_W, DESK_H);
-    const mon = el('div', 'mon');
-    const kb = el('div', 'kb');
-    const chair = el('div', 'chair');
-    box(chair, d.x - 19, d.y + SEAT_DY - 19, 38, 38);
-    n.append(mon, kb);
-    d.node = n;
-    d.chair = chair;
-    stage.append(n, chair);
-  }
-
-  const crowd = el('div', 'crowd');
-  const empty = el('div', 'nobody');
-  box(empty, 368, 62, 560, 46);
-  stage.append(crowd, empty);
-
-  // ---------- la fascia in cima ----------
-  const bar = el('header', 'bar');
-  const title = el('span', 'lab');
-  const titleText = document.createTextNode(t('office.title'));
-  title.append(icon('people'), titleText);
-  const count = el('span', 'count');
-  const chips = el('span', 'chips');
-  const chipS = el('span', 'chip');
-  const chipW = el('span', 'chip');
-  chips.append(chipS, chipW);
-  bar.append(title, count, el('span', 'grow'), chips);
-
-  wrap.append(stage);
-  document.body.append(bar, wrap);
-
-  /**
-   * La pianta e' in pixel fissi e si rimpicciolisce tutta insieme per stare nella
-   * scheda. Non si allarga oltre il vero: ingrandita, una scrivania da 170 pixel
-   * diventa una macchia sfocata, e l'ufficio non guadagna niente a essere gigante.
-   */
-  function fit() {
-    const k = Math.min(wrap.clientWidth / STAGE.w, wrap.clientHeight / STAGE.h, 1.35);
-    stage.style.transform = 'scale(' + k + ')';
-  }
-  window.addEventListener('resize', fit);
-  new ResizeObserver(fit).observe(wrap);
-
-  // ---------- le persone ----------
+  let root;
+  let stage;
+  let crowd;
+  let empty;
+  let count;
+  let chips;
+  let chipS;
+  let chipW;
+  let send = () => {};
+  let last = null;
   const people = new Map();
   /** Chi siede dove: una volta preso il posto non lo si cambia a ogni giro. */
   const seats = new Array(DESKS.length).fill(null);
 
-  function buildPerson(id) {
-    const b = el('button', 'station');
+  /** Mette uno sprite del foglio delle stanze su una mattonella. */
+  function room(name, c, r, cls) {
+    const [sc, sr] = T[name];
+    const n = el('div', cls ? 'spr ' + cls : 'spr');
+    n.style.backgroundPosition = -sc * STEP + 'px ' + -sr * STEP + 'px';
+    n.style.left = c * TILE + 'px';
+    n.style.top = r * TILE + 'px';
+    return n;
+  }
+
+  /** Uno strato di una persona: stesso mestiere, foglio diverso. */
+  function folk(sc, sr, cls) {
+    const n = el('span', 'spr folk ' + cls);
+    n.style.backgroundPosition = -sc * STEP + 'px ' + -sr * STEP + 'px';
+    return n;
+  }
+
+  function build(container, post) {
+    root = container;
+    send = post;
+    root.textContent = '';
+
+    // Gli sprite arrivano come URI della webview: il CSP non fa passare un
+    // <style> scritto nella pagina, quindi la strada e' un data-attributo letto
+    // di qui e messo in una variabile CSS. Da li' in poi e' foglio di stile.
+    // Assoluti, sempre: un indirizzo relativo dentro una variabile CSS lo risolve
+    // il foglio di stile, non la pagina — e il foglio sta in una cartella piu' giu'.
+    // Nella webview vera arrivano gia' assoluti e questo non li tocca.
+    const abs = (p) => (p ? new URL(p, document.baseURI).href : '');
+    root.style.setProperty('--sheet-room', 'url("' + abs(root.dataset.room) + '")');
+    root.style.setProperty('--sheet-folk', 'url("' + abs(root.dataset.folk) + '")');
+
+    // --- la fascia in cima ---
+    const bar = el('header', 'of-bar');
+    const title = el('span', 'of-lab');
+    const titleText = document.createTextNode(t('office.title'));
+    const ico = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    ico.setAttribute('class', 'ico');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#ion-people');
+    ico.appendChild(use);
+    title.append(ico, titleText);
+    count = el('span', 'of-count');
+    chips = el('span', 'of-chips');
+    chipS = el('span', 'of-chip');
+    chipW = el('span', 'of-chip');
+    chips.append(chipS, chipW);
+
+    // Il bottone per tornare alla chat classica. Sta qui e non fra i comandi di
+    // VS Code perche' l'ufficio riempie la scheda: quando ci sei dentro, questa
+    // fascia e' l'unica cosa dell'estensione che vedi.
+    const back = el('button', 'of-back');
+    back.type = 'button';
+    const backText = el('span', null, t('office.toChat'));
+    const bico = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    bico.setAttribute('class', 'ico');
+    const buse = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    buse.setAttribute('href', '#ion-chatbubble-ellipses');
+    bico.appendChild(buse);
+    back.append(bico, backText);
+    back.onclick = () => send({ cmd: 'view', value: 'chat' });
+
+    bar.append(title, count, el('span', 'of-grow'), chips, back);
+
+    // --- il piano ---
+    const wrap = el('div', 'of-wrap');
+    stage = el('div', 'of-stage');
+    stage.style.width = COLS * TILE + 'px';
+    stage.style.height = ROWS * TILE + 'px';
+
+    stage.append(el('div', 'of-floor'));
+
+    for (const w of WALLS) {
+      const n = el('div', 'of-wall');
+      n.style.left = w.c * TILE + 'px';
+      n.style.top = w.r * TILE + 'px';
+      n.style.width = w.w * TILE + 'px';
+      n.style.height = w.h * TILE + 'px';
+      stage.append(n);
+    }
+
+    for (const p of PROPS) stage.append(room(p.s, p.c, p.r));
+
+    // Le scrivanie ci sono anche quando non ci siede nessuno: un ufficio con
+    // quindici posti vuoti dice quante conversazioni potresti avere aperte, uno
+    // con tre scrivanie e basta sembra un ufficio da tre persone.
+    for (const d of DESKS) {
+      const seat = room('stool', d.c + 0.5, d.r + STOOL_DR, 'of-stool');
+      const left = room('deskL', d.c, d.r, 'of-desk');
+      const right = room('deskR', d.c + 1, d.r, 'of-desk');
+      // Il monitor e' disegnato qui e non preso dal foglio: nel pacchetto non
+      // c'e' — e comunque e' l'unico mobile che deve accendersi, il che vuol
+      // dire un colore che cambia, non un'immagine.
+      const mon = el('div', 'of-mon');
+      mon.style.left = (d.c + 0.5) * TILE + 'px';
+      mon.style.top = (d.r + 0.05) * TILE + 'px';
+      d.nodes = [left, right, mon];
+      d.seat = seat;
+      stage.append(seat, left, right, mon);
+    }
+
+    crowd = el('div', 'of-crowd');
+    empty = el('div', 'of-nobody');
+    stage.append(crowd, empty);
+
+    wrap.append(stage);
+    root.append(bar, wrap);
+
+    new ResizeObserver(fit).observe(wrap);
+    fitOn = wrap;
+    fit();
+
+    window.I18N.onChange(() => {
+      titleText.nodeValue = t('office.title');
+      backText.textContent = t('office.toChat');
+      if (last) render(last);
+    });
+  }
+
+  let fitOn;
+
+  /**
+   * La pianta e' in pixel fissi e si ingrandisce tutta insieme per riempire la
+   * scheda. Il fattore si arrotonda a mezzi: su pixel art un ingrandimento con
+   * la virgola lunga fa mattonelle larghe una volta tre e una volta quattro, e
+   * il pavimento comincia a ondeggiare.
+   */
+  function fit() {
+    if (!fitOn) return;
+    const raw = Math.min(fitOn.clientWidth / (COLS * TILE), fitOn.clientHeight / (ROWS * TILE));
+    const k = Math.max(0.5, Math.min(5, Math.floor(raw * 4) / 4));
+    stage.style.transform = 'scale(' + k + ')';
+  }
+
+  // ---------- le persone ----------
+
+  function buildPerson(s) {
+    const b = el('button', 'of-guy');
     b.type = 'button';
-    const who = el('span', 'guy');
-    who.append(el('span', 'shoulders'), el('span', 'head'), el('span', 'hair'));
-    const bubble = el('span', 'bubble');
-    const dots = el('span', 'dots');
+    const h = hash(s.id);
+    const who = el('span', 'of-body');
+    const [bc, br] = pick(BODY, h, 1);
+    // Le schede dell'estensione ufficiale vanno in camice bianco: la stessa
+    // distinzione che il pannello fa con l'icona sulla card, detta senza parole.
+    // Le nostre si vestono come gli pare.
+    const [sc, sr] = s.own ? pick(SHIRT, h, 2) : [10, 4];
+    const [hc, hr] = pick(HAIR, h, 3);
+    who.append(folk(bc, br, 'l-body'), folk(sc, sr, 'l-shirt'), folk(hc, hr, 'l-hair'));
+
+    const bubble = el('span', 'of-bubble');
+    const dots = el('span', 'of-dots');
     dots.append(el('i'), el('i'), el('i'));
-    bubble.append(dots, icon('checkmark', 'bico'));
-    const plate = el('span', 'plate');
-    const pname = el('span', 'pname');
-    const pbar = el('span', 'pbar');
-    const pfill = el('span', 'pfill');
+    const tick = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    tick.setAttribute('class', 'ico of-tick');
+    const tuse = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    tuse.setAttribute('href', '#ion-checkmark');
+    tick.appendChild(tuse);
+    bubble.append(dots, tick);
+
+    const plate = el('span', 'of-plate');
+    const pname = el('span', 'of-name');
+    const pbar = el('span', 'of-bar2');
+    const pfill = el('span', 'of-fill');
     pbar.append(pfill);
     plate.append(pname, pbar);
-    b.append(el('span', 'ring'), who, bubble, plate);
-    b.onclick = () => vscode.postMessage({ cmd: 'focus', id });
-    b._p = { pname, pfill, plate };
+
+    b.append(el('span', 'of-ring'), who, bubble, plate);
+    b.onclick = () => send({ cmd: 'focus', id: s.id });
+    b._p = { pname, pfill };
     return b;
   }
 
@@ -221,9 +507,9 @@
   const barColor = (p) =>
     p == null ? 'var(--line)' : p >= 80 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
 
-  function paintPerson(b, s, spot) {
-    b.style.left = spot.x + 'px';
-    b.style.top = spot.y + 'px';
+  function paintPerson(b, s, c, r) {
+    b.style.left = c * TILE + 'px';
+    b.style.top = r * TILE + 'px';
     b.classList.toggle('own', !!s.own);
     b.classList.toggle('busy', !!s.busy);
     b.classList.toggle('done', !s.busy && !!s.done);
@@ -244,10 +530,8 @@
     b.setAttribute('aria-label', label);
   }
 
-  let last = null;
-
   function render(d) {
-    if (!d) return;
+    if (!d || !root) return;
     last = d;
     const list = d.cards || [];
 
@@ -267,7 +551,7 @@
     for (const s of list) {
       let b = people.get(s.id);
       if (!b) {
-        b = buildPerson(s.id);
+        b = buildPerson(s);
         people.set(s.id, b);
         crowd.append(b);
       }
@@ -276,23 +560,25 @@
         seat = seats.indexOf(null);
         if (seat >= 0) seats[seat] = s.id;
       }
-      // Finiti i posti si sta in piedi in corridoio, in fila lungo il salone.
-      // ponytail: oltre una ventina la fila esce dal muro. Venti conversazioni
-      // aperte insieme non le ha nessuno; se capita, si va a capo.
-      const spot =
-        seat >= 0
-          ? { x: DESKS[seat].x, y: DESKS[seat].y + SEAT_DY }
-          : { x: 410 + spare++ * 66, y: 756 };
-      paintPerson(b, s, spot);
+      // Finiti i posti si sta in piedi in corridoio, in fila. E' il corridoio
+      // vero, quello fra le stanze di sopra e il salone: la fila di chi aspetta
+      // una scrivania sta dove starebbe davvero.
+      // ponytail: oltre due file esce dal muro. Quaranta conversazioni aperte
+      // insieme non le ha nessuno; se capita, si va a capo.
+      const d0 = DESKS[seat];
+      const c = seat >= 0 ? d0.c + 0.5 : 2 + (spare % 20) * 1.4;
+      const r = seat >= 0 ? d0.r + SEAT_DR : 9.3 + Math.floor(spare++ / 20) * 1.4;
+      paintPerson(b, s, c, r);
     }
 
-    // Il monitor acceso e' della scrivania, non della persona: e' quello che si vede
-    // per primo entrando, e da lontano dice gia' chi sta lavorando.
-    DESKS.forEach((d, i) => {
-      const s = seats[i] ? list.find((c) => c.id === seats[i]) : null;
-      d.node.classList.toggle('on', !!s);
-      d.node.classList.toggle('working', !!s?.busy);
-      d.chair.classList.toggle('taken', !!s);
+    // Il monitor acceso e' della scrivania, non della persona: e' quello che si
+    // vede per primo entrando, e da lontano dice gia' chi sta lavorando.
+    DESKS.forEach((dk, i) => {
+      const s = seats[i] ? list.find((x) => x.id === seats[i]) : null;
+      const mon = dk.nodes[2];
+      mon.classList.toggle('on', !!s);
+      mon.classList.toggle('working', !!s?.busy);
+      dk.seat.classList.toggle('taken', !!s);
     });
 
     count.textContent = t('office.count', { n: list.length });
@@ -305,20 +591,13 @@
     chips.hidden = !d.usage;
   }
 
-  window.I18N.onChange(() => {
-    titleText.nodeValue = t('office.title');
-    for (const n of stage.querySelectorAll('.room')) {
-      n.querySelector('.rname').textContent = t('office.' + n._key);
-    }
-    if (last) render(last);
-  });
-
-  window.addEventListener('message', (e) => {
-    if (!e.data) return;
-    if (e.data.k === 'lang') window.I18N.set(e.data.value);
-    if (e.data.k === 'data') render(e.data.d);
-  });
-
-  fit();
-  vscode.postMessage({ cmd: 'ready' });
+  return {
+    /** Si monta una volta sola, dentro il contenitore che gli da' la pagina. */
+    mount(container, post) {
+      if (!root) build(container, post);
+    },
+    render,
+    /** Tornato a schermo dopo essere stato via: la misura di prima non vale piu'. */
+    resize: fit,
+  };
 })();

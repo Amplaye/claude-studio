@@ -288,12 +288,7 @@
     'office.who': '{name} — {state} · {pct} of the context used',
     'office.session': 'session {pct}',
     'office.week': 'week {pct}',
-    'office.reception': 'Reception',
-    'office.accounting': 'Accounting',
-    'office.annex': 'The annex',
-    'office.conference': 'Conference room',
-    'office.boss': "Boss's office",
-    'office.kitchen': 'Break room',
+    'office.toChat': 'Chat',
   };
 
   const IT = {
@@ -536,12 +531,7 @@
     'office.who': '{name} — {state} · {pct} di contesto usato',
     'office.session': 'sessione {pct}',
     'office.week': 'settimana {pct}',
-    'office.reception': 'Reception',
-    'office.accounting': 'Contabilita’',
-    'office.annex': 'L’annesso',
-    'office.conference': 'Sala riunioni',
-    'office.boss': 'Ufficio del capo',
-    'office.kitchen': 'Cucina',
+    'office.toChat': 'Chat',
   };
 
   const DICT = { en: EN, it: IT };

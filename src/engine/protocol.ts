@@ -239,6 +239,11 @@ export type Wire =
     }
   | { k: 'ask_done'; id: string; ok: boolean; label: string }
   | { k: 'mode'; value: Mode }
+  // Quale delle due facce della scheda si guarda: la chat, o la pianta
+  // dell'ufficio. Il bottone nella testata la gira da solo senza passare di qui;
+  // questo serve a chi la chiede da fuori — il comando, o la testata della barra
+  // laterale, che aprono la scheda gia' sulla faccia giusta.
+  | { k: 'view'; value: 'chat' | 'office' }
   | { k: 'prefs'; value: Prefs }
   | { k: 'models'; items: ModelChoice[] }
   // The "play now" is decided by the extension, not the page: it's the only one that
@@ -445,10 +450,6 @@ export type Cmd =
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'newTab' }
-  // L'ufficio, dal bottone nella testata: i bottoni della testata di VS Code
-  // esistono solo per i pannelli della barra laterale, e chi lavora nella scheda
-  // non ne vede nemmeno uno.
-  | { cmd: 'office' }
   // The page has already played its exit animation: here it really closes.
   | { cmd: 'closeTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }

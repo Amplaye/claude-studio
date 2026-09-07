@@ -1,457 +1,242 @@
-/* Claude Studio — L'ufficio, a tutto schermo.
-   La pianta di un ufficio visto dall'alto: moquette, scrivanie, la sala riunioni coi
-   vetri, la fotocopiatrice che lampeggia. Ogni conversazione aperta e' una persona
-   seduta a una scrivania.
+/* Claude Studio — L'ufficio.
+   La pianta di un ufficio vista dall'alto: moquette a mattonelle, muri color
+   panna, scrivanie con il monitor acceso. Ogni conversazione aperta e' una
+   persona seduta a una scrivania.
 
-   Tinte sue, non quelle del pannello: questa e' un'illustrazione che riempie una
-   scheda, e una moquette color `--vscode-editorWidget-background` non e' una moquette.
-   Il tema conta lo stesso — le due righe in fondo accendono le luci quando l'editor e'
-   chiaro — ma parte da un ufficio, non da un riquadro.
+   I mobili e le persone sono sprite di Kenney (kenney.nl, CC0), presi da due
+   fogli da 16 pixel. Pavimento e muri no: quelli sono gradienti, perche' un
+   pavimento a mattonelle e' una ripetizione e ripeterla e' esattamente quello
+   che il CSS sa fare senza chiedere un'immagine — e perche' cosi' la stanza
+   resta nitida a qualunque ingrandimento.
 
-   Tutto in CSS: la posizione la decide office.js (due numeri per mobile), il resto e'
-   forma e keyframe. E il blocco reduced-motion di motion.css spegne gia' tutto quanto,
-   senza una riga in piu' qui. */
+   Tinte sue, non quelle dell'editor: questa e' un'illustrazione che riempie una
+   scheda, e un pavimento color `--vscode-editorWidget-background` non e' un
+   pavimento. Solo la fascia in cima usa i colori del tema, perche' quella e'
+   interfaccia e deve stare attaccata al resto.
 
-.off {
-  --carpet: #2a2621;
-  --carpet-2: #342f28;
-  --wallc: #4a443c;
-  --wood: #6f4e32;
-  --wood-2: #966f49;
-  --steel: #494e55;
-  --glassc: rgba(150, 200, 255, 0.06);
-  --skin: #e2b68e;
-  --hair: #3a2a1f;
-  --plant: #43804f;
-  --lamp: rgba(255, 232, 190, 0.18);
+   Il blocco reduced-motion di motion.css spegne gia' tutte le animazioni di qui
+   dentro, senza una riga in piu'. */
 
-  margin: 0;
-  height: 100vh;
-  display: flex;
+.office {
+  --of-floor: #93a98e;
+  --of-floor-2: #8ba187;
+  --of-line: rgba(0, 0, 0, 0.055);
+  --of-dot: rgba(255, 255, 255, 0.14);
+  --of-wall: #f1ece0;
+  --of-wall-b: #cdc6b6;
+  --of-edge: #2b2723;
+
+  display: none;
   flex-direction: column;
-  overflow: hidden;
-  background: #15120e;
-}
-
-html {
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
-
-/* Ufficio di giorno: le stesse stanze con la luce accesa. */
-body.off.vscode-light,
-body.off.vscode-high-contrast-light {
-  --carpet: #b9ac97;
-  --carpet-2: #c9bda9;
-  --wallc: #8d8578;
-  --wood: #a97b4e;
-  --wood-2: #c79a6a;
-  --steel: #9aa1a9;
-  --glassc: rgba(90, 150, 220, 0.1);
-  --hair: #4a3524;
-  --lamp: rgba(255, 246, 220, 0.5);
-  background: #ded4c2;
+/* L'ufficio e' una faccia della stessa pagina della chat: si accende una e si
+   spegne l'altra, e la scheda resta una sola. */
+body.inoffice .office {
+  display: flex;
+}
+body.inoffice .shell {
+  display: none;
 }
 
 /* ---------- la fascia in cima ---------- */
 
-.off .bar {
+.of-bar {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
+  gap: 10px;
+  padding: 8px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
-.off .grow {
+.of-lab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.of-grow {
   flex: 1 1 auto;
 }
-.off .count {
+.of-count {
   font-size: 12px;
   opacity: 0.72;
 }
-.off .chip {
-  margin-left: 7px;
-  padding: 2px 10px;
+.of-chip {
+  margin-left: 6px;
+  padding: 2px 9px;
   border: 1px solid var(--line);
   border-radius: var(--pill);
   font-size: 11px;
   font-weight: 700;
 }
+/* Il ritorno alla chat. Da qui dentro e' l'unica via d'uscita che si vede:
+   percio' ha una parola scritta sopra e non e' l'ennesima icona muta. */
+.of-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.of-back:hover {
+  background: var(--hover);
+  border-color: var(--claude-2);
+}
+.of-back:focus-visible {
+  outline: 2px solid var(--claude-2);
+  outline-offset: 2px;
+}
 
 /* ---------- il piano ---------- */
 
-.off .wrap {
+.of-wrap {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 14px;
+  padding: 10px;
+  background: #6f7f6c;
 }
 
-/* Misure fisse, e tutto si rimpicciolisce insieme: vedi fit() in office.js. */
-.off .stage {
+/* Misure fisse in mattonelle, e tutto si ingrandisce insieme: vedi fit(). */
+.of-stage {
   position: relative;
   flex: 0 0 auto;
   transform-origin: center center;
+  outline: 2px solid var(--of-edge);
+  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.6);
 }
 
-/* La moquette. Il pelo va di traverso e scorre pianissimo: da fermo il piano sembra
-   una pianta stampata, e questa e' l'unica cosa che dice "e' acceso" quando in ufficio
-   non c'e' nessuno che lavora. */
-.off .floor {
+/* Il pavimento: una mattonella ogni 16, e un rombo chiaro ogni due incroci —
+   che e' l'unica cosa che distingue un pavimento piastrellato da un rettangolo
+   verde. */
+.of-floor {
   position: absolute;
   inset: 0;
-  border-radius: 12px;
-  /* Il muro esterno. Sta dentro la misura del piano (box-sizing: border-box), quindi
-     stanze e scrivanie non si spostano di un pixel. */
-  border: 15px solid var(--wallc);
-  background:
-    repeating-linear-gradient(104deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 7px),
-    repeating-linear-gradient(14deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 9px),
-    linear-gradient(160deg, var(--carpet-2), var(--carpet));
-  box-shadow:
-    inset 0 0 140px rgba(0, 0, 0, 0.5),
-    0 24px 60px -30px rgba(0, 0, 0, 0.9);
-  animation: off-carpet 26s linear infinite;
-}
-@keyframes off-carpet {
-  to {
-    background-position: 140px 0, -120px 0, 0 0;
-  }
+  background-color: var(--of-floor);
+  background-image:
+    radial-gradient(circle at 0 0, var(--of-dot) 1.4px, transparent 1.5px),
+    linear-gradient(var(--of-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--of-line) 1px, transparent 1px),
+    linear-gradient(160deg, var(--of-floor-2), var(--of-floor));
+  background-size:
+    32px 32px,
+    16px 16px,
+    16px 16px,
+    100% 100%;
 }
 
-/* I neon del soffitto: pozze di luce calda che respirano fuori tempo l'una dall'altra,
-   come i tubi di un ufficio vero, che non sono mai tutti d'accordo. */
-.off .lights {
+/* I muri. Panna, con l'ombra sotto: senza quella due muri che si toccano sono
+   una macchia bianca sola e le stanze spariscono. */
+.of-wall {
+  position: absolute;
+  background: var(--of-wall);
+  box-shadow:
+    inset 0 -2px 0 var(--of-wall-b),
+    0 2px 3px -1px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------- gli sprite ---------- */
+
+/* Una casella del foglio, sempre 16x16. Quale casella lo dice il
+   background-position, che scrive il JS. */
+.spr {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background-image: var(--sheet-room);
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.spr.folk {
   position: absolute;
   inset: 0;
-  pointer-events: none;
-}
-.off .lamp {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--lamp), transparent 72%);
-  animation: off-lamp 7s ease-in-out infinite;
-}
-.off .lamp:nth-child(2) {
-  animation-delay: -1.4s;
-}
-.off .lamp:nth-child(3) {
-  animation-delay: -3.1s;
-}
-.off .lamp:nth-child(4) {
-  animation-delay: -4.6s;
-}
-.off .lamp:nth-child(5) {
-  animation-delay: -2.2s;
-}
-.off .lamp:nth-child(6) {
-  animation-delay: -5.5s;
-}
-@keyframes off-lamp {
-  0%,
-  100% {
-    opacity: 0.72;
-  }
-  50% {
-    opacity: 1;
-  }
+  background-image: var(--sheet-folk);
 }
 
-/* ---------- le stanze ---------- */
-
-.off .room {
-  position: absolute;
-  border: 3px solid var(--wallc);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.018);
-  box-shadow: 0 10px 26px -18px rgba(0, 0, 0, 0.9);
+.of-stool {
+  opacity: 0.9;
+  transition: opacity 0.3s ease;
 }
-/* Le due coi vetri: sala riunioni e ufficio del capo. Si vede dentro, ed e' l'unica
-   differenza che serve fra una stanza e l'altra. */
-.off .room.glass {
-  border-color: rgba(160, 205, 255, 0.32);
-  background: var(--glassc);
-  box-shadow: inset 0 0 46px rgba(140, 190, 255, 0.07);
-}
-.off .rname {
-  position: absolute;
-  left: 11px;
-  top: 8px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  opacity: 0.5;
-}
-/* Sulla moquette chiara un bianco al 40% e' carta su carta: il nome della stanza
-   sparisce proprio nel tema dove la stanza si vede meglio. */
-body.off.vscode-light .rname,
-body.off.vscode-high-contrast-light .rname {
-  color: #3d362c;
-  opacity: 0.62;
+.of-stool.taken {
+  opacity: 1;
 }
 
-/* ---------- i mobili ---------- */
-
-.off .prop {
+/* Il monitor non viene dal foglio: nel pacchetto non c'e', e comunque e'
+   l'unico mobile che deve accendersi — il che vuol dire un colore che cambia,
+   non un'immagine. */
+.of-mon {
   position: absolute;
-  border-radius: 6px;
+  box-sizing: border-box;
+  width: 14px;
+  height: 11px;
+  margin-left: 1px;
+  border: 2px solid #22262b;
+  border-radius: 1px;
+  background: #3a4048;
+  transition: background 0.3s ease;
 }
-.off .prop.table {
-  background: linear-gradient(180deg, var(--wood-2), var(--wood));
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+.of-mon.on {
+  background: #5b6672;
 }
-.off .prop.oval {
-  border-radius: 50% / 44%;
+/* Il monitor acceso e' la cosa che si vede per prima da lontano: prima ancora
+   di capire chi c'e' seduto, si vede quali schermi stanno lavorando. */
+.of-mon.working {
+  background: linear-gradient(180deg, #b6e2ff, #63a8de);
+  box-shadow: 0 0 7px rgba(110, 190, 255, 0.85);
+  animation: of-screen 2.6s ease-in-out infinite;
 }
-.off .prop.counter {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--steel) 80%, #fff 12%), var(--steel));
-  border-radius: 4px;
-}
-.off .prop.cabinet {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--steel) 82%, #fff 14%), var(--steel));
-  border-radius: 4px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
-}
-/* I cassetti, che sono quello che distingue uno schedario da un parallelepipedo. */
-.off .prop.cabinet::after {
-  content: "";
-  position: absolute;
-  inset: 8px 10px;
-  border-radius: 2px;
-  background: repeating-linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.28) 0 2px,
-    transparent 2px 30px
-  );
-}
-.off .prop.copier {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--steel) 78%, #fff 10%), #3b4046);
-  border-radius: 6px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.45);
-}
-/* La spia verde. Una fotocopiatrice ferma e' un armadio; questa lampeggia. */
-.off .prop.copier::after {
-  content: "";
-  position: absolute;
-  right: 9px;
-  top: 9px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ok);
-  animation: off-led 3.4s ease-in-out infinite;
-}
-@keyframes off-led {
-  0%,
-  46%,
-  100% {
-    opacity: 0.25;
-  }
-  50%,
-  62% {
-    opacity: 1;
-  }
-}
-.off .prop.cooler {
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #cfe9ff, #5d90bd);
-  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.45);
-}
-/* Dall'alto una pianta e' una rosetta di foglie, non una biglia verde. */
-.off .prop.plant {
-  border-radius: 50%;
-  background: repeating-conic-gradient(
-    from 0deg,
-    color-mix(in srgb, var(--plant) 82%, #fff 18%) 0 22deg,
-    #275437 22deg 44deg
-  );
-  box-shadow:
-    0 6px 14px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 3px rgba(0, 0, 0, 0.18);
-  animation: off-sway 5.4s ease-in-out infinite;
-}
-.off .prop.plant:nth-of-type(even) {
-  animation-delay: -2.3s;
-}
-@keyframes off-sway {
-  0%,
-  100% {
-    transform: rotate(-2.5deg) scale(1);
-  }
-  50% {
-    transform: rotate(2.5deg) scale(1.03);
-  }
-}
-.off .prop.sofa {
-  background: linear-gradient(180deg, #5b4b40, #40352d);
-  border-radius: 12px;
-  box-shadow: 0 7px 15px rgba(0, 0, 0, 0.45);
-}
-/* I cuscini: senza, e' un rettangolo marrone come il tavolo. */
-.off .prop.sofa::after {
-  content: "";
-  position: absolute;
-  inset: 12px 8px 6px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.25), inset -1px 0 0 rgba(0, 0, 0, 0.25);
-}
-/* Le sedie della sala riunioni: come quelle delle scrivanie, ma senza nessuno che
-   possa sedercisi — sono un mobile, non un posto. */
-.off .prop.seat {
-  border-radius: 50%;
-  background: #3d4249;
-  box-shadow: 0 4px 9px rgba(0, 0, 0, 0.4);
-}
-/* Le finestre sul muro in alto, e la luce del giorno che cade dentro. Sono la sola
-   cosa qui dentro che dica da che parte sta fuori. */
-.off .prop.window {
-  border-radius: 2px;
-  background: linear-gradient(
-    90deg,
-    rgba(190, 225, 255, 0.42) 0 22%,
-    rgba(190, 225, 255, 0.16) 22% 26%,
-    rgba(190, 225, 255, 0.42) 26% 48%,
-    rgba(190, 225, 255, 0.16) 48% 52%,
-    rgba(190, 225, 255, 0.42) 52% 74%,
-    rgba(190, 225, 255, 0.16) 74% 78%,
-    rgba(190, 225, 255, 0.42) 78% 100%
-  );
-  box-shadow: 0 0 10px rgba(180, 220, 255, 0.28);
-}
-/* La luce che entra. Sfuma anche di lato: tagliata di netto sui fianchi non e' una
-   luce, e' un rettangolo grigio appoggiato sulla moquette. */
-.off .prop.window::after {
-  content: "";
-  position: absolute;
-  left: -40px;
-  right: -40px;
-  top: 100%;
-  height: 210px;
-  background: linear-gradient(180deg, rgba(200, 228, 255, 0.12), transparent 80%);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
-  pointer-events: none;
-}
-
-/* ---------- le scrivanie ---------- */
-
-.off .desk {
-  position: absolute;
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--wood-2), var(--wood));
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-.off .desk .mon {
-  position: absolute;
-  left: 50%;
-  top: 7px;
-  width: 54px;
-  height: 17px;
-  margin-left: -27px;
-  border-radius: 3px;
-  background: #1e2228;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-}
-.off .desk.on .mon {
-  background: #2a3038;
-}
-/* Il monitor acceso e' la cosa che si vede per prima da lontano: prima ancora di
-   capire chi c'e' seduto, si vede quali schermi sono accesi. */
-.off .desk.working .mon {
-  background: linear-gradient(180deg, #a9dcff, #4e9bdc);
-  box-shadow:
-    0 0 20px rgba(90, 180, 255, 0.55),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-  animation: off-screen 2.6s ease-in-out infinite;
-}
-@keyframes off-screen {
+@keyframes of-screen {
   0%,
   100% {
     filter: brightness(1);
   }
   50% {
-    filter: brightness(1.22);
+    filter: brightness(1.25);
   }
 }
-.off .desk .kb {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  width: 46px;
-  height: 10px;
-  margin-left: -23px;
-  border-radius: 2px;
-  background: rgba(0, 0, 0, 0.34);
-}
-.off .chair {
-  position: absolute;
-  border-radius: 50% 50% 44% 44%;
-  background: #383d43;
-  box-shadow: 0 5px 11px rgba(0, 0, 0, 0.45);
-  transition: background 0.3s ease;
-}
-.off .chair.taken {
-  background: #474d55;
-}
 
-/* ---------- le persone, viste dall'alto ---------- */
+/* ---------- le persone ---------- */
 
-.off .crowd {
+.of-crowd {
   position: absolute;
   inset: 0;
 }
 
-.off .station {
-  --suit: color-mix(in srgb, var(--run) 78%, #000 10%);
-  --suit-2: color-mix(in srgb, var(--run) 92%, #fff 22%);
+.of-guy {
   position: absolute;
-  width: 58px;
-  height: 58px;
-  margin: -29px 0 0 -29px;
+  width: 16px;
+  height: 16px;
   padding: 0;
   border: 0;
   background: none;
   color: var(--ink);
   cursor: pointer;
-  /* Quando una conversazione si chiude, chi resta si sposta al posto libero: con la
-     transizione ci cammina, senza si teletrasporta. */
+  /* Quando una conversazione si chiude, chi resta si sposta al posto libero: con
+     la transizione ci cammina, senza si teletrasporta. */
   transition:
     left 0.9s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.9s cubic-bezier(0.4, 0, 0.2, 1),
     filter 0.2s ease;
-  animation: off-arrive 0.55s ease-out both;
+  animation: of-arrive 0.5s ease-out both;
 }
-/* Le nostre in creta, le schede dell'estensione ufficiale in azzurro: la stessa
-   distinzione che fanno l'icona e la pillola sulla card, detta senza parole. */
-.off .station.own {
-  --suit: color-mix(in srgb, var(--claude-1) 88%, #000 8%);
-  --suit-2: var(--claude-2);
-}
-/* Ferma da un pezzo. In `filter` e non in `opacity`, che qui e' gia' occupata
-   dall'animazione di entrata e vincerebbe. */
-.off .station:not(.busy):not(.recent):not(.done) {
-  filter: grayscale(0.6) opacity(0.5);
-}
-.off .station:hover {
-  filter: brightness(1.15);
-  z-index: 5;
-}
-.off .station:focus-visible {
-  outline: 2px solid var(--claude-2);
-  outline-offset: 2px;
-  border-radius: 12px;
-}
-@keyframes off-arrive {
+@keyframes of-arrive {
   from {
     opacity: 0;
   }
@@ -459,239 +244,235 @@ body.off.vscode-high-contrast-light .rname {
     opacity: 1;
   }
 }
-
-.off .guy {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
+/* Ferma da un pezzo. In `filter` e non in `opacity`, che qui e' gia' occupata
+   dall'animazione di entrata e vincerebbe. */
+.of-guy:not(.busy):not(.recent):not(.done) {
+  filter: grayscale(0.65) opacity(0.5);
 }
-.off .shoulders {
+.of-guy:hover {
+  filter: brightness(1.2);
+  z-index: 6;
+}
+.of-guy:focus-visible {
+  outline: 2px solid var(--claude-2);
+  outline-offset: 1px;
+}
+
+.of-body {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 42% 30%, var(--suit-2), var(--suit) 72%);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+  /* L'ombra sotto i piedi. Senza, una persona da 16 pixel su un pavimento da 16
+     pixel e' un mobile in piu': e' l'ombra a staccarla dal pavimento e a dire
+     che quella e' l'unica cosa viva nella stanza. */
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.22));
 }
-.off .head {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 21px;
-  height: 21px;
-  margin: -10.5px 0 0 -10.5px;
-  border-radius: 50%;
-  background: var(--skin);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+/* I tre strati del pacchetto di Kenney, nell'ordine in cui si vestono. */
+.l-body {
+  z-index: 1;
 }
-/* I capelli: dall'alto sono la calotta sopra la faccia, ed e' il minimo che serve
-   perche' una testa smetta di essere un cerchio. */
-.off .hair {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 21px;
-  height: 21px;
-  margin: -10.5px 0 0 -10.5px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, var(--hair) 0 56%, transparent 56%);
+.l-shirt {
+  z-index: 2;
+}
+.l-hair {
+  z-index: 3;
 }
 
-.off .station.recent .guy {
-  animation: off-breathe 3s ease-in-out infinite;
+.of-guy.recent .of-body {
+  animation: of-breathe 3s ease-in-out infinite;
 }
-.off .station.busy .guy {
-  animation: off-type 0.62s ease-in-out infinite;
+.of-guy.busy .of-body {
+  animation: of-type 0.62s ease-in-out infinite;
 }
-.off .station.done .guy {
-  animation: off-cheer 1.8s cubic-bezier(0.3, 0.8, 0.4, 1) infinite;
+.of-guy.done .of-body {
+  animation: of-cheer 1.8s cubic-bezier(0.3, 0.8, 0.4, 1) infinite;
 }
-@keyframes off-breathe {
+@keyframes of-breathe {
   0%,
   100% {
-    transform: scale(1);
+    transform: translateY(0);
   }
   50% {
-    transform: scale(1.035);
+    transform: translateY(-0.5px);
   }
 }
-@keyframes off-type {
+@keyframes of-type {
   0%,
   100% {
     transform: translateY(0) rotate(0deg);
   }
   50% {
-    transform: translateY(-2px) rotate(-2deg);
+    transform: translateY(-1px) rotate(-3deg);
   }
 }
-@keyframes off-cheer {
+@keyframes of-cheer {
   0%,
   58%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   70% {
-    transform: translateY(-7px) scale(1.06);
+    transform: translateY(-3.5px);
   }
   84% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-/* Il faretto sulla conversazione dove sei. */
-.off .ring {
+/* Il faretto sulla conversazione dove sei. Sotto la persona, come l'alone dei
+   personaggi attivi nei giochi: e' l'unico modo di dire "questa" senza
+   aggiungere un'altra etichetta a una stanza che ne ha gia' una per testa. */
+.of-ring {
   position: absolute;
   left: 50%;
-  top: 50%;
-  width: 84px;
-  height: 84px;
-  margin: -42px 0 0 -42px;
+  top: 100%;
+  width: 34px;
+  height: 15px;
+  margin: -6px 0 0 -17px;
   border-radius: 50%;
   background: radial-gradient(
     closest-side,
-    color-mix(in srgb, var(--claude-1) 52%, transparent),
-    transparent 74%
+    color-mix(in srgb, var(--claude-1) 85%, transparent),
+    color-mix(in srgb, var(--claude-1) 30%, transparent) 62%,
+    transparent 78%
   );
   opacity: 0;
   pointer-events: none;
 }
-.off .station.focused .ring {
+.of-guy.focused .of-ring {
   opacity: 1;
-  animation: off-spot 2.8s ease-in-out infinite;
+  animation: of-spot 2.8s ease-in-out infinite;
 }
-@keyframes off-spot {
+@keyframes of-spot {
   0%,
   100% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
   50% {
     opacity: 1;
   }
 }
 
-/* Sopra la testa: i puntini mentre lavora, la spunta verde quando ha finito e non
-   l'hai ancora guardata. */
-.off .bubble {
+/* Sopra la testa: i puntini mentre lavora, la spunta verde quando ha finito e
+   non l'hai ancora guardata. */
+.of-bubble {
   position: absolute;
-  left: calc(50% + 15px);
-  top: calc(50% - 32px);
+  left: 11px;
+  top: -7px;
   display: none;
   align-items: center;
-  padding: 3px 5px;
-  border: 1px solid var(--line);
-  border-radius: 7px 7px 7px 2px;
-  background: rgba(12, 10, 8, 0.82);
+  gap: 1px;
+  padding: 1px 2px;
+  border: 1px solid #2b2723;
+  border-radius: 2px;
+  background: #f6f2e6;
   pointer-events: none;
+  z-index: 5;
 }
-.off .station.busy .bubble,
-.off .station.done .bubble {
+.of-guy.busy .of-bubble,
+.of-guy.done .of-bubble {
   display: flex;
 }
-.off .station.done .bubble {
-  border-color: color-mix(in srgb, var(--ok) 62%, transparent);
-}
-.off .dots {
+.of-dots {
   display: none;
-  gap: 3px;
+  gap: 1px;
 }
-.off .station.busy .dots {
+.of-guy.busy .of-dots {
   display: flex;
 }
-.off .dots i {
-  width: 4px;
-  height: 4px;
+.of-dots i {
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
-  background: var(--ok);
-  animation: off-dot 1.1s ease-in-out infinite;
+  background: #2f7d43;
+  animation: of-dot 1.1s ease-in-out infinite;
 }
-.off .dots i:nth-child(2) {
+.of-dots i:nth-child(2) {
   animation-delay: 0.18s;
 }
-.off .dots i:nth-child(3) {
+.of-dots i:nth-child(3) {
   animation-delay: 0.36s;
 }
-.off .bico {
-  display: none;
-  width: 12px;
-  height: 12px;
-  color: var(--ok);
-  stroke-width: 3;
-}
-.off .station.done .bico {
-  display: block;
-}
-@keyframes off-dot {
+@keyframes of-dot {
   0%,
   100% {
-    opacity: 0.28;
+    opacity: 0.25;
     transform: translateY(0);
   }
   50% {
     opacity: 1;
-    transform: translateY(-2px);
+    transform: translateY(-1px);
   }
 }
+.of-tick {
+  display: none;
+  width: 6px;
+  height: 6px;
+  color: #2f7d43;
+  stroke-width: 3;
+}
+.of-guy.done .of-tick {
+  display: block;
+}
 
-/* La targhetta sulla scrivania: il nome della conversazione e quanto contesto le
-   resta. E' l'unico numero che l'ufficio si porta dietro dal pannello, ed e' quello
-   che si guarda per decidere a chi andare a parlare. */
-.off .plate {
+/* La targhetta sotto la scrivania: il nome della conversazione e quanto
+   contesto le resta. E' l'unico numero che l'ufficio si porta dietro dal
+   pannello, ed e' quello che si guarda per decidere a chi andare a parlare. */
+.of-plate {
   position: absolute;
   left: 50%;
-  top: calc(50% + 25px);
-  width: 152px;
-  margin-left: -76px;
-  padding: 3px 7px 4px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  background: rgba(10, 9, 7, 0.62);
+  top: 30px;
+  width: 50px;
+  margin-left: -25px;
+  padding: 1px 2px 2px;
+  border: 1px solid #2b2723;
+  border-radius: 2px;
+  background: #f6f2e6;
+  color: #2b2723;
   pointer-events: none;
+  z-index: 4;
 }
-body.off.vscode-light .plate {
-  border-color: rgba(0, 0, 0, 0.16);
-  background: rgba(255, 253, 248, 0.78);
+.of-guy.focused .of-plate {
+  border-color: var(--claude-1);
+  box-shadow: 0 0 0 1px var(--claude-1);
 }
-.off .station.focused .plate {
-  border-color: color-mix(in srgb, var(--claude-1) 70%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--claude-1) 35%, transparent);
-}
-.off .pname {
+.of-name {
   display: block;
-  font-size: 10.5px;
+  font-size: 6px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.off .pbar {
+.of-bar2 {
   display: block;
-  height: 3px;
-  margin-top: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.16);
+  height: 2px;
+  margin-top: 1px;
+  background: rgba(0, 0, 0, 0.18);
   overflow: hidden;
 }
-.off .pfill {
+.of-fill {
   display: block;
   height: 100%;
   width: 0;
-  border-radius: 2px;
   transition: width 0.5s ease;
 }
 
 /* ---------- ufficio vuoto ---------- */
 
-.off .nobody {
+.of-nobody {
   position: absolute;
+  left: 0;
+  right: 0;
+  top: 40%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  letter-spacing: 0.01em;
-  opacity: 0.6;
+  padding: 3px 8px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #2b2723;
   text-align: center;
+  pointer-events: none;
 }

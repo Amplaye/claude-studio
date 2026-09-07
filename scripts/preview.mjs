@@ -24,7 +24,11 @@ function build(page, out) {
     .replace(/\{\{sprite\}\}/, sprite)
     .replace(/\{\{nonce\}\}/g, 'preview')
     .replace(/\{\{(\w+)Css\}\}/g, (_, k) => `webview/${k}.css`)
-    .replace(/\{\{(\w+)Js\}\}/g, (_, k) => `webview/${k}.js`);
+    .replace(/\{\{(\w+)Js\}\}/g, (_, k) => `webview/${k}.js`)
+    // I fogli di sprite dell'ufficio. Nella webview vera sono URI di VS Code; qui
+    // sono i file, che e' l'unica differenza fra le due pagine.
+    .replace(/\{\{roomPng\}\}/g, 'webview/sprites-room.png')
+    .replace(/\{\{folkPng\}\}/g, 'webview/sprites-folk.png');
   fs.writeFileSync(path.join(dist, out), html, 'utf8');
   console.log('dist/' + out);
 }
@@ -33,5 +37,5 @@ function build(page, out) {
 // l'ultima card del pannello del contesto, e si guarda in preview-context.html.
 build('chat.html', 'preview.html');
 build('context.html', 'preview-context.html');
-// E l'ufficio, che e' una scheda a tutto schermo e si guarda tutto insieme.
-build('office.html', 'preview-office.html');
+// L'ufficio non ha piu' una pagina sua: e' l'altra faccia di preview.html, e si
+// accende dal bottone nella testata (o da document.body.classList).

@@ -51,8 +51,7 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "onWebviewPanel:claudeStudio.panel",
-    "onWebviewPanel:claudeStudio.office"
+    "onWebviewPanel:claudeStudio.panel"
   ],
   "main": "./dist/extension.js",
   "contributes": {

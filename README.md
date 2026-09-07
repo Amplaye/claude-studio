@@ -191,6 +191,9 @@ size, and whether the icon opens the sidebar or a full tab.
 **Requires** the [Claude Code](https://claude.com/claude-code) CLI, installed and signed in.
 It's your account and your usage: Claude Studio adds no service and no key of its own.
 
+The office is furnished with the *Roguelike Indoors* and *Roguelike Characters* packs
+by [Kenney](https://kenney.nl) — public domain (CC0), and a pleasure to be able to use.
+
 MIT · [Report an issue](https://github.com/Amplaye/claude-studio/issues) · [Development notes](https://github.com/Amplaye/claude-studio/blob/main/docs/SVILUPPO.md)
 
 </div>

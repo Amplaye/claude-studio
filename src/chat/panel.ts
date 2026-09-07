@@ -40,6 +40,24 @@ export class ChatPanel {
   }
 
   /**
+   * "Claude Studio: L'ufficio": la scheda principale, aperta gia' sulla pianta.
+   *
+   * L'ufficio non e' piu' una scheda sua — e' l'altra faccia di questa, e il
+   * bottone nella testata la gira. Due schede sullo stesso piano erano due
+   * finestre da chiudere, e dall'ufficio non si tornava a *quella* chat: si
+   * andava a cercarsela fra le linguette.
+   */
+  static openOffice(
+    ctx: vscode.ExtensionContext,
+    chat: ChatController,
+    monitor?: ContextMonitor
+  ) {
+    const panel = ChatPanel.open(ctx, chat, undefined, monitor);
+    panel.showOffice();
+    return panel;
+  }
+
+  /**
    * Quello che fanno la scorciatoia e il comando "apri": sempre una conversazione
    * nuova. La prima volta la scheda principale non c'e' ancora e si fa quella —
    * nasce vuota, che e' gia' il foglio bianco che stai chiedendo. Dalla seconda in
@@ -154,6 +172,25 @@ export class ChatPanel {
   /** The name changed somewhere else (a rename from the context card). */
   refreshName() {
     this.followName();
+  }
+
+  /**
+   * Gira la scheda sulla pianta dell'ufficio.
+   *
+   * Se la pagina non e' ancora in piedi — la scheda l'abbiamo appena aperta — il
+   * messaggio finirebbe nel vuoto: si riprova al primo colpo d'occhio utile, che
+   * arriva comunque entro un attimo dal caricamento.
+   */
+  showOffice() {
+    const send = () => {
+      try {
+        void this.panel.webview.postMessage({ k: 'view', value: 'office' });
+      } catch {
+        /* scheda chiusa nel frattempo */
+      }
+    };
+    send();
+    setTimeout(send, 400);
   }
 
   private constructor(

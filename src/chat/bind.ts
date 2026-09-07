@@ -32,11 +32,17 @@ export function bindWebview(
     contextCss: 'context.css',
     tasksCss: 'tasks.css',
     chatCss: 'chat.css',
+    officeCss: 'office.css',
     i18nJs: 'i18n.js',
     ctxpanelJs: 'ctxpanel.js',
     taskspanelJs: 'taskspanel.js',
     chimeJs: 'chime.js',
+    officeJs: 'office.js',
     chatJs: 'chat.js',
+    // I mobili e le gente dell'ufficio: due fogli di sprite di Kenney (CC0). Il
+    // foglio di stile li prende da un data-attributo della pagina — vedi chat.html.
+    roomPng: 'sprites-room.png',
+    folkPng: 'sprites-folk.png',
   });
 
   const surface: Surface = {
@@ -104,9 +110,6 @@ export function bindWebview(
         return;
       case 'newTab':
         void vscode.commands.executeCommand('claudeStudio.openNewTab');
-        return;
-      case 'office':
-        void vscode.commands.executeCommand('claudeStudio.office');
         return;
       case 'closeTab':
         // From the tab only: in the sidebar the button isn't there at all, and
