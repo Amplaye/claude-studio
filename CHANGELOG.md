@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.2
+
+- **Il bottone dell’ufficio non si vedeva a tutto schermo.** Stava sulla testata che
+  disegna VS Code sopra i pannelli della barra laterale, e sopra una scheda quella
+  testata non esiste: chi lavora a tutto schermo — cioè esattamente chi guarderebbe
+  l’ufficio — non aveva modo di aprirlo se non dalla tavolozza dei comandi. Adesso
+  nella scheda il bottone sta nella testata della chat, accanto a quello del contesto;
+  nella barra laterale resta dov’era, che lì lo spazio per un’icona in più non c’è e la
+  pillola dello stato ci rimetteva le parole.
+
 ## 0.22.1
 
 - **L’ufficio non si trovava.** Stava solo nella testata del pannello del contesto, che

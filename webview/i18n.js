@@ -37,6 +37,7 @@
     'top.settings': 'Model, thinking and notifications ({alt}I)',
     'top.history': 'Conversations in this project ({alt}H)',
     'top.context': 'Show or hide the context ({alt}C)',
+    'top.office': 'The office: every open conversation at its desk',
     'top.tab': 'Open as a tab',
     'top.new': 'New session in a new tab ({alt}N)',
 
@@ -306,6 +307,7 @@
     'top.settings': 'Modello, ragionamento e notifiche ({alt}I)',
     'top.history': 'Conversazioni di questo progetto ({alt}H)',
     'top.context': 'Mostra o nascondi il contesto ({alt}C)',
+    'top.office': "L'ufficio: ogni conversazione aperta alla sua scrivania",
     'top.tab': 'Apri come scheda',
     'top.new': 'Nuova sessione in una nuova scheda ({alt}N)',
 

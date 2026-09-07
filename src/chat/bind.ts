@@ -105,6 +105,9 @@ export function bindWebview(
       case 'newTab':
         void vscode.commands.executeCommand('claudeStudio.openNewTab');
         return;
+      case 'office':
+        void vscode.commands.executeCommand('claudeStudio.office');
+        return;
       case 'closeTab':
         // From the tab only: in the sidebar the button isn't there at all, and
         // closing "the active editor" from there would mean closing someone else's file.

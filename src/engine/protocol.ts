@@ -445,6 +445,10 @@ export type Cmd =
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'newTab' }
+  // L'ufficio, dal bottone nella testata: i bottoni della testata di VS Code
+  // esistono solo per i pannelli della barra laterale, e chi lavora nella scheda
+  // non ne vede nemmeno uno.
+  | { cmd: 'office' }
   // The page has already played its exit animation: here it really closes.
   | { cmd: 'closeTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }

@@ -1078,6 +1078,7 @@ for (const surface of ['view', 'panel']) {
       isWide: document.body.classList.contains('wide'),
       // the `hidden` property is not enough: what counts is whether it really shows
       tabBtnHidden: getComputedStyle(document.getElementById('btnTab')).display === 'none',
+      officeBtnShown: getComputedStyle(document.getElementById('btnOffice')).display !== 'none',
       composerLeft: Math.round(document.getElementById('composer').getBoundingClientRect().left),
       msgLeft: first ? Math.round(first.getBoundingClientRect().left) : 0,
       // width of the reading column and horizontal overflow
@@ -1115,6 +1116,10 @@ for (const surface of ['view', 'panel']) {
 
   t(r.isWide === wide, 'the face did not recognise itself');
   t(r.tabBtnHidden === wide, 'the "open as tab" button is in the wrong place');
+  // Nella scheda la testata di VS Code non c'e', quindi il bottone dell'ufficio deve
+  // stare qui dentro: senza, l'ufficio non si apre da nessuna parte per chi lavora
+  // a tutto schermo — che e' esattamente chi lo guarderebbe.
+  t(r.officeBtnShown === wide, "il bottone dell'ufficio e' nel posto sbagliato");
   if (wide) {
     // The tab uses the whole window: whatever is not thread is the context column,
     // not wasted space.

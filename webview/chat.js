@@ -1598,6 +1598,12 @@
         $('btnTab').hidden = m.surface === 'panel';
         // The context alongside only makes sense where there's room: in the tab.
         $('btnCtx').hidden = m.surface !== 'panel';
+        // L'ufficio, stessa storia ma per un motivo diverso: nella barra laterale il
+        // bottone ce l'ha gia' VS Code sulla testata della vista, e uno in piu' qui
+        // dentro strizzerebbe la pillola dello stato fino a tagliarne le parole. Nella
+        // scheda quella testata non esiste, e senza questo l'ufficio non si aprirebbe
+        // da nessuna parte.
+        $('btnOffice').hidden = m.surface !== 'panel';
         // And a tab can be closed; the sidebar can't. There's no button for it any
         // more — the header was crowded and VS Code already draws an X on the tab —
         // but Alt+W still has to know where it is.
@@ -2718,6 +2724,7 @@
   }
 
   $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
+  $('btnOffice').addEventListener('click', () => vscode.postMessage({ cmd: 'office' }));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   // ---------- opening and closing the tab ----------
