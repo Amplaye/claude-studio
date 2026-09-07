@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.20.1
+
+- **I messaggi in attesa vanno in alto a sinistra.** Stavano appoggiati sopra la barra
+  di scrittura, cioe' fra le cose gia' dette e quella che stai scrivendo: due o tre in
+  fila spingevano il campo verso il basso e si leggevano come pezzi del discorso, che
+  e' l'unica cosa che non sono — non sono ancora successi. Adesso sono un riquadro suo
+  in cima alla colonna, ancorato a sinistra e largo quanto gli basta, sopra il discorso
+  e non dentro. Resta tutto il resto: la frase che dice quanti sono e quando partono,
+  il numero d'ordine, la matita, la ×.
+
 ## 0.20.0
 
 - **Via la mappa del turno.** La colonna di bande colorate lungo il bordo sinistro del

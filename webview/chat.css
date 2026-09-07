@@ -82,7 +82,11 @@ body.wide .log {
   padding-top: 22px;
   gap: 14px;
 }
-/* same margin as the log: the writing field stays lined up with the messages */
+/* same margin as the log: the writing field and the queue stay lined up with the
+   messages, which in the wide face start at the gutter and not at the window edge */
+body.wide .queued {
+  margin-left: var(--gutter);
+}
 body.wide .composer {
   margin-left: var(--gutter);
   margin-right: var(--gutter);
@@ -2867,25 +2871,30 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 
 /* ---------- the queue: what you wrote while it was working ----------
-   Above the box you wrote it in, not inside the conversation: it hasn't happened
-   yet. The clock says what it is waiting for, the × takes it back while there is
-   still time. */
+   In alto a sinistra, sopra il discorso: non e' ancora successo, quindi non sta ne'
+   nel discorso — dove si confonderebbe con quello che e' gia' stato detto — ne'
+   dentro la barra di scrittura, che e' il posto di quello che stai scrivendo adesso.
+   L'orologio dice cosa aspetta, la × lo ritira finche' c'e' tempo. */
 /* La sala d'attesa: uno spazio dichiarato, non tre pastiglie appoggiate sopra la
    barra di scrittura. Ha un bordo suo e una frase in testa, perche' la domanda a cui
    deve rispondere — "questo cos'e' e quando parte?" — non ha risposta in un'icona. */
 .queued {
+  /* Larga quanto le basta e ancorata a sinistra, come una nota appuntata in un
+     angolo: a tutta riga sarebbe una seconda barra di scrittura in cima. */
+  align-self: flex-start;
+  flex: 0 0 auto;
+  max-width: min(420px, 100%);
   display: flex;
   flex-direction: column;
   gap: 4px;
-  width: 100%;
-  margin-bottom: 7px;
+  margin: 8px var(--pad) 0;
   padding: 7px;
   border-radius: var(--r);
   border: 1px dashed color-mix(in srgb, var(--claude-1) 45%, var(--line));
   background: color-mix(in srgb, var(--claude-1) 5%, transparent);
-  /* Quattro messaggi in coda, ognuno con una foto e due allegati, e la barra di
-     scrittura finirebbe fuori dalla finestra: la sala d'attesa scorre invece di
-     spingere via la cosa che serve per svuotarla. */
+  /* Quattro messaggi in coda, ognuno con una foto e due allegati, e del discorso
+     resterebbero due righe: la sala d'attesa scorre invece di mangiarsi la cosa
+     che sta guardando. */
   max-height: 34vh;
   overflow-y: auto;
 }

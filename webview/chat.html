@@ -146,6 +146,15 @@
           </button>
         </div>
 
+        <!-- Quello che hai scritto mentre Claude lavorava. Non entra nel discorso
+             finche' non parte davvero: sta in alto a sinistra, sopra il discorso e
+             fuori dalla barra di scrittura, perche' e' una cosa che aspetta e non
+             una cosa detta. Qui c'e' scritto cosa aspetta e quando partira', in che
+             ordine, e con cosa — le immagini e i file che si porta dietro si vedono
+             qui come si vedranno nel discorso. La × lo ritira finche' e' ancora in
+             tempo, e il testo torna nel campo. -->
+        <div class="queued" id="queued" role="region" data-i18n-label="queue.title" aria-label="Messages waiting to be sent" hidden></div>
+
         <main class="log" id="log" role="log"></main>
 
         <!-- What a screen reader is told, and the only thing it is told.
@@ -156,12 +165,6 @@
 
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>
-          <!-- Quello che hai scritto mentre Claude lavorava. Non entra nel discorso
-               finche' non parte davvero: qui c'e' scritto che sta aspettando e
-               quando partira', in che ordine, e con cosa — le immagini e i file che
-               si porta dietro si vedono qui come si vedranno nel discorso. La × lo
-               ritira finche' e' ancora in tempo, e il testo torna nel campo. -->
-          <div class="queued" id="queued" role="region" data-i18n-label="queue.title" aria-label="Messages waiting to be sent" hidden></div>
           <div class="attach" id="attach" hidden></div>
           <textarea id="input" rows="1" data-i18n-ph="composer.placeholder" placeholder="Message Claude…  (@ for a file, / for a command, Enter to send)"></textarea>
           <!-- Attachments. The picker is VS Code's own and it filters nothing:
