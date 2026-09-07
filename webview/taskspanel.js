@@ -128,9 +128,20 @@
       }
       while (rows.length > total) list.removeChild(rows.pop().row);
 
+      // Una riga accesa, non quattro.
+      //
+      // La CLI lancia i sub-agent a mazzi, e sul filo passano tutti accesi come sono
+      // davvero — l'ufficio ne disegna uno per persona e quelli gli servono veri. Qui
+      // no: quattro righe arancioni insieme sono un muro, e non si capisce piu' dove
+      // sia arrivato. Vale il primo, che e' anche quello a cui la lista scorre dietro;
+      // gli altri si disegnano come quello che sono per chi legge una lista, cioe' da
+      // fare.
+      const acceso = d && typeof d.active === 'number' ? d.active : -1;
+
       items.forEach((it, i) => {
         const r = rows[i];
-        const status = it.status || 'pending';
+        const vero = it.status || 'pending';
+        const status = vero === 'in_progress' && i !== acceso ? 'pending' : vero;
         // While it is the one being worked on it reads "Renaming the column"; the rest
         // of the time "Rename the column". That's what activeForm is for.
         const text = status === 'in_progress' ? it.activeForm || it.content : it.content;
@@ -156,7 +167,7 @@
       // taller than the panel, so the one that matters is exactly the one that scrolls
       // off — and the whole point of this panel is seeing it without hunting for it.
       // Only on a change: scrolling on every repaint would fight the mouse wheel.
-      const active = d && typeof d.active === 'number' ? d.active : -1;
+      const active = acceso;
       if (active >= 0 && active !== lastActive && rows[active]) {
         // `nearest` moves the list only when the row is actually out of sight, and
         // never drags the surrounding page around with it.

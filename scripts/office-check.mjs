@@ -24,7 +24,12 @@
 //    occupata: ne' da seduto, ne' in piedi in fondo al salone;
 //  - la posta: una busta per turno che comincia e una per turno che finisce,
 //    nessuna al primo giro (se no aprire la scheda e' una raffica di buste), e
-//    tutte se ne vanno da sole quando sono atterrate.
+//    tutte se ne vanno da sole quando sono atterrate;
+//  - i capi e i loro impiegati: ogni conversazione e' un capo, i sub-agent che
+//    apre sono i suoi, e ognuno deve stare accanto AL SUO — due capi vicini con
+//    gli impiegati mescolati sono due capi senza nessuno. Arrivano dalla porta e
+//    se ne vanno dalla porta, che e' l'unica cosa che fa vedere che un sub-agent
+//    e' finito invece che sparito.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -84,6 +89,7 @@ await page.goto(url);
 const t = (cond, msg) => !cond && fails.push(msg);
 const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
 const ctx = (d) => post({ k: 'ctx', d });
+const tasks = (d) => post({ k: 'tasks', d });
 const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 const sent = (cmd) => page.evaluate((c) => (window.__sent || []).some((m) => m.cmd === c), cmd);
 const inOffice = () => page.evaluate(() => document.body.classList.contains('inoffice'));
@@ -502,6 +508,83 @@ t((await buste()) === 5, 'i turni che ripartono non mandano una busta a testa: '
 await page.waitForTimeout(2400);
 t((await buste()) === 0, 'le buste restano appese in aria: ' + (await buste()));
 
+// ---- i capi e i loro impiegati ----
+//
+// Una conversazione e' un capo, e i sub-agent che apre sono i suoi impiegati. Due
+// conversazioni sono due capi, ognuno coi suoi: e' la gerarchia vera, non una
+// inventata per fare scena. Gli impiegati entrano dalla porta, si mettono nella
+// corsia accanto al capo che li ha chiamati, e riescono dalla porta quando hanno
+// finito — e' l'unica cosa che fa vedere che un sub-agent e' finito invece che
+// sparito.
+//
+// Qui si guarda quello che a occhio non si nota finche' non da' fastidio: che
+// arrivino, che siano quelli giusti (solo quelli in corso), che stiano vicini al
+// loro capo e non a un altro, e che se ne vadano davvero.
+const staff = () => page.locator('.of-staff').count();
+const T = (id, content, status) => ({ id, content, status });
+
+await ctx(data([]));
+await page.waitForTimeout(300);
+await ctx(
+  data([
+    card({ id: 'capo-a', name: 'Prima conversazione', busy: true }),
+    card({ id: 'capo-b', name: 'Seconda conversazione', busy: true }),
+  ])
+);
+await page.waitForTimeout(300);
+await tasks({
+  'capo-a': {
+    items: [T('1', 'Leggere', 'in_progress'), T('2', 'Cercare', 'in_progress'), T('3', 'Poi', 'pending')],
+    done: 0,
+    total: 3,
+    active: 0,
+    busy: true,
+  },
+  'capo-b': { items: [T('9', 'Impaginare', 'in_progress')], done: 0, total: 1, active: 0, busy: true },
+});
+// Il tempo di attraversare la stanza: entrano dalla porta, non compaiono al posto.
+await page.waitForTimeout(9000);
+t((await staff()) === 3, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 3');
+
+// Ognuno accanto al SUO capo: due capi vicini e gli impiegati mescolati sono due
+// capi senza nessuno.
+const vicini = await page.evaluate(() => {
+  const p = (n) => [parseFloat(n.style.left) + 8, parseFloat(n.style.top) + 24];
+  const capi = [...document.querySelectorAll('.of-guy:not(.of-staff)')].map(p);
+  return [...document.querySelectorAll('.of-staff')].map((s) => {
+    const [x, y] = p(s);
+    return Math.round(Math.min(...capi.map(([cx, cy]) => Math.hypot(cx - x, cy - y))));
+  });
+});
+t(
+  vicini.every((d) => d <= 48),
+  'un impiegato sta a ' + Math.max(...vicini) + ' pixel dal capo piu\' vicino'
+);
+
+// Dentro i muri, come tutti gli altri.
+const fuoriStaff = await page.evaluate(() => {
+  const r = document.querySelector('.of-floor').getBoundingClientRect();
+  return [...document.querySelectorAll('.of-staff')].filter((s) => {
+    const b = s.getBoundingClientRect();
+    return b.left < r.left || b.right > r.right || b.top < r.top || b.bottom > r.bottom;
+  }).length;
+});
+t(!fuoriStaff, 'ci sono ' + fuoriStaff + ' impiegati fuori dai muri');
+
+// E chi ha finito se ne va: per la porta, e ci mette il tempo di arrivarci.
+await tasks({
+  'capo-a': {
+    items: [T('1', 'Leggere', 'completed'), T('2', 'Cercare', 'completed'), T('3', 'Poi', 'pending')],
+    done: 2,
+    total: 3,
+    active: -1,
+    busy: false,
+  },
+  'capo-b': { items: [T('9', 'Impaginare', 'in_progress')], done: 0, total: 1, active: 0, busy: true },
+});
+await page.waitForTimeout(11000);
+t((await staff()) === 1, 'chi ha finito non se n’e’ andato: restano ' + (await staff()) + ' invece di 1');
+
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
 await page.screenshot({ path: path.join(root, 'dist', 'preview-office-full.png') });
@@ -511,4 +594,4 @@ if (fails.length) {
   console.error('office-check FAIL\n - ' + fails.join('\n - '));
   process.exit(1);
 }
-console.log('office-check ok — il bottone, la pianta, la gente, i posti a sedere e la posta');
+console.log('office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta e gli impiegati');

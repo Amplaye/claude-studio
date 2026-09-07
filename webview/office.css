@@ -302,6 +302,16 @@ body.inoffice .top .activity {
   filter: brightness(1.2);
   z-index: 400;
 }
+
+/* Gli impiegati dei sub-agent. Stessa gente, ma non si clicca: dietro non c'e'
+   una conversazione da aprire, c'e' un pezzo di quella del loro capo. Quello che
+   fanno lo dicono passandoci sopra col mouse.
+
+   Non hanno targhetta, ed e' la differenza che si legge da lontano: chi ha un
+   nome sulla scrivania e' un capo, chi sta in piedi accanto lavora per lui. */
+.of-staff {
+  cursor: default;
+}
 .of-guy:focus-visible {
   outline: 2px solid var(--claude-2);
   outline-offset: 1px;

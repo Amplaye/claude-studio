@@ -1680,8 +1680,12 @@
         break;
       // I passi stanno nella stessa colonna, sotto l'ultima card: arrivano a parte
       // perche' cambiano al ritmo di Claude, non a quello dei consumi.
+      // E all'ufficio, che dei passi fa gente: ogni sub-attivita' e' un impiegato
+      // che entra dalla porta, si mette accanto al capo che l'ha aperta e se ne va
+      // quando ha finito.
       case 'tasks':
         rail.renderTasks(m.d);
+        if (window.OFFICE) window.OFFICE.renderTasks(m.d);
         break;
       case 'commands':
         commands = m.items || [];

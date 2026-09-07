@@ -3,6 +3,16 @@
 
 /** One entry of Claude's list, as the TodoWrite tool writes it. */
 export interface TaskItem {
+  /**
+   * Il "#3" della CLI, quando c'e'.
+   *
+   * Viaggia perche' l'ufficio disegna una persona per sub-agent, e una persona ha
+   * bisogno di restare la stessa: senza un nome proprio l'unica cosa con cui
+   * riconoscerla e' la sua posizione nell'elenco, e l'elenco si riordina — un
+   * passo che finisce fa scalare tutti gli altri di uno, e mezzo ufficio si
+   * cambia faccia in mezzo al corridoio.
+   */
+  id?: string;
   /** "Rename the column" — how it reads when it is not the one being done. */
   content: string;
   /** "Renaming the column" — how it reads while it is the one being done. */

@@ -229,6 +229,136 @@ window.OFFICE = (() => {
     };
   }
 
+  // ---------- gli impiegati ----------
+  //
+  // Una conversazione e' un capo, e i sub-agent che apre sono i suoi impiegati.
+  // Due schede aperte sono due capi, ognuno coi suoi: la gerarchia non e'
+  // inventata per fare scena, e' quella vera — quei sub-agent li ha aperti quella
+  // conversazione li', e nessun'altra.
+  //
+  // Sono gente di passaggio, ed e' il punto: entrano dalla porta quando il
+  // sub-agent parte, si mettono accanto al capo che li ha chiamati, e riescono
+  // dalla porta quando hanno finito. Una scrivania non gliela si da' — sono sei
+  // in tutto e sono dei capi — e comunque quattro che si stringono attorno a un
+  // tavolo dicono "questi lavorano per lui" meglio di quattro sparpagliati per
+  // la stanza.
+  //
+  // Il legame e' gratis: la chiave del quadro delle task e' l'id della sessione,
+  // cioe' lo stesso `id` che ha la card del capo.
+
+  /** Quanti se ne tengono per capo. Oltre, sono una folla attorno a una scrivania. */
+  const MAX_STAFF = 4;
+  /**
+   * Dove si mettono, in pixel dai piedi del capo: due per parte, nelle corsie fra
+   * una colonna di scrivanie e l'altra.
+   *
+   * In fila sotto il capo era il posto ovvio ed era quello sbagliato: fra una
+   * fila di scrivanie e l'altra ci sono settanta pixel, e ventisei se li prende
+   * la targhetta di quella dopo — gli impiegati della prima fila finivano
+   * scritti sopra il nome della seconda. Le corsie invece sono larghe
+   * cinquantadue e non c'e' niente, che e' esattamente dove si sta in piedi in
+   * un ufficio quando si e' fermi alla scrivania di qualcun altro.
+   */
+  const POSTI_STAFF = [
+    [40, -10],
+    [-40, -10],
+    [40, 16],
+    [-40, 16],
+  ];
+
+  /** L'ultimo quadro delle task, per id di conversazione. */
+  let board = {};
+  /** chiave `idCapo/idTask` -> l'impiegato. */
+  const staff = new Map();
+
+  function buildStaff(chiave, capo, it) {
+    const b = el('span', 'of-guy of-staff busy');
+    const who = el('span', 'of-body');
+    const bubble = el('span', 'of-bubble');
+    const dots = el('span', 'of-dots');
+    dots.append(el('i'), el('i'), el('i'));
+    bubble.append(dots);
+    b.append(el('span', 'of-ring'), who, bubble);
+    crowd.append(b);
+    // Nasce sulla porta: da li' entra. La porta e' il muro in fondo in mezzo, ed
+    // e' l'unico punto della pianta che non e' di nessuno.
+    const [px, py] = window.ROOM.PORTA;
+    b.style.left = px - 8 + 'px';
+    b.style.top = py - 24 + 'px';
+    b.style.zIndex = py;
+    const chi = { chiave, el: b, fig: who, seme: capo.seme + '/' + (it.id || it.content) };
+    window.ROOM.vesti(who, chi.seme, 'cammina');
+    return chi;
+  }
+
+  /** Il posto di questo impiegato: nella corsia accanto al suo capo. */
+  const postoStaff = (capo, i) => [
+    capo.casa.x + 8 + POSTI_STAFF[i][0],
+    capo.casa.y + 24 + POSTI_STAFF[i][1],
+  ];
+
+  /**
+   * Chi c'e' adesso, capo per capo.
+   *
+   * Solo i sub-agent davvero in corso: uno "da fare" non e' ancora entrato in
+   * ufficio, e uno finito se n'e' andato. E solo i capi seduti — chi e' in piedi
+   * in fila non ha un posto attorno a cui mettere nessuno.
+   */
+  function volutiStaff() {
+    const out = new Map();
+    for (const [id, capo] of people) {
+      if (!capo.casa) continue;
+      const items = (board[id] && board[id].items) || [];
+      const vivi = items.filter((it) => it.status === 'in_progress').slice(0, MAX_STAFF);
+      vivi.forEach((it, i) => out.set(id + '/' + (it.id || it.content), { capo, it, i }));
+    }
+    return out;
+  }
+
+  async function entra(chi, capo, i) {
+    chi.va = true;
+    if (await window.ROOM.viaggio(chi.el, ...postoStaff(capo, i))) {
+      window.ROOM.vesti(chi.fig, chi.seme, 'digita');
+    }
+    chi.va = false;
+  }
+
+  async function esce(chi) {
+    chi.esce = true;
+    window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
+    await window.ROOM.viaggio(chi.el, ...window.ROOM.PORTA);
+    chi.el.remove();
+    staff.delete(chi.chiave);
+  }
+
+  function paintStaff() {
+    const voluti = volutiStaff();
+
+    // Chi ha finito se ne va — ma per la porta, non svanendo: e' l'unica cosa che
+    // fa vedere che un sub-agent e' finito invece che sparito.
+    for (const [chiave, chi] of staff) {
+      if (!voluti.has(chiave) && !chi.esce) esce(chi);
+    }
+
+    for (const [chiave, { capo, it, i }] of voluti) {
+      let chi = staff.get(chiave);
+      if (!chi) {
+        chi = buildStaff(chiave, capo, it);
+        staff.set(chiave, chi);
+        entra(chi, capo, i);
+      } else if (!chi.va && !chi.esce) {
+        // Il posto puo' cambiare sotto i piedi: un fratello che finisce fa
+        // scalare tutti gli altri di uno. Ci si sposta camminando, che a questa
+        // misura sono venti pixel e non si nota, invece di teletrasportarsi.
+        const [fx, fy] = postoStaff(capo, i);
+        if (Math.abs(parseFloat(chi.el.style.left) + 8 - fx) > 2) entra(chi, capo, i);
+      }
+      const cosa = it.activeForm || it.content || '';
+      chi.el.title = capo.pname.textContent + ' · ' + cosa;
+      chi.el.setAttribute('aria-label', chi.el.title);
+    }
+  }
+
   /** Colore della barra: lo stesso semaforo del pannello. */
   const barColor = (p) =>
     p == null ? 'var(--line)' : p >= 80 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
@@ -407,6 +537,11 @@ window.OFFICE = (() => {
       boss.classList.toggle('busy', !!head.busy);
     }
 
+    // Gli impiegati stanno accanto al loro capo, e il capo si e' appena seduto:
+    // se una conversazione ha cambiato scrivania — o l'ha appena presa — i suoi
+    // devono seguirla.
+    paintStaff();
+
     count.textContent = t('office.count', { n: list.length });
     empty.textContent = t('office.empty');
     empty.hidden = list.length > 0;
@@ -423,6 +558,16 @@ window.OFFICE = (() => {
       if (!root) build(container, post);
     },
     render,
+    /**
+     * Il quadro delle task, cioe' i sub-agent aperti da ogni conversazione.
+     *
+     * Arriva a parte dal resto perche' cambia al ritmo di Claude e non a quello
+     * dei consumi, ed e' la stessa chiave: `board[idConversazione]`.
+     */
+    renderTasks(d) {
+      board = d || {};
+      if (root) paintStaff();
+    },
     /** Tornato a schermo dopo essere stato via: la misura di prima non vale piu'. */
     resize: fit,
   };

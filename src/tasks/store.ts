@@ -479,36 +479,35 @@ export class TaskStore {
 
   /** Rifa' i conti di una lista che e' cambiata e la manda a schermo. */
   private settle(key: string, l: List) {
-    // Uno in corso, non quattro.
+    // Quello a cui il pannello sta guardando: il primo in corso.
     //
     // Tutta la grammatica del pannello dice "uno": una riga accesa, un `active`, una
-    // stima. Le sorgenti pero' non lo garantiscono — il piano lo riscrive il modello a
-    // ogni giro, e gliene sfugge facilmente piu' d'uno acceso insieme — e allora
-    // quattro righe si accendevano tutte, la lista diventava un muro d'arancione e non
-    // si capiva piu' dove fosse arrivato. Vale il primo; gli altri tornano a essere
-    // quello che sono, cioe' da fare.
+    // stima. Ma "uno" e' una regola di come si disegna, non di cosa succede — la CLI
+    // lancia i sub-agent a mazzi di tre o quattro, e per un pezzo qui dentro gli altri
+    // venivano riscritti a "da fare" per non accendere quattro righe insieme. Adesso
+    // che l'ufficio disegna una persona per sub-agent quella bugia costava cara: tre
+    // impiegati su quattro stavano fermi a guardare. Sul filo passa la verita', e a
+    // tenere accesa una riga sola ci pensa il pannello, che e' l'unico che lo vuole.
     const active = l.steps.findIndex((s) => s.status === 'in_progress');
 
     // L'orologio di ogni passo, tenuto qui e non altrove perche' e' l'unico punto da
     // cui passa ogni cambiamento di stato, da qualunque delle tre sorgenti arrivi.
     // Non serve sapere com'era prima: "sta correndo e non ha ancora un inizio" e "non
     // corre piu' e non ha ancora una durata" sono le due sole domande.
-    //
-    // Corre solo quello scelto sopra, e conta: uno degli scartati che prendesse
-    // l'orologio adesso, quando poi tocca a lui davvero, ripartirebbe da mezz'ora fa.
     const now = Date.now();
-    l.steps.forEach((s, i) => {
-      if (i === active) {
+    l.steps.forEach((s) => {
+      if (s.status === 'in_progress') {
         if (!s.startedAt) s.startedAt = now;
       } else if (s.startedAt && !s.ms) {
         s.ms = Math.max(1, now - s.startedAt);
       }
     });
 
-    const items: TaskItem[] = l.steps.map((s, i) => ({
+    const items: TaskItem[] = l.steps.map((s) => ({
+      id: s.id || undefined,
       content: s.content,
       activeForm: s.activeForm,
-      status: s.status === 'in_progress' && i !== active ? 'pending' : s.status,
+      status: s.status,
     }));
     l.data = {
       items,

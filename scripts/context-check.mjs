@@ -348,6 +348,38 @@ for (const width of [320, 620]) {
   t(tk.rows === 3, 'i passi disegnati sono ' + tk.rows + ' invece di 3');
   t(tk.running === 1, 'il passo in corso non e\' segnato: ' + tk.running);
   t(tk.ticked === 1, 'il passo finito non e\' spuntato: ' + tk.ticked);
+
+  // ---- una riga accesa, non quattro ----
+  //
+  // Sul filo i passi accesi arrivano tutti, quanti sono davvero: la CLI i sub-agent li
+  // lancia a mazzi, e l'ufficio ne disegna uno per persona. Qui no — quattro righe
+  // arancioni insieme sono un muro in cui non si capisce piu' dove sia arrivato. Vale
+  // il primo, che e' anche quello a cui la lista scorre dietro; gli altri si disegnano
+  // come quello che sono per chi legge una lista, cioe' da fare.
+  await steps(
+    list({
+      items: [
+        { content: 'Read the transcript', status: 'completed' },
+        { content: 'Fix the counter', activeForm: 'Fixing the counter', status: 'in_progress' },
+        { content: 'Run the checks', activeForm: 'Running the checks', status: 'in_progress' },
+      ],
+      done: 1,
+      total: 3,
+      active: 1,
+    })
+  );
+  await page.waitForTimeout(200);
+  const accesi = await page.evaluate(() => ({
+    running: document.querySelectorAll('.csteps .tk-row.in_progress').length,
+    // E deve essere il primo, non uno a caso.
+    primo: [...document.querySelectorAll('.csteps .tk-row')].findIndex((r) =>
+      r.classList.contains('in_progress')
+    ),
+  }));
+  t(accesi.running === 1, 'due passi accesi insieme accendono due righe: ' + accesi.running);
+  t(accesi.primo === 1, 'la riga accesa non e\' la prima delle due: ' + accesi.primo);
+  await steps(list());
+  await page.waitForTimeout(200);
   t(/1 of 3/.test(tk.count || ''), 'il conteggio dei passi e\' sbagliato: ' + tk.count);
   t(tk.beat === 'tk-beat', 'il passo in corso non pulsa: ' + tk.beat);
 

@@ -444,6 +444,24 @@ window.ROOM = (() => {
     return chi.el.isConnected;
   }
 
+  /**
+   * Porta un elemento da dov'e' a `[fx, fy]`, e basta.
+   *
+   * `vai` qui sopra e' per chi ha una scrivania e una conversazione dietro: si
+   * ferma se Claude riparte, e sa dove tornare. Gli impiegati dei sub-agent non
+   * hanno niente di tutto questo — entrano dalla porta, si mettono accanto al
+   * loro capo e se ne vanno quando hanno finito — e per loro serve solo la
+   * strada. Il tragitto e' quello vero: la stanza sa dove sono i mobili.
+   */
+  async function viaggio(el, fx, fy) {
+    const chi = { el };
+    for (const [x, y] of cammino(...piedi(chi), fx, fy)) {
+      if (!el.isConnected) return false;
+      await muovi(chi, x, y);
+    }
+    return el.isConnected;
+  }
+
   /** Aspetta, ma con un orecchio: se Claude riparte la pausa finisce subito. */
   async function pausa(chi, ms) {
     const fine = Date.now() + ms;
@@ -615,6 +633,7 @@ window.ROOM = (() => {
     posto,
     monta,
     posta,
+    viaggio,
     vesti,
     cammino,
     occupata,

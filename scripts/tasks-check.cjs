@@ -577,7 +577,7 @@ async function live(tab, side) {
   await settle();
   const plan = board(tab)[ID_PLAN];
   t(
-    line(plan) === 'c:Leggere il modulo | i:Portare i totali su interi | p:Sistemare i test',
+    line(plan) === 'c:Leggere il modulo | i:Portare i totali su interi | i:Sistemare i test',
     'il piano scritto con lo strumento nostro non arriva al pannello: ' + line(plan)
   );
   t(
@@ -594,10 +594,22 @@ async function live(tab, side) {
     plan && typeof plan.expectedMs === 'number' && plan.expectedMs > 0,
     'non c’e’ nessuna attesa su cui stimare: ' + (plan && plan.expectedMs)
   );
+  // Due passi accesi insieme arrivano accesi tutti e due, ed e' giusto cosi'.
+  //
+  // Per un pezzo qui si controllava il contrario: che ne arrivasse uno solo, perche'
+  // il pannello con quattro righe arancioni diventa un muro. Ma "uno" e' una regola di
+  // come si disegna una lista, non di cosa sta succedendo — la CLI i sub-agent li
+  // lancia a mazzi — e da quando l'ufficio disegna una persona per sub-agent quella
+  // bugia si vedeva: tre impiegati su quattro stavano fermi a guardare. Adesso sul filo
+  // passa la verita', e a tenere accesa una riga sola ci pensa il pannello, che e'
+  // l'unico che lo vuole. Che lo faccia davvero lo controlla context-check.
   t(
-    (plan?.items ?? []).filter((i) => i.status === 'in_progress').length === 1,
-    'due passi accesi insieme arrivano accesi tutti e due al pannello: ' + line(plan)
+    (plan?.items ?? []).filter((i) => i.status === 'in_progress').length === 2,
+    'i passi accesi insieme non arrivano accesi: ' + line(plan)
   );
+  // E l'indice attivo resta uno solo: e' il primo acceso, ed e' quello a cui la lista
+  // scorre dietro.
+  t(plan && plan.active === 1, 'l’indice attivo non e’ il primo acceso: ' + (plan && plan.active));
 
   // ---- started before it had a number ----
   tab.webview._onMsg({ cmd: 'open', id: ID_EARLY });
