@@ -5,8 +5,8 @@
   La stessa pianta dell'ufficio, ma i mobili non sono piu' disegnati: sono
   ritagliati da SeasonVale (interiors/All Tileset, caselle da 16).
 
-  Tre cose la distinguono dalla pelle disegnata, e sono quelle che si volevano
-  vedere:
+  Cinque cose la distinguono dalla pelle disegnata, e sono quelle che si
+  volevano vedere:
 
   1. I mobili hanno un'altezza. Kenney disegna un tavolo dentro la sua casella,
      visto da sopra e schiacciato; SeasonVale lo disegna alto — occupa una
@@ -20,11 +20,35 @@
      muove, quindi si ricalcola a ogni tratto invece di scriverlo a mano.
 
   3. La stanza non sta mai ferma. Tutti respirano, chi lavora batte a macchina,
-     e ogni tanto qualcuno si alza e va davvero da qualche parte — alla
-     fotocopiatrice, al cestino, al bar, in sala riunioni — poi torna al suo
-     posto. Non e' un ciclo finto in un punto solo: e' un tragitto per corridoi
-     che esistono, ed e' per quello che il corridoio centrale e' largo sei
-     caselle e le scrivanie gli lasciano una corsia libera a sinistra.
+     e ogni tanto qualcuno si alza e va davvero da qualche parte — al bar, alla
+     fotocopiatrice, al cestino, in sala riunioni — poi torna al suo posto. Non
+     e' un ciclo finto in un punto solo: e' un tragitto per corridoi che
+     esistono, ed e' per quello che il corridoio centrale e' largo sei caselle e
+     le scrivanie gli lasciano una corsia libera a sinistra.
+
+     Il giro tocca a tutti e le mete girano insieme a lui: tocca sempre a chi e'
+     tornato al posto per primo, e la meta' successiva e' la prossima della
+     fila. A caso capitava che in un minuto di stanza al bar non ci andasse
+     nessuno — e il bar e' meta' del motivo per cui uno si alza. Ci si sta in
+     due, uno per posto al bancone, e ci si ferma il quadruplo che altrove: fra
+     andata e ritorno il tragitto e' mezzo minuto, e con una sosta di due
+     secondi non ci si vedeva mai nessuno.
+
+     E ogni tanto qualcuno dice qualcosa — la macchinetta, la call, il venerdi'
+     che non si rilascia. Una nuvoletta alla volta: a questa misura due sono due
+     rettangoli bianchi, e nessuno legge due rettangoli bianchi.
+
+  4. Le facce girano a ogni apertura. Nascono dal seme, e finche' il seme e' il
+     nome della conversazione la stanza ha per sempre gli stessi cinque
+     impiegati: si riapre e c'e' la stessa faccia sulla stessa sedia, il che
+     dopo la terza volta la fa sembrare una fotografia. Il turno entra nel seme,
+     ma non cambia mentre la stanza e' aperta — dentro la stessa apertura
+     ognuno resta se stesso.
+
+  5. I mobili sono numerati, e il numero si spegne. E' un attrezzo per chi monta
+     la stanza: serve a dire "togli il 12" invece di "togli la pianta in fondo a
+     destra". Con i numeri accesi pero' la stanza non si puo' giudicare a
+     occhio, quindi c'e' la casella sopra per spegnerli.
 
   Le tinte sono prese dal legno dei mobili invece che scelte a parte: il
   campionamento del foglio da' #e86837 di corpo, #ff9148 di luce, #b64335 di
@@ -51,6 +75,7 @@
   h1 { font-size: 17px; margin: 0 0 4px; letter-spacing: .02em; }
   .lede { margin: 0 0 20px; opacity: .62; font-size: 13px; max-width: 76ch; }
   .lede code { color: #ffb083; }
+  .tog { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
 
   /* La tavolozza esce dal foglio dei mobili, non da una scelta a parte: il legno
      e' #e86837, e tutto il resto e' imparentato con quello. Il pavimento sta
@@ -63,7 +88,12 @@
 
     --floor:#8a4e2c; --floor-hi:#9c5a34; --floor-lo:#6e3d22;
     --sand:#c9a887; --sand-hi:#d9bb9b; --sand-jo:#a8825c;
-    --wall:#f0dcc0; --wall-hi:#fbeedb; --wall-lo:#d3b58e; --wall-jo:#b3906a;
+    /* I muri sono di legno come i mobili: stessa famiglia del bancone, due
+       gradini piu' chiari perche' restino dietro invece che venire avanti. */
+    --wall:#cf8c4a; --wall-hi:#e8a866; --wall-lo:#a4652f; --wall-jo:#7d4a21;
+    /* La carta delle targhette era il muro. Adesso che il muro e' legno le
+       serve una tinta sua, se no il nome sopra non si legge piu'. */
+    --paper:#f0dcc0;
 
     --olive:#a1ab3c; --olive-lo:#68662b;
     --shade:rgba(46,28,44,.42);
@@ -98,18 +128,20 @@
     box-shadow: inset 0 -1px 0 var(--sand-jo), inset 0 -2px 0 rgba(60,40,20,.14);
   }
 
-  /* Muretti bassi. Il sole sta a nord-ovest per tutti: spigolo illuminato in alto
-     a sinistra, spessore in ombra in basso a destra, e l'ombra per terra sono due
-     gradini pieni invece di una sfocatura. L'ombra usa il contorno dei mobili,
-     non un nero qualunque: e' quello che li fa stare nella stessa stanza. */
+  /* Muretti bassi di assito. Le assi stanno in piedi — fughe verticali ogni
+     otto — perche' e' cosi' che si mette il legno su un muro, e perche' il
+     pavimento le ha orizzontali: due tavolati nello stesso verso sarebbero la
+     stessa superficie piegata. Il sole sta a nord-ovest per tutti: spigolo
+     illuminato in alto a sinistra, spessore in ombra in basso a destra, e
+     l'ombra per terra sono due gradini pieni invece di una sfocatura. */
   .wall {
     position: absolute;
     background-color: var(--wall);
     background-image:
-      repeating-linear-gradient(180deg, var(--wall-jo) 0 1px, var(--wall-hi) 1px 2px, transparent 2px 8px),
-      repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, transparent 1px 16px),
-      conic-gradient(rgba(140,100,60,.07) 0 25%, transparent 0 50%, rgba(140,100,60,.07) 0 75%, transparent 0);
-    background-size: auto, auto, 4px 4px;
+      repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, var(--wall-hi) 1px 2px, transparent 2px 8px),
+      repeating-linear-gradient(180deg, rgba(255,215,170,.10) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(180deg, rgba(70,35,18,.12) 0 1px, transparent 1px 7px);
+    background-size: auto, auto, auto;
     box-shadow:
       inset 1px 1px 0 var(--wall-hi), inset -1px -1px 0 var(--wall-lo),
       2px 2px 0 rgba(46,28,44,.40), 4px 4px 0 rgba(46,28,44,.18);
@@ -185,9 +217,9 @@
   .guy.idle { filter: grayscale(.6) opacity(.55); }
 
   .plate {
-    position: absolute; left: 50%; width: 52px; margin-left: -26px;
+    position: absolute; width: 52px; margin-left: -26px;
     padding: 1px 2px 2px; pointer-events: none;
-    background: var(--wall); color: #4a2c1c;
+    background: var(--paper); color: #4a2c1c;
     box-shadow: inset 0 0 0 1px var(--ink), 2px 2px 0 rgba(46,28,44,.5);
   }
   .plate b { display: block; font-weight: 700; font-size: 6px; line-height: 1.35;
@@ -195,17 +227,59 @@
   .plate s { display: block; height: 2px; margin-top: 1px; text-decoration: none;
              background: rgba(46,28,44,.24); }
   .plate s i { display: block; height: 100%; }
+
+  /* ---- i numeri sui mobili ----
+     Un attrezzo, non arredamento: servono a dire "togli il 12" invece di
+     "togli la pianta in fondo a destra". Stanno sopra tutto — un numero
+     coperto da uno scaffale non si puo' leggere — e si spengono dalla
+     casella sopra la stanza, perche' con i numeri accesi la stanza non si
+     puo' giudicare a occhio. */
+  .num {
+    position: absolute; transform: translate(-50%, -50%);
+    padding: 0 1px; pointer-events: none;
+    font: 700 7px/1.3 ui-monospace, "Cascadia Mono", monospace;
+    color: #14100f; background: #ffd24a;
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+  .pane.puliti .num { display: none; }
+
+  /* ---- quello che uno dice ----
+     Sopra la testa e ben sotto la targhetta: la targhetta sta in alto sopra la
+     scrivania e li' resta anche mentre uno cammina, quindi le due non si
+     incontrano mai. Compare e sparisce da sola; il JS mette solo il testo. */
+  .dice {
+    position: absolute; left: 50%; top: -15px; transform: translateX(-50%);
+    padding: 1px 2px; white-space: nowrap; pointer-events: none; z-index: 50;
+    font: 700 6px/1.4 ui-sans-serif, system-ui, sans-serif;
+    background: var(--paper); color: #4a2c1c;
+    box-shadow: inset 0 0 0 1px var(--ink), 2px 2px 0 rgba(46,28,44,.5);
+    animation: fiato 3.2s ease-out both;
+  }
+  /* Entra di scatto e se ne va sfumando: chi parla comincia di colpo e smette
+     piano, ed e' l'unica cosa qui dentro che non e' a scatti interi perche'
+     non e' fatta di pixel — e' un cartello. */
+  @keyframes fiato {
+    0%   { opacity: 0; transform: translate(-50%, 3px); }
+    8%   { opacity: 1; transform: translate(-50%, 0); }
+    85%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
 </style>
 
 <h1>L'ufficio, coi mobili di SeasonVale</h1>
 <p class="lede">
-  Sei scrivanie, i mobili di <code>interiors/All&nbsp;Tileset</code> e le tinte
-  prese dal loro legno. Il centro in alto e' un passaggio, non una terza stanza,
-  ed e' largo apposta: e' di li' che si va al bar e in sala riunioni. Nessuno sta
-  fermo — tutti respirano, chi lavora batte a macchina, e a turno qualcuno si
-  alza e ci va davvero.
+  Sei scrivanie, i mobili di <code>interiors/All&nbsp;Tileset</code>, i muri di
+  assito e le tinte prese dal legno. Si siede su sgabelli e basta: la sedia del
+  pacchetto ha uno schienale che dal davanti copre mezzo tavolo. Il centro in
+  alto e' un passaggio, non una terza stanza, ed e' largo apposta: e' di li' che
+  si va al bar e in sala riunioni. Nessuno sta fermo — tutti respirano, chi
+  lavora batte a macchina, e a turno qualcuno si alza, va a prendersi un caffe'
+  e ogni tanto dice la sua. A ogni apertura tocca a un altro giro di facce.
 </p>
-<div class="pane"><div class="stage" id="stage"></div></div>
+<p class="lede">
+  <label class="tog"><input type="checkbox" id="numeri" checked /> numeri sui mobili</label>
+</p>
+<div class="pane" id="pane"><div class="stage" id="stage"></div></div>
 
 <script>
 const TILE = 16, COLS = 24, ROWS = 20;
@@ -230,11 +304,14 @@ const WALLS = [
    numero intero di caselle, e allinearli alla griglia li lasciava sbilenchi in
    mezzo alle stanze. Cosi' invece si centrano davvero. */
 const PROPS = [
-  // --- sala riunioni: tavolo centrato, sei posti, la bacheca sul muro ---
+  // --- sala riunioni: tavolo centrato, sei posti, la bacheca sul muro.
+  //     Si siede su sgabelli e basta: la sedia di SeasonVale ha uno schienale
+  //     alto che dal davanti copre mezzo tavolo, e in una stanza dove tutto e'
+  //     visto dall'alto era l'unico mobile che si metteva di traverso. ---
   { s:'cork',        x:67,  b:36 },
-  { s:'chairB',      x:72,  b:66 },  { s:'chairB', x:91,  b:66 },
+  { s:'stoolRound',  x:72,  b:66 },  { s:'stoolRound', x:91,  b:66 },
   { s:'meetTable',   x:64,  b:84 },
-  { s:'chairB',      x:44,  b:96 },  { s:'chairB', x:113, b:96 },
+  { s:'stoolRound',  x:44,  b:96 },  { s:'stoolRound', x:113, b:96 },
   { s:'plantBlue',   x:136, b:46 },
   { s:'plantPurple', x:22,  b:110 },
 
@@ -276,10 +353,20 @@ const PORTE = 60;            // l'altezza delle due porte, righe 3-4
 const METE = {
   copiatrice: [[322, CORSIA], [322, 196]],
   cestino:    [[34, CORSIA], [34, 236]],
-  bar:        [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [300, PORTE]],
+  // Al bar si arriva al bancone, davanti al tavolino e non in mezzo alla
+  // stanza: sono due posti separati perche' due che ci vanno insieme sono una
+  // pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
+  // due volte. Si sta davanti al tavolino e non di fianco agli sgabelli: di
+  // fianco si finiva dietro la botte, che a quel punto copriva le gambe.
+  caffe:      [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [300, PORTE], [284, 86]],
+  spuntino:   [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [300, PORTE], [318, 86]],
   riunione:   [[CORSIA_SU, CORSIA], [CORSIA_SU, PORTE], [44, PORTE], [44, 92]],
 };
-const NOMI_METE = Object.keys(METE);
+/* Il bar pesa il doppio del resto, ed e' giusto cosi': in un ufficio vero si va
+   piu' spesso a prendere un caffe' che a stampare. Pesare ripetendo il nome e'
+   tutto quello che serve — una tabella di probabilita' sarebbe la stessa cosa
+   scritta in dieci righe. */
+const NOMI_METE = ['caffe', 'spuntino', 'caffe', 'spuntino', 'copiatrice', 'cestino', 'riunione'];
 
 // Cinque conversazioni, i quattro stati che l'ufficio sa dire. Una scrivania
 // resta vuota: un ufficio pieno non dice quante conversazioni potresti aprire.
@@ -323,17 +410,35 @@ for (const w of WALLS) {
   n.style.height = w.h * TILE + 'px';
   stage.append(depth(n, (w.r + w.h) * TILE));
 }
-for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
+/* Ogni mobile porta il suo numero, nell'ordine in cui sta scritto qui sopra.
+   Il cartellino sta al centro del ritaglio e sopra ogni cosa: uno che si
+   nasconde dietro lo scaffale che deve numerare non serve a niente. */
+function numero(i, cx, cy) {
+  const n = el('div', 'num');
+  n.textContent = i;
+  n.style.left = cx + 'px';
+  n.style.top = cy + 'px';
+  n.style.zIndex = 9000;
+  return n;
+}
+PROPS.forEach((p, i) => {
+  const d = window.SV[p.s];
+  stage.append(prop(p.s, p.x, p.b));
+  stage.append(numero(i + 1, p.x + d.w / 2, p.b - d.h / 2));
+});
+
+const pane = document.getElementById('pane');
+const numeri = document.getElementById('numeri');
+numeri.onchange = () => pane.classList.toggle('puliti', !numeri.checked);
 
 const SW = window.SV.desk.w, SH = window.SV.desk.h;
 
 DESKS.forEach((d, i) => {
   const who = PEOPLE[i];
   const top = d.b - SH;
-  // La sedia si vede solo dove non siede nessuno, ed e' proprio quello che deve
-  // dire: posto libero. Sotto una persona sarebbe comunque coperta, e lo
-  // schienale spuntava sopra il piano proprio dove sta il monitor.
-  if (!who) stage.append(prop('chairB', d.x + 14, d.b + 22));
+  // Lo sgabello si vede solo dove non siede nessuno, ed e' proprio quello che
+  // deve dire: posto libero. Sotto una persona sarebbe comunque coperto.
+  if (!who) stage.append(prop('stoolRound', d.x + 13, d.b + 22));
   stage.append(prop('desk', d.x, d.b));
 
   const pc = el('div', 'pc' + (who ? (who.st === 'busy' ? ' on busy' : ' on') : ''));
@@ -355,6 +460,17 @@ DESKS.forEach((d, i) => {
    fare le strisce si ripiega sul disegno fermo — meglio un ufficio immobile che
    un ufficio vuoto. */
 const DURATA = { fermo: 1700, digita: 420, cammina: 560 };
+
+/* Il turno di chi c'e' oggi.
+
+   Le facce nascono dal seme, e finche' il seme e' il nome della conversazione
+   l'ufficio ha per sempre gli stessi cinque impiegati: si riapre la stanza e c'e'
+   la stessa faccia sulla stessa sedia, il che dopo la terza volta la fa sembrare
+   una fotografia. Il turno entra nel seme, quindi a ogni apertura tocca a un
+   altro giro di gente — ma dentro la stessa apertura ognuno resta se stesso,
+   perche' il turno non cambia mentre la stanza e' aperta. */
+const TURNO = Math.floor(Math.random() * 8);
+const seme = (p) => p.name + '#' + TURNO;
 function vesti(fig, seme, posa) {
   const s = window.NPC.strip && window.NPC.strip(seme, posa);
   if (s && s.frames > 1) {
@@ -379,10 +495,14 @@ PEOPLE.forEach((p, i) => {
   g.style.top = y + 'px';
 
   const fig = el('div', 'fig');
-  vesti(fig, p.name, p.st === 'busy' ? 'digita' : 'fermo');
+  vesti(fig, seme(p), p.st === 'busy' ? 'digita' : 'fermo');
 
+  /* La targhetta sta sulla scrivania e ci resta: dice di chi e' quel posto, e
+     un posto non si alza. Appesa alla persona se ne andava al bar con lei, e
+     mezza stanza si ritrovava un nome che le volava sopra la testa. */
   const plate = el('div', 'plate');
-  plate.style.top = d.top - y - 20 + 'px';
+  plate.style.left = d.x + SW / 2 + 'px';
+  plate.style.top = d.top - 20 + 'px';
   const b = el('b');
   b.textContent = p.name;
   const s = el('s');
@@ -392,9 +512,11 @@ PEOPLE.forEach((p, i) => {
   s.append(fill);
   plate.append(b, s);
 
-  g.append(fig, plate);
-  stage.append(depth(g, y + 24));
-  gente.push({ p, g, fig, casa: { x, y }, fuori: false });
+  g.append(fig);
+  stage.append(depth(plate, d.b), depth(g, y + 24));
+  // `ultimo` e' quando e' tornato al posto l'ultima volta: e' cosi' che il
+  // giro tocca a tutti invece che sempre agli stessi due.
+  gente.push({ p, g, fig, casa: { x, y }, fuori: false, meta: null, dice: null, ultimo: 0 });
 });
 
 /* ---- l'ufficio non sta mai fermo ----
@@ -409,7 +531,10 @@ PEOPLE.forEach((p, i) => {
    contraddizione. E si muove uno alla volta, che a questa misura due che
    camminano insieme sembrano solo confusione. */
 
-const VELOCITA = 26;                 // pixel al secondo
+/* Pixel al secondo. Due caselle al secondo: il bar sta in fondo alla stanza e
+   dall'altra parte di due porte, e a passo di lumaca la pausa caffe' era tutta
+   corridoio e mai bar. */
+const VELOCITA = 32;
 const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
 const caso = (a) => a[Math.floor(Math.random() * a.length)];
 
@@ -428,28 +553,112 @@ function muovi(chi, x, y) {
 
 async function giro(chi, meta) {
   chi.fuori = true;
-  vesti(chi.fig, chi.p.name, 'cammina');
+  chi.meta = meta;
+  vesti(chi.fig, seme(chi.p), 'cammina');
   const tappe = METE[meta];
   // Prima si scende sul corridoio restando sulla propria colonna: uscire in
   // diagonale da sotto la scrivania la attraversava.
   await muovi(chi, chi.casa.x, CORSIA);
   for (const [x, y] of tappe) await muovi(chi, x, y);
-  vesti(chi.fig, chi.p.name, 'fermo');
-  await attesa(2000 + Math.random() * 2500);
-  vesti(chi.fig, chi.p.name, 'cammina');
+  vesti(chi.fig, seme(chi.p), 'fermo');
+  // Al bar ci si ferma quattro volte tanto. Non e' un vezzo: fra andata e
+  // ritorno il tragitto e' mezzo minuto, e con una sosta di due secondi al bar
+  // non ci si vede mai nessuno — si vede solo gente che attraversa i corridoi.
+  const sosta = meta === 'caffe' || meta === 'spuntino' ? 8000 : 2000;
+  parla(chi);
+  await attesa(sosta + Math.random() * 2500);
+  vesti(chi.fig, seme(chi.p), 'cammina');
   for (let i = tappe.length - 2; i >= 0; i--) await muovi(chi, tappe[i][0], tappe[i][1]);
   await muovi(chi, chi.casa.x, CORSIA);
   await muovi(chi, chi.casa.x, chi.casa.y);
-  vesti(chi.fig, chi.p.name, chi.p.st === 'busy' ? 'digita' : 'fermo');
+  vesti(chi.fig, seme(chi.p), chi.p.st === 'busy' ? 'digita' : 'fermo');
   chi.fuori = false;
+  chi.meta = null;
+  chi.ultimo = Date.now();
 }
+
+/* ---- quello che si dice in ufficio ----
+
+   Frasi corte apposta: a sei pixel una riga lunga esce dalla stanza, e comunque
+   in piedi vicino alla macchinetta nessuno fa un discorso. Sono le frasi che si
+   sentono davvero, quelle che uno riconosce senza doverle leggere due volte. */
+const FRASI = [
+  "Vado a fare un caffe'",
+  "Prendi qualcosa anche tu?",
+  "Il latte e' finito. Di nuovo",
+  "Cinque minuti e arrivo",
+  "Te la giro per mail",
+  "Lo mettiamo a backlog",
+  "La stampante s'e' inceppata",
+  "Punto veloce alle tre?",
+  "Ho la call fra dieci minuti",
+  "Venerdi' non si rilascia",
+  "In locale funzionava",
+  "Chi ha preso la mia tazza?",
+  "Domani ci penso",
+  "Era una mail, non una call",
+  "Due minuti e ho finito",
+  "Ci aggiorniamo dopo pranzo",
+];
+
+/* Uno parla alla volta e per tre secondi: due nuvolette insieme a questa misura
+   sono due rettangoli bianchi, e nessuno legge due rettangoli bianchi. */
+function parla(chi) {
+  if (chi.dice) return;
+  const n = el('div', 'dice');
+  n.textContent = caso(FRASI);
+  chi.g.append(n);
+  chi.dice = n;
+  setTimeout(() => {
+    n.remove();
+    if (chi.dice === n) chi.dice = null;
+  }, 3200);
+}
+
+async function chiacchiere() {
+  for (;;) {
+    await attesa(4000 + Math.random() * 5000);
+    // Chi e' fermo da un pezzo non parla, come non si alza: sbiadito e loquace
+    // sarebbe una contraddizione.
+    const vivi = gente.filter((c) => c.p.st !== 'idle' && !c.dice);
+    if (vivi.length) parla(caso(vivi));
+  }
+}
+
+/* Due in giro insieme, non piu': due davanti alla macchinetta sono una pausa,
+   tre che si incrociano per i corridoi sono confusione. */
+const MAX_FUORI = 2;
+/** A che punto e' il giro delle mete. */
+let prossima = 0;
 
 async function vita() {
   for (;;) {
-    await attesa(5000 + Math.random() * 6000);
+    await attesa(3000 + Math.random() * 4000);
+    const fuori = gente.filter((c) => c.fuori);
+    if (fuori.length >= MAX_FUORI) continue;
     const liberi = gente.filter((c) => !c.fuori && c.p.st !== 'idle');
-    if (liberi.length) await giro(caso(liberi), caso(NOMI_METE));
+    if (!liberi.length) continue;
+    // Anche le mete girano, invece di uscire a caso: fra andata, sosta e
+    // ritorno un giro dura mezzo minuto, quindi in una stanza guardata per un
+    // minuto il caso poteva benissimo non mandare nessuno al bar — ed e' meta'
+    // del motivo per cui uno si alza. Quelle gia' occupate si saltano: due
+    // fermi nello stesso punto sono una persona sola disegnata due volte.
+    const presi = new Set(fuori.map((c) => c.meta));
+    let meta = null;
+    for (let i = 0; i < NOMI_METE.length && !meta; i++) {
+      const m = NOMI_METE[prossima];
+      prossima = (prossima + 1) % NOMI_METE.length;
+      if (!presi.has(m)) meta = m;
+    }
+    if (!meta) continue;
+    // Tocca a chi e' tornato al posto per primo: cosi' il giro fa il giro
+    // davvero, invece di ricadere sempre sugli stessi due.
+    const chi = liberi.reduce((a, b) => (a.ultimo <= b.ultimo ? a : b));
+    // Non si aspetta che rientri: e' proprio l'attesa che teneva l'ufficio a
+    // una persona in piedi alla volta.
+    giro(chi, meta);
   }
 }
 vita();
+chiacchiere();
 </script>
