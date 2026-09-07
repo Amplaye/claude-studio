@@ -232,6 +232,131 @@
     filter: brightness(1.25);
   }
 }
+/* Il log che scorre. Uno schermo acceso e fermo e' una lampada: quello che dice
+   "ci sta scrivendo qualcosa" sono le righe che salgono, non la luce. Sono due
+   righe da un pixel dentro la cornice, e salgono a scatti interi — a pixel una
+   riga a meta' strada fra due righe e' una riga sporca.
+
+   Larghezze diverse apposta: due righe uguali che salgono sono un motivo a
+   strisce, e un motivo a strisce non e' testo. */
+.of-mon.working .of-screen::before {
+  content: '';
+  position: absolute;
+  /* Il vetro sta fra i tre pixel di cornice: otto per sei, ed e' tutto lo spazio
+     che c'e' per far finta che ci sia scritto qualcosa. */
+  left: 4px;
+  top: 3px;
+  right: 5px;
+  bottom: 3px;
+  background-image:
+    linear-gradient(90deg, rgba(46, 42, 38, 0.5) 0 5px, transparent 5px),
+    linear-gradient(90deg, rgba(46, 42, 38, 0.5) 0 3px, transparent 3px);
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  animation: of-log 1.2s steps(3) infinite;
+}
+@keyframes of-log {
+  0% {
+    background-position:
+      0 2px,
+      0 5px;
+  }
+  100% {
+    background-position:
+      0 -1px,
+      0 2px;
+  }
+}
+/* E il cursore che lampeggia, di fianco. E' l'unico pezzo che non si muove, ed
+   e' quello che fa leggere il resto come testo invece che come strisce. */
+.of-mon.working .of-screen::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  bottom: 3px;
+  width: 2px;
+  height: 2px;
+  background: var(--of-contorno);
+  animation: of-cursore 1.06s steps(1) infinite;
+}
+@keyframes of-cursore {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- la posta ----
+   La busta che vola fra la porta e una scrivania. Quattordici per dieci, il
+   lembo fatto con due linee che scendono dagli angoli di sopra e si incontrano
+   in mezzo: e' il minimo perche' a questa misura si legga "busta" e non
+   "rettangolo".
+
+   Va sopra tutto — vola, e una cosa che vola dietro un armadio non vola. */
+.of-mail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  height: 10px;
+  margin: -5px 0 0 -7px;
+  z-index: 9500;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px var(--of-contorno),
+    2px 2px 0 rgba(46, 28, 44, 0.4);
+  animation: of-vola 1.2s ease-in-out both;
+}
+/* Il lembo: un triangolo rovesciato appena piu' scuro del corpo. Fatto coi bordi
+   e non con due sfumature in diagonale — a quattordici pixel una diagonale
+   disegnata da un gradiente cade dove le pare, un bordo no. */
+.of-mail::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 5px solid rgba(46, 42, 38, 0.3);
+}
+/* Il colore dice il verso, e a colpo d'occhio dice piu' della direzione: chiaro
+   e' quello che arriva, verde e' quello che torna finito. */
+.of-mail.su {
+  background-color: #cfe2ee;
+}
+.of-mail.giu {
+  background-color: #cfe7c8;
+}
+/* Il dondolio e' quello che la fa sembrare leggera: due gradi avanti e indietro
+   mentre percorre l'arco. Compare e sparisce in fretta — una busta che sfuma per
+   mezzo secondo sembra un fantasma, non una lettera. */
+@keyframes of-vola {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+    rotate: -7deg;
+  }
+  12% {
+    opacity: 1;
+  }
+  50% {
+    rotate: 7deg;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+    rotate: -7deg;
+  }
+}
 
 /* ---- la gente ---- */
 

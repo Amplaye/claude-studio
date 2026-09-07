@@ -549,6 +549,56 @@ window.ROOM = (() => {
     }
   }
 
+  // ---------- la posta ----------
+  //
+  // Una busta che vola dalla porta a una scrivania quando parte un turno, e
+  // dalla scrivania alla porta quando il turno finisce.
+  //
+  // Non e' un vezzo: uno schermo acceso e uno che si spegne dicono *com'e'
+  // adesso*, e stando dall'altra parte della stanza il momento in cui cambia si
+  // perde. La busta dice il momento — e da lontano, prima ancora di leggere un
+  // nome, si vede se la stanza sta ricevendo o consegnando.
+  //
+  // La porta e' il muro in fondo in mezzo: e' da li' che entri tu, ed e' l'unico
+  // punto della pianta che non e' di nessuno.
+  //
+  // Vola per conto suo. Gli estremi si fissano alla partenza — chi la manda puo'
+  // benissimo alzarsi e andare al bar mentre lei e' ancora in aria, e una busta
+  // che insegue una persona e' una busta che sbanda. L'arco lo fa `offset-path`:
+  // una curva di due punti e un'animazione sola, invece di un timer che ridipinge
+  // un elemento sessanta volte al secondo per un secondo e mezzo.
+  const PORTA = [W / 2, H - TILE];
+  /** Quante ne stanno in aria insieme. Oltre, sono coriandoli. */
+  const MAX_BUSTE = 8;
+
+  /**
+   * Manda una busta fra la porta e `[x, y]`.
+   *
+   * `verso` e' `'giu''` quando la risposta esce e `'su'` quando il turno entra;
+   * decide il colore e da che parte si vola.
+   */
+  function posta(stage, x, y, verso) {
+    // Si contano quelle che ci sono, invece di tenere il conto: la stanza si
+    // rimonta da capo quando la scheda si riapre, e un contatore sopravvissuto a
+    // un rimontaggio e' un contatore che dice otto per sempre.
+    if (stage.querySelectorAll('.of-mail').length >= MAX_BUSTE) return;
+    const [px, py] = PORTA;
+    const [x0, y0, x1, y1] = verso === 'su' ? [px, py, x, y] : [x, y, px, py];
+    const n = el('div', 'of-mail ' + verso);
+    // Il punto di controllo sta in mezzo e trentotto pixel piu' in alto: e'
+    // quello che fa la campata. Piatta, una busta sembra trascinata per terra.
+    const cx = (x0 + x1) / 2;
+    const cy = (y0 + y1) / 2 - 38;
+    n.style.offsetPath = `path("M ${x0} ${y0} Q ${cx} ${cy} ${x1} ${y1}")`;
+    // La durata viene dalla distanza, non dall'orologio: una busta che attraversa
+    // tutta la stanza nello stesso tempo di una che va alla scrivania accanto e'
+    // una che vola e una che scatta.
+    const ms = Math.min(2000, Math.max(800, (Math.hypot(x1 - x0, y1 - y0) / 230) * 1000));
+    n.style.animationDuration = ms + 'ms';
+    n.addEventListener('animationend', () => n.remove());
+    stage.append(n);
+  }
+
   return {
     TILE,
     COLS,
@@ -559,10 +609,12 @@ window.ROOM = (() => {
     PROPS,
     DESKS,
     METE,
+    PORTA,
     SW,
     SH,
     posto,
     monta,
+    posta,
     vesti,
     cammino,
     occupata,

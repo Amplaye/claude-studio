@@ -21,7 +21,10 @@
 //    sembra solo un ufficio vuoto;
 //  - e nei mobili non ci si passa dentro. La stanza tiene una griglia di dove
 //    si possono mettere i piedi, e nessuno deve mai trovarsi su una casella
-//    occupata: ne' da seduto, ne' in piedi in fondo al salone.
+//    occupata: ne' da seduto, ne' in piedi in fondo al salone;
+//  - la posta: una busta per turno che comincia e una per turno che finisce,
+//    nessuna al primo giro (se no aprire la scheda e' una raffica di buste), e
+//    tutte se ne vanno da sole quando sono atterrate.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -468,6 +471,37 @@ t(
     dopoB.length
 );
 
+// ---- la posta ----
+//
+// Una busta per ogni turno che comincia e per ogni turno che finisce, e nessuna
+// al primo giro: le conversazioni gia' avviate arrivano tutte insieme all'apertura
+// della scheda, e sarebbero cinque buste in faccia per niente. Il conto e' un
+// buco facile da rifare — basta segnare "gia' visto" solo quando qualcosa cambia,
+// e chi nasce fermo la sua prima busta non la manda mai.
+const buste = () => page.locator('.of-mail').count();
+
+await ctx(data([]));
+await page.waitForTimeout(1400);
+await ctx(data(cinque({ busy: true })));
+await page.waitForTimeout(200);
+t((await buste()) === 0, "all'apertura partono le buste delle conversazioni gia' avviate");
+
+// Cinque che si fermano: cinque buste verso la porta.
+await ctx(data(cinque({ busy: false, done: true })));
+await page.waitForTimeout(200);
+t((await buste()) === 5, 'i turni finiti non mandano una busta a testa: ' + (await buste()) + ' su 5');
+
+// E cinque che ripartono, dopo che le prime sono atterrate.
+await page.waitForTimeout(2400);
+await ctx(data(cinque({ busy: true })));
+await page.waitForTimeout(200);
+t((await buste()) === 5, 'i turni che ripartono non mandano una busta a testa: ' + (await buste()) + ' su 5');
+
+// E le buste si tolgono di mezzo da sole: una stanza che ne accumula una per
+// turno diventa, dopo mezz'ora, una nuvola di rettangoli.
+await page.waitForTimeout(2400);
+t((await buste()) === 0, 'le buste restano appese in aria: ' + (await buste()));
+
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
 await page.screenshot({ path: path.join(root, 'dist', 'preview-office-full.png') });
@@ -477,4 +511,4 @@ if (fails.length) {
   console.error('office-check FAIL\n - ' + fails.join('\n - '));
   process.exit(1);
 }
-console.log('office-check ok — il bottone, la pianta, la gente e i posti a sedere');
+console.log('office-check ok — il bottone, la pianta, la gente, i posti a sedere e la posta');

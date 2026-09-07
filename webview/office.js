@@ -196,7 +196,9 @@ window.OFFICE = (() => {
     tick.appendChild(tuse);
     bubble.append(dots, tick);
 
-    b.append(el('span', 'of-ring'), who, bubble);
+    // La scatoletta del contesto quasi finito. Sta addosso alla persona e non
+    // sulla targhetta perche' e' una cosa che succede a lei, non al suo posto.
+    b.append(el('span', 'of-ring'), who, bubble, el('span', 'of-crunch'));
     b.onclick = () => send({ cmd: 'focus', id: s.id });
 
     // La targhetta non sta dentro la persona: sta sulla scrivania, e ci resta
@@ -231,8 +233,43 @@ window.OFFICE = (() => {
   const barColor = (p) =>
     p == null ? 'var(--line)' : p >= 80 ? 'var(--bad)' : p >= 60 ? 'var(--warn)' : 'var(--ok)';
 
+  /** Sotto il minuto non si festeggia. */
+  const TURNO_VERO = 60000;
+
+  /**
+   * La posta del turno, e la festa solo se il turno c'e' stata davvero.
+   *
+   * Parte una busta quando Claude comincia e una quando ha finito: e' il momento
+   * del cambio, che uno schermo acceso da solo non racconta. Vanno da e verso la
+   * porta perche' e' da li' che entri tu — l'unico mittente vero che ha questa
+   * stanza.
+   *
+   * Il saltello invece si festeggia solo dopo un minuto di lavoro. Non e' una
+   * soglia scelta a caso: senza, una conversazione che si sveglia e si riaddormenta
+   * ogni due minuti fa festa ogni due minuti, e una stanza che esulta di continuo
+   * ha appena smesso di dire che qualcosa e' stato fatto.
+   */
+  function turno(chi, s) {
+    const era = !!chi.busy;
+    // Il primo giro dopo l'apertura non e' un cambio: le conversazioni gia'
+    // avviate arrivano tutte insieme, e sarebbero sei buste in faccia. Segnato
+    // a ogni giro e non solo quando qualcosa cambia — chi arriva gia' fermo un
+    // cambio non ce l'ha, e senza questa riga la sua prima busta non parte mai.
+    const visto = chi.visto;
+    chi.visto = true;
+    chi.busy = !!s.busy;
+    if (era === chi.busy) return;
+    if (visto) {
+      const p = chi.casa || { x: parseFloat(chi.el.style.left) || 0, y: parseFloat(chi.el.style.top) || 0 };
+      window.ROOM.posta(stage, p.x + 8, p.y + 12, chi.busy ? 'su' : 'giu');
+    }
+    if (chi.busy) chi.da = Date.now();
+    else chi.festa = chi.da != null && Date.now() - chi.da >= TURNO_VERO;
+  }
+
   function paintPerson(chi, s, seat) {
     const b = chi.el;
+    turno(chi, s);
     chi.posa = s.busy ? 'digita' : 'fermo';
     // Chi e' fermo da un pezzo non si alza e non parla: sbiadito e in giro
     // sarebbe una contraddizione.
@@ -278,6 +315,11 @@ window.OFFICE = (() => {
     b.classList.toggle('done', !s.busy && !!s.done);
     b.classList.toggle('recent', !s.busy && !s.done && !!s.recent);
     b.classList.toggle('focused', !!s.focused);
+    // Il saltello e' della festa, non del "finito": la spunta la mette sempre.
+    b.classList.toggle('festa', !s.busy && !!s.done && !!chi.festa);
+    // Il contesto quasi finito. Ottantacinque e non ottanta: a ottanta ci arriva
+    // mezza stanza e la scatoletta smette di voler dire qualcosa.
+    b.classList.toggle('crunch', s.pct != null && s.pct >= 85);
     chi.plate.classList.toggle('focused', !!s.focused);
     chi.pname.textContent = s.name;
     chi.pfill.style.width = (s.pct == null ? 0 : Math.max(0, Math.min(100, s.pct))) + '%';
