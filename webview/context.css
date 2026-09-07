@@ -417,9 +417,11 @@ body {
 .ctx .csteps[hidden] {
   display: none;
 }
-/* La gutter la mette gia' la card: rimettendola, le righe partirebbero dodici pixel
-   piu' in dentro dei numeri sopra di loro. */
-.ctx .csteps .taskroot {
+/* La gutter la mette gia' la card: rimettendola, le righe partono dodici pixel piu'
+   in dentro dei numeri sopra di loro. `.csteps` *e'* il taskroot — TaskPanel aggiunge
+   la classe al contenitore che gli passi, non a un figlio — quindi niente spazio nel
+   selettore, se no la regola non tocca niente e la gutter resta. */
+.ctx .csteps.taskroot {
   padding: 0;
   font-size: 11.5px;
 }
@@ -428,10 +430,16 @@ body {
    oltre decine di righe che non stavi cercando. Ogni lista si tiene la sua altezza e
    scorre per conto suo, cosi' le card restano tutte a portata di sguardo — e quella al
    lavoro si porta comunque davanti il passo in corso (vedi taskspanel.js). */
+/* La barra di scorrimento sta nella gutter della card, non dentro la lista: presa
+   dal di dentro si mangiava dieci pixel di riga, e i passi finivano dieci pixel
+   prima della barra del contesto che hanno sopra. La gutter e' riservata sempre
+   (`stable`), se no le liste corte — quelle senza barra — sporgerebbero. */
 .ctx .csteps .tk-list {
   max-height: 164px;
+  margin-right: calc(-1 * var(--sbw));
   overflow-y: auto;
   overflow-x: hidden;
+  scrollbar-gutter: stable;
 }
 
 /* ---------- the column inside the full-screen tab ---------- */

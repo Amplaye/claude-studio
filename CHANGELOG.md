@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.19.3
+
+- **I passi finivano prima della barra sopra di loro.** La lista dentro la card si
+  rimetteva la gutter che la card gia' le dava, e la barra di scorrimento si mangiava
+  gli ultimi dieci pixel di ogni riga: i passi partivano dodici pixel piu' in dentro
+  dei numeri del contesto e finivano venti prima. Adesso righe, barra dei passi e barra
+  del contesto cominciano e finiscono sulle stesse due linee, con o senza scorrimento.
+
 ## 0.19.2
 
 - **Partito e ritirato erano indistinguibili.** Un messaggio usciva dalla coda con la
