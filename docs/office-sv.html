@@ -1,0 +1,296 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>L'ufficio — coi mobili di SeasonVale</title>
+<!--
+  La stessa pianta dell'ufficio, ma i mobili non sono piu' disegnati: sono
+  ritagliati da SeasonVale (interiors/All Tileset, caselle da 16).
+
+  Due cose cambiano rispetto alle otto pelli di office-drafts.html, e sono
+  proprio quelle che si volevano vedere:
+
+  1. I mobili hanno un'altezza. Kenney disegna un tavolo dentro la sua casella,
+     visto da sopra e schiacciato; SeasonVale lo disegna alto — occupa una
+     casella per terra ma ne mangia due in su, perche' si vede anche il fianco.
+     Quindi qui uno sprite non e' piu' "grande quanto la sua casella": ha la sua
+     misura vera e si appoggia per terra dal basso. E' il motivo per cui la
+     stanza sembra una stanza e non una pianta catastale.
+
+  2. Chi sta piu' in basso copre chi sta piu' in alto. Con i mobili alti serve
+     per forza: senza, una sedia davanti al tavolo ci finisce dentro. Non e' una
+     tabella di z-index scritta a mano, e' l'ordinamento per riga — la regola di
+     qualunque gioco visto dall'alto, tre righe di codice.
+
+  Pavimento e muri restano in CSS, gli stessi della pelle 1: il pacchetto ha dei
+  pavimenti, ma sono grigi da cantina, e il teak del CRM li batte. Le persone
+  restano quelle del generatore: SeasonVale ha tredici paesani in tunica, non
+  degli impiegati.
+
+  Si apre a doppio clic: niente build, niente rete.
+-->
+<script src="skins/sv-room.js"></script>
+<!-- Il generatore e' quello vero dell'estensione, non una copia: due copie dello
+     stesso file si scollano al primo ritocco, e questa pagina serve proprio a
+     giudicare la gente che sta di la'. -->
+<script src="../webview/npc.js"></script>
+<style>
+  :root {
+    --t200:#ffc9a9; --t400:#fb7740; --t500:#f45517; --t600:#e53f0c;
+    --o200:#d6ddcb; --o400:#95a881; --o600:#5c6c4b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 22px;
+    background: #14180f; color: #eaede5;
+    font: 14px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 17px; margin: 0 0 4px; letter-spacing: .02em; }
+  .lede { margin: 0 0 20px; opacity: .62; font-size: 13px; max-width: 74ch; }
+  .lede a { color: #ffa579; }
+
+  /* Gli stessi materiali della pelle 1: teak per terra dove si lavora, pietra
+     chiara nelle stanze in alto, muretti bassi. Il legno di SeasonVale e'
+     arancio caldo, che e' gia' la terracotta del CRM: ci sta sopra senza
+     ritocchi. */
+  .pane {
+    --teak:#a4714a; --teak-hi:#c69061; --teak-lo:#7c5230;
+    --stone:#f2e8d4; --stone-hi:#fffaf0; --stone-lo:#d9c5a3; --stone-jo:#bda57e;
+    --pave:#c1b294; --pave-hi:#d5c8ac; --pave-jo:#998b70;
+    --wood:#63421f; --shade:rgba(38,24,10,.5);
+    width: 768px; height: 640px; overflow: hidden; background: #1b2a14;
+    display: flex; align-items: center; justify-content: center; border-radius: 10px;
+  }
+  .stage { position: relative; width: 384px; height: 320px; flex: 0 0 auto; transform: scale(2); }
+
+  .floor { position: absolute; inset: 0; z-index: 0;
+    background-color: var(--teak);
+    background-image:
+      repeating-linear-gradient(180deg, var(--teak-lo) 0 1px, var(--teak-hi) 1px 2px, transparent 2px 16px),
+      repeating-linear-gradient(180deg, rgba(255,228,186,.09) 0 1px, transparent 1px 7px),
+      repeating-linear-gradient(180deg, rgba(60,34,12,.09) 0 1px, transparent 1px 11px),
+      linear-gradient(135deg, rgba(255,232,176,.10) 0 9%, rgba(255,232,176,.05) 9% 20%, transparent 20%);
+  }
+  /* Le stanze in alto sono lastricate: il muro di riga 7 cade esatto sul cambio
+     di materiale, 8 caselle da 16. */
+  .floor::after {
+    content: ""; position: absolute; left: 0; top: 0; right: 0; height: 128px;
+    background-color: var(--pave);
+    background-image:
+      repeating-linear-gradient(90deg, var(--pave-jo) 0 1px, var(--pave-hi) 1px 2px, transparent 2px 32px),
+      repeating-linear-gradient(180deg, var(--pave-jo) 0 1px, var(--pave-hi) 1px 2px, transparent 2px 32px),
+      conic-gradient(rgba(255,255,255,.05) 0 25%, transparent 0 50%, rgba(255,255,255,.05) 0 75%, transparent 0),
+      linear-gradient(135deg, rgba(255,232,176,.13) 0 14%, rgba(255,232,176,.06) 14% 30%, transparent 30%);
+    background-size: auto, auto, 4px 4px, auto;
+    box-shadow: inset 0 -1px 0 var(--pave-jo), inset 0 -2px 0 rgba(60,40,20,.14);
+  }
+
+  .wall {
+    position: absolute;
+    background-color: var(--stone);
+    background-image:
+      repeating-linear-gradient(180deg, var(--stone-jo) 0 1px, var(--stone-hi) 1px 2px, transparent 2px 8px),
+      repeating-linear-gradient(90deg, var(--stone-jo) 0 1px, transparent 1px 16px),
+      conic-gradient(rgba(140,110,70,.07) 0 25%, transparent 0 50%, rgba(140,110,70,.07) 0 75%, transparent 0);
+    background-size: auto, auto, 4px 4px;
+    box-shadow:
+      inset 1px 1px 0 var(--stone-hi), inset -1px -1px 0 var(--stone-lo),
+      2px 2px 0 rgba(38,24,10,.42), 4px 4px 0 rgba(38,24,10,.20);
+  }
+
+  /* Un mobile: la sua misura vera, ritagliata dal foglio. Niente ridimensionamenti
+     — il foglio e' a 16 e la stanza e' a 16, quindi un pixel resta un pixel. */
+  .prop {
+    position: absolute;
+    background-image: url("skins/sv-room.png");
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+  /* I tappeti sono l'unica cosa appoggiata per terra: niente ombra, e sempre
+     sotto a tutto il resto. */
+  .prop:not(.rug) { filter: drop-shadow(2px 2px 0 var(--shade)); }
+  .rug { z-index: 0 !important; }
+
+  .mon {
+    position: absolute; width: 14px; height: 9px;
+    background: #2a3125;
+    box-shadow: inset 0 0 0 1px #161c11, 0 2px 0 rgba(30,18,8,.45);
+  }
+  .mon.on { background: linear-gradient(180deg, var(--o200) 0 3px, var(--o400) 3px 6px, var(--o600) 6px); }
+  .mon.busy {
+    background: linear-gradient(180deg, var(--t200) 0 3px, var(--t400) 3px 6px, var(--t600) 6px);
+    box-shadow: 0 0 0 1px var(--t500), 0 0 0 2px rgba(244,85,23,.35), 0 2px 0 rgba(30,18,8,.45);
+  }
+
+  .guy { position: absolute; width: 16px; height: 16px; }
+  .fig {
+    position: absolute; left: 0; bottom: -4px; width: 16px; height: 24px;
+    background: var(--npc) center bottom / contain no-repeat;
+    image-rendering: pixelated;
+    filter: drop-shadow(2px 2px 0 rgba(34,20,8,.42));
+  }
+  .guy.idle { filter: grayscale(.65) opacity(.5); }
+
+  /* Piu' in alto dei -30 delle altre pelli: la scrivania di SeasonVale e' alta
+     27 pixel invece di 16, e a -30 il cartellino finiva sopra il monitor. */
+  .plate {
+    position: absolute; left: 50%; top: -46px; width: 50px; margin-left: -25px;
+    padding: 1px 2px 2px; pointer-events: none;
+    background: var(--stone); color: #3a2917;
+    box-shadow: inset 0 0 0 1px var(--wood), 2px 2px 0 rgba(30,18,8,.5);
+  }
+  .plate b { display: block; font-weight: 700; font-size: 6px; line-height: 1.35;
+             text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plate s { display: block; height: 2px; margin-top: 1px; text-decoration: none;
+             background: rgba(51,61,44,.22); }
+  .plate s i { display: block; height: 100%; }
+</style>
+
+<h1>L'ufficio, coi mobili di SeasonVale</h1>
+<p class="lede">
+  Stessa pianta, stesse otto scrivanie, stesse cinque conversazioni. I mobili
+  arrivano da <code>interiors/All&nbsp;Tileset</code> — una corsia sola, che il
+  pacchetto ne ha tre e mescolarle si vede. Il centro in alto e' vuoto: e' un
+  passaggio fra le due stanze, non una terza stanza.
+  <br />
+  <a href="office-drafts.html">Le otto pelli disegnate, per il confronto.</a>
+</p>
+<div class="pane"><div class="stage" id="stage"></div></div>
+
+<script>
+const TILE = 16, COLS = 24, ROWS = 20;
+
+const WALLS = [
+  {c:0,r:0,w:COLS,h:1}, {c:0,r:ROWS-1,w:COLS,h:1},
+  {c:0,r:0,w:1,h:ROWS}, {c:COLS-1,r:0,w:1,h:ROWS},
+  {c:10,r:1,w:1,h:2}, {c:10,r:5,w:1,h:3},
+  {c:15,r:1,w:1,h:2}, {c:15,r:5,w:1,h:3},
+  {c:1,r:7,w:9,h:1}, {c:14,r:7,w:9,h:1},
+];
+
+/* Un mobile: `s` il ritaglio, `c`/`r` la casella su cui appoggia. Il disegno
+   sta in piedi da li' in su, quanto e' alto lui. `r` accetta i decimali perche'
+   una sedia accostata a un tavolo non finisce sul confine di una casella. */
+const PROPS = [
+  // --- sala riunioni, in alto a sinistra ---
+  {s:'cork',        c:3.2, r:2},      // la bacheca coi foglietti: la lavagna
+  {s:'rugOlive',    c:3,   r:6},
+  {s:'chairUp',     c:3.8, r:3.2}, {s:'chairUp', c:6.2, r:3.2},
+  {s:'meetTable',   c:3,   r:4.6},
+  {s:'chairDown',   c:3.8, r:6.1}, {s:'chairDown', c:6.2, r:6.1},
+  {s:'plantBlue',   c:8.2, r:1.6},
+  {s:'plantPurple', c:1.2, r:6.2},
+
+  // --- in mezzo, fra le due stanze: niente. E' il passaggio. ---
+
+  // --- la zona bar, in alto a destra ---
+  {s:'shelfJars',   c:16,   r:2},
+  {s:'shelfFull',   c:18,   r:2},
+  {s:'cabinet',     c:20,   r:2},
+  {s:'nightstand',  c:22,   r:2.4},   // il comodino fa il frigo
+  {s:'stoolRound',  c:17,   r:5.2}, {s:'stoolRound', c:20.6, r:5.2},
+  {s:'tableSmall',  c:18,   r:5.4},
+  {s:'barrel',      c:16.2, r:6.4},
+  {s:'plantBlue',   c:22.2, r:6.2},
+
+  // --- il salone: quello che sta fra una scrivania e l'altra ---
+  {s:'plantPurple', c:1.2,  r:8.4},
+  {s:'plantBlue',   c:22.2, r:8.4},
+  {s:'cabinet',     c:21,   r:11},    // l'armadio fa la fotocopiatrice
+  {s:'barrel',      c:1.2,  r:12.4},  // la botte fa il cestino
+  {s:'rugRed',      c:9.5,  r:18.4},
+  {s:'shelfEmpty',  c:20.5, r:19},
+  {s:'board',       c:2,    r:19},
+];
+
+const DESKS = [
+  {c:2,r:9},{c:7,r:9},{c:12,r:9},{c:17,r:9},
+  {c:2,r:14},{c:7,r:14},{c:12,r:14},{c:17,r:14},
+];
+
+// Cinque conversazioni, i quattro stati che l'ufficio sa dire.
+const PEOPLE = [
+  {name:"Ufficio, palette", pct:40, st:'busy'},
+  {name:"Sito di Susan",    pct:66, st:'done'},
+  {name:"CRM BaliFlow",     pct:12, st:'recent'},
+  {name:"Vecchia sessione", pct:78, st:'idle'},
+  {name:"Release 0.22",     pct:55, st:'recent'},
+];
+const barColor = (p) => (p >= 80 ? '#cf222e' : p >= 60 ? '#e3b341' : '#4c9a2a');
+
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+
+/* Chi sta piu' in basso copre chi sta piu' in alto: e' l'unica regola che tiene
+   in ordine dei mobili alti, e vale sia per un tavolo che per una persona. Si
+   ordina sul bordo di sotto, non sulla riga: una sedia mezza casella piu' giu'
+   deve stare davanti, e la riga da sola non lo direbbe. */
+const depth = (n, bottom) => { n.style.zIndex = Math.round(bottom); return n; };
+
+/** Appoggia un ritaglio sulla casella `c,r`: il bordo di sotto sta in fondo a
+    quella riga, e il disegno cresce verso l'alto quanto e' alto lui. */
+function prop(name, c, r, cls) {
+  const d = window.SV[name];
+  if (!d) throw new Error('ritaglio mancante nel foglio: ' + name);
+  const n = el('div', cls ? 'prop ' + cls : 'prop');
+  const bottom = (r + 1) * TILE;
+  n.style.left = c * TILE + 'px';
+  n.style.top = bottom - d.h + 'px';
+  n.style.width = d.w + 'px';
+  n.style.height = d.h + 'px';
+  n.style.backgroundPosition = -d.x + 'px ' + -d.y + 'px';
+  return depth(n, cls === 'rug' ? 0 : bottom);
+}
+
+const stage = document.getElementById('stage');
+stage.append(el('div', 'floor'));
+
+for (const w of WALLS) {
+  const n = el('div', 'wall');
+  n.style.left = w.c * TILE + 'px';
+  n.style.top = w.r * TILE + 'px';
+  n.style.width = w.w * TILE + 'px';
+  n.style.height = w.h * TILE + 'px';
+  stage.append(depth(n, (w.r + w.h) * TILE));
+}
+
+for (const p of PROPS) stage.append(prop(p.s, p.c, p.r, p.s.startsWith('rug') ? 'rug' : null));
+
+DESKS.forEach((d, i) => {
+  const who = PEOPLE[i];
+  // Lo sgabello sta piu' in su della persona, cosi' l'ordinamento per riga la
+  // mette seduta sopra invece che dietro.
+  stage.append(prop('stoolRound', d.c + 1.1, d.r + 1));
+  stage.append(prop('desk', d.c, d.r));
+
+  const deskBottom = (d.r + 1) * TILE;
+  const top = deskBottom - window.SV.desk.h;
+  const mon = el('div', 'mon' + (who ? (who.st === 'busy' ? ' on busy' : ' on') : ''));
+  mon.style.left = d.c * TILE + 17 + 'px';
+  mon.style.top = top + 2 + 'px';
+  // Il monitor sta SOPRA il piano, non dietro: e' l'unica cosa della stanza che
+  // non segue la riga, perche' e' appoggiato sul mobile che la occupa.
+  stage.append(depth(mon, deskBottom + 1));
+});
+
+PEOPLE.forEach((p, i) => {
+  const d = DESKS[i];
+  const g = el('div', 'guy' + (p.st === 'idle' ? ' idle' : ''));
+  const bottom = (d.r + 2.2) * TILE;
+  g.style.left = (d.c + 1) * TILE + 'px';
+  g.style.top = bottom - TILE + 'px';
+
+  const fig = el('div', 'fig');
+  if (window.NPC) fig.style.setProperty('--npc', 'url("' + window.NPC.sprite(p.name) + '")');
+
+  const plate = el('div', 'plate');
+  const b = el('b');
+  b.textContent = p.name;
+  const s = el('s');
+  const fill = el('i');
+  fill.style.width = p.pct + '%';
+  fill.style.background = barColor(p.pct);
+  s.append(fill);
+  plate.append(b, s);
+
+  g.append(fig, plate);
+  stage.append(depth(g, bottom));
+});
+</script>

@@ -10,10 +10,11 @@
  * niente. Il pannello risponde a "quanto contesto le resta"; questa risponde a
  * "chi c'e' e chi sta lavorando" dall'altra parte della stanza.
  *
- * I mobili e le persone sono sprite di Kenney (kenney.nl, CC0): due fogli da
- * 16 pixel, `sprites-room.png` e `sprites-folk.png`. Pavimento e muri no —
- * quelli sono due gradienti CSS, perche' un pavimento a mattonelle e' una
- * ripetizione e ripeterla e' quello che il CSS sa fare senza chiedere immagini.
+ * I mobili sono sprite di Kenney (kenney.nl, CC0): un foglio da 16 pixel,
+ * `sprites-room.png`. Le persone no — quelle nascono dal seme, e le disegna
+ * `npc.js`. Pavimento e muri nemmeno: sono gradienti CSS, perche' un pavimento
+ * a mattonelle e' una ripetizione e ripeterla e' quello che il CSS sa fare
+ * senza chiedere immagini.
  *
  * Tre regole di casa:
  *   - niente innerHTML con dei dati: tutto passa da textContent;
@@ -104,79 +105,15 @@ window.OFFICE = (() => {
   };
 
   /**
-   * Le persone si montano a strati, che e' come il pacchetto di Kenney e' fatto:
-   * corpo, maglietta, capelli, tutti allineati sulla stessa casella da 16. Otto
-   * magliette e otto teste bastano a non vedere due volte la stessa persona in
-   * una stanza — e la scelta la fa l'id della conversazione, quindi la stessa
-   * conversazione ritrova sempre la sua faccia.
-   */
-  const BODY = [
-    [0, 0],
-    [0, 1],
-    [0, 2],
-    [1, 0],
-    [1, 1],
-    [1, 2],
-  ];
-  /**
-   * Le magliette. Le righe 1 e 6 sono quelle col colletto bianco — camicia da
-   * ufficio; le righe 0 e 5 sono tinta unita.
+   * Le persone non sono piu' tre caselle di un foglio di sprite — corpo,
+   * maglietta, capelli, uguali per tutti. Le disegna `npc.js` partendo dal seme,
+   * e il seme e' l'id della conversazione: la stessa conversazione ritrova
+   * sempre la sua faccia, anche fra una sessione e l'altra.
    *
-   * Le righe 4 e 9 no: da lontano sembrano magliette, ma sono corazze con gli
-   * spallacci, e mezzo ufficio andava in giro vestito da guerra.
+   * Il generatore restituisce un PNG come data URL, e se lo tiene da parte per
+   * seme: richiamarlo a ogni ridipintura non ridisegna niente.
    */
-  const SHIRT = [
-    [8, 1],
-    [12, 1],
-    [16, 1],
-    [8, 6],
-    [12, 6],
-    [16, 6],
-    [12, 0],
-    [16, 0],
-    [8, 0],
-    [8, 5],
-  ];
-  /** La divisa di chi non e' nostro: neutra, e uguale per tutti. */
-  const SHIRT_GUEST = [12, 5];
-  /**
-   * I capelli. Nel foglio stanno alle colonne 19-26: un blocco per colore
-   * (castano, rosso, biondo, nero, bianco) e una pettinatura per casella.
-   *
-   * La colonna 3 — dove li avevamo cercati prima — sono le cinture. Per un
-   * giorno intero mezzo ufficio ha lavorato con una cintura in testa.
-   */
-  const HAIR = [
-    [20, 0],
-    [21, 0],
-    [24, 0],
-    [25, 0],
-    [20, 4],
-    [21, 4],
-    [24, 4],
-    [25, 4],
-    [20, 8],
-    [21, 8],
-  ];
-
-  /** Somma dei caratteri: basta a spargere, e la stessa id da' sempre lo stesso. */
-  function hash(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-    return h;
-  }
-
-  /**
-   * Una scelta dall'elenco, diversa per ogni strato.
-   *
-   * Il sale rimescola prima di prendere il resto: con un semplice `h >> 3` due
-   * conversazioni con l'id vicino finivano sulla stessa maglietta, e mezzo
-   * ufficio si vestiva uguale.
-   */
-  function pick(list, h, salt) {
-    const m = Math.imul(h ^ Math.imul(salt, 0x9e3779b1), 0x85ebca6b) >>> 0;
-    return list[(m >>> 13) % list.length];
-  }
+  const faccia = (id) => 'url("' + window.NPC.sprite(id) + '")';
 
   // ---------- la pianta, in mattonelle ----------
   //
@@ -227,13 +164,10 @@ window.OFFICE = (() => {
     { s: 'chairR', c: 8, r: 3 },
     { s: 'plantB', c: 1, r: 5 },
 
-    // --- l'ingresso, fra le due stanze: il divano dove si aspetta, le stampanti ---
-    { s: 'sofaL', c: 11, r: 1 },
-    { s: 'sofaM', c: 12, r: 1 },
-    { s: 'sofaR', c: 13, r: 1 },
-    { s: 'rugL', c: 11, r: 3 },
-    { s: 'rugR', c: 12, r: 3 },
-    { s: 'plantA', c: 11, r: 5 },
+    // --- fra le due stanze non c'e' niente: e' il passaggio, e basta. C'erano
+    //     un divano, una stuoia e una pianta, ed erano proprio quelli a farlo
+    //     sembrare una terza stanza schiacciata invece che il corridoio che
+    //     tiene separate le due vere. ---
 
     // --- la zona bar: il bancone con sopra la roba, il frigo, e il tavolino dove
     //     ci si siede a non lavorare. Senza quello e' una cucina, non un bar. ---
@@ -304,7 +238,7 @@ window.OFFICE = (() => {
   let chipS;
   let chipW;
   let boss;
-  let bossLayers;
+  let bossFace;
   let bossName;
   let bossWhat;
   let send = () => {};
@@ -317,16 +251,14 @@ window.OFFICE = (() => {
   function room(name, c, r, cls) {
     const [sc, sr] = T[name];
     const n = el('div', cls ? 'spr ' + cls : 'spr');
+    // Il nome della casella resta scritto sull'elemento: e' l'unico modo che ha
+    // il foglio di stile di sapere che questa e' una pianta e non un armadio.
+    // Le piante sono l'unica cosa qui dentro che deve debordare dalla sua
+    // mattonella — e' quello che le fa sembrare piante invece che pedine.
+    n.dataset.k = name;
     n.style.backgroundPosition = -sc * STEP + 'px ' + -sr * STEP + 'px';
     n.style.left = c * TILE + 'px';
     n.style.top = r * TILE + 'px';
-    return n;
-  }
-
-  /** Uno strato di una persona: stesso mestiere, foglio diverso. */
-  function folk(sc, sr, cls) {
-    const n = el('span', 'spr folk ' + cls);
-    n.style.backgroundPosition = -sc * STEP + 'px ' + -sr * STEP + 'px';
     return n;
   }
 
@@ -343,7 +275,6 @@ window.OFFICE = (() => {
     // Nella webview vera arrivano gia' assoluti e questo non li tocca.
     const abs = (p) => (p ? new URL(p, document.baseURI).href : '');
     root.style.setProperty('--sheet-room', 'url("' + abs(root.dataset.room) + '")');
-    root.style.setProperty('--sheet-folk', 'url("' + abs(root.dataset.folk) + '")');
 
     // --- la fascia in cima ---
     const bar = el('header', 'of-bar');
@@ -381,12 +312,10 @@ window.OFFICE = (() => {
     // sedici teste da sedici pixel.
     boss = el('div', 'of-boss');
     const face = el('span', 'of-face');
-    bossLayers = [
-      folk(0, 0, 'l-body'),
-      folk(0, 0, 'l-shirt'),
-      folk(0, 0, 'l-hair'),
-    ];
-    face.append(...bossLayers);
+    // La stessa faccia di chi sta seduto di la', ingrandita: un solo disegno,
+    // non piu' tre strati sovrapposti.
+    bossFace = el('span', 'of-body');
+    face.append(bossFace);
     bossName = el('span', 'of-boss-name');
     bossWhat = el('span', 'of-boss-what');
     const bossText = el('span', 'of-boss-text');
@@ -470,15 +399,12 @@ window.OFFICE = (() => {
   function buildPerson(s) {
     const b = el('button', 'of-guy');
     b.type = 'button';
-    const h = hash(s.id);
     const who = el('span', 'of-body');
-    const [bc, br] = pick(BODY, h, 1);
-    // Le schede dell'estensione ufficiale vanno in camice bianco: la stessa
-    // distinzione che il pannello fa con l'icona sulla card, detta senza parole.
-    // Le nostre si vestono come gli pare.
-    const [sc, sr] = s.own ? pick(SHIRT, h, 2) : SHIRT_GUEST;
-    const [hc, hr] = pick(HAIR, h, 3);
-    who.append(folk(bc, br, 'l-body'), folk(sc, sr, 'l-shirt'), folk(hc, hr, 'l-hair'));
+    // ponytail: prima le schede non nostre portavano tutte la stessa maglietta
+    // neutra — si vedeva a colpo d'occhio chi era ospite. Il generatore veste
+    // dal seme e basta, quindi per adesso quella divisa non c'e' piu'. La classe
+    // `own` resta sul bottone: il giorno che serve, la dice il CSS.
+    who.style.setProperty('--npc', faccia(s.id));
 
     const bubble = el('span', 'of-bubble');
     const dots = el('span', 'of-dots');
@@ -586,15 +512,7 @@ window.OFFICE = (() => {
     const head = list.find((s) => s.focused) || list.find((s) => s.busy) || list[0];
     boss.hidden = !head;
     if (head) {
-      const h = hash(head.id);
-      const parts = [
-        pick(BODY, h, 1),
-        head.own ? pick(SHIRT, h, 2) : SHIRT_GUEST,
-        pick(HAIR, h, 3),
-      ];
-      bossLayers.forEach((n, i) => {
-        n.style.backgroundPosition = -parts[i][0] * STEP + 'px ' + -parts[i][1] * STEP + 'px';
-      });
+      bossFace.style.setProperty('--npc', faccia(head.id));
       bossName.textContent = head.name;
       bossWhat.textContent = head.busy
         ? t('ctx.busy')

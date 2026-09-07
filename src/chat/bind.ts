@@ -37,12 +37,13 @@ export function bindWebview(
     ctxpanelJs: 'ctxpanel.js',
     taskspanelJs: 'taskspanel.js',
     chimeJs: 'chime.js',
+    npcJs: 'npc.js',
     officeJs: 'office.js',
     chatJs: 'chat.js',
-    // I mobili e le gente dell'ufficio: due fogli di sprite di Kenney (CC0). Il
-    // foglio di stile li prende da un data-attributo della pagina — vedi chat.html.
+    // I mobili dell'ufficio: un foglio di sprite di Kenney (CC0). Il foglio di
+    // stile lo prende da un data-attributo della pagina — vedi chat.html. La
+    // gente no: la disegna npc.js, e non passa da nessuna immagine.
     roomPng: 'sprites-room.png',
-    folkPng: 'sprites-folk.png',
   });
 
   const surface: Surface = {

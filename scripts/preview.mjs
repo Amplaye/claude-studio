@@ -25,10 +25,9 @@ function build(page, out) {
     .replace(/\{\{nonce\}\}/g, 'preview')
     .replace(/\{\{(\w+)Css\}\}/g, (_, k) => `webview/${k}.css`)
     .replace(/\{\{(\w+)Js\}\}/g, (_, k) => `webview/${k}.js`)
-    // I fogli di sprite dell'ufficio. Nella webview vera sono URI di VS Code; qui
-    // sono i file, che e' l'unica differenza fra le due pagine.
-    .replace(/\{\{roomPng\}\}/g, 'webview/sprites-room.png')
-    .replace(/\{\{folkPng\}\}/g, 'webview/sprites-folk.png');
+    // Il foglio dei mobili dell'ufficio. Nella webview vera e' un URI di VS Code;
+    // qui e' il file. Le persone non hanno un foglio: le disegna npc.js.
+    .replace(/\{\{roomPng\}\}/g, 'webview/sprites-room.png');
   fs.writeFileSync(path.join(dist, out), html, 'utf8');
   console.log('dist/' + out);
 }

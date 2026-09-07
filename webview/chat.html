@@ -203,7 +203,7 @@
          I due fogli di sprite arrivano da qui dentro perche' il CSP non fa passare
          uno <style> scritto nella pagina, e un data-attributo e' la strada che resta
          per far arrivare un URI della webview al foglio di stile. -->
-    <div class="office" id="office" data-room="{{roomPng}}" data-folk="{{folkPng}}"></div>
+    <div class="office" id="office" data-room="{{roomPng}}"></div>
 
     <!-- i18n first: everything after it draws in the chosen language from the
          very first frame, instead of flashing English and then correcting itself. -->
@@ -213,6 +213,7 @@
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{chimeJs}}"></script>
     <!-- Prima di chat.js, che lo monta appena sa di essere in una scheda. -->
+    <script nonce="{{nonce}}" src="{{npcJs}}"></script>
     <script nonce="{{nonce}}" src="{{officeJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>
   </body>

@@ -151,7 +151,11 @@ const plan = await page.evaluate(() => ({
 t(plan.desks === DESKS * 2, 'le scrivanie sono ' + plan.desks / 2 + ', non ' + DESKS);
 t(plan.mons === DESKS, 'i monitor sono ' + plan.mons + ', le scrivanie ' + DESKS);
 t(plan.stools === DESKS, 'gli sgabelli sono ' + plan.stools + ', le scrivanie ' + DESKS);
-t(plan.props > 80, 'la stanza e\' spoglia: solo ' + plan.props + ' mobili');
+// Erano piu' di 80 finche' in mezzo alle due stanze in alto c'erano un divano,
+// una stuoia e una pianta. Adesso quel pezzo e' vuoto apposta — e' il passaggio —
+// e la soglia scende di conseguenza: serve a dire "la stanza non e' spoglia", non
+// a contare i mobili uno per uno.
+t(plan.props > 70, 'la stanza e\' spoglia: solo ' + plan.props + ' mobili');
 t(/url\(/.test(plan.sheet), 'i mobili non hanno il foglio di sprite: ' + plan.sheet);
 t(!plan.people, "c'e' gente in ufficio senza nemmeno una conversazione aperta");
 t(plan.emptyShown, "l'ufficio vuoto non dice che e' vuoto");
@@ -185,8 +189,9 @@ const room = await page.evaluate(() => {
       const r = rect(p);
       return r.left < floor.left || r.right > floor.right || r.top < floor.top || r.bottom > floor.bottom;
     }).length,
-    // Ogni persona e' fatta dei tre strati del pacchetto: corpo, maglietta, capelli.
-    layers: ps.map((p) => p.querySelectorAll('.of-body .folk').length),
+    // Ogni persona e' disegnata dal generatore, e il seme e' il suo id: quattro
+    // conversazioni devono dare quattro facce, non quattro volte la stessa.
+    facce: ps.map((p) => getComputedStyle(p.querySelector('.of-body')).backgroundImage),
     busy: document.querySelectorAll('.of-guy.busy').length,
     done: document.querySelectorAll('.of-guy.done').length,
     focused: document.querySelectorAll('.of-guy.focused').length,
@@ -202,9 +207,12 @@ t(room.n === 4, 'le persone sono ' + room.n + ', le conversazioni quattro');
 t(room.gap > 30, 'due persone quasi sovrapposte: ' + Math.round(room.gap) + 'px fra loro');
 t(!room.out, room.out + ' persone finiscono fuori dai muri');
 t(
-  room.layers.every((n) => n === 3),
-  'una persona non e\' vestita: strati ' + room.layers.join(',')
+  room.facce.every((f) => f.startsWith('url("data:image/png')),
+  'una persona non ha la faccia del generatore: ' + room.facce.map((f) => f.slice(0, 24)).join(' | ')
 );
+// Il generatore esiste proprio per questo: prima erano otto scrivanie con otto
+// volte lo stesso omino, e da lontano l'ufficio non diceva piu' niente.
+t(new Set(room.facce).size === room.facce.length, 'due conversazioni hanno la stessa faccia');
 t(room.busy === 1, 'chi sta lavorando sono ' + room.busy + ', dovrebbe essere una');
 t(room.done === 1, 'la spunta verde sta su ' + room.done + ' persone, ne vuole una');
 t(room.focused === 1, 'il faretto sta su ' + room.focused + ' persone, ne vuole una');
