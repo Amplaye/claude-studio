@@ -174,9 +174,21 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   // it takes its place there like any other message.
   const qFrom = got.length;
   const since = () => got.slice(qFrom);
+  // Il terzo si porta dietro un file, e le sue parole verranno cambiate mentre e' in
+  // fila. E' li' che si nasconde il modo piu' facile di rompere questa faccenda: il
+  // messaggio vero non e' solo quello che hai scritto — in coda ha l'elenco dei
+  // percorsi allegati — e riscrivere il testo e basta staccherebbe il file senza dire
+  // niente. Il nonce nel file e' l'unico modo di sapere che l'ha davvero aperto.
+  const NONCE = 'zqx' + Math.random().toString(36).slice(2, 8);
+  const attached = path.join(root, 'dist', 'host-check-attached.txt');
+  fs.writeFileSync(attached, `the secret word is ${NONCE}\n`, 'utf8');
   onMsg({ cmd: 'send', text: 'Reply with the single word: uno.' });
   onMsg({ cmd: 'send', text: 'Reply with the single word: NEVER.' });
-  onMsg({ cmd: 'send', text: 'Reply with the single word: due.' });
+  onMsg({
+    cmd: 'send',
+    text: 'placeholder',
+    files: [{ path: attached, name: 'host-check-attached.txt', size: 30 }],
+  });
   // Straight away, before the CLI has had time to answer anything: the first is in
   // the conversation, the other two are waiting their turn.
   await new Promise((r) => setTimeout(r, 200));
@@ -188,12 +200,32 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   // it never left, which is the whole difference between this and the stop button.
   const dropped = since().find((m) => m.k === 'queued' && /NEVER/.test(m.text || ''));
   if (dropped) onMsg({ cmd: 'unqueue', id: dropped.id });
+  // E il terzo cambia parole mentre aspetta, senza uscire dalla fila.
+  const rewritten = since().find((m) => m.k === 'queued' && /placeholder/.test(m.text || ''));
+  if (rewritten) {
+    onMsg({
+      cmd: 'editQueued',
+      id: rewritten.id,
+      text: 'Open the attached file and reply with the secret word in it, nothing else.',
+    });
+  }
   await turns(6);
   const queueAfter = {
     user: since().filter((m) => m.k === 'user').length,
     unqueued: since().filter((m) => m.k === 'unqueued').length,
     ran: since().some((m) => m.k === 'user' && /NEVER/.test(m.text || '')),
+    // Le parole nuove sono quelle entrate nel discorso, non quelle di prima.
+    echoed: since().some((m) => m.k === 'user' && /secret word/.test(m.text || '')),
+    stale: since().some((m) => m.k === 'user' && /placeholder/.test(m.text || '')),
+    // E il file era ancora attaccato: se la coda del messaggio fosse stata buttata
+    // via con la modifica, questa parola non avrebbe modo di comparire.
+    said: since().some((m) => (m.k === 'block_final' || m.k === 'delta') && String(m.text || '').includes(NONCE)),
   };
+  try {
+    fs.rmSync(attached, { force: true });
+  } catch {
+    /* lo pulira' il sistema */
+  }
 
   const sessionId = (got.find((m) => m.k === 'session') || {}).id;
 
@@ -249,6 +281,13 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   t(queueAfter.unqueued === 2, 'the queue never emptied: ' + queueAfter.unqueued);
   t(queueAfter.user === 2, 'the queued message never took its place in the conversation');
   t(!queueAfter.ran, 'a message taken back out of the queue was sent anyway');
+  t(queueAfter.echoed, 'un messaggio modificato in fila e’ partito con le parole di prima');
+  t(!queueAfter.stale, 'le parole di prima sono entrate lo stesso nel discorso');
+  t(
+    queueAfter.said,
+    'modificare un messaggio in fila gli ha staccato il file che si portava dietro: ' +
+      'la parola dentro il file non e’ mai comparsa'
+  );
 
   t(!!ctxProvider, 'the context panel is not registered');
   t(!!ctxData, 'the context panel receives no data');

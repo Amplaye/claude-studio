@@ -454,6 +454,9 @@ export type Cmd =
   // "Quello che ho scritto mentre lavoravi, lascia perdere": toglie dalla fila un
   // messaggio che non e' ancora partito.
   | { cmd: 'unqueue'; id: string }
+  // "Volevo dire un'altra cosa": le parole di un messaggio ancora in fila, cambiate
+  // dove sta, senza ritirarlo e riscriverlo da capo — e senza fargli perdere il posto.
+  | { cmd: 'editQueued'; id: string; text: string }
   // "Torna a questo messaggio": la freccia accanto a un messaggio tuo. E' lo stesso
   // "/rewind" di sempre, saltato il primo passo — il punto l'hai gia' indicato.
   | { cmd: 'rewind'; id: number }

@@ -381,6 +381,67 @@ for (const surface of ['view', 'panel']) {
   t(q.chip === 'conti.xlsx', 'a file attached to a queued message is not shown: ' + q.chip);
   t(q.numbered.every((d) => d !== 'none') && q.nums.join('') === '12', 'two queued messages are not numbered: ' + q.nums.join(','));
 
+  // ---- cambiare le parole senza perdere il posto in fila ----
+  //
+  // Ritirare e riscrivere manderebbe il messaggio in fondo, e con due in attesa
+  // correggere un refuso nel primo vorrebbe dire spedirlo dopo il secondo — che e'
+  // l'unica cosa che una coda deve garantire. Quindi si modifica dove sta.
+  await page.locator('.qmsg .qedit-btn').first().click();
+  await page.waitForTimeout(120);
+  t((await page.locator('.qmsg .qedit').count()) === 1, 'la matita non apre nessun campo');
+  t(
+    (await page.locator('.qmsg .qedit').inputValue()) === 'e poi controlla il foglio dei conti',
+    'il campo non parte da quello che avevi scritto'
+  );
+  await page.locator('.qmsg .qedit').fill('e controlla soprattutto la colonna IVA');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(200);
+  const ed = await lastSent();
+  t(
+    ed?.cmd === 'editQueued' && ed.id === 'q1' && ed.text === 'e controlla soprattutto la colonna IVA',
+    'la modifica non arriva all’estensione: ' + JSON.stringify(ed)
+  );
+  const edited = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#queued .qmsg')];
+    return {
+      order: rows.map((r) => r.querySelector('.qtext')?.textContent || ''),
+      // gli allegati restano attaccati: correggere un refuso non stacca il PDF
+      imgs: rows[0].querySelectorAll('.uimg').length,
+      chips: rows[0].querySelectorAll('.att-name').length,
+      open: document.querySelectorAll('#queued .qedit').length,
+    };
+  });
+  t(
+    edited.order[0] === 'e controlla soprattutto la colonna IVA',
+    'la riga non mostra le parole nuove: ' + edited.order[0]
+  );
+  t(
+    edited.order[1] === 'infine committa tutto',
+    'la modifica ha fatto perdere il posto in fila: ' + edited.order.join(' | ')
+  );
+  t(
+    edited.imgs === 1 && edited.chips === 1,
+    'la modifica ha staccato gli allegati: ' + edited.imgs + '/' + edited.chips
+  );
+  t(edited.open === 0, 'il campo di modifica resta aperto dopo l’invio');
+
+  // Esc lascia le cose com'erano — e non deve essere il `blur` che lo segue a
+  // rimettere dentro quello che hai appena buttato via.
+  await page.locator('.qmsg .qedit-btn').first().click();
+  await page.waitForTimeout(120);
+  await page.locator('.qmsg .qedit').fill('roba scritta per sbaglio');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  t(
+    (await page.locator('.qmsg .qtext').first().textContent()) ===
+      'e controlla soprattutto la colonna IVA',
+    'Esc ha applicato la modifica che stavi annullando'
+  );
+  t(
+    (await lastSent())?.text === 'e controlla soprattutto la colonna IVA',
+    'Esc ha mandato la modifica annullata: ' + JSON.stringify(await lastSent())
+  );
+
   // taking one back must not throw away what you wrote in it
   // .nth(1), non :nth-of-type(2): la frase in testa e' un div anche lei, e il
   // selettore CSS conta i fratelli dello stesso tipo, non quelli con la stessa classe.

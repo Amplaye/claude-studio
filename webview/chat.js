@@ -2485,9 +2485,87 @@
     const body = el('div', 'qbody');
     // Everything it carries, drawn the way the thread will draw it in a moment.
     body.append(...attachRows(m.images, m.files));
-    const said = (m.text || '').trim();
-    if (said) body.append(el('div', 'qtext', said));
+    let said = (m.text || '').trim();
+    const txt = el('div', 'qtext', said);
+    if (said) body.append(txt);
     row.append(body);
+
+    /**
+     * Cambiare le parole senza perdere il posto in fila.
+     *
+     * Ritirarlo e riscriverlo lo farebbe passare ultimo — e con due messaggi in
+     * attesa correggere un refuso nel primo vorrebbe dire mandarlo dopo il secondo,
+     * che e' l'unica cosa che la coda deve garantire. Quindi si modifica dove sta:
+     * il campo prende il posto della riga, e il messaggio resta dov'era.
+     *
+     * Solo le parole. Gli allegati non si toccano da qui: viaggiano gia' col
+     * messaggio e il motore se li tiene appesi in coda al testo (vedi editQueued in
+     * engine/session.ts), quindi una correzione non stacca il PDF che avevi messo.
+     */
+    let editing = false;
+    function edit() {
+      if (editing) return;
+      editing = true;
+      const box = document.createElement('textarea');
+      box.className = 'qedit';
+      box.value = said;
+      box.rows = 1;
+      const fit = () => {
+        box.style.height = 'auto';
+        box.style.height = Math.min(140, box.scrollHeight) + 'px';
+      };
+      let closed = false;
+      /**
+       * `next` = le parole nuove, o `null` per "lascia stare".
+       *
+       * Chiudere e' idempotente perche' arriva da due parti: togliere il campo fa
+       * scattare anche il suo `blur`, e senza questa guardia un Esc verrebbe subito
+       * dopo annullato dal blur che applica quello che avevi appena buttato via.
+       */
+      const close = (next) => {
+        if (closed) return;
+        closed = true;
+        editing = false;
+        box.replaceWith(txt);
+        // Svuotarlo del tutto non e' una modifica: un messaggio senza parole non e'
+        // un messaggio, e per toglierlo c'e' la × qui accanto.
+        if (next && next !== said) {
+          said = next;
+          txt.textContent = next;
+          vscode.postMessage({ cmd: 'editQueued', id: m.id, text: next });
+        }
+        input.focus();
+      };
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation(); // Esc qui non ferma il turno: chiude il campo e basta
+          close(null);
+        } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+          e.preventDefault();
+          close(box.value.trim());
+        }
+      });
+      // Cliccare altrove vale come "va bene cosi'": chiudere buttando via quello che
+      // hai appena scritto sarebbe il modo piu' rapido di perderlo.
+      box.addEventListener('blur', () => close(box.value.trim()));
+      box.addEventListener('input', fit);
+      if (txt.isConnected) txt.replaceWith(box);
+      else body.append(box);
+      fit();
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+    }
+
+    const pen = el('button', 'qedit-btn');
+    pen.type = 'button';
+    pen.title = t('queue.edit');
+    pen.setAttribute('aria-label', t('queue.edit'));
+    pen.append(icon('pencil'));
+    pen.addEventListener('click', edit);
+    row.append(pen);
+    // La riga stessa e' il bersaglio grande: si clicca dove si legge.
+    txt.addEventListener('click', edit);
 
     const x = el('button', 'qx');
     x.type = 'button';

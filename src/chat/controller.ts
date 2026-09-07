@@ -620,6 +620,11 @@ export class ChatController {
     this.session?.cancelQueued(id);
   }
 
+  /** Le parole di un messaggio in fila, cambiate senza fargli perdere il posto. */
+  editQueued(id: string, text: string) {
+    this.session?.editQueued(id, text);
+  }
+
   newSession() {
     this.resume = undefined;
     // Chiedendo una conversazione nuova, quella vecchia non va piu' riaperta al

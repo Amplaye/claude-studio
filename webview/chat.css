@@ -3260,8 +3260,10 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   padding-top: 1px;
 }
 /* Due righe, non una troncata: un messaggio in attesa lo rileggi per decidere se
-   tenerlo, e mezza frase non basta a deciderlo. */
+   tenerlo, e mezza frase non basta a deciderlo. E si clicca: e' il bersaglio grande
+   della matita qui accanto, perche' si corregge dove si legge. */
 .qtext {
+  cursor: text;
   min-width: 0;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -3287,6 +3289,32 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .qmsg .att {
   font-size: 11px;
 }
+.qtext:empty {
+  display: none;
+}
+/* Il campo prende esattamente il posto della riga che sostituisce: modificare non
+   deve far saltare la carta, o non si capisce piu' quale messaggio si sta toccando. */
+.qedit {
+  width: 100%;
+  min-width: 0;
+  resize: none;
+  overflow-y: auto;
+  padding: 4px 7px;
+  border: 1.5px solid var(--claude-1);
+  border-radius: 7px;
+  /* Il fondo del pannello, non quello della carta: la riga su cui sta e' gia' tinta
+     di argilla, e un campo con un bordo d'argilla sopra un fondo d'argilla e' un
+     campo che non si vede. L'alone attorno fa il resto. */
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--claude-1) 20%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.qedit-btn,
 .qx {
   flex: 0 0 auto;
   display: inline-flex;
@@ -3303,9 +3331,16 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   cursor: pointer;
   transition: background 0.16s ease;
 }
+.qedit-btn:hover,
 .qx:hover {
   background: color-mix(in srgb, var(--fg) 14%, transparent);
 }
+/* La matita si accende del colore della coda: e' la cosa che quel riquadro ti
+   invita a fare, la × e' la via d'uscita. */
+.qedit-btn:hover {
+  color: var(--accent);
+}
+.qedit-btn .ico,
 .qx .ico {
   width: 13px;
   height: 13px;

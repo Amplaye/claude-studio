@@ -274,6 +274,30 @@ export class Session {
     return true;
   }
 
+  /**
+   * Cambiare le parole di un messaggio che non e' ancora partito, senza fargli
+   * perdere il posto in fila.
+   *
+   * Il messaggio vero non e' solo quello che hai scritto: puo' portarsi dietro il
+   * codice selezionato nell'editor e l'elenco dei percorsi allegati, appesi in coda
+   * da chat/controller.ts. Quella coda va conservata — riscrivere `text` e basta
+   * vorrebbe dire che correggere un refuso stacca il PDF che avevi attaccato.
+   *
+   * Si ritrova per differenza: `full` comincia sempre con l'eco, perche' e' cosi' che
+   * viene costruito, quindi quello che resta e' la coda. Se un giorno smettesse di
+   * essere vero, la coda si perde ma il messaggio parte lo stesso con le parole
+   * nuove: meglio un allegato in meno di una modifica che non si applica.
+   */
+  editQueued(id: string, text: string): boolean {
+    const one = this.pending.find((p) => p.id === id && !p.silent);
+    if (!one) return false;
+    const was = one.echo ?? one.text;
+    const suffix = one.text.startsWith(was) ? one.text.slice(was.length) : '';
+    one.text = (text + suffix).trim();
+    one.echo = text;
+    return true;
+  }
+
   async interrupt() {
     try {
       await this.q?.interrupt();

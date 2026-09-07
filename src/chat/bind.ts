@@ -90,6 +90,9 @@ export function bindWebview(
       case 'unqueue':
         chat.unqueue(m.id);
         return;
+      case 'editQueued':
+        chat.editQueued(m.id, m.text);
+        return;
       case 'rewind':
         void chat.rewind(m.id);
         return;

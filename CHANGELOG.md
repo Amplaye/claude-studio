@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.19.1
+
+- **Un messaggio in attesa si puo' correggere.** C'era la ×, che lo ritira, e da li'
+  lo riscrivi da capo — ma riscriverlo lo manda in fondo, e con due in attesa
+  correggere un refuso nel primo vorrebbe dire spedirlo dopo il secondo, che e'
+  l'unica cosa che una coda deve garantire. Adesso c'e' la matita: il campo prende il
+  posto della riga, Invio tiene, Esc lascia com'era, e il messaggio non si muove dal
+  suo posto. Si clicca anche sul testo, che e' dove guardi.
+
+  Solo le parole. Gli allegati non si toccano da li' e restano attaccati: il messaggio
+  vero si porta dietro il codice selezionato e l'elenco dei percorsi, appesi in coda al
+  testo, e riscrivere il testo e basta avrebbe staccato il PDF senza dire niente. La
+  coda si ritrova per differenza e si riattacca alle parole nuove. Il controllo lo
+  prova sul serio, con la CLI vera: un file con dentro una parola inventata, il
+  messaggio modificato mentre e' in fila, e quella parola deve comparire nella
+  risposta — se l'allegato si fosse staccato, non avrebbe modo di saperla.
+
 ## 0.19.0
 
 - **La lista dei passi, e non piu' solo quello in corso.** La CLI non ha piu' uno
