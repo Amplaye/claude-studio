@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.22.1
+
+- **L’ufficio non si trovava.** Stava solo nella testata del pannello del contesto, che
+  e’ la meta’ di sotto della barra laterale: chi guarda la chat non lo vedeva mai. Adesso
+  il bottone c’e’ anche sopra la chat, accanto a “apri come scheda”, e la scheda torna da
+  sola dopo un riavvio della finestra anche se l’estensione non era ancora sveglia.
+
 ## 0.22.0
 
 - **L'ufficio.** Un comando nuovo — *Claude Studio: The Office*, e il bottone in cima al
