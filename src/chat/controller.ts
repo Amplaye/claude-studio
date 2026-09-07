@@ -300,6 +300,11 @@ export class ChatController {
     return text.length > 42 ? text.slice(0, 41).trimEnd() + '…' : text;
   }
 
+  /** La lingua scelta: serve alle poche scritte che nascono qui e non nella pagina. */
+  lang() {
+    return this.prefs.lang;
+  }
+
   /** Ogni volta che quel nome puo' essere cambiato. */
   onTitle(fn: () => void): vscode.Disposable {
     this.titleFns.add(fn);

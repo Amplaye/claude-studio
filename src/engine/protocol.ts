@@ -450,6 +450,8 @@ export type Cmd =
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
   | { cmd: 'newTab' }
+  // "Portami all'ufficio": non gira questa scheda, ne chiede una sua.
+  | { cmd: 'openOffice' }
   // The page has already played its exit animation: here it really closes.
   | { cmd: 'closeTab' }
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }

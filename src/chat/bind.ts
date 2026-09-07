@@ -108,6 +108,9 @@ export function bindWebview(
       case 'openTab':
         void vscode.commands.executeCommand('claudeStudio.openTab');
         return;
+      case 'openOffice':
+        void vscode.commands.executeCommand('claudeStudio.office');
+        return;
       case 'newTab':
         void vscode.commands.executeCommand('claudeStudio.openNewTab');
         return;

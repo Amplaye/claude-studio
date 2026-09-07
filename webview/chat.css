@@ -30,10 +30,23 @@ body {
 
 /* The chat and the context column sit side by side; inside, the chat stays the
    same old stack (header, thread, writing field). */
+/* Contenitore di query, e non e' una decorazione. Le soglie qui sotto — quando la
+   testata rinuncia alle parole, quando due bottoni si fanno da parte — misuravano
+   la finestra, mentre quello che conta e' quanto e' larga *questa* colonna. Con
+   l'ufficio accanto la colonna sta in quattrocento pixel dentro una finestra da
+   millecinquecento: nessuna soglia scattava, e la testata restava larga come un
+   tavolo che non aveva piu'.
+
+   E c'e' il secondo effetto, che e' poi quello che risolve il guaio: con
+   `inline-size` la larghezza minima automatica di un elemento flessibile smette di
+   essere quella del suo contenuto. Senza, questa colonna si prendeva mille pixel a
+   forza di bottoni — flex-basis o no — e la pianta dell'ufficio si stringeva fino a
+   sparire. */
 .shell {
   display: flex;
   height: 100%;
   width: 100%;
+  container: chat / inline-size;
 }
 .chatcol {
   flex: 1 1 auto;
@@ -174,7 +187,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
    The three numbers below aren't taste, they're the widths at which the row stops
    fitting: measured across 330→560px in steps of five (see the header sweep in
    scripts/ui-check.mjs, which fails if the state ever gets clipped again). */
-@media (max-width: 456px) {
+@container chat (max-width: 456px) {
   .top {
     gap: 7px;
     padding: 10px;
@@ -185,7 +198,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
     display: none;
   }
 }
-@media (max-width: 410px) {
+@container chat (max-width: 410px) {
   /* History and "open as tab" step aside. Neither is something you reach for in
      the middle of a turn, both are a keystroke away (Alt+H, Alt+O), and both are
      back the moment it's done. */
@@ -194,7 +207,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
     display: none;
   }
 }
-@media (max-width: 340px) {
+@container chat (max-width: 340px) {
   /* Narrower than this and the pill would be a dot again. It takes a line of its
      own instead — still in the header, still one strip, just wrapped. */
   .top {
@@ -2678,7 +2691,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   grid-template-columns: 1fr 1fr;
   gap: 4px;
 }
-@media (max-width: 380px) {
+@container chat (max-width: 380px) {
   .menu-grid {
     grid-template-columns: 1fr;
   }

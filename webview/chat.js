@@ -2755,9 +2755,13 @@
     if (on && window.OFFICE) window.OFFICE.resize();
   }
 
-  $('btnOffice').addEventListener('click', () =>
-    showOffice(!document.body.classList.contains('inoffice'))
-  );
+  // Da dentro l'ufficio il bottone riporta alla chat, che e' dove sei. Da fuori
+  // non gira questa scheda: l'ufficio ha la sua, e chiederla all'estensione e'
+  // anche il modo di ritrovare quella gia' aperta invece di aprirne una seconda.
+  $('btnOffice').addEventListener('click', () => {
+    if (document.body.classList.contains('inoffice')) return showOffice(false);
+    vscode.postMessage({ cmd: 'openOffice' });
+  });
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   // ---------- opening and closing the tab ----------

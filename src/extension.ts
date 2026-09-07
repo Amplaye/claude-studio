@@ -106,10 +106,10 @@ export function activate(ctx: vscode.ExtensionContext) {
       vscode.commands.executeCommand('claudeStudio.context.focus')
     ),
     // L'ufficio: le stesse conversazioni del pannello, ma disegnate come gente
-    // seduta alle scrivanie. Non e' una scheda sua — e' l'altra faccia della
-    // scheda della chat, e questo comando la apre gia' girata di la'.
+    // seduta alle scrivanie. Ha una scheda sua, con dentro la sua chat — e ce n'e'
+    // una sola: se e' gia' aperta, questo comando la riporta davanti.
     vscode.commands.registerCommand('claudeStudio.office', () =>
-      ChatPanel.openOffice(ctx, chat, monitor)
+      ChatPanel.openOffice(ctx, monitor)
     ),
     vscode.commands.registerCommand('claudeStudio.context.refresh', () => monitor.tick()),
     vscode.commands.registerCommand('claudeStudio.context.diagnose', () => monitor.diagnose()),

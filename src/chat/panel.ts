@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
 import type { ContextMonitor } from '../context/monitor';
+import { t } from '../shared/i18n';
 import { bindWebview } from './bind';
 import { ChatController } from './controller';
 
@@ -15,6 +16,8 @@ export class ChatPanel {
   private static primary?: ChatPanel;
   /** Every open tab, primary included: they're needed for cleanup. */
   private static all = new Set<ChatPanel>();
+  /** L'ufficio: una scheda sola. Il bottone ci riporta invece di aprirne un'altra. */
+  private static officeTab?: ChatPanel;
 
   /**
    * Opens the primary tab: if it's already there, it brings it to the front. This is
@@ -40,21 +43,31 @@ export class ChatPanel {
   }
 
   /**
-   * "Claude Studio: L'ufficio": la scheda principale, aperta gia' sulla pianta.
+   * "Claude Studio: L'ufficio": la pianta, in una scheda tutta sua.
    *
-   * L'ufficio non e' piu' una scheda sua — e' l'altra faccia di questa, e il
-   * bottone nella testata la gira. Due schede sullo stesso piano erano due
-   * finestre da chiudere, e dall'ufficio non si tornava a *quella* chat: si
-   * andava a cercarsela fra le linguette.
+   * Girare la scheda su cui stavi non reggeva. La chat le si metteva accanto e si
+   * prendeva la larghezza che le serviva — in una scheda intera sono mille pixel
+   * di testata — e la pianta finiva schiacciata in una striscia: l'ufficio si
+   * rimpiccioliva per far posto alla conversazione, che e' l'esatto contrario di
+   * quello che deve fare. Adesso ha la sua scheda, con dentro la sua chat, e
+   * quella colonna e' larga quanto diciamo noi.
+   *
+   * Una sola: se c'e' gia', torna davanti quella.
    */
-  static openOffice(
-    ctx: vscode.ExtensionContext,
-    chat: ChatController,
-    monitor?: ContextMonitor
-  ) {
-    const panel = ChatPanel.open(ctx, chat, undefined, monitor);
-    panel.showOffice();
-    return panel;
+  static openOffice(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
+    if (ChatPanel.officeTab) {
+      ChatPanel.officeTab.panel.reveal(undefined, false);
+      ChatPanel.officeTab.showOffice();
+      return ChatPanel.officeTab;
+    }
+    const chat = new ChatController(ctx, { primary: false });
+    const panel = vscode.window.createWebviewPanel(TYPE, 'Claude Studio', vscode.ViewColumn.Active, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+    });
+    const tab = new ChatPanel(panel, ctx, chat, monitor, false, true);
+    tab.showOffice();
+    return tab;
   }
 
   /**
@@ -189,8 +202,11 @@ export class ChatPanel {
         /* scheda chiusa nel frattempo */
       }
     };
+    // La scheda e' appena nata e la pagina non e' ancora in piedi: il primo colpo
+    // va nel vuoto. Tre in un secondo, che e' molto piu' di quanto ci mette a
+    // caricarsi, e quelli di troppo non costano niente.
     send();
-    setTimeout(send, 400);
+    for (const ms of [400, 1000]) setTimeout(send, ms);
   }
 
   private constructor(
@@ -198,11 +214,14 @@ export class ChatPanel {
     ctx: vscode.ExtensionContext,
     chat: ChatController,
     monitor: ContextMonitor | undefined,
-    isPrimary: boolean
+    isPrimary: boolean,
+    /** La scheda dell'ufficio: si chiama come l'ufficio, e ce n'e' una sola. */
+    private readonly isOffice = false
   ) {
     this.chat = chat;
     this.isPrimary = isPrimary;
     if (isPrimary) ChatPanel.primary = this;
+    if (isOffice) ChatPanel.officeTab = this;
     ChatPanel.all.add(this);
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
@@ -225,7 +244,12 @@ export class ChatPanel {
     // un pallino, sulla linguetta, esattamente dove stai gia' guardando per capire
     // quale scheda aprire. Sparisce appena quella scheda torna davanti.
     this.followName = () => {
-      const name = (owned.isDone(chat.key) ? '● ' : '') + chat.name();
+      // La scheda dell'ufficio si chiama l'ufficio finche' la sua conversazione non
+      // ha un nome suo. `name()` risponde 'Claude Studio' proprio quando non ce l'ha
+      // ancora, ed e' l'unica etichetta che in una fila di linguette non dice niente.
+      const given = chat.name();
+      const label = this.isOffice && given === 'Claude Studio' ? t(chat.lang(), 'tab.office') : given;
+      const name = (owned.isDone(chat.key) ? '● ' : '') + label;
       if (panel.title !== name) panel.title = name;
     };
     this.followName();
@@ -254,6 +278,7 @@ export class ChatPanel {
       else if (!chat.hasFaces()) owned.end(chat.key);
       ChatPanel.all.delete(this);
       if (ChatPanel.primary === this) ChatPanel.primary = undefined;
+      if (ChatPanel.officeTab === this) ChatPanel.officeTab = undefined;
     });
   }
 }

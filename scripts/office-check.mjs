@@ -79,6 +79,7 @@ const t = (cond, msg) => !cond && fails.push(msg);
 const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
 const ctx = (d) => post({ k: 'ctx', d });
 const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
+const sent = (cmd) => page.evaluate((c) => (window.__sent || []).some((m) => m.cmd === c), cmd);
 const inOffice = () => page.evaluate(() => document.body.classList.contains('inoffice'));
 
 // La scheda si annuncia come scheda: e' quello che tira fuori il bottone
@@ -86,12 +87,21 @@ const inOffice = () => page.evaluate(() => document.body.classList.contains('ino
 await post({ k: 'hello', cwd: '/x', project: 'x', cliVersion: '1', surface: 'panel' });
 await page.waitForTimeout(150);
 
-// ---- il bottone gira la scheda, e la gira anche indietro ----
+// ---- il bottone chiede la scheda dell'ufficio, e di la' si torna indietro ----
 t(!(await inOffice()), 'la scheda parte dall\'ufficio invece che dalla chat');
 t(!(await page.locator('#btnOffice').isHidden()), "in una scheda il bottone dell'ufficio non c'e'");
+// Il bottone non gira piu' questa scheda. Girarla voleva dire mettere la chat
+// accanto alla pianta, e la chat si prendeva la larghezza che le serviva: la
+// stanza si rimpiccioliva per far posto alla conversazione. L'ufficio ha una
+// scheda sua, con dentro la sua chat, e il bottone la chiede all'estensione.
 await page.click('#btnOffice');
 await page.waitForTimeout(200);
-t(await inOffice(), "il bottone non porta all'ufficio");
+t(!(await inOffice()), "il bottone gira questa scheda invece di chiedere quella dell'ufficio");
+t(await sent('openOffice'), "il bottone non chiede la scheda dell'ufficio");
+// E quella scheda nasce gia' girata: gliela gira l'host appena e' in piedi.
+await post({ k: 'view', value: 'office' });
+await page.waitForTimeout(200);
+t(await inOffice(), "la scheda dell'ufficio non nasce sulla pianta");
 t(
   await page.locator('.office .of-back').isVisible(),
   "dall'ufficio non si vede il bottone per tornare alla chat"
@@ -101,6 +111,21 @@ t(
 t(await page.locator('.shell').isVisible(), "dall'ufficio la chat non si vede: non ci si puo' lavorare");
 t(await page.locator('#input').isVisible(), "dall'ufficio non si puo' scrivere a Claude");
 t(!(await page.locator('.rail').isVisible()), "la colonna del contesto ripete a parole quello che la stanza dice a figure");
+// Il guaio da cui e' nata la scheda a parte: la colonna della chat non scendeva
+// sotto la larghezza del suo contenuto — una testata piena di bottoni — e se la
+// prendeva tutta alla pianta, che restava una striscia. La stanza e' la parte
+// grande, se no non e' una stanza.
+const split = await page.evaluate(() => ({
+  office: document.querySelector('.office').getBoundingClientRect().width,
+  shell: document.querySelector('.shell').getBoundingClientRect().width,
+}));
+t(
+  split.office > split.shell,
+  'la chat si prende piu\' spazio della pianta: ' +
+    Math.round(split.shell) +
+    ' contro ' +
+    Math.round(split.office)
+);
 await page.click('.office .of-back');
 await page.waitForTimeout(200);
 t(!(await inOffice()), "dall'ufficio non si torna alla chat");

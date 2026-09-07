@@ -1,0 +1,56 @@
+/* ============================================================
+     2 — VETTORIALE PIATTO   (niente sprite: e' tutto CSS)
+     ============================================================ */
+  .f .pane { background: var(--o800); }
+  .f .stage { box-shadow: 0 8px 34px -10px rgba(0,0,0,.7); }
+  .f .floor {
+    background-color: var(--o300);
+    background-image:
+      linear-gradient(rgba(60,70,51,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(60,70,51,.05) 1px, transparent 1px);
+    background-size: 16px 16px, 16px 16px;
+    border-radius: 3px;
+  }
+  .f .wall { background: var(--s5); box-shadow: 0 1px 0 var(--s1), 0 2px 4px -1px rgba(51,61,44,.3); }
+  .f .prop i, .f .desk i { display: none; }
+  .f .prop { border-radius: 3px; }
+  .f .prop[data-k=table]  { background: var(--s3); box-shadow: inset 0 -2px 0 var(--s1); border-radius: 4px; }
+  .f .prop[data-k=chair],
+  .f .prop[data-k=stool]  { background: var(--t200); border-radius: 4px; box-shadow: inset 0 0 0 2px var(--t300); }
+  .f .prop[data-k=sofa]   { background: var(--t400); border-radius: 5px; box-shadow: inset 0 -3px 0 var(--t600); }
+  .f .prop[data-k=rug]    { background: var(--t100); border-radius: 6px; box-shadow: inset 0 0 0 2px var(--t200); }
+  .f .prop[data-k=board]  { background: var(--o600); border-radius: 2px; box-shadow: 0 0 0 2px var(--s5); }
+  .f .prop[data-k=green]  { background: var(--o500); border-radius: 2px; box-shadow: 0 0 0 2px var(--s5); }
+  .f .prop[data-k=shelf],
+  .f .prop[data-k=bar]    { background: var(--s2); border-radius: 3px; box-shadow: inset 0 -3px 0 var(--s1); }
+  .f .prop[data-k=sink],
+  .f .prop[data-k=fridge],
+  .f .prop[data-k=copier] { background: var(--o300); border-radius: 3px; box-shadow: inset 0 -2px 0 var(--o400); }
+  .f .prop[data-k=bin]    { background: var(--o400); border-radius: 50%; }
+  /* La pianta di una pianta e' un cerchio verde: da qui sopra e' tutto quello
+     che se ne vede, e bastano dieci pixel per riconoscerla. */
+  .f .prop[data-k=plant]  { background: none; }
+  .f .prop[data-k=plant]::after {
+    content: ""; position: absolute; inset: 3px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, var(--o400), var(--o600));
+    box-shadow: 0 0 0 2px var(--t200);
+  }
+  .f .desk { width: 32px; height: 16px; background: var(--s3); border-radius: 4px;
+             box-shadow: inset 0 -3px 0 var(--s1), 0 1px 3px -1px rgba(51,61,44,.45); }
+  .f .stool { width: 16px; height: 16px; background: var(--t200); border-radius: 4px;
+              box-shadow: inset 0 0 0 2px var(--t300); }
+  .f .mon { width: 14px; height: 9px; margin-left: 1px; margin-top: 2px;
+            border-radius: 2px; background: var(--o700); }
+  .f .mon.on { background: var(--o500); }
+  .f .mon.busy { background: linear-gradient(180deg, var(--t300), var(--t500));
+                 box-shadow: 0 0 8px rgba(244,85,23,.8); }
+  .f .guy { width: 16px; height: 16px; }
+  .f .fig { position: absolute; left: 2px; top: 2px; width: 12px; height: 12px;
+            border-radius: 50%; background: var(--shirt);
+            box-shadow: 0 2px 4px -1px rgba(51,61,44,.55); }
+  .f .fig::after { content: ""; position: absolute; left: 3px; top: 3px;
+                   width: 6px; height: 6px; border-radius: 50%; background: var(--s3);
+                   box-shadow: inset 0 -1px 0 rgba(51,61,44,.18); }
+  .f .fig i { display: none; }
+  .f .plate { background: var(--s5); border-radius: 4px; color: var(--o800);
+              box-shadow: 0 2px 5px -1px rgba(51,61,44,.5); }

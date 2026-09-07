@@ -59,8 +59,14 @@ body.inoffice .office {
      normale. A schermo va prima: si guarda la stanza e si scrive a destra. */
   order: -1;
 }
+/* La colonna della chat e' larga quanto dice questa riga e non un pixel di piu'.
+   Il `min-width: 0` e' quello che glielo impone: senza, un elemento flessibile non
+   scende sotto la larghezza del suo contenuto, e una testata piena di bottoni ne
+   valeva mille — presi tutti alla stanza. Alla pianta resta il resto, che e' la
+   parte grande, che e' il punto. */
 body.inoffice .shell {
-  flex: 0 0 clamp(340px, 36%, 560px);
+  flex: 0 0 clamp(340px, 32%, 520px);
+  min-width: 0;
   width: auto;
   border-left: 1px solid var(--line);
 }

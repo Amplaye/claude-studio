@@ -59,6 +59,7 @@ const STRINGS = {
     'rewind.noFiles': 'no file changes',
     'rewind.done': 'Restored {n} file(s).',
     'rewind.skipped': 'Restored {n} file(s), skipped {s} (symlinked or unwritable).',
+    'tab.office': 'The Office',
   },
   it: {
     'toast.done': 'Claude ha finito · {project}',
@@ -86,6 +87,7 @@ const STRINGS = {
     'rewind.noFiles': 'nessun file cambiato',
     'rewind.done': 'Rimessi a posto {n} file.',
     'rewind.skipped': 'Rimessi {n} file, saltati {s} (link simbolici o non scrivibili).',
+    'tab.office': 'L’ufficio',
   },
 } satisfies Record<Lang, Record<string, string>>;
 

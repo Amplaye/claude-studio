@@ -1,0 +1,32 @@
+/* ============================================================
+     1 — KENNEY, RIVESTITO BALIFLOW   (quello che c'e' adesso)
+     ============================================================ */
+  .k .pane { background: var(--o700); }
+  .k .floor {
+    background-color: #b8c6a9;
+    background-image:
+      radial-gradient(circle at 0 0, rgba(255,255,255,.22) 1.4px, transparent 1.5px),
+      linear-gradient(rgba(51,61,44,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(51,61,44,.07) 1px, transparent 1px),
+      linear-gradient(160deg, #a9b998, #b8c6a9);
+    background-size: 32px 32px, 16px 16px, 16px 16px, 100% 100%;
+  }
+  .k .stage { outline: 2px solid var(--o900); }
+  .k .wall { background: var(--s5); box-shadow: inset 0 -2px 0 var(--s1), 0 2px 3px -1px rgba(0,0,0,.35); }
+  .k .prop i, .k .desk i, .k .stool {
+    background-image: url("../../webview/sprites-room.png");
+    background-repeat: no-repeat; image-rendering: pixelated;
+  }
+  .k .desk { width: 32px; height: 16px; }
+  .k .stool { width: 16px; height: 16px; }
+  .k .mon { width: 14px; height: 11px; margin-left: 1px; border: 2px solid var(--o900);
+            border-radius: 1px; background: #46503f; }
+  .k .mon.on { background: #6d7a5f; }
+  .k .mon.busy { background: linear-gradient(180deg, var(--t300), var(--t500));
+                 box-shadow: 0 0 7px rgba(244,85,23,.75); }
+  .k .guy { width: 16px; height: 16px; }
+  .k .fig { position: absolute; inset: 0; filter: drop-shadow(0 2px 0 rgba(0,0,0,.22)); }
+  .k .fig i { position: absolute; inset: 0; width: 16px; height: 16px; float: none;
+              background-image: url("../../webview/sprites-folk.png");
+              background-repeat: no-repeat; image-rendering: pixelated; }
+  .k .plate { border: 1px solid var(--o900); background: var(--s5); color: var(--o800); }
