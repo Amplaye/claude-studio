@@ -66,7 +66,7 @@
   /* Il pavimento e i muri li mette room.css: qui c'e' solo la cornice intorno,
      che nell'ufficio vero e' la scheda di VS Code e qui e' un riquadro. */
   .pane {
-    width: 900px; height: 772px; overflow: hidden; background: #1d1512;
+    width: 768px; height: 640px; overflow: hidden; background: #1d1512;
     display: flex; align-items: center; justify-content: center; border-radius: 10px;
   }
   #stage { transform: scale(2); }
@@ -150,12 +150,14 @@ PEOPLE.forEach((p, i) => {
   // Ferma da un pezzo: sbiadita, come nell'ufficio vero.
   if (p.st === 'idle') g.style.filter = 'grayscale(.6) opacity(.55)';
   const fig = el('div', 'of-body');
-  g.append(el('div', 'of-ring'), fig);
+  g.append(fig);
 
-  // La targhetta sta addosso a chi la porta e la segue dove va: di chi sia
-  // quella scrivania lo dice lo schermo acceso, che resta acceso anche mentre
-  // lei e' al bar.
+  // La targhetta sta sulla scrivania e ci resta: dice di chi e' quel posto, e un
+  // posto non si alza.
   const plate = el('div', 'of-plate');
+  plate.style.left = d.x + ROOM.SW / 2 + 'px';
+  plate.style.top = d.top - 20 + 'px';
+  plate.style.zIndex = d.b;
   const b = el('b', 'of-name');
   b.textContent = p.name;
   const s = el('s', 'of-bar2');
@@ -164,12 +166,11 @@ PEOPLE.forEach((p, i) => {
   fill.style.background = barColor(p.pct);
   s.append(fill);
   plate.append(b, s);
-  g.append(plate);
 
   d.mon.classList.add('on');
   if (p.st === 'busy') d.mon.classList.add('working');
 
-  stage.append(g);
+  stage.append(plate, g);
   const chi = {
     el: g,
     fig,
@@ -177,9 +178,6 @@ PEOPLE.forEach((p, i) => {
     casa,
     posa: p.st === 'busy' ? 'digita' : 'fermo',
     ferma: p.st === 'idle',
-    // Chi lavora resta alla sua scrivania: al bar ci si va quando non c'e'
-    // niente da fare.
-    lavora: p.st === 'busy',
   };
   ROOM.vesti(fig, chi.seme, chi.posa);
   gente.push(chi);

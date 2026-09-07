@@ -30,7 +30,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const url = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 
 /** Le scrivanie della pianta: room.js ne mette una per posto, sempre le stesse. */
-const DESKS = 12;
+const DESKS = 6;
 
 const card = (over = {}) => ({
   id: 'aaaa',

@@ -196,22 +196,20 @@ window.OFFICE = (() => {
     tick.appendChild(tuse);
     bubble.append(dots, tick);
 
-    // La targhetta sta addosso a chi la porta, e la segue dove va: e' cosi' che
-    // si legge una pianta d'ufficio, ed e' l'unico posto che le resta ora che le
-    // file sono strette — sul piano della scrivania c'e' il monitor. Di chi sia
-    // quel posto lo dice lo schermo acceso, che resta acceso anche mentre lei e'
-    // al bar. Attaccata al bottone si sposta da sola: due elementi con due
-    // transizioni loro si scollavano a meta' corridoio.
+    b.append(el('span', 'of-ring'), who, bubble);
+    b.onclick = () => send({ cmd: 'focus', id: s.id });
+
+    // La targhetta non sta dentro la persona: sta sulla scrivania, e ci resta
+    // anche quando chi ci lavora e' andato al bar. Appesa addosso se ne andava
+    // in giro con lei, e mezza stanza si ritrovava un nome che le volava sopra
+    // la testa.
     const plate = el('span', 'of-plate');
     const pname = el('span', 'of-name');
     const pbar = el('span', 'of-bar2');
     const pfill = el('span', 'of-fill');
     pbar.append(pfill);
     plate.append(pname, pbar);
-
-    b.append(el('span', 'of-ring'), who, bubble, plate);
-    b.onclick = () => send({ cmd: 'focus', id: s.id });
-    crowd.append(b);
+    crowd.append(plate, b);
 
     // La forma che vuole room.js — `el`, `fig`, `seme`, `casa`, `posa`, `ferma`
     // — piu' quello che serve solo di qua.
@@ -244,9 +242,24 @@ window.OFFICE = (() => {
     // che stia lavorando, e richiama a sedersi chi era gia' uscito.
     chi.lavora = !!s.busy;
 
-    // Chi sta in piedi non ha una scrivania da cui alzarsi, quindi non gira per
-    // la stanza.
-    chi.casa = seat >= 0 ? window.ROOM.posto(seat) : null;
+    if (seat >= 0) {
+      const d = scrivanie[seat];
+      chi.casa = window.ROOM.posto(seat);
+      chi.plate.hidden = false;
+      chi.plate.style.left = d.x + window.ROOM.SW / 2 + 'px';
+      chi.plate.style.top = d.top - 20 + 'px';
+      chi.plate.style.zIndex = d.b;
+    } else {
+      // Finiti i posti si sta in piedi in fondo al salone, in fila lungo il muro:
+      // e' il posto dove uno aspetta davvero che si liberi una scrivania. Chi sta
+      // in piedi non ha una scrivania da cui alzarsi, quindi non gira per la
+      // stanza — e la sua targhetta gli sta sopra la testa, non su un mobile.
+      chi.casa = null;
+      chi.plate.hidden = false;
+      chi.plate.style.left = parseFloat(b.style.left) + 8 + 'px';
+      chi.plate.style.top = parseFloat(b.style.top) - 20 + 'px';
+      chi.plate.style.zIndex = 9000;
+    }
 
     // Chi e' in giro non lo si sposta e non lo si riveste: ci pensa la stanza,
     // e riportarlo alla scrivania a ogni aggiornamento vorrebbe dire un
@@ -312,15 +325,15 @@ window.OFFICE = (() => {
         if (seat >= 0) seats[seat] = s.id;
       }
       if (seat < 0 && !chi.fuori) {
-        // In fila nel corridoio, che e' l'unica fascia di pavimento libera in
-        // tutta la stanza — ed e' anche il posto dove uno aspetta davvero che si
-        // liberi una scrivania. Sei per fila e distanti sessanta: e' la
-        // larghezza della targhetta a decidere, non la persona — piu' stretti i
-        // nomi si coprono a vicenda e la fila diventa una macchia bianca.
-        // ponytail: oltre una fila si va a capo, e la seconda finisce nel muro.
-        // Diciannove conversazioni insieme non le ha nessuno.
-        chi.el.style.left = 40 + (spare % 6) * 60 + 'px';
-        chi.el.style.top = 138 - Math.floor(spare++ / 6) * 26 + 'px';
+        // In fila lungo il muro in fondo, dove il corridoio e' libero. Sei per
+        // fila e distanti cinquantaquattro: e' la larghezza della targhetta,
+        // ed e' quella a decidere, non la persona — piu' stretti i nomi si
+        // coprono a vicenda e la fila diventa una macchia bianca. Si parte da
+        // cinquantasei per non finire dentro la pianta dell'angolo.
+        // ponytail: oltre una fila si va a capo, e la seconda fila finisce
+        // addosso alle scrivanie. Tredici conversazioni insieme non le ha nessuno.
+        chi.el.style.left = 56 + (spare % 6) * 54 + 'px';
+        chi.el.style.top = 266 - Math.floor(spare++ / 6) * 26 + 'px';
         chi.el.style.zIndex = parseFloat(chi.el.style.top) + 24;
       }
       paintPerson(chi, s, seat);
