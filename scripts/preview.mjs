@@ -62,11 +62,14 @@ function build(page, out) {
     .replace('<meta http-equiv="Content-Security-Policy" content="{{csp}}" />', stub)
     .replace(/\{\{sprite\}\}/, sprite)
     .replace(/\{\{nonce\}\}/g, 'preview')
+    // La mappa dei ritagli ha il trattino nel nome e va prima della regola
+    // generica, che dal nome del segnaposto ricava il file e qui sbaglierebbe.
+    .replace(/\{\{svRoomJs\}\}/g, 'webview/sv-room.js')
     .replace(/\{\{(\w+)Css\}\}/g, (_, k) => `webview/${k}.css`)
     .replace(/\{\{(\w+)Js\}\}/g, (_, k) => `webview/${k}.js`)
     // Il foglio dei mobili dell'ufficio. Nella webview vera e' un URI di VS Code;
     // qui e' il file. Le persone non hanno un foglio: le disegna npc.js.
-    .replace(/\{\{roomPng\}\}/g, 'webview/sprites-room.png');
+    .replace(/\{\{roomPng\}\}/g, 'webview/sv-room.png');
   fs.writeFileSync(path.join(dist, out), html, 'utf8');
   console.log('dist/' + out);
 }

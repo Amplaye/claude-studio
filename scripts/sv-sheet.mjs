@@ -1,5 +1,9 @@
 // Ritaglia i mobili che servono all'ufficio dai fogli di SeasonVale e li impacchetta
-// in un foglio solo, `docs/skins/sv-room.png`, con accanto la mappa dei nomi.
+// in un foglio solo, `webview/sv-room.png`, con accanto la mappa dei nomi.
+//
+// Sta in `webview/` e non in `docs/` perche' il foglio e' dell'ufficio vero: la
+// pagina di prova se lo va a prendere di la', che e' l'unico modo di essere sicuri
+// che stia guardando gli stessi mobili.
 //
 // Perche' un foglio nostro invece dei due originali: dei due fogli di partenza
 // l'ufficio usa una ventina di caselle su quattrocento, e il resto e' roba da
@@ -172,18 +176,18 @@ const out = await page.evaluate(
 await browser.close();
 
 const bin = (dataUrl) => Buffer.from(dataUrl.split(',')[1], 'base64');
-fs.writeFileSync(path.join(root, 'docs', 'skins', 'sv-room.png'), bin(out.png));
+fs.writeFileSync(path.join(root, 'webview', 'sv-room.png'), bin(out.png));
 // La mappa esce come .js e non come .json apposta: la pagina si apre a doppio
 // clic, e da file:// una fetch di un .json la blocca il browser. Un <script>
 // invece entra sempre.
 fs.writeFileSync(
-  path.join(root, 'docs', 'skins', 'sv-room.js'),
+  path.join(root, 'webview', 'sv-room.js'),
   '/* Generato da scripts/sv-sheet.mjs — non si scrive a mano. */\n' +
     'window.SV = ' +
     JSON.stringify(out.map, null, 1) +
     ';\n'
 );
-console.log(`docs/skins/sv-room.png  ${out.W}x${out.H}  ${Object.keys(out.map).length} pezzi`);
+console.log(`webview/sv-room.png  ${out.W}x${out.H}  ${Object.keys(out.map).length} pezzi`);
 if (out.provino) {
   fs.mkdirSync(path.join(root, 'dist', 'sv'), { recursive: true });
   fs.writeFileSync(path.join(root, 'dist', 'sv', 'contact.png'), bin(out.provino));

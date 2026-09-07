@@ -18,7 +18,10 @@
 //    dentro i muri;
 //  - i mobili e la gente sono sprite che devono essere arrivati davvero: un
 //    foglio non caricato lascia una stanza di rettangoli invisibili, e da fuori
-//    sembra solo un ufficio vuoto.
+//    sembra solo un ufficio vuoto;
+//  - e nei mobili non ci si passa dentro. La stanza tiene una griglia di dove
+//    si possono mettere i piedi, e nessuno deve mai trovarsi su una casella
+//    occupata: ne' da seduto, ne' in piedi in fondo al salone.
 import { chromium } from 'playwright';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -26,8 +29,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const url = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 
-/** Le scrivanie della pianta: office.js ne mette una per posto, sempre le stesse. */
-const DESKS = 8;
+/** Le scrivanie della pianta: room.js ne mette una per posto, sempre le stesse. */
+const DESKS = 6;
 
 const card = (over = {}) => ({
   id: 'aaaa',
@@ -141,24 +144,54 @@ await page.waitForTimeout(150);
 const plan = await page.evaluate(() => ({
   desks: document.querySelectorAll('.of-desk').length,
   mons: document.querySelectorAll('.of-mon').length,
-  stools: document.querySelectorAll('.of-stool').length,
-  props: document.querySelectorAll('.office .spr').length,
+  props: document.querySelectorAll('.office .of-prop').length,
   people: document.querySelectorAll('.of-guy').length,
   emptyShown: !document.querySelector('.of-nobody').hidden,
-  sheet: getComputedStyle(document.querySelector('.office .spr')).backgroundImage,
+  sheet: getComputedStyle(document.querySelector('.office .of-prop')).backgroundImage,
 }));
-// Due mattonelle per scrivania: il piano e il cassetto.
-t(plan.desks === DESKS * 2, 'le scrivanie sono ' + plan.desks / 2 + ', non ' + DESKS);
+// Una scrivania e' un ritaglio solo: i mobili di SeasonVale non stanno dentro
+// una casella, hanno la loro misura vera.
+t(plan.desks === DESKS, 'le scrivanie sono ' + plan.desks + ', non ' + DESKS);
 t(plan.mons === DESKS, 'i monitor sono ' + plan.mons + ', le scrivanie ' + DESKS);
-t(plan.stools === DESKS, 'gli sgabelli sono ' + plan.stools + ', le scrivanie ' + DESKS);
-// Erano piu' di 80 finche' in mezzo alle due stanze in alto c'erano un divano,
-// una stuoia e una pianta. Adesso quel pezzo e' vuoto apposta — e' il passaggio —
-// e la soglia scende di conseguenza: serve a dire "la stanza non e' spoglia", non
-// a contare i mobili uno per uno.
-t(plan.props > 70, 'la stanza e\' spoglia: solo ' + plan.props + ' mobili');
+// La soglia serve a dire "la stanza non e' spoglia", non a contare i mobili uno
+// per uno: le scrivanie contano, i muri e il pavimento no.
+t(plan.props > 20, 'la stanza e\' spoglia: solo ' + plan.props + ' mobili');
 t(/url\(/.test(plan.sheet), 'i mobili non hanno il foglio di sprite: ' + plan.sheet);
 t(!plan.people, "c'e' gente in ufficio senza nemmeno una conversazione aperta");
 t(plan.emptyShown, "l'ufficio vuoto non dice che e' vuoto");
+
+// ---- e da ogni scrivania si arriva a ogni meta' senza passare nei mobili ----
+//
+// Qui non si guarda la gente che cammina: si guarda la strada. Il conto e'
+// immediato e non dipende da chi si alza in quel momento, quindi becca il
+// mobile spostato di traverso anche se in quel minuto nessuno ci passava.
+// Due modi di sbagliare: non arrivarci — e allora la strada finisce dove ha
+// potuto invece che sulla meta' — o arrivarci attraversando un tavolo.
+const strade = await page.evaluate(() => {
+  const guai = [];
+  for (const [nome, [gx, gy]] of Object.entries(ROOM.METE)) {
+    for (let i = 0; i < ROOM.DESKS.length; i++) {
+      const casa = ROOM.posto(i);
+      let qui = [casa.x + 8, casa.y + 24];
+      const via = ROOM.cammino(qui[0], qui[1], gx, gy);
+      let sporco = 0;
+      for (const t of via) {
+        const n = Math.max(1, Math.ceil(Math.hypot(t[0] - qui[0], t[1] - qui[1]) / 2));
+        for (let k = 0; k <= n; k++) {
+          const x = qui[0] + ((t[0] - qui[0]) * k) / n;
+          const y = qui[1] + ((t[1] - qui[1]) * k) / n;
+          if (ROOM.occupata[ROOM.cella(x, y)]) sporco++;
+        }
+        qui = t;
+      }
+      if (sporco) guai.push(nome + " dalla scrivania " + i + ": passa dentro un mobile");
+      else if (Math.hypot(qui[0] - gx, qui[1] - gy) > 1)
+        guai.push(nome + " dalla scrivania " + i + ": si ferma prima");
+    }
+  }
+  return guai;
+});
+t(!strade.length, 'la strada non porta dove deve: ' + strade.join(' | '));
 
 // ---- quattro conversazioni, quattro persone ----
 const four = [
@@ -196,8 +229,18 @@ const room = await page.evaluate(() => {
     done: document.querySelectorAll('.of-guy.done').length,
     focused: document.querySelectorAll('.of-guy.focused').length,
     working: document.querySelectorAll('.of-mon.working').length,
-    taken: document.querySelectorAll('.of-stool.taken').length,
-    names: ps.map((p) => p.querySelector('.of-name').textContent),
+    // La targhetta non sta piu' dentro la persona: sta sulla scrivania, e ci
+    // resta anche quando chi ci lavora e' andato al bar.
+    names: [...document.querySelectorAll('.of-plate .of-name')].map((n) => n.textContent),
+    // Nessuno dentro un mobile: la posizione si legge dal rettangolo disegnato,
+    // perche' durante una camminata style.left e' gia' l'arrivo.
+    dentro: ps.filter((p) => {
+      const s = p.getBoundingClientRect();
+      const k = s.width / 16;
+      const fx = (s.left - floor.left) / k + 8;
+      const fy = (s.top - floor.top) / k + 24;
+      return ROOM.occupata[ROOM.cella(fx, fy)];
+    }).length,
     labels: ps.map((p) => p.getAttribute('aria-label')),
     emptyShown: !document.querySelector('.of-nobody').hidden,
   };
@@ -247,7 +290,7 @@ t(room.focused === 1, 'il faretto sta su ' + room.focused + ' persone, ne vuole 
 // Il monitor acceso e' la cosa che si vede da lontano: sulla scrivania sbagliata
 // dice una bugia sul chi sta lavorando.
 t(room.working === 1, room.working + ' monitor accesi, ne lavora una sola');
-t(room.taken === 4, 'gli sgabelli occupati sono ' + room.taken + ', le persone quattro');
+t(!room.dentro, room.dentro + ' persone stanno dentro un mobile');
 t(
   room.names.join('|') === 'Sta lavorando|Ha finito|Di recente|Ferma da un pezzo',
   "le targhette non dicono di chi e' la scrivania: " + room.names.join(' | ')

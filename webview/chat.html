@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="{{contextCss}}" />
     <link rel="stylesheet" href="{{tasksCss}}" />
     <link rel="stylesheet" href="{{chatCss}}" />
+    <!-- room.css prima di office.css: la stanza mette il vestito, l&APO;ufficio ci
+         aggiunge quello che la stanza non sa. -->
+    <link rel="stylesheet" href="{{roomCss}}" />
     <link rel="stylesheet" href="{{officeCss}}" />
     <title>Claude Studio</title>
   </head>
@@ -212,8 +215,12 @@
     <script nonce="{{nonce}}" src="{{taskspanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{ctxpanelJs}}"></script>
     <script nonce="{{nonce}}" src="{{chimeJs}}"></script>
-    <!-- Prima di chat.js, che lo monta appena sa di essere in una scheda. -->
+    <!-- Prima di chat.js, che lo monta appena sa di essere in una scheda.
+         L'ordine conta: la mappa dei ritagli, poi chi disegna la gente, poi la
+         stanza che li usa tutti e due, e per ultimo l'ufficio che ci abita. -->
+    <script nonce="{{nonce}}" src="{{svRoomJs}}"></script>
     <script nonce="{{nonce}}" src="{{npcJs}}"></script>
+    <script nonce="{{nonce}}" src="{{roomJs}}"></script>
     <script nonce="{{nonce}}" src="{{officeJs}}"></script>
     <script nonce="{{nonce}}" src="{{chatJs}}"></script>
   </body>

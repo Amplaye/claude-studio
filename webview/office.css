@@ -1,52 +1,32 @@
 /* Claude Studio — L'ufficio.
-   La pianta di un ufficio vista dall'alto, disegnata come una terrazza: doghe
-   di teak dove si lavora, pietra lastricata nelle tre stanze in cima, muretti
-   bassi di pietra chiara. Ogni conversazione aperta e' una persona seduta a una
-   scrivania.
 
-   Tutto a pixel, a stop netti: dove serve un rilievo ci sono due righe di
-   colore pieno, non una sfumatura, e l'ombra e' una copia spostata di due. E'
-   la pelle `k` delle bozze (docs/skins/k.css) portata di qua.
+   Ogni conversazione aperta e' una persona seduta a una scrivania. La stanza
+   attorno — muri, mobili, pavimento, monitor, figure e targhette — sta in
+   `room.css`, insieme alla pianta che la costruisce: la usano in due, questo
+   ufficio e la prova `docs/office-sv.html`, e due copie della stessa stanza si
+   scollano al primo mobile spostato.
 
-   I mobili sono sprite di Kenney (kenney.nl, CC0), un foglio da 16 pixel; le
-   persone le disegna `npc.js` dal seme della conversazione. Pavimento e muri
-   no: quelli sono gradienti, perche' un lastricato e' una ripetizione e
-   ripeterla e' esattamente quello che il CSS sa fare senza chiedere
-   un'immagine — e perche' cosi' la stanza resta nitida a qualunque
-   ingrandimento.
+   Qui resta quello che la stanza non sa: la fascia in cima con chi comanda il
+   piano, come la pianta e la chat si dividono la scheda, il faretto sulla
+   conversazione che stai guardando, i puntini di chi lavora, la spunta verde di
+   chi ha finito, e la scritta quando non c'e' nessuno.
 
-   Tinte sue, non quelle dell'editor: questa e' un'illustrazione che riempie una
-   scheda, e un pavimento color `--vscode-editorWidget-background` non e' un
-   pavimento. Solo la fascia in cima usa i colori del tema, perche' quella e'
-   interfaccia e deve stare attaccata al resto.
+   La fascia in cima usa i colori del tema, perche' quella e' interfaccia e deve
+   stare attaccata al resto dell'editor. La stanza no: e' un'illustrazione che
+   riempie una scheda, e un pavimento color `--vscode-editorWidget-background`
+   non e' un pavimento.
 
    Il blocco reduced-motion di motion.css spegne gia' tutte le animazioni di qui
    dentro, senza una riga in piu'. */
 
 .office {
-  /* I materiali della terrazza. In piu' dei tre colori servono i toni di scarto,
-     perche' a pixel un passaggio si fa con due righe di colore pieno: `-jo` e'
-     la fuga fra due doghe o due lastre, `-hi` il pixel che prende sole, `-lo`
-     quello che resta indietro. Il sole sta a nord-ovest per tutta la stanza. */
-  --teak: #a4714a;
-  --teak-hi: #c69061;
-  --teak-lo: #7c5230;
-  --stone: #f2e8d4;
-  --stone-hi: #fffaf0;
-  --stone-lo: #d9c5a3;
-  --stone-jo: #bda57e;
-  --pave: #c1b294;
-  --pave-hi: #d5c8ac;
-  --pave-jo: #998b70;
-  --wood: #63421f;
-  --shade: rgba(38, 24, 10, 0.5);
-  /* Il filo scuro attorno alla pianta: oliva-900 del CRM, l'unica cosa che resta
-     delle sue due scale Tailwind insieme alla terracotta qui sotto. */
-  --of-edge: #333d2c;
+  /* Il legno dei mobili, per le poche cose di qui che devono stargli accanto:
+     il fondo del ritratto e il buio attorno alla pianta. Il resto della
+     tavolozza sta in room.css, dove sta la stanza. */
+  --of-legno: #8a4e2c;
+  --of-buio: #1d1512;
   --of-clay: #f45517; /* terracotta-500 */
   --of-clay-2: #ffa579; /* terracotta-300 */
-  /* L'inchiostro e' il bruno del teak scurito: su una terrazza il nero non c'e'. */
-  --of-ink: #3a2917;
 
   display: none;
   flex-direction: column;
@@ -147,7 +127,7 @@ body.inoffice .rail {
   height: 42px;
   overflow: hidden;
   border-radius: 4px;
-  background: var(--teak);
+  background: var(--of-legno);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
 }
 /* La stessa faccia di chi sta seduto di la', al triplo: il fattore e' intero,
@@ -225,227 +205,15 @@ body.inoffice .rail {
   justify-content: center;
   overflow: hidden;
   padding: 10px;
-  background: #1b2a14; /* il giardino attorno alla terrazza */
+  background: var(--of-buio); /* il buio attorno alla stanza */
 }
 
-/* Misure fisse in mattonelle, e tutto si ingrandisce insieme: vedi fit(). */
+/* La stanza e' in pixel fissi e si ingrandisce tutta insieme: vedi fit(). Il
+   filo scuro e l'ombra sono di qui e non di room.css: sono la cornice della
+   scheda, non un muro. */
 .of-stage {
-  position: relative;
-  flex: 0 0 auto;
-  transform-origin: center center;
-  outline: 2px solid var(--of-edge);
+  outline: 2px solid var(--of-contorno);
   box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.6);
-}
-
-/* Doghe di teak, tutte nello stesso verso. Le venature stanno su periodi
-   dispari e primi fra loro perche' il disegno non si richiuda ogni sedici
-   insieme alle fughe: se no l'occhio trova la riga e la insegue. */
-.of-floor {
-  position: absolute;
-  inset: 0;
-  background-color: var(--teak);
-  background-image:
-    /* la fuga fra due doghe: un pixel d'ombra e sotto il pixel che prende sole */
-    repeating-linear-gradient(
-      180deg,
-      var(--teak-lo) 0 1px,
-      var(--teak-hi) 1px 2px,
-      transparent 2px 16px
-    ),
-    repeating-linear-gradient(180deg, rgba(255, 228, 186, 0.09) 0 1px, transparent 1px 7px),
-    repeating-linear-gradient(180deg, rgba(60, 34, 12, 0.09) 0 1px, transparent 1px 11px),
-    /* Il sole da nord-ovest, a due scalini piatti. Una macchia tonda si legge
-       come una macchia: qui la luce entra dritta dall'angolo, che a stop netti
-       e' l'unica forma che non lascia un alone in mezzo al pavimento. */
-      linear-gradient(
-        135deg,
-        rgba(255, 232, 176, 0.1) 0 9%,
-        rgba(255, 232, 176, 0.05) 9% 20%,
-        transparent 20%
-      );
-}
-
-/* Le tre stanze in alto sono lastricate, il legno resta dove si lavora: il muro
-   di riga 7 cade esatto sul cambio di materiale, 8 caselle da 16. Sta in un
-   pseudo-elemento e non in un div perche' la pianta la scrive office.js in
-   mattonelle, e il lastricato non e' un mobile: e' il pavimento stesso. */
-.of-floor::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  height: 128px;
-  background-color: var(--pave);
-  background-image:
-    /* la fuga fra le lastre e' un pixel scuro; il pixel dopo e' quello che
-       guarda il sole, ed e' tutto il rilievo che una lastra ha bisogno */
-    repeating-linear-gradient(
-      90deg,
-      var(--pave-jo) 0 1px,
-      var(--pave-hi) 1px 2px,
-      transparent 2px 32px
-    ),
-    repeating-linear-gradient(
-      180deg,
-      var(--pave-jo) 0 1px,
-      var(--pave-hi) 1px 2px,
-      transparent 2px 32px
-    ),
-    /* grana: un quadretto di due pixel. Il retino e' il modo pixel di avere
-       mezzo tono senza sfumare niente. */
-      conic-gradient(
-        rgba(255, 255, 255, 0.05) 0 25%,
-        transparent 0 50%,
-        rgba(255, 255, 255, 0.05) 0 75%,
-        transparent 0
-      ),
-    linear-gradient(
-      135deg,
-      rgba(255, 232, 176, 0.13) 0 14%,
-      rgba(255, 232, 176, 0.06) 14% 30%,
-      transparent 30%
-    );
-  background-size:
-    auto,
-    auto,
-    4px 4px,
-    auto;
-  /* lo scalino dove la pietra finisce: due righe piene, non una sfumatura */
-  box-shadow:
-    inset 0 -1px 0 var(--pave-jo),
-    inset 0 -2px 0 rgba(60, 40, 20, 0.14);
-}
-
-/* Muretti bassi di pietra chiara. Il sole sta a nord-ovest per tutti: spigolo
-   illuminato in alto a sinistra, spessore in ombra in basso a destra, e l'ombra
-   per terra sono due gradini pieni invece di una sfocatura — senza quella due
-   muri che si toccano sono una macchia chiara sola e le stanze spariscono. */
-.of-wall {
-  position: absolute;
-  background-color: var(--stone);
-  background-image:
-    repeating-linear-gradient(
-      180deg,
-      var(--stone-jo) 0 1px,
-      var(--stone-hi) 1px 2px,
-      transparent 2px 8px
-    ),
-    repeating-linear-gradient(90deg, var(--stone-jo) 0 1px, transparent 1px 16px),
-    conic-gradient(
-      rgba(140, 110, 70, 0.07) 0 25%,
-      transparent 0 50%,
-      rgba(140, 110, 70, 0.07) 0 75%,
-      transparent 0
-    );
-  background-size:
-    auto,
-    auto,
-    4px 4px;
-  box-shadow:
-    inset 1px 1px 0 var(--stone-hi),
-    inset -1px -1px 0 var(--stone-lo),
-    2px 2px 0 rgba(38, 24, 10, 0.42),
-    4px 4px 0 rgba(38, 24, 10, 0.2);
-}
-
-/* ---------- gli sprite ---------- */
-
-/* Una casella del foglio, sempre 16x16. Quale casella lo dice il
-   background-position, che scrive il JS. */
-.spr {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background-image: var(--sheet-room);
-  background-repeat: no-repeat;
-  image-rendering: pixelated;
-  /* Il legno sul legno sparisce: e' l'ombra a staccare un mobile dal pavimento,
-     e a pixel l'ombra e' una copia spostata di due, senza sfocatura. */
-  filter: drop-shadow(2px 2px 0 var(--shade));
-}
-
-/* Le piante di Kenney stanno in una casella, e li' dentro sembrano pedine.
-   Debordando sembrano piante. L'unico ingrandimento che non sfoca un pixel e'
-   per due: 16 diventa 32, centrato sulla stessa casella, 8 pixel di sbordo per
-   lato. Quale casella sia una pianta lo dice il data-attributo che scrive
-   office.js.
-
-   I vasi, poi, sono azzurri, e l'azzurro qui dentro non esiste. Sepia schiaccia
-   tutto su un'unica tinta calda e la rotazione la porta sul verde oliva:
-   restano i chiari e gli scuri del pixel, sparisce il colore che non c'entra.
-   L'ombra va ripetuta qui dentro, se no questa `filter` cancella quella di
-   `.spr`. */
-.spr[data-k^='plant'] {
-  transform: scale(2);
-  z-index: 3;
-}
-/* Il verde del bar no: quello e' una stuoia, non una pianta. Ingrandirla la
-   trasforma in un lenzuolo verde in mezzo al bancone — prende la tinta, non la
-   misura. */
-.spr[data-k^='plant'],
-.spr[data-k^='green'] {
-  filter: sepia(1) saturate(2.2) hue-rotate(50deg) brightness(0.88)
-    drop-shadow(2px 2px 0 var(--shade));
-}
-/* La stuoia e' l'unica cosa appoggiata per terra: non ha ombra. */
-.spr[data-k^='rug'] {
-  filter: none;
-}
-
-.of-stool {
-  opacity: 0.9;
-  transition: opacity 0.3s ease;
-  /* office.js mette lo sgabello a 1.8 caselle, che fa 28.8: mezzo pixel di
-     scarto a pixel art si vede, e questo lo riporta sul pixel intero. */
-  margin-top: -0.8px;
-}
-.of-stool.taken {
-  opacity: 1;
-}
-
-/* Il monitor non viene dal foglio: nel pacchetto non c'e', e comunque e'
-   l'unico mobile che deve accendersi — il che vuol dire un colore che cambia,
-   non un'immagine. */
-.of-mon {
-  position: absolute;
-  box-sizing: border-box;
-  width: 14px;
-  height: 9px;
-  /* Il vetro spento e' un blocco solo, con il telaio dentro invece che intorno:
-     un bordo vero si mangiava un pixel per lato e lo schermo restava una
-     fessura. Sotto, lo spessore della cornice: due pixel pieni. */
-  margin: 1.2px 0 0 1px;
-  border-radius: 0;
-  background: #2a3125;
-  box-shadow:
-    inset 0 0 0 1px #161c11,
-    0 2px 0 rgba(30, 18, 8, 0.45);
-  transition: background 0.3s ease;
-}
-/* Uno schermo acceso a pixel sono tre fasce piene, non un gradiente. */
-.of-mon.on {
-  background: linear-gradient(180deg, #d6ddcb 0 3px, #95a881 3px 6px, #5c6c4b 6px);
-}
-/* Il monitor acceso e' la cosa che si vede per prima da lontano: prima ancora
-   di capire chi c'e' seduto, si vede quali schermi stanno lavorando. Quella che
-   lavora adesso ha il bagliore, che qui e' un anello netto attorno al vetro. */
-.of-mon.working {
-  background: linear-gradient(180deg, var(--of-clay-2) 0 3px, #fb7740 3px 6px, #e53f0c 6px);
-  box-shadow:
-    0 0 0 1px var(--of-clay),
-    0 0 0 2px rgba(244, 85, 23, 0.35),
-    0 2px 0 rgba(30, 18, 8, 0.45);
-  animation: of-screen 2.6s ease-in-out infinite;
-}
-@keyframes of-screen {
-  0%,
-  100% {
-    filter: brightness(1);
-  }
-  50% {
-    filter: brightness(1.25);
-  }
 }
 
 /* ---------- le persone ---------- */
@@ -455,20 +223,13 @@ body.inoffice .rail {
   inset: 0;
 }
 
+/* La figura la disegna room.css: qui c'e' solo quello che ne fa un bottone. */
 .of-guy {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  background: none;
   color: var(--ink);
   cursor: pointer;
-  /* office.js siede la gente a 1.1 caselle, che fa 17.6: come per lo sgabello,
-     questo la riporta sul pixel intero. */
-  margin-top: -1.6px;
-  /* Quando una conversazione si chiude, chi resta si sposta al posto libero: con
-     la transizione ci cammina, senza si teletrasporta. */
+  /* Quando una conversazione si chiude, chi resta si sposta al posto libero:
+     con la transizione ci cammina, senza si teletrasporta. Chi sta camminando
+     davvero se la riscrive addosso, con la durata del suo tratto. */
   transition:
     left 0.9s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.9s cubic-bezier(0.4, 0, 0.2, 1),
@@ -490,61 +251,15 @@ body.inoffice .rail {
 }
 .of-guy:hover {
   filter: brightness(1.2);
-  z-index: 6;
+  z-index: 400;
 }
 .of-guy:focus-visible {
   outline: 2px solid var(--claude-2);
   outline-offset: 1px;
 }
 
-/* La persona la disegna npc.js e arriva qui come immagine di fondo, in una
-   variabile: 16 di larghezza per 24 di altezza, i piedi in fondo alla casella e
-   la testa che sborda in alto sul bordo della scrivania, come chi e' seduto al
-   suo posto. I quattro pixel di scarto tengono la capigliatura sotto il monitor
-   invece che dietro: e' dall'altra parte del piano.
-
-   L'ombra sotto i piedi non e' un vezzo: senza, una persona da 16 pixel su un
-   pavimento da 16 pixel e' un mobile in piu' — ed e' l'ombra a dire che quella
-   e' l'unica cosa viva nella stanza. A pixel e' una copia spostata di due. */
-.of-body {
-  position: absolute;
-  left: 0;
-  bottom: -4px;
-  width: 16px;
-  height: 24px;
-  /* Il ripiego a fasce serve solo se il generatore non ha ancora risposto:
-     meglio un impiegato squadrato che otto scrivanie vuote. */
-  background-image: var(
-    --npc,
-    linear-gradient(180deg, transparent 0 5px, #33261a 5px 8px, #dcb187 8px 13px, #5c6c4b 13px 24px)
-  );
-  background-repeat: no-repeat;
-  /* Il disegno non e' un fotogramma solo: e' una striscia di fotogrammi
-     affiancati, e quanto e' larga lo dice il JS perche' lo decide il generatore.
-     `contain` schiaccerebbe tutta la striscia dentro una casella sola. */
-  background-size: var(--nw, 16px) 24px;
-  image-rendering: pixelated;
-  filter: drop-shadow(2px 2px 0 rgba(34, 20, 8, 0.42));
-  animation: of-passo var(--nd, 1700ms) steps(var(--nf, 1)) infinite;
-}
-
-/* L'ufficio non sta mai fermo, nemmeno quando non lo stai guardando: chi respira
-   respira sempre. Lo scatto e' intero — `steps()` — perche' un fotogramma
-   intermedio su pixel art e' solo un fotogramma sfocato. */
-@keyframes of-passo {
-  from {
-    background-position-x: 0;
-  }
-  to {
-    background-position-x: calc(-1 * var(--nw, 16px));
-  }
-}
-
-/* Respiro e battitura adesso sono fotogrammi veri, disegnati dal generatore:
-   le due imitazioni a transform non servono piu' e si pestavano con la striscia.
-   Il saltello di chi ha finito resta finto, e puo' restarlo — muove il transform
-   mentre la striscia muove lo sfondo — ma vanno elencate tutte e due, o la
-   seconda scalza la prima. */
+/* Il saltello di chi ha finito muove il transform mentre la striscia muove lo
+   sfondo — ma vanno elencate tutte e due, o la seconda scalza la prima. */
 .of-guy.done .of-body {
   animation:
     of-passo var(--nd, 1700ms) steps(var(--nf, 1)) infinite,
@@ -609,10 +324,10 @@ body.inoffice .rail {
   gap: 1px;
   padding: 1px 2px;
   border-radius: 0;
-  background: var(--stone);
+  background: var(--paper);
   box-shadow:
-    inset 0 0 0 1px var(--wood),
-    2px 2px 0 rgba(30, 18, 8, 0.5);
+    inset 0 0 0 1px var(--of-contorno),
+    2px 2px 0 rgba(46, 28, 44, 0.5);
   pointer-events: none;
   z-index: 5;
 }
@@ -662,59 +377,13 @@ body.inoffice .rail {
   display: block;
 }
 
-/* La targhetta sotto la scrivania: il nome della conversazione e quanto
-   contesto le resta. E' l'unico numero che l'ufficio si porta dietro dal
-   pannello, ed e' quello che si guarda per decidere a chi andare a parlare. */
-/* Sopra la scrivania, non sotto: sotto si mangiava lo sgabello, e con due file
-   di scrivanie una targhetta finiva addosso al monitor della fila dopo. */
-.of-plate {
-  position: absolute;
-  left: 50%;
-  top: -30px;
-  width: 50px;
-  margin-left: -25px;
-  padding: 1px 2px 2px;
-  /* Carta chiara, cornice di teak spessa un pixel, ombra a gradino. Niente
-     angoli arrotondati — a pixel un angolo o e' pieno o non c'e'. */
-  border-radius: 0;
-  background: var(--stone);
-  color: var(--of-ink);
-  box-shadow:
-    inset 0 0 0 1px var(--wood),
-    2px 2px 0 rgba(30, 18, 8, 0.5);
-  pointer-events: none;
-  z-index: 4;
-}
 /* La targhetta di quella che stai guardando: la cornice diventa dell'accento,
    dentro e fuori, e lo scalino resta dov'era. */
-.of-guy.focused .of-plate {
+.of-plate.focused {
   box-shadow:
     inset 0 0 0 1px var(--claude-1),
     0 0 0 1px var(--claude-1),
-    2px 2px 0 rgba(30, 18, 8, 0.5);
-}
-.of-name {
-  display: block;
-  font-size: 6px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.of-bar2 {
-  display: block;
-  height: 2px;
-  margin-top: 1px;
-  background: rgba(51, 61, 44, 0.22);
-  overflow: hidden;
-}
-.of-fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  transition: width 0.5s ease;
+    2px 2px 0 rgba(46, 28, 44, 0.5);
 }
 
 /* ---------- ufficio vuoto ---------- */
@@ -724,13 +393,17 @@ body.inoffice .rail {
   left: 0;
   right: 0;
   top: 40%;
+  z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px 8px;
   font-size: 8px;
   font-weight: 700;
-  color: var(--of-ink);
+  /* Carta chiara sul legno scuro: e' l'unica scritta che sta sul pavimento e
+     non su una targhetta, e sul legno l'inchiostro non si legge. */
+  color: var(--paper);
+  text-shadow: 1px 1px 0 var(--of-contorno);
   text-align: center;
   pointer-events: none;
 }

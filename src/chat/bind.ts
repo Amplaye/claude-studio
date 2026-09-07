@@ -32,18 +32,22 @@ export function bindWebview(
     contextCss: 'context.css',
     tasksCss: 'tasks.css',
     chatCss: 'chat.css',
+    roomCss: 'room.css',
     officeCss: 'office.css',
     i18nJs: 'i18n.js',
     ctxpanelJs: 'ctxpanel.js',
     taskspanelJs: 'taskspanel.js',
     chimeJs: 'chime.js',
+    svRoomJs: 'sv-room.js',
     npcJs: 'npc.js',
+    roomJs: 'room.js',
     officeJs: 'office.js',
     chatJs: 'chat.js',
-    // I mobili dell'ufficio: un foglio di sprite di Kenney (CC0). Il foglio di
-    // stile lo prende da un data-attributo della pagina — vedi chat.html. La
-    // gente no: la disegna npc.js, e non passa da nessuna immagine.
-    roomPng: 'sprites-room.png',
+    // I mobili dell'ufficio: un foglio ritagliato da SeasonVale, impacchettato
+    // da scripts/sv-sheet.mjs. Il foglio di stile lo prende da un data-attributo
+    // della pagina — vedi chat.html. La gente no: la disegna npc.js, e non passa
+    // da nessuna immagine.
+    roomPng: 'sv-room.png',
   });
 
   const surface: Surface = {
