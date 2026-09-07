@@ -8,11 +8,25 @@
 
   --claude-1: #d97757; /* clay  */
   --claude-2: #e9a97f; /* peach */
+  --run: #6aa9d8; /* a command ran */
+
+  /* The ink.
+     The palette above was written for a dark surface, where "full contrast" means
+     white: the text is white, the borders are white at 14%, a hover is white at 4%.
+     On a light theme every one of those turns invisible — same colour as the paper.
+     So the neutral is named once here instead of being spelled out fifty times, and
+     a light theme is the four lines at the bottom of this file rather than a second
+     stylesheet to keep in step. On dark it is #fff, exactly what it always was. */
+  --ink: #fff;
+  /* A well sunk into whatever it sits on: diffs, plan bodies, quoted output. */
+  --sunken: rgba(0, 0, 0, 0.16);
 
   --fg: var(--vscode-foreground, #e6edf3);
   --surface: var(--vscode-sideBar-background, var(--vscode-editor-background, #1e1e1e));
   --card: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.1));
-  --line: var(--vscode-editorWidget-border, rgba(255, 255, 255, 0.14));
+  /* The fallback matters: plenty of light themes leave editorWidget.border unset,
+     and a white hairline on white paper is no border at all. */
+  --line: var(--vscode-editorWidget-border, color-mix(in srgb, var(--ink) 14%, transparent));
 
   --r: 11px;
   --pill: 999px;
@@ -33,6 +47,27 @@
   --sans: var(--vscode-font-family, ui-sans-serif, system-ui, "Segoe UI", sans-serif);
 }
 
+/* The light themes, in full.
+   VS Code writes the family of the current theme as a class on <body>, so this is
+   the one place that has to know a light theme exists. Turning the ink over fixes
+   every border, every hover wash and every label at once; the four status colours
+   are the only ones that need their own value, because a #e3b341 yellow that reads
+   as a warning on near-black is a smear of highlighter on white. */
+body.vscode-light,
+body.vscode-high-contrast-light {
+  --ink: #1c1917;
+  --sunken: rgba(0, 0, 0, 0.045);
+  /* Ridichiarata, e non e' una ripetizione per svista: una proprieta' custom
+     sostituisce i suoi `var()` sull'elemento dove e' *dichiarata*, non dove viene
+     usata. Quella su :root si e' gia' risolta contro l'inchiostro bianco, e il
+     ribaltamento qui sotto non la raggiungerebbe mai. */
+  --line: var(--vscode-editorWidget-border, color-mix(in srgb, var(--ink) 14%, transparent));
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --bad: #cf222e;
+  --run: #2f6f9f;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -50,6 +85,21 @@
    block that pushes the whole page down. */
 svg.sprite {
   display: none !important;
+}
+
+/* Said out loud, never drawn. `display: none` would take it out of the
+   accessibility tree along with the layout, which is exactly the wrong half. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 body {

@@ -222,11 +222,11 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.32);
+  background: color-mix(in srgb, var(--ink) 32%, transparent);
   transition: background 0.2s ease;
 }
 .ctx .dot.recent {
-  background: color-mix(in srgb, var(--ok) 60%, rgba(255, 255, 255, 0.35));
+  background: color-mix(in srgb, var(--ok) 60%, color-mix(in srgb, var(--ink) 35%, transparent));
 }
 .ctx .dot.busy {
   background: var(--ok);
@@ -277,7 +277,7 @@ body {
   border-radius: 5px;
   background: color-mix(in srgb, var(--ok) 26%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 62%, transparent);
-  color: #fff;
+  color: var(--ink);
   font-size: 9.5px;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -385,7 +385,7 @@ body {
   height: 6px;
   margin-top: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
   overflow: hidden;
 }
 .ctx .fill {

@@ -211,7 +211,13 @@ export type Wire =
   // same — they leave as a list of paths folded into the prompt, which is stripped
   // from the echo, so without carrying them here a PDF would vanish the moment you
   // pressed Enter while a PNG stayed put.
-  | { k: 'user'; text: string; images?: Pasted[]; files?: SentFile[] }
+  // `cp` e' il checkpoint che questo messaggio ha aperto: com'era il codice un attimo
+  // prima che partisse. Viaggia fin qui perche' la freccia disegnata accanto al
+  // messaggio possa dire "torna a questo punto" — i checkpoint funzionavano da
+  // sempre, ma l'unica porta era "/rewind" e un elenco a scelta rapida. Assente
+  // quando il messaggio non ne ha uno: una conversazione ripescata dalla cronologia
+  // e' fatta di parole gia' dette, e non c'e' nessun codice messo da parte dietro.
+  | { k: 'user'; text: string; images?: Pasted[]; files?: SentFile[]; cp?: number }
   | { k: 'turn_start' }
   // `parent` is there when the piece comes from a sub-agent: it's the tool_use_id of
   // the Task that launched it, and that's where underneath it has to be drawn.
@@ -257,7 +263,7 @@ export type Wire =
         aliases?: string[];
       }[];
     }
-  | { k: 'files'; items: string[] }
+  | { k: 'files'; items: PickItem[] }
   // The files you picked with the paperclip (or dropped on the composer), as the
   // extension found them on disk: images come back with their bytes so the chip can
   // show a thumbnail, everything else with a path Claude opens itself.
@@ -360,6 +366,25 @@ export type Wire =
   // A new conversation draws the empty screen again, so it gets a new tip with it.
   | { k: 'reset'; tip?: { en: string; it: string } | null };
 
+/**
+ * Una riga del menu che si apre scrivendo "@".
+ *
+ * Quello che entra nel messaggio e' sempre `path`, perche' e' l'unica cosa che "@"
+ * sa espandere. Gli altri campi ci sono solo quando la riga arriva da una ricerca
+ * fra i simboli — allora la riga dice il nome, il tipo e a che altezza sta, che e'
+ * come si riconosce quale dei quattro `parse` si sta allegando.
+ */
+export interface PickItem {
+  /** percorso relativo alla cartella di lavoro */
+  path: string;
+  /** il simbolo trovato li' dentro: "Session.send" */
+  symbol?: string;
+  /** "function", "class", "method"… */
+  kind?: string;
+  /** 1-based */
+  line?: number;
+}
+
 /** Webview -> extension. */
 /** An image pasted into the composer. */
 export interface Pasted {
@@ -429,6 +454,9 @@ export type Cmd =
   // "Quello che ho scritto mentre lavoravi, lascia perdere": toglie dalla fila un
   // messaggio che non e' ancora partito.
   | { cmd: 'unqueue'; id: string }
+  // "Torna a questo messaggio": la freccia accanto a un messaggio tuo. E' lo stesso
+  // "/rewind" di sempre, saltato il primo passo — il punto l'hai gia' indicato.
+  | { cmd: 'rewind'; id: number }
   // "My audio is awake": a page can only make a sound once you've touched it, and
   // the chime has to go to one that can actually be heard. See chat/sound.ts.
   | { cmd: 'audio'; ok: boolean }

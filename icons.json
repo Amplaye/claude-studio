@@ -51,7 +51,8 @@
     "musical-notes-outline",
     "archive-outline",
     "grid-outline",
-    "volume-medium-outline"
+    "volume-medium-outline",
+    "arrow-undo-outline"
   ],
   "bar": {
     "studio-chat": "chatbubble-ellipses",

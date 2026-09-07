@@ -22,6 +22,18 @@ const WRITERS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 const MAX = 100;
 
 export interface Checkpoint {
+  /**
+   * Chi e'. Non la sua posizione nell'elenco: le posizioni si riciclano.
+   *
+   * Tornare a un punto butta via quelli dopo, e i messaggi seguenti ne aprono di
+   * nuovi che riprendono le posizioni appena liberate. Un messaggio piu' vecchio
+   * rimasto sullo schermo si porta dietro il numero che aveva, e con le posizioni
+   * quel numero indicherebbe adesso il checkpoint di qualcun altro: la freccia
+   * accanto a un messaggio rimetterebbe a posto dei file che non c'entrano niente.
+   * Un id che non si ripete non ha questo problema — sparito il suo punto, non lo
+   * trova e lo dice.
+   */
+  readonly id: number;
   /** Quando: serve solo a farli vedere in ordine. */
   readonly at: number;
   /** Il messaggio che l'ha aperto: e' cosi' che lo riconosci nell'elenco. */
@@ -32,12 +44,24 @@ export interface Checkpoint {
 
 export class Checkpoints {
   private list: Checkpoint[] = [];
+  private seq = 0;
 
-  /** Un messaggio nuovo: da qui in poi le modifiche appartengono a questo punto. */
-  begin(prompt: string) {
-    this.list.push({ at: Date.now(), prompt, files: new Map() });
+  /**
+   * Un messaggio nuovo: da qui in poi le modifiche appartengono a questo punto.
+   * Torna il suo id, che e' quello che il messaggio si porta dietro fino alla chat:
+   * e' cosi' che la freccia disegnata accanto sa a quale punto tornare.
+   */
+  begin(prompt: string): number {
+    const id = ++this.seq;
+    this.list.push({ id, at: Date.now(), prompt, files: new Map() });
     // Oltre il tetto si buttano i piu' vecchi, che nessuno andra' piu' a riprendere.
     if (this.list.length > MAX) this.list.splice(0, this.list.length - MAX);
+    return id;
+  }
+
+  /** Dove sta, adesso, il punto con questo id. -1 = non c'e' piu'. */
+  private posOf(id: number): number {
+    return this.list.findIndex((c) => c.id === id);
   }
 
   /**
@@ -56,23 +80,26 @@ export class Checkpoints {
   }
 
   /** L'elenco da mostrare, dal piu' recente. */
-  entries(): { index: number; prompt: string; at: number; files: number }[] {
+  entries(): { id: number; prompt: string; at: number; files: number }[] {
     return this.list
-      .map((c, index) => ({ index, prompt: c.prompt, at: c.at, files: c.files.size }))
+      .map((c) => ({ id: c.id, prompt: c.prompt, at: c.at, files: c.files.size }))
       .reverse();
   }
 
   /** Quanti file tornerebbero indietro scegliendo questo punto. */
-  filesAt(index: number): number {
-    return this.affected(index).size;
+  filesAt(id: number): number {
+    return this.affected(id).size;
   }
 
   /**
    * Riporta i file com'erano a quel punto e butta via i checkpoint successivi.
-   * Torna quanti file ha rimesso a posto e quanti ne ha saltati.
+   * Torna quanti file ha rimesso a posto e quanti ne ha saltati. Un punto che non
+   * esiste piu' non tocca niente: e' l'unica risposta onesta.
    */
-  async restore(index: number): Promise<{ restored: number; skipped: string[] }> {
-    const targets = this.affected(index);
+  async restore(id: number): Promise<{ restored: number; skipped: string[] }> {
+    const from = this.posOf(id);
+    if (from < 0) return { restored: 0, skipped: [] };
+    const targets = this.affected(id);
     let restored = 0;
     const skipped: string[] = [];
     for (const [file, was] of targets) {
@@ -95,7 +122,7 @@ export class Checkpoints {
         skipped.push(file);
       }
     }
-    this.list = this.list.slice(0, index);
+    this.list = this.list.slice(0, from);
     return { restored, skipped };
   }
 
@@ -105,13 +132,15 @@ export class Checkpoints {
   }
 
   /**
-   * Cosa va rimesso a posto per tornare a `index`: tutti i checkpoint da li' in
+   * Cosa va rimesso a posto per tornare al punto `id`: tutti i checkpoint da li' in
    * avanti, e per ogni file la copia *piu' vecchia* — quella e' com'era prima
    * che qualcuno lo toccasse.
    */
-  private affected(index: number): Map<string, string | null> {
+  private affected(id: number): Map<string, string | null> {
     const out = new Map<string, string | null>();
-    for (let i = index; i < this.list.length; i++) {
+    const from = this.posOf(id);
+    if (from < 0) return out;
+    for (let i = from; i < this.list.length; i++) {
       for (const [file, was] of this.list[i].files) {
         if (!out.has(file)) out.set(file, was);
       }

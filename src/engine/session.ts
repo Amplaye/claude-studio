@@ -119,6 +119,8 @@ type Outgoing = {
   queued: boolean;
   /** Mandato dall'estensione, non da te: nel discorso non ci va. */
   silent?: boolean;
+  /** Il checkpoint che ha aperto: viaggia con l'eco, non verso il motore. */
+  cp?: number;
 };
 
 let seq = 0;
@@ -198,19 +200,21 @@ export class Session {
     files?: SentFile[],
     /** Non e' roba tua: non entra nel discorso come se l'avessi scritto tu. Chi lo
         manda si disegna la sua card (vedi l'autofix in chat/controller.ts). */
-    silent?: boolean
+    silent?: boolean,
+    /** L'indice del checkpoint aperto per questo messaggio (vedi chat/checkpoints.ts). */
+    cp?: number
   ) {
     if (this.disposed) return;
     // `files` non viaggia verso il motore: i percorsi sono gia' dentro `text`,
     // rimandarli vorrebbe dire scriverli due volte nello stesso messaggio. Resta qui
     // solo per le pastiglie, che sono roba da guardare.
     const queued = this.busy;
-    const one: Outgoing = { id: `q${++seq}`, text, images, echo, files, queued, silent: !!silent };
+    const one: Outgoing = { id: `q${++seq}`, text, images, echo, files, queued, silent: !!silent, cp };
     this.pending.push(one);
     if (silent) {
       /* niente eco: chi l'ha mandato lo racconta a modo suo */
     } else if (queued) this.o.emit({ k: 'queued', id: one.id, text: echo ?? text, images, files });
-    else this.o.emit({ k: 'user', text: echo ?? text, images, files });
+    else this.o.emit({ k: 'user', text: echo ?? text, images, files, cp });
     this.setBusy(true);
     if (!this.running) this.running = this.run();
     this.wake?.();
@@ -319,7 +323,7 @@ export class Session {
       // mostrarti quello che hai appena scritto.
       if (out.queued && !out.silent) {
         this.o.emit({ k: 'unqueued', id: out.id });
-        this.o.emit({ k: 'user', text: out.echo ?? out.text, images: out.images, files: out.files });
+        this.o.emit({ k: 'user', text: out.echo ?? out.text, images: out.images, files: out.files, cp: out.cp });
       }
       // Le immagini incollate viaggiano come blocchi, prima del testo: e' l'ordine
       // in cui si guardano.

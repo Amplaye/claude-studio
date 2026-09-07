@@ -128,7 +128,13 @@ Switch any time, even halfway through a conversation.
 
 ## The handy bits
 
-- **`@` for a file, `/` for a command** — your skills and plugins included.
+- **`@` for a file *or a function*, `/` for a command** — type `@parseToken` and you
+  get the file it lives in, with the line. Your skills and plugins are in the `/` menu.
+- **The shape of a long answer, down the left edge.** One band per run of steps, as
+  tall as the run is long — you see "read for a while, wrote one file, got stuck on
+  red" without scrolling. Point at it and it opens into a list that says it in words.
+- **A way back beside every message you sent.** It puts the files back the way they
+  were just before Claude touched them, and asks first.
 - **Paste an image**, **drop a file**, or use the paperclip — any format, any size.
 - **A chime and a notification** when it's done, if you've wandered off — and a
   mark on the conversation that finished, so you know which one.
@@ -152,8 +158,9 @@ and Linux, `⌥` (Option) on a Mac.
 | Settings | `Alt+I` | `⌥I` |
 | Show or hide the context | `Alt+C` | `⌥C` |
 | Close this tab | `Alt+W` | `⌥W` |
+| Jump through the turn | `Alt+↑` · `Alt+↓` | `⌥↑` · `⌥↓` |
 | Stop | `Esc` | `Esc` |
-| A file · a command | `@` · `/` | `@` · `/` |
+| A file, or a symbol · a command | `@` · `/` | `@` · `/` |
 
 And from anywhere in VS Code, with the chat not even focused:
 

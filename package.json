@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code but, a better IDE! The same Claude Code, in a panel you can actually watch. It keeps the Claude Code CLI updated on its own, so you're never behind on models or features. Live progress, diffs you open when you want, one-click permissions, and attach any file, not just images.",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -286,8 +286,9 @@
     "tasks-live": "node build.mjs && node scripts/tasks-check.cjs --live",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
-    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/autofix-check.cjs && node scripts/update-check.cjs",
-    "autofix-check": "node build.mjs && node scripts/autofix-check.cjs"
+    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/autofix-check.cjs && node scripts/checkpoint-check.cjs && node scripts/update-check.cjs",
+    "autofix-check": "node build.mjs && node scripts/autofix-check.cjs",
+    "checkpoint-check": "node scripts/checkpoint-check.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

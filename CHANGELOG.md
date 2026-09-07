@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.17.0
+
+- **La mappa del turno dice a parole quello che diceva a colori.** Era una tacca per
+  passo lungo il bordo, colorata per tipo: grigio, arancione, blu e rosso senza una
+  legenda da nessuna parte, cioe' un codice che nessuno ti ha mai insegnato e che si
+  impara a ignorare. E una tacca per passo non reggeva un turno vero: col minimo di
+  tre pixel e due di distacco, oltre i centoquaranta passi la colonna era piena e
+  tutto il resto veniva tagliato via — la mappa perdeva esattamente il pezzo che
+  stavi guardando. Adesso l'unita' non e' il passo, e' il **gruppo**: le letture di
+  fila sono una banda sola, alta quanti passi tiene. Quindici bande invece di
+  duecento tacche, e le differenze d'altezza sono la forma. Col puntatore sopra (o
+  entrandoci col Tab) la colonna si apre in un elenco che dice le stesse cose
+  scritte: icona, nome, quanti — "Letto ×12", "Eseguito git status", "Andato storto
+  out.txt". Il colore smette di essere qualcosa da decifrare, perche' la legenda e'
+  la cosa stessa. `Alt+↑` e `Alt+↓` saltano da un gruppo all'altro senza mouse.
+
+- **Il tema chiaro non e' piu' un tema al buio.** Il pannello e' nato su fondo scuro,
+  dove "massimo contrasto" vuol dire bianco: testo bianco, bordi bianchi al 14%,
+  hover bianchi al 4%. Su un tema chiaro ognuna di quelle e' della tinta della carta
+  — cioe' non c'e': i bordi sparivano, le etichette sparivano, la barra della
+  modalita' diventava una pastiglia vuota. Il neutro adesso e' un token solo
+  (`--ink`), e un tema chiaro e' quattro righe che lo ribaltano invece di un secondo
+  foglio di stile da tenere al passo. Verde, giallo e rosso hanno il loro valore
+  chiaro: un `#e3b341` che su nero legge come un avviso, su bianco e' una
+  scarabocchiata di evidenziatore.
+
+- **La richiesta di permesso prende la tastiera.** Era una carta che compariva e
+  basta: per rispondere senza mouse dovevi tabulare tutta la conversazione, e uno
+  screen reader la incontrava come un paragrafo qualsiasi che scorreva via mentre il
+  turno restava fermo per motivi che nessuno aveva annunciato. Ora si annuncia
+  (`alertdialog`) e il fuoco ci va sopra — ma **non mentre stai scrivendo**: rubare
+  il cursore a meta' frase e' come si finisce a scrivere mezzo messaggio dentro un
+  bottone. Risposta data, il fuoco torna alla barra di scrittura invece di restare
+  parcheggiato su un bottone spento. E c'e' una riga sola, invisibile, che dice a voce
+  quello che dice la pastiglia in testata — non il discorso intero, che vorrebbe dire
+  leggere ad alta voce ogni singolo token in arrivo.
+
+- **Quello che avevi scritto e' ancora li'.** Mezzo paragrafo battuto, poi un
+  "Reload Window", un cambio di scheda, un cambio di tema — e la bozza spariva. Ora
+  sta nella stessa memoria che gia' si ricorda quale conversazione e' in questa
+  scheda, ed e' l'unica che sopravvive a un ricaricamento.
+
+- **Il resto di un diff lungo si apre.** La carta si ferma a sessanta righe, che e'
+  giusto — mille righe versate nel discorso ti fanno perdere il messaggio sopra — ma
+  "+840 righe" era un punto fermo con niente dietro: la coda di una modifica che ti
+  stavano chiedendo di approvare non si poteva proprio leggere. Adesso e' un bottone.
+
+- **La freccia per tornare indietro sta accanto al messaggio.** I checkpoint — com'era
+  ogni file un attimo prima che Claude lo toccasse — c'erano da sempre, ma l'unica
+  porta era `/rewind` e un elenco a scelta rapida in cui riconoscere il proprio
+  messaggio da settanta caratteri. Il punto pero' e' esattamente li', accanto al
+  messaggio che l'ha aperto, ed e' li' che lo cerchi guardando. Cosa rimettere a posto
+  — codice, conversazione o tutti e due — lo chiede ancora l'estensione: riscrivere
+  dei file e' roba che si conferma. E ogni punto adesso ha un id suo invece della sua
+  posizione nell'elenco: tornare indietro butta via i punti successivi, i messaggi
+  dopo ne aprono di nuovi, e con le posizioni la freccia di un messaggio del ramo
+  abbandonato avrebbe rimesso a posto i file di qualcun altro.
+
+- **`@` trova anche i simboli.** Cercava solo fra i percorsi, quindi allegare la
+  funzione che stai guardando voleva dire ricordarsi in quale file vive — e se te lo
+  ricordassi non la staresti cercando. I simboli VS Code li ha gia' indicizzati: sono
+  quelli di `Ctrl+T`, li calcola il language server del progetto, e chiederli non
+  costa niente. `@needsThinking` adesso trova `needsThinking — function —
+  src/engine/protocol.ts:60`. Nel messaggio entra sempre il percorso, che e' l'unica
+  cosa che `@` sa espandere: il simbolo e' come l'hai trovato, non cosa gli mandi.
+
+
 ## 0.16.0
 
 - **Il pannello delle task era agganciato a tre strumenti che non esistono piu'.**

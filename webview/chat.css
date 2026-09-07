@@ -76,9 +76,11 @@ body.wide {
   --gutter: max(16px, calc((100% - 860px) / 2));
 }
 body.wide .log {
-  /* la mappa del turno si prende `--pad` di questo margine: sommati restano il
-     `--gutter` di prima, e la colonna resta allineata alla barra di scrittura */
-  padding-left: calc(var(--gutter) - var(--pad));
+  /* La mappa del turno sta *sopra* il margine, non dentro la riga: il padding qui
+     e' tutto il `--gutter`, e la colonna resta allineata alla barra di scrittura.
+     Finche' la mappa era una colonna flex questo valore le sottraeva `--pad` —
+     diventata una sovrapposizione, quei pixel non li toglie piu' nessuno. */
+  padding-left: var(--gutter);
   /* the scrollbar's width comes off this side, same as in the narrow face */
   padding-right: calc(var(--gutter) - var(--sbw));
   padding-top: 22px;
@@ -234,7 +236,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   width: var(--ctl);
   height: var(--ctl);
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
   border-radius: 8px;
   background: transparent;
   color: var(--fg);
@@ -286,7 +288,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--ink);
   margin-bottom: 4px;
 }
 /* Colour is carried by borders, halos and gradients: text stays full white,
@@ -299,7 +301,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--ink);
 }
 .pop-sec:first-of-type {
   border-top: 0;
@@ -332,7 +334,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   cursor: pointer;
   transition: border-color 0.22s ease, background 0.22s ease, transform 0.2s ease, box-shadow 0.3s ease;
   text-align: center;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
 }
 .model-card:hover {
@@ -582,7 +584,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.3;
-  color: #fff;
+  color: var(--ink);
 }
 /* The context window ("1M context") wraps onto its own line under the name: it's
    a detail of the model, not part of what it's called. */
@@ -594,7 +596,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   text-transform: uppercase;
   line-height: 1.2;
   margin-top: 1px;
-  color: #fff;
+  color: var(--ink);
 }
 /* Two lines, then the ellipsis: the descriptions are written by the CLI and are
    of unpredictable length — on a single line only the start would be left. */
@@ -604,7 +606,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   font-size: 10px;
-  color: #fff;
+  color: var(--ink);
   line-height: 1.25;
   overflow: hidden;
   text-wrap: balance;
@@ -631,7 +633,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border: 1.5px solid transparent;
   border-radius: var(--pill);
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -661,7 +663,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .seg-btn.on {
   opacity: 1;
-  color: #fff;
+  color: var(--ink);
   font-weight: 700;
 }
 /* Pressed: the button gives way a little. The slider takes a third of a second to
@@ -693,7 +695,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .phint {
   margin: 4px 0 4px;
   font-size: 11px;
-  color: #fff;
+  color: var(--ink);
   line-height: 1.35;
 }
 .phint:empty {
@@ -715,7 +717,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .plab {
   flex: 0 0 76px;
   font-size: 11.5px;
-  color: #fff;
+  color: var(--ink);
 }
 
 /* ---- the dropdown ----
@@ -736,7 +738,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--card);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -792,7 +794,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -894,7 +896,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   gap: 9px;
   margin-bottom: 7px;
   font-size: 11.5px;
-  color: #fff;
+  color: var(--ink);
   opacity: 0.9;
   cursor: pointer;
   transition: opacity 0.2s ease;
@@ -977,7 +979,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border: 1px solid var(--line);
   border-radius: var(--pill);
   background: var(--card);
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 11.5px;
   cursor: pointer;
@@ -1084,79 +1086,236 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   min-height: 0;
   display: flex;
   align-items: stretch;
+  /* La mappa si apre *sopra* il discorso, non di fianco: allargare una colonna in
+     un flex vorrebbe dire far saltare di lato tutte le carte ogni volta che ci
+     passi il puntatore sopra. */
+  position: relative;
 }
 
 /* ---------- the map of the turn ----------
-   One tick per step down the left edge, coloured by what the step was: you see the
-   shape of a long answer without scrolling it, and a click puts you at that step.
-   The ticks share the height between them, so six steps and two hundred both fit. */
-/* It lives in the gutter the thread already had: `--pad` moves from the log to here,
-   so the boxes still start exactly where the writing field does. The column stays put
-   even when there is nothing to draw in it — a layout that shifts sideways at the
-   fourth step of every turn would be worse than no map at all. */
+
+   One band per run of steps of the same kind, as tall as the run is long. Closed it
+   is the shape of the answer — a long grey stretch of reading, one orange write, a
+   red patch where it got stuck — in the gutter the thread already had, so it costs
+   the layout nothing. Open it is the same thing in words.
+
+   Two states, one element list. Closed, everything but the coloured bar is folded
+   away by `overflow: hidden` on a column eleven pixels wide; open, the column lifts
+   out over the thread (`position: absolute`, which is why .logwrap is relative) and
+   the rows are allowed to be rows. Nothing is rebuilt to open it — a second DOM tree
+   for the same data is a second DOM tree to keep in step. */
 .tmap {
-  flex: 0 0 var(--pad);
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  width: var(--pad);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   padding: 15px 0 9px;
   overflow: hidden;
+  border-radius: 0 var(--r) var(--r) 0;
+  background: transparent;
+  border: 1px solid transparent;
+  /* Chiudersi e' immediato; il ritardo per aprirsi sta nella regola :hover qui
+     sotto — mezzo secondo, cosi' il puntatore che passa di li' per andare altrove
+     non se la trova spalancata addosso. */
+  transition: width 0.2s cubic-bezier(0.2, 0.9, 0.25, 1), background 0.2s ease,
+    border-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* Sotto i quattro passi non c'e' una forma da vedere, e una striscia di fianco a tre
+   carte e' solo una striscia che nessuno ha chiesto. */
+.tmap.few {
+  pointer-events: none;
 }
 .tmap.few .tm {
   visibility: hidden;
 }
+.tmap:hover,
+.tmap:focus-within {
+  width: 216px;
+  max-width: 68%;
+  /* Aperta e' alta quanto l'elenco. Chiusa deve prendersi tutta la colonna — e'
+     l'altezza che porta l'informazione — ma un pannello di dodici righe steso su
+     novecento pixel e' tre quarti di vuoto appoggiato sopra il discorso. */
+  bottom: auto;
+  max-height: 100%;
+  overflow-y: auto;
+  gap: 1px;
+  padding: 10px 8px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-color: var(--line);
+  box-shadow: 0 18px 44px -22px #000;
+}
+.tmap:hover {
+  transition-delay: 0.45s;
+}
+/* Arrivarci col Tab e' una scelta, non un passaggio: si apre subito. */
+.tmap:focus-within {
+  transition-delay: 0s;
+}
+
 .tm {
-  flex: 1 1 0;
+  /* `--n` = quanti passi tiene questa banda, scritto dal JS. E' l'altezza. */
+  flex: var(--n, 1) 1 0;
   min-height: 3px;
-  max-height: 26px;
-  width: 3px;
+  /* Un gruppo lungo non si prende tutta la colonna: oltre questo la differenza fra
+     "quaranta letture" e "sessanta" non la vede nessuno, e le bande sotto sparirebbero. */
+  max-height: 90px;
+  /* Chiusa e' una barretta, non una colonna piena: la gutter e' larga undici pixel
+     e riempirla di colore farebbe di una mappa un bordo. */
+  width: 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   padding: 0;
   border: 0;
   border-radius: 2px;
   cursor: pointer;
+  overflow: hidden;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
   background: color-mix(in srgb, var(--fg) 22%, transparent);
-  transition: width 0.16s ease, background 0.2s ease, opacity 0.2s ease;
+  transition: opacity 0.2s ease, background 0.2s ease, width 0.16s ease;
 }
-/* Wider under the pointer, and wider for the piece you are looking at: the block of
-   ticks that has your attention is a shape you can see without reading anything. */
-.tm:hover,
-.tm.here {
-  width: 7px;
+/* Chiusa, la banda *e'* il colore: icona, nome e conteggio esistono ma non hanno
+   spazio in cui stare. */
+.tmap:not(:hover):not(:focus-within) .tm > * {
+  display: none;
 }
-.tmap:hover .tm:not(.here) {
-  opacity: 0.75;
+/* Dove stai guardando adesso. Chiusa la banda si allarga e si accende — la
+   parentesi che dice quale fetta del discorso hai davanti — aperta e' la riga
+   evidenziata. */
+.tmap:not(:hover):not(:focus-within) .tm.here {
+  width: 9px;
+  border-radius: 3px;
 }
-/* Reading and looking around: the background hum of a turn. */
+.tmap:not(:hover):not(:focus-within) .tm:not(.here) {
+  opacity: 0.62;
+}
+
+/* Aperta: righe che si leggono. L'altezza proporzionale ha finito il suo lavoro —
+   qui si legge una parola, e una parola vuole la stessa riga delle altre. */
+.tmap:hover .tm,
+.tmap:focus-within .tm {
+  flex: 0 0 auto;
+  min-height: 26px;
+  max-height: none;
+  width: auto;
+  align-self: stretch;
+  padding: 3px 8px;
+  border-radius: 7px;
+  /* Il colore passa dal fondo a una barretta a sinistra: su una riga di testo un
+     fondo pieno di quel colore renderebbe le parole illeggibili. */
+  background: transparent;
+  box-shadow: inset 3px 0 0 currentColor;
+}
+.tmap:hover .tm:hover,
+.tmap:focus-within .tm:hover,
+.tmap .tm:focus-visible {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  outline: none;
+}
+.tmap:hover .tm.here,
+.tmap:focus-within .tm.here {
+  background: color-mix(in srgb, var(--claude-1) 15%, transparent);
+}
+.tm-ico {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+.tm-name {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.tm-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 10.5px;
+  font-family: var(--mono);
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+/* Quanti passi tiene questa banda. Vuoto quando ne tiene uno: "×1" e' rumore. */
+.tm-n {
+  flex: 0 0 auto;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--pill);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+.tm-n:empty {
+  display: none;
+}
+
+/* Il colore di ogni specie. Chiuso e' il fondo della banda, aperto e' la barretta a
+   sinistra e l'icona: e' lo stesso `currentColor` in tutti e due i casi, quindi la
+   tinta non puo' divergere fra le due facce. */
 .tm-read,
 .tm-tool,
 .tm-think {
   background: color-mix(in srgb, var(--fg) 20%, transparent);
+  color: color-mix(in srgb, var(--fg) 45%, transparent);
 }
 /* Something happened to a file. */
 .tm-write {
   background: var(--claude-1);
+  color: var(--claude-1);
 }
 /* A command ran. */
 .tm-run {
-  background: #6aa9d8;
+  background: var(--run);
+  color: var(--run);
 }
 /* You said something, or it answered you. */
 .tm-user {
   background: color-mix(in srgb, var(--fg) 72%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
 }
 .tm-say {
   background: color-mix(in srgb, var(--fg) 45%, transparent);
+  color: color-mix(in srgb, var(--fg) 45%, transparent);
 }
 /* It is waiting for you. */
 .tm-ask {
   background: var(--warn);
+  color: var(--warn);
 }
 .tm-fail {
   background: var(--bad);
+  color: var(--bad);
 }
 .tm-recap {
   background: var(--ok);
+  color: var(--ok);
+}
+/* Aperta, il nome resta inchiostro e solo l'icona porta il colore: dieci righe di
+   testo colorato sono dieci righe che si leggono peggio. */
+.tmap:hover .tm .tm-ico,
+.tmap:focus-within .tm .tm-ico {
+  color: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tmap,
+  .tm {
+    transition: none;
+  }
 }
 
 .log {
@@ -1165,10 +1324,10 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
-  /* La gutter di sinistra ce l'ha la mappa (.tmap), che sta li' dentro: sommate
-     fanno lo stesso `--pad` di prima, e le carte partono dove parte la barra di
-     scrittura come hanno sempre fatto. */
-  padding: 14px calc(var(--pad) - var(--sbw)) 8px 0;
+  /* La gutter di sinistra la occupa la mappa, che ora ci sta sopra invece che
+     dentro: il padding a sinistra tiene il posto che prima teneva lei, e le carte
+     partono dove parte la barra di scrittura come hanno sempre fatto. */
+  padding: 14px calc(var(--pad) - var(--sbw)) 8px var(--pad);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1235,6 +1394,58 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .msg.user .utext:empty {
   display: none;
+}
+
+/* "Torna a un attimo prima di questo messaggio".
+   Sta nell'angolo e resta invisibile finche' non passi sopra il messaggio: e' un
+   comando che riscrive dei file, e non deve essere la cosa piu' appariscente della
+   carta. Al fuoco da tastiera compare comunque, altrimenti chi tabula ci finisce
+   dentro senza vedere dove si trova. */
+.msg.user .rewind {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease,
+    border-color 0.18s ease, color 0.18s ease;
+}
+.msg.user:hover .rewind,
+.msg.user .rewind:focus-visible {
+  opacity: 0.7;
+  transform: none;
+}
+.msg.user .rewind:hover,
+.msg.user .rewind:focus-visible {
+  opacity: 1;
+  color: var(--claude-1);
+  border-color: color-mix(in srgb, var(--claude-1) 55%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 14%, transparent);
+}
+.msg.user .rewind .ico {
+  width: 14px;
+  height: 14px;
+}
+/* Il testo non gli finisce sotto: la prima riga si ferma prima dell'angolo. */
+.msg.user:has(.rewind) .utext {
+  padding-right: 22px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg.user .rewind {
+    transition: opacity 0.18s ease;
+    transform: none;
+  }
 }
 .uimg {
   height: 74px;
@@ -1758,7 +1969,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border-radius: 8px;
   overflow: auto;
   max-height: 320px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--sunken);
 }
 .diff .row {
   display: flex;
@@ -1790,6 +2001,24 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .diff .more {
   padding: 4px 9px;
   font-size: 11px;
+}
+/* "+840 lines" is a button now, so it has to look like one. */
+.diff .more-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--claude-1);
+  font: inherit;
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+.diff .more-btn:hover {
+  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
 }
 
 /* todo list */
@@ -1881,7 +2110,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   height: 3px;
   margin-top: 8px;
   border-radius: var(--pill);
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
   overflow: hidden;
 }
 .tool.done .tool-bar,
@@ -1944,7 +2173,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--sunken);
 }
 .perm .plan {
   margin-top: 9px;
@@ -1961,7 +2190,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--sunken);
   overflow-x: auto;
   white-space: pre;
 }
@@ -2018,7 +2247,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .perm .opt:hover {
   border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
 }
 .perm .opt:active {
   transform: scale(0.99);
@@ -2169,7 +2398,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   padding: 3px;
   border-radius: var(--pill);
   background: var(--card);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  border: 1px solid color-mix(in srgb, var(--ink) 45%, transparent);
   position: relative;
 }
 .modeseg-btn {
@@ -2180,7 +2409,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border: 1.5px solid transparent;
   border-radius: var(--pill);
   background: transparent;
-  color: #fff;
+  color: var(--ink);
   font: inherit;
   font-size: 11px;
   font-weight: 600;
@@ -2203,9 +2432,9 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
    it only lit the text, so on Yolo the red slider showing through underneath read
    like a highlight that had been clipped short. */
 .modeseg-btn:hover {
-  color: #fff;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--ink) 45%, transparent);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
 }
 .modeseg-btn[data-mode='default']:hover {
   background: color-mix(in srgb, var(--claude-1) 26%, transparent);
@@ -2260,7 +2489,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 .modeseg-btn[data-mode='default'].on,
 .modeseg-btn[data-mode='plan'].on,
 .modeseg-btn.yolo.on {
-  color: #fff;
+  color: var(--ink);
 }
 
 /* "thinking" state */
@@ -2597,7 +2826,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   border-radius: 10px;
   cursor: pointer;
   font-size: 15px;
-  color: #fff;
+  color: var(--ink);
   background: linear-gradient(135deg, var(--claude-1), var(--claude-2));
   transition: transform 0.12s ease, filter 0.2s ease, opacity 0.2s ease;
 }
@@ -2756,6 +2985,24 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: right;
+}
+/* Una riga che viene dai simboli e non dai percorsi: il nome e' del codice, quindi
+   e' in monospaziato, e la pastiglia dice di che specie e'. */
+.mitem-sym .mlabel {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+.mkind {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: var(--pill);
+  border: 1px solid color-mix(in srgb, var(--claude-1) 40%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
+  color: var(--claude-1);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 /* command row: name and description on two lines, with a symbol on the left */
 .mitem-cmd {
@@ -3047,7 +3294,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
-  border: 1px solid #fff;
+  border: 1px solid color-mix(in srgb, var(--ink) 70%, transparent);
   border-radius: 10px;
   background: transparent;
   color: var(--claude-1);
@@ -3063,7 +3310,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .clip:hover {
   opacity: 1;
-  color: #fff;
+  color: var(--ink);
   border-color: var(--claude-1);
   background: var(--claude-1);
   transform: translateY(-2px);
@@ -3090,7 +3337,7 @@ body:not(.wide) .top.busy .modeseg-btn:not(.on) span {
 }
 .composer.dropping .clip {
   opacity: 1;
-  color: #fff;
+  color: var(--ink);
   border-color: var(--claude-1);
   background: var(--claude-1);
   transform: translateY(-2px) scale(1.08);

@@ -95,7 +95,9 @@ for (const surface of ['view', 'panel']) {
 
   await post({ k: 'session', id: 'abc', model: 'claude-opus-4-6[1m]', cwd: 'C:/Users/Steward/CRM' });
   await post({ k: 'busy', value: true });
-  await post({ k: 'user', text: 'Read the two config files and tell me what the difference is.' });
+  // `cp` = il checkpoint che questo messaggio ha aperto: e' quello che accende la
+  // freccia "torna a un attimo prima di qui" accanto al messaggio.
+  await post({ k: 'user', text: 'Read the two config files and tell me what the difference is.', cp: 7 });
 
   await post({ k: 'turn_start' });
   await post({ k: 'block_start', id: 'b1_0', kind: 'thinking' });
@@ -192,6 +194,116 @@ for (const surface of ['view', 'panel']) {
   t(/I counted 2 files/.test(tr.kidsText || ''), 'the sub-agent thread is not nested: ' + tr.kidsText);
   t(!tr.strayGlob, 'the sub-agent tool also ended up at the end of the conversation');
   t(tr.counts.includes('40 lines'), 'a long output does not say how many lines it has: ' + tr.counts.join(','));
+
+  // ---- a diff longer than what fits: the rest has to be reachable ----
+  await post({
+    k: 'tool_start',
+    id: 'tu_BIG',
+    name: 'Write',
+    input: {
+      file_path: 'C:/Users/Steward/CRM/src/big.ts',
+      content: Array.from({ length: 80 }, (_, i) => 'row ' + i).join('\n'),
+    },
+  });
+  await post({ k: 'tool_end', id: 'tu_BIG', ok: true, text: 'The file has been created.' });
+  await page.waitForTimeout(150);
+  const bigSel = '.tool[data-tool="Write"]:last-of-type .diff';
+  t(
+    (await page.locator(bigSel + ' .row').count()) === 60,
+    'the long diff does not stop at sixty rows: ' + (await page.locator(bigSel + ' .row').count())
+  );
+  // Le carte nascono chiuse: per arrivare al bottone la si apre, come faresti tu.
+  await page.evaluate(() => {
+    const cards = document.querySelectorAll('.tool[data-tool="Write"]');
+    cards[cards.length - 1].open = true;
+  });
+  await page.waitForTimeout(150);
+  t(await page.isVisible(bigSel + ' .more-btn'), 'the rest of a long diff has no way in');
+  await page.click(bigSel + ' .more-btn');
+  await page.waitForTimeout(80);
+  t(
+    (await page.locator(bigSel + ' .row').count()) === 80,
+    'clicking does not open the rest of the diff: ' + (await page.locator(bigSel + ' .row').count())
+  );
+  t((await page.locator(bigSel + ' .more-btn').count()) === 0, 'the button stays once there is nothing left');
+  t(await page.isVisible(bigSel), 'opening the rest folded the card shut');
+
+  // ---- the map of the turn: runs, not steps ----
+  // Three reads in a row are one band that says how many, not three ticks nobody
+  // can tell apart — and every band says in words what it is, because a colour with
+  // no key anywhere is decoration.
+  for (const f of ['src/one.ts', 'src/two.ts', 'src/three.ts']) {
+    await post({ k: 'tool_start', id: 'tu_R_' + f, name: 'Read', input: { file_path: f } });
+    await post({ k: 'tool_end', id: 'tu_R_' + f, ok: true, text: 'ok' });
+  }
+  await page.waitForTimeout(250);
+  const map = await page.evaluate(() => {
+    const bands = [...document.querySelectorAll('#tmap .tm')];
+    const last = bands[bands.length - 1];
+    return {
+      bands: bands.length,
+      steps: document.querySelectorAll('#log > .msg').length,
+      lastKind: last ? last.className : '',
+      lastCount: last?.querySelector('.tm-n')?.textContent || '',
+      lastGrow: last ? getComputedStyle(last).flexGrow : '',
+      named: bands.every((b) => (b.querySelector('.tm-name')?.textContent || '').trim().length > 0),
+      labelled: bands.every((b) => !!b.getAttribute('aria-label')),
+      hidden: document.getElementById('tmap').getAttribute('aria-hidden'),
+    };
+  });
+  t(map.steps > 4, 'not enough steps to have a shape: ' + map.steps);
+  t(map.bands < map.steps, 'the map still draws one tick per step: ' + map.bands + ' vs ' + map.steps);
+  t(/tm-read/.test(map.lastKind), 'three reads in a row are not one read band: ' + map.lastKind);
+  t(map.lastCount === '3', 'the band does not say how many steps it holds: ' + map.lastCount);
+  t(map.lastGrow === '3', 'the band is not as tall as its run is long: ' + map.lastGrow);
+  t(map.named, 'the bands have no name to read when the rail opens');
+  t(map.labelled, 'the bands say nothing to a screen reader');
+  t(map.hidden !== 'true', 'the map is still hidden from assistive tech');
+
+  // …and opening it turns the colours into words. This is the answer to "a coloured
+  // stripe with no key anywhere", so it is the half worth guarding.
+  const railClosed = await page.evaluate(
+    () => Math.round(document.getElementById('tmap').getBoundingClientRect().width)
+  );
+  await page.hover('#tmap .tm');
+  await page.waitForTimeout(900); // half a second of delay before it opens, then the slide
+  const open = await page.evaluate(() => {
+    const rail = document.getElementById('tmap');
+    const first = rail.querySelector('.tm .tm-name');
+    return {
+      w: Math.round(rail.getBoundingClientRect().width),
+      nameShown: first ? getComputedStyle(first).display !== 'none' : false,
+      nameWidth: first ? Math.round(first.getBoundingClientRect().width) : 0,
+      // aperte sono righe, non piu' bande: l'altezza proporzionale ha finito il suo
+      // lavoro, e una riga di testo tre volte piu' alta di quella sopra non e' un elenco
+      grows: [...rail.querySelectorAll('.tm')].map((b) => getComputedStyle(b).flexGrow),
+    };
+  });
+  t(open.w > railClosed + 80, 'the map does not open when you point at it: ' + railClosed + ' -> ' + open.w);
+  t(open.nameShown && open.nameWidth > 0, 'the map opens but still says nothing in words');
+  t(
+    open.grows.every((g) => g === '0'),
+    'the open rows still stretch with the run they hold: ' + open.grows.join(',')
+  );
+  await page.screenshot({ path: path.join(outDir, `preview-${surface}-map.png`) });
+  // and it has to shut again, or it would sit on top of the thread for good
+  await page.hover('#input');
+  await page.waitForTimeout(400);
+  t(
+    (await page.evaluate(() => Math.round(document.getElementById('tmap').getBoundingClientRect().width))) ===
+      railClosed,
+    'the map stays open once you have left it'
+  );
+
+  // ---- back to just before a message ----
+  const back = await page.locator('.msg.user .rewind').first();
+  t((await page.locator('.msg.user .rewind').count()) === 1, 'the message with a checkpoint has no way back');
+  await back.click();
+  const rw = await lastSent();
+  t(
+    rw?.cmd === 'rewind' && rw.id === 7,
+    'the arrow does not ask to go back to its own checkpoint: ' + JSON.stringify(rw)
+  );
 
   // ---- permissions: the three kinds of question, really clicked ----
   await post({
@@ -578,14 +690,48 @@ for (const surface of ['view', 'panel']) {
   await page.waitForTimeout(250);
   const sf = await lastSent();
   t(sf?.cmd === 'files' && sf.q === 'ap', 'the file search does not fire: ' + JSON.stringify(sf));
-  await post({ k: 'files', items: ['src/app.ts', 'docs/appunti.md'] });
+  // Two kinds of row, one insertion. A path arrives bare; a symbol arrives with the
+  // name, the kind and the line it sits on — and picking either puts the *path* in
+  // the message, because a path is the only thing "@" knows how to expand.
+  await post({
+    k: 'files',
+    items: [
+      { path: 'src/app.ts' },
+      { path: 'docs/appunti.md' },
+      { path: 'src/apply.ts', symbol: 'applyPatch', kind: 'function', line: 42 },
+    ],
+  });
   await page.waitForTimeout(120);
-  t((await page.locator('.menu .mitem').count()) === 2, 'the files do not show up in the menu');
+  t((await page.locator('.menu .mitem').count()) === 3, 'the files do not show up in the menu');
+  t((await page.locator('.menu .mitem-sym').count()) === 1, 'the symbol row is not told apart from a file');
+  t(
+    (await page.locator('.menu .mitem-sym .mkind').textContent()) === 'function',
+    'the symbol row does not say what kind of symbol it is'
+  );
+  t(
+    (await page.locator('.menu .mitem-sym .mhint').textContent()) === 'src/apply.ts:42',
+    'the symbol row does not say where the symbol lives'
+  );
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   t(
     (await page.inputValue('#input')) === 'look at @docs/appunti.md ',
     'the chosen file does not end up in the message: ' + (await page.inputValue('#input'))
+  );
+
+  // and picking the symbol hands over the file it was found in
+  await page.fill('#input', '');
+  await page.type('#input', '@applyP');
+  await page.waitForTimeout(250);
+  await post({
+    k: 'files',
+    items: [{ path: 'src/apply.ts', symbol: 'applyPatch', kind: 'function', line: 42 }],
+  });
+  await page.waitForTimeout(120);
+  await page.keyboard.press('Enter');
+  t(
+    (await page.inputValue('#input')) === '@src/apply.ts ',
+    'picking a symbol does not attach its file: ' + (await page.inputValue('#input'))
   );
 
   await post({ k: 'selection', file: 'src/app.ts', lines: '12-38' });
@@ -866,7 +1012,7 @@ for (const surface of ['view', 'panel']) {
   });
 
   t(errors.length === 0, 'JS errors on the page: ' + errors.join(' | '));
-  t(r.tools.length === 7, 'expected 7 top-level tools, found ' + r.tools.length);
+  t(r.tools.length === 11, 'expected 11 top-level tools, found ' + r.tools.length);
   t(r.tools[0]?.name === 'Read' && r.tools[0]?.out === 'RESULT-OF-A', 'Read took the wrong result: ' + r.tools[0]?.out);
   t(r.tools[1]?.name === 'Bash' && r.tools[1]?.out === 'RESULT-OF-B', 'Bash took the wrong result: ' + r.tools[1]?.out);
   t(/\bdone\b/.test(r.tools[0]?.cls || ''), 'Read is not marked as completed');
@@ -1046,6 +1192,76 @@ for (const surface of ['view', 'panel']) {
   await page.evaluate(() => (document.getElementById('log').scrollTop = 0));
   await page.waitForTimeout(120);
   await page.screenshot({ path: path.join(outDir, `preview-${surface}-top.png`), fullPage: true });
+
+  // ---- the light themes ----
+  //
+  // This panel was drawn on a dark surface, where "full contrast" means white: white
+  // text, white borders at 14%, a white wash at 4% for a hover. On a light theme
+  // every one of those is the colour of the paper — which is to say, not there. The
+  // neutral is one token now (--ink), and this checks the flip actually lands rather
+  // than that the stylesheet claims to do it. Contrast is measured on what the
+  // browser computed, composited over what is really behind it.
+  await page.evaluate(() => {
+    document.body.classList.add('vscode-light');
+    const s = document.documentElement.style;
+    // the values VS Code injects with a light theme
+    s.setProperty('--vscode-foreground', '#3b3b3b');
+    s.setProperty('--vscode-editor-background', '#ffffff');
+    s.setProperty('--vscode-sideBar-background', '#f8f8f8');
+    s.setProperty('--vscode-editorWidget-background', '#f3f3f3');
+  });
+  await page.waitForTimeout(150);
+  const light = await page.evaluate(() => {
+    const rgba = (v) => {
+      const m = String(v).match(/[\d.]+/g) || [];
+      return { r: +m[0] || 0, g: +m[1] || 0, b: +m[2] || 0, a: m[3] === undefined ? 1 : +m[3] };
+    };
+    // what you actually see when a colour with alpha sits on top of another
+    const over = (fg, bg) => ({
+      r: fg.r * fg.a + bg.r * (1 - fg.a),
+      g: fg.g * fg.a + bg.g * (1 - fg.a),
+      b: fg.b * fg.a + bg.b * (1 - fg.a),
+      a: 1,
+    });
+    const lum = (c) => {
+      const f = (v) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+    };
+    const ratio = (a, b) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    // the real backdrop of the panel, whatever the theme made it
+    const paper = rgba(getComputedStyle(document.body).backgroundColor);
+    const at = (sel, prop) => {
+      const n = document.querySelector(sel);
+      if (!n) return null;
+      return ratio(over(rgba(getComputedStyle(n)[prop]), paper), paper);
+    };
+    return {
+      ink: getComputedStyle(document.body).getPropertyValue('--ink').trim(),
+      // text has to be readable…
+      userText: at('.msg.user .utext', 'color'),
+      mode: at('.modeseg-btn', 'color'),
+      mapName: at('.tm .tm-name', 'color'),
+      // …and the lines that draw the boxes have to be there at all
+      iconBorder: at('.iconbtn', 'borderTopColor'),
+      // non .slim: quelle il bordo non ce l'hanno per scelta, e' il loro sfondo a dirle
+      cardBorder: at('.tool:not(.slim)', 'borderTopColor'),
+    };
+  });
+  t(light.ink !== '#fff', 'the light theme did not turn the ink over: --ink is ' + light.ink);
+  t(light.userText > 4.5, 'your own message is unreadable on a light theme: ' + light.userText);
+  t(light.mode > 4.5, 'the mode switch is unreadable on a light theme: ' + light.mode);
+  t(light.mapName > 4.5, 'the map bands are unreadable on a light theme: ' + light.mapName);
+  t(light.iconBorder > 1.2, 'the header buttons have no edge on a light theme: ' + light.iconBorder);
+  t(light.cardBorder > 1.2, 'the cards have no edge on a light theme: ' + light.cardBorder);
+  await page.screenshot({ path: path.join(outDir, `preview-${surface}-light.png`), fullPage: true });
+  await page.evaluate(() => document.body.classList.remove('vscode-light'));
+  await page.waitForTimeout(80);
 
   // ---- switching conversation: the old thread slides out ----
   // Tested last, because it leaves the chat empty and would ruin the screenshots.

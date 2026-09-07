@@ -159,14 +159,26 @@
   //
   // A long answer has a shape — read for two minutes, then wrote three files in a
   // row, then got stuck on a red command — and the only way to see it was to scroll
-  // through it. One tick per step down the left edge, coloured by what the step was,
-  // and the shape is there in one glance. Click a tick and you are at that step.
+  // through it.
   //
-  // The ticks share the height between them (flex: 1 1 0), so a turn of six and a
-  // turn of two hundred both fit without any arithmetic in here.
+  // It used to be one tick per step, coloured by what the step was. Two things were
+  // wrong with that. A colour is a code you have to be taught, and nothing here ever
+  // taught it: grey, orange, blue and red down the edge of the screen with no key
+  // anywhere is decoration you learn to ignore. And one tick per step does not
+  // survive a real turn — with a floor of three pixels and a gap of two, a hundred
+  // and forty steps fill the column and everything after them is clipped away, so
+  // the map lost exactly the part you were looking at.
+  //
+  // So the unit is no longer the step, it's the **run**: reads in a row are one
+  // band, and its height says how many. Fifteen bands instead of two hundred ticks,
+  // and the height differences are the shape — "read for a long time, wrote once,
+  // got stuck on red". Then, when you put the pointer on it (or tab into it), the
+  // column opens into a list that says the same thing in words: an icon, a name, a
+  // count. The colour stops being something to decode, because the legend is the
+  // thing itself.
   const tmap = $('tmap');
 
-  /** What colour a step is. It is asked again at the end: a failure changes it. */
+  /** What kind a step is. It is asked again at the end: a failure changes it. */
   function mapKind(node) {
     const c = node.classList;
     if (c.contains('user')) return 'user';
@@ -186,47 +198,174 @@
     return 'other';
   }
 
-  function mapPaint(node) {
-    const tick = node._tick;
-    if (!tick) return;
-    tick.className = 'tm tm-' + mapKind(node);
-    const head = node.querySelector('.head') || node;
-    tick.title = (head.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  /** The glyph for each kind: this is the legend, and it is drawn where you look. */
+  const MAP_ICON = {
+    read: 'eye',
+    write: 'create',
+    run: 'terminal',
+    think: 'sparkles',
+    tool: 'flash',
+    user: 'chatbubble-ellipses',
+    say: 'document-text',
+    ask: 'shield-checkmark',
+    fail: 'alert-circle',
+    recap: 'checkmark-circle',
+    other: 'ellipsis-horizontal',
+  };
+
+  /**
+   * What the row says after the name: the file, the command, the first words.
+   *
+   * The one that has to be picked on purpose is the piece of the card that is the
+   * content and not the chrome. A reasoning block opens with the word "Reasoning" in
+   * its summary, and taking the card whole gives you "ReasoningI need to open both…"
+   * — the label of the box glued to the front of what is in it.
+   */
+  function mapDetail(node) {
+    const part =
+      node.querySelector('.head .arg') || node.querySelector('.utext') || node.querySelector('.body');
+    const text = (part || node).textContent || '';
+    return text.replace(/\s+/g, ' ').trim().slice(0, 60);
   }
 
-  function mapAdd(node) {
-    const tick = el('button', 'tm');
-    tick.type = 'button';
-    tick.tabIndex = -1; // the conversation itself is what you tab through, not this
-    tick.addEventListener('click', () => {
-      stick = false; // you asked to be somewhere: don't get dragged back to the end
-      node.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    });
-    node._tick = tick;
-    tmap.append(tick);
-    mapPaint(node);
+  // One rebuild per frame, whatever happened. The rail is a handful of elements and
+  // deriving it from the thread each time is what keeps it honest: a tool that turns
+  // red at the end splits the run it was merged into, and there is no incremental
+  // version of that which does not eventually drift from what is on screen.
+  let mapDirty = false;
+  function mapPaint() {
+    if (mapDirty) return;
+    mapDirty = true;
+    requestAnimationFrame(mapBuild);
+  }
+
+  function mapBuild() {
+    mapDirty = false;
+    const nodes = [];
+    for (const n of log.children) if (n.classList.contains('msg')) nodes.push(n);
+
+    // Consecutive steps of the same kind are one band.
+    const runs = [];
+    for (const n of nodes) {
+      const kind = mapKind(n);
+      const last = runs[runs.length - 1];
+      if (last && last.kind === kind) last.nodes.push(n);
+      else runs.push({ kind, nodes: [n] });
+    }
+
+    // Il turno va avanti e la mappa si rifa': se stavi dentro con la tastiera, il
+    // fuoco non deve finire nel vuoto — e con lui si porterebbe via anche il pannello
+    // aperto, che sta in piedi grazie a :focus-within.
+    const hadFocus = tmap.contains(document.activeElement)
+      ? [...tmap.children].indexOf(document.activeElement)
+      : -1;
+
+    tmap.replaceChildren();
+    for (const r of runs) {
+      const band = el('button', 'tm tm-' + r.kind);
+      band.type = 'button';
+      // Una sola fermata di Tab per tutta la mappa, poi le frecce dentro. Quindici
+      // bottoni tabbabili fra il discorso e la barra di scrittura sarebbero quindici
+      // pressioni di Tab per arrivare a scrivere, che e' peggio di non averla.
+      band.tabIndex = tmap.childElementCount === 0 ? 0 : -1;
+      // Proportional to how many steps it holds: that is the whole point of a shape.
+      // Through a custom property, not `style.flexGrow`: inline wins over any class,
+      // so setting it directly would keep the bands growing after the rail opens —
+      // and a row of text three times taller than the one above it is not a list.
+      band.style.setProperty('--n', String(r.nodes.length));
+      const name = t('map.' + r.kind);
+      const detail = mapDetail(r.nodes[0]);
+      const count = r.nodes.length > 1 ? ' ×' + r.nodes.length : '';
+      // Closed it is a coloured band with a tooltip; open it is a row that reads.
+      band.title = name + count + (detail ? ' — ' + detail : '');
+      band.setAttribute('aria-label', band.title);
+      band.append(
+        icon(MAP_ICON[r.kind] || 'flash', 'tm-ico'),
+        el('span', 'tm-name', name),
+        el('span', 'tm-detail', detail),
+        el('span', 'tm-n', r.nodes.length > 1 ? String(r.nodes.length) : '')
+      );
+      band._nodes = r.nodes;
+      band.addEventListener('click', () => {
+        stick = false; // you asked to be somewhere: don't get dragged back to the end
+        r.nodes[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      tmap.append(band);
+    }
+    if (hadFocus >= 0 && tmap.children.length) {
+      const back = tmap.children[Math.min(hadFocus, tmap.children.length - 1)];
+      for (const b of tmap.children) b.tabIndex = b === back ? 0 : -1;
+      back.focus();
+    }
     // Under four steps there is no shape to see, and a rail beside three cards is
     // just a stripe nobody asked for.
-    tmap.classList.toggle('few', tmap.childElementCount < 4);
+    tmap.classList.toggle('few', nodes.length < 4);
+    mapHere();
   }
 
   function mapClear() {
     tmap.replaceChildren();
     tmap.classList.add('few');
+    onscreen.clear();
+  }
+
+  // Dentro la mappa le frecce spostano il fuoco di banda in banda (e la tengono a
+  // una sola fermata di Tab), Invio ci salta, Esc riporta alla barra di scrittura.
+  tmap.addEventListener('keydown', (e) => {
+    const bands = [...tmap.children];
+    const at = bands.indexOf(document.activeElement);
+    if (at < 0) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      input.focus();
+      return;
+    }
+    const d = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!d) return;
+    e.preventDefault();
+    const next = bands[Math.min(bands.length - 1, Math.max(0, at + d))];
+    if (!next || next === bands[at]) return;
+    bands[at].tabIndex = -1;
+    next.tabIndex = 0;
+    next.focus();
+  });
+
+  /** Jump to the band before or after the one you are looking at. */
+  function mapStep(d) {
+    const bands = [...tmap.children];
+    if (!bands.length) return;
+    const at = bands.findIndex((b) => b.classList.contains('here'));
+    const next = bands[Math.min(bands.length - 1, Math.max(0, (at < 0 ? 0 : at) + d))];
+    if (!next) return;
+    stick = false;
+    next._nodes[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    say(next.title);
+  }
+
+  // Which bands are the ones you are looking at. A band counts as "here" if any of
+  // its steps is on screen, which is what makes the bracket in the collapsed rail
+  // line up with the slice of the thread in front of you.
+  const onscreen = new Set();
+  function mapHere() {
+    for (const band of tmap.children) {
+      band.classList.toggle('here', band._nodes.some((n) => onscreen.has(n)));
+    }
   }
 
   // Infinite loops stop when off screen: twenty halos pulsing where you aren't
   // looking heat up the laptop for nothing.
   //
-  // The same pass says which ticks are the ones you're looking at: the observer is
+  // The same pass says which steps are the ones you're looking at: the observer is
   // already running, and a second one — or a listener on every scroll — would be
   // paying twice for an answer we are being handed.
   const seen = new IntersectionObserver(
     (entries) => {
       for (const e of entries) {
         e.target.classList.toggle('offscreen', !e.isIntersecting);
-        if (e.target._tick) e.target._tick.classList.toggle('here', e.isIntersecting);
+        if (e.isIntersecting) onscreen.add(e.target);
+        else onscreen.delete(e.target);
       }
+      mapHere();
     },
     { root: log, rootMargin: '160px' }
   );
@@ -250,7 +389,7 @@
     seen.observe(node);
     // Solo quello che sta nel discorso vero: i passi di un sub-agent sono dentro la
     // card del Task che li ha lanciati, e nella mappa conta quella.
-    mapAdd(node);
+    mapPaint();
     toBottom();
     return node;
   }
@@ -795,13 +934,40 @@
     }
     if (!rows.length) return null; // nothing to show: better no box than an empty one
 
+    // Sixty rows at a time: a Write of a new file is the whole file, and pouring a
+    // thousand lines into the thread is how you lose the message above it. The rest
+    // is one click away — it used to be a full stop ("+840 lines") with nothing
+    // behind it, which meant the tail of a change you were being asked to approve
+    // simply could not be read.
     const MAX = 60;
-    for (const [sign, text] of rows.slice(0, MAX)) {
-      const row = el('div', 'row ' + (sign === '+' ? 'add' : 'del'));
-      row.append(el('span', 'sign', sign), el('span', 'code', text || ' '));
-      box.append(row);
+    let drawn = 0;
+    const paint = () => {
+      const upto = Math.min(rows.length, drawn + MAX);
+      for (const [sign, text] of rows.slice(drawn, upto)) {
+        const row = el('div', 'row ' + (sign === '+' ? 'add' : 'del'));
+        row.append(el('span', 'sign', sign), el('span', 'code', text || ' '));
+        box.append(row);
+      }
+      drawn = upto;
+    };
+    paint();
+    if (rows.length > drawn) {
+      const more = el('button', 'more more-btn');
+      more.type = 'button';
+      const label = () => t('msg.moreLines', { n: rows.length - drawn });
+      more.textContent = label();
+      more.addEventListener('click', (e) => {
+        // The diff lives inside a <details>: without this the click folds the card.
+        e.preventDefault();
+        e.stopPropagation();
+        paint();
+        if (rows.length > drawn) {
+          more.textContent = label();
+          box.append(more); // the fresh rows landed after it: it goes back to the end
+        } else more.remove();
+      });
+      box.append(more);
     }
-    if (rows.length > MAX) box.append(el('div', 'more', t('msg.moreLines', { n: rows.length - MAX })));
     if (inp.replace_all) box.append(el('div', 'more', t('msg.replaceAll')));
     return box;
   }
@@ -884,7 +1050,7 @@
     // piena, con la sua altezza e il suo stacco dalle vicine.
     if (!ok) node.classList.remove('slim');
     node.classList.add(ok ? 'done' : 'fail');
-    mapPaint(node); // andata storta, cambia colore anche nella mappa
+    mapPaint(); // andata storta, cambia colore anche nella mappa
     const fresh = ok ? drawnCheck('tool-ico') : icon('alert-circle', 'tool-ico');
     node._ico.replaceWith(fresh);
     node._ico = fresh;
@@ -1069,15 +1235,35 @@
     }
 
     node.append(acts);
+    // It is a question that blocks the turn until you answer it, so it says so:
+    // without a role a screen reader meets it as one more paragraph scrolling past,
+    // and the turn just sits there for reasons nobody announced.
+    node.setAttribute('role', 'alertdialog');
+    node.setAttribute('aria-label', title);
     asks.set(m.id, node);
     stick = true; // a permission request must not get lost off screen
     add(node);
+    say(title);
+    // The keyboard goes to the card. Not while you are typing, though: stealing the
+    // caret mid-sentence to put it on "Deny" is how a queued message ends up half
+    // written into a button. If you are writing, the card waits its turn.
+    const typing =
+      document.activeElement &&
+      (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
+    if (!typing) {
+      const first = node.querySelector('button:not([disabled])');
+      if (first) requestAnimationFrame(() => first.focus());
+    }
   }
 
   function askDone(m) {
     const node = asks.get(m.id);
     if (!node) return;
     asks.delete(m.id);
+    // Answered, the card's buttons all go dead: leaving the keyboard parked on a
+    // disabled button means the next thing you type goes nowhere. It goes back to
+    // the writing field, which is where you were headed anyway.
+    if (node.contains(document.activeElement)) input.focus();
     node.classList.add('resolved', m.ok ? 'ok' : 'no');
     const acts = node.querySelector('.acts');
     const verdict = el('div', 'verdict');
@@ -1475,12 +1661,26 @@
     actBar.dataset.quiet = quiet > 12000 ? t('act.quiet', { n: Math.round(quiet / 1000) }) : '';
   }
 
+  // What a screen reader hears. The thread can't be a live region — it would read
+  // every streamed token — so the one sentence the pill already writes is mirrored
+  // here instead, and only when it actually changes: the pill repaints every second
+  // to move its clock, and re-announcing "Reading store.ts" once a second is worse
+  // than saying nothing.
+  const sayNode = $('say');
+  let saidLast = '';
+  function say(text) {
+    if (!sayNode || !text || text === saidLast) return;
+    saidLast = text;
+    sayNode.textContent = text;
+  }
+
   /** Every event that means "it's alive" passes through here. */
   function activity(key, vars) {
     actKey = key;
     actVars = vars || null;
     actLast = Date.now();
     paintActivity();
+    say(vars ? t(key, vars) : t(key));
   }
 
   function startActivity() {
@@ -1544,6 +1744,15 @@
         if (m.surface === 'panel') showRail((vscode.getState() || {}).rail !== false);
         cwd = m.cwd || '';
         if (m.tip) currentTip = m.tip;
+        // Whatever was in the box when this face last went away.
+        {
+          const draft = (vscode.getState() || {}).draft;
+          if (draft && !input.value) {
+            input.value = draft;
+            grow();
+            input.setSelectionRange(draft.length, draft.length);
+          }
+        }
         showEmpty();
         // Opening animation: the tab comes in whole, while the side panel
         // (which is always there) sticks to its own conversation.
@@ -1688,6 +1897,26 @@
           n.append(box);
         }
         if (m.text) n.append(el('div', 'utext', m.text));
+        // Torna a prima di questo messaggio.
+        //
+        // I checkpoint c'erano da sempre — com'era ogni file un attimo prima che
+        // Claude lo toccasse — ma l'unica porta era "/rewind" e un elenco a scelta
+        // rapida in cui riconoscere il proprio messaggio da settanta caratteri. Il
+        // punto pero' e' esattamente qui, accanto al messaggio che l'ha aperto: e'
+        // dove lo cerchi guardando. Cosa rimettere a posto — codice, conversazione o
+        // tutti e due — lo chiede ancora l'estensione, perche' riscrivere dei file e'
+        // roba che si conferma.
+        if (typeof m.cp === 'number') {
+          const back = el('button', 'rewind');
+          back.type = 'button';
+          back.title = t('msg.rewind');
+          back.setAttribute('aria-label', t('msg.rewind'));
+          back.append(icon('arrow-undo'));
+          back.addEventListener('click', () =>
+            vscode.postMessage({ cmd: 'rewind', id: m.cp })
+          );
+          n.append(back);
+        }
         add(n);
         break;
       }
@@ -1921,8 +2150,11 @@
       });
     } else {
       items.forEach((it, i) => {
-        const row = el('div', 'mitem' + (i === 0 ? ' on' : ''));
+        const row = el('div', 'mitem' + (i === 0 ? ' on' : '') + (it.kind ? ' mitem-sym' : ''));
         row.append(el('span', 'mlabel', it.label));
+        // "function", "class": la pastiglia e' come si distingue a colpo d'occhio un
+        // simbolo da un file senza leggere il percorso.
+        if (it.kind) row.append(el('span', 'mkind', it.kind));
         if (it.hint) row.append(el('span', 'mhint', it.hint));
         row.addEventListener('mousedown', (e) => {
           e.preventDefault();
@@ -2004,7 +2236,23 @@
     }
     picking.start = t.start;
     picking.end = t.end;
-    paintMenu(items.map((p) => ({ label: p.split('/').pop(), hint: p, insert: '@' + p })));
+    // Due specie di riga, un solo inserimento. Un file si annuncia col suo nome e il
+    // percorso sotto; un simbolo col nome della funzione, il tipo, e il file con la
+    // riga esatta — ma quello che entra nel messaggio e' sempre il percorso, perche'
+    // e' l'unica cosa che "@" sa espandere in contenuto. Il simbolo e' come lo hai
+    // trovato, non cosa gli mandi.
+    paintMenu(
+      items.map((p) =>
+        p.symbol
+          ? {
+              label: p.symbol,
+              kind: p.kind || '',
+              hint: p.line ? `${p.path}:${p.line}` : p.path,
+              insert: '@' + p.path,
+            }
+          : { label: p.path.split('/').pop(), hint: p.path, insert: '@' + p.path }
+      )
+    );
   }
 
   // ---------- lightbox ----------
@@ -2343,9 +2591,25 @@
     input.style.height = 'auto';
     input.style.height = Math.min(190, input.scrollHeight) + 'px';
   }
+  // What you had written, still there when you come back.
+  //
+  // `vscode.setState` is the only memory that belongs to this single face of the
+  // chat and survives "Developer: Reload Window" — the same one that already
+  // remembers which conversation is in this tab. Half a paragraph typed and then a
+  // reload, a theme change, a switch to another tab and back used to throw the lot
+  // away, which is the cheapest possible way to lose real work.
+  let draftTimer = 0;
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      vscode.setState(Object.assign({}, vscode.getState() || {}, { draft: input.value }));
+    }, 300);
+  }
+
   input.addEventListener('input', () => {
     grow();
     refreshMenu();
+    saveDraft();
   });
   // Leaving the textarea closes the menu — unless you're going *into* the menu.
   // The command search box is a real field: clicking it blurs the textarea, and
@@ -2369,8 +2633,10 @@
       return;
     }
     // Up arrow on an empty field: the last message sent comes back, to touch up
-    // instead of rewriting from scratch.
-    if (e.key === 'ArrowUp' && !input.value && lastText) {
+    // instead of rewriting from scratch. With Alt held it isn't ours: that is the
+    // map of the turn stepping, and answering it here would swallow it before the
+    // page ever sees it.
+    if (e.key === 'ArrowUp' && !e.altKey && !input.value && lastText) {
       e.preventDefault();
       input.value = lastText;
       grow();
@@ -2405,6 +2671,7 @@
       withSelection: !!(selection && useSelection),
     });
     input.value = '';
+    saveDraft(); // gone out: there is no draft left to come back to
     images = [];
     files = [];
     // The selection gets attached only once: it stays selected in the editor, but it
@@ -3210,6 +3477,18 @@
       case 'h':
         e.preventDefault();
         toggleHistory();
+        return;
+      // Su e giu' per la mappa: si salta da un gruppo di passi al successivo senza
+      // toccare il mouse, che e' l'unico modo in cui una barra alta trecento pixel
+      // e' davvero raggiungibile. La freccia senza Alt resta quella che ripesca
+      // l'ultimo messaggio.
+      case 'arrowup':
+        e.preventDefault();
+        mapStep(-1);
+        return;
+      case 'arrowdown':
+        e.preventDefault();
+        mapStep(1);
         return;
       case 'i':
         e.preventDefault();

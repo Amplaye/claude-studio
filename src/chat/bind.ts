@@ -90,6 +90,9 @@ export function bindWebview(
       case 'unqueue':
         chat.unqueue(m.id);
         return;
+      case 'rewind':
+        void chat.rewind(m.id);
+        return;
       case 'newSession':
         chat.newSession();
         return;

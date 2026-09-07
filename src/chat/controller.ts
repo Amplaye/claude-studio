@@ -29,6 +29,7 @@ import {
   diagnosticsSettled,
   errorSnapshot,
   findFiles,
+  findSymbols,
   follow,
   newErrors,
   workspaceRoot,
@@ -473,7 +474,7 @@ export class ChatController {
     }
     // Da qui in poi le modifiche appartengono a questo messaggio: e' il punto a
     // cui "/rewind" sa tornare.
-    this.checkpoints.begin(text);
+    const cp = this.checkpoints.begin(text);
     // Un messaggio tuo apre una partita nuova per l'autofix: i file toccati tornano a
     // zero, i giri pure, e si fotografa com'erano gli errori *prima*, che e' l'unico
     // modo per distinguere quelli che nascono adesso da quelli di ieri.
@@ -484,7 +485,7 @@ export class ChatController {
     // I file viaggiano a parte dall'eco: nel messaggio vero sono gia' dentro `full`
     // come percorsi, qui servono solo perche' la chat possa disegnarli attaccati al
     // messaggio, esattamente come fa con le immagini.
-    this.ensureSession().send(full, images, text, files);
+    this.ensureSession().send(full, images, text, files, false, cp);
   }
 
   /** Il fermaglio: il selettore di VS Code, senza filtri. */
@@ -509,9 +510,28 @@ export class ChatController {
     if (p) s.post({ k: 'preview', ...p });
   }
 
-  /** L'elenco per il menu che si apre scrivendo "@". */
+  /**
+   * L'elenco per il menu che si apre scrivendo "@": prima i file, poi i simboli.
+   *
+   * L'ordine non e' arbitrario. Nove volte su dieci "@" si scrive per allegare un
+   * file, e i simboli sono la risposta alla domanda che resta — "in che file sta
+   * questa funzione?" — quindi stanno sotto, dove si guarda solo se sopra non c'era
+   * quello che cercavi. Le due ricerche partono insieme: quella dei simboli
+   * interroga il language server, e aspettarla in fila dietro al disco vorrebbe dire
+   * pagare due attese per un menu che si apre mentre scrivi.
+   */
   async sendFiles(q: string, s?: Surface) {
-    const e: Wire = { k: 'files', items: await findFiles(q) };
+    const [files, symbols] = await Promise.all([findFiles(q), findSymbols(q)]);
+    const seen = new Set(files);
+    const e: Wire = {
+      k: 'files',
+      items: [
+        ...files.map((path) => ({ path })),
+        // Un simbolo il cui file e' gia' li' sopra resta: e' la riga che dice *dove*
+        // dentro quel file, ed e' esattamente quello che il percorso da solo non dice.
+        ...symbols.filter((x) => x.symbol && (x.line || !seen.has(x.path))),
+      ],
+    };
     if (s) s.post(e);
     else this.broadcast(e);
   }
@@ -635,8 +655,8 @@ export class ChatController {
       // mai. Un checkpoint pero' si apre lo stesso — cambia file come un turno
       // qualsiasi, e "/rewind" deve poterlo disfare.
       askEngine: (prompt) => {
-        this.checkpoints.begin(prompt);
-        this.ensureSession().send(prompt, undefined, prompt);
+        const cp = this.checkpoints.begin(prompt);
+        this.ensureSession().send(prompt, undefined, prompt, undefined, false, cp);
       },
     };
   }
@@ -648,28 +668,46 @@ export class ChatController {
    * quel punto. Come nell'originale, si puo' scegliere solo il codice, solo la
    * conversazione, o tutti e due.
    */
-  private async rewind() {
+  async rewind(id?: number) {
     const points = this.checkpoints.entries();
     if (!points.length) {
       void vscode.window.showInformationMessage(t(this.prefs.lang, 'rewind.none'));
       return;
     }
     const lang = this.prefs.lang;
-    const pick = await vscode.window.showQuickPick(
-      points.map((p) => ({
-        label: p.prompt.replace(/\s+/g, ' ').slice(0, 70) || '—',
-        description:
-          p.files > 0 ? t(lang, 'rewind.files', { n: String(p.files) }) : t(lang, 'rewind.noFiles'),
-        detail: new Date(p.at).toLocaleTimeString(),
-        index: p.index,
-      })),
-      { title: t(lang, 'rewind.pick'), matchOnDescription: true }
-    );
-    if (!pick) return;
+    // Con un id il punto e' gia' indicato — e' la freccia accanto al messaggio, che
+    // sa a quale appartiene — e il primo passo si salta. Senza, si sceglie da un
+    // elenco come ha sempre fatto "/rewind".
+    const pick =
+      id === undefined
+        ? await vscode.window.showQuickPick(
+            points.map((p) => ({
+              label: p.prompt.replace(/\s+/g, ' ').slice(0, 70) || '—',
+              description:
+                p.files > 0
+                  ? t(lang, 'rewind.files', { n: String(p.files) })
+                  : t(lang, 'rewind.noFiles'),
+              detail: new Date(p.at).toLocaleTimeString(),
+              id: p.id,
+            })),
+            { title: t(lang, 'rewind.pick'), matchOnDescription: true }
+          )
+        : // Un punto che non esiste piu' — un rewind precedente ha buttato via quelli
+          // dopo, e la freccia di un messaggio rimasto sullo schermo appartiene a un
+          // ramo che non c'e' — non e' un errore da urlare: e' un punto che non c'e'.
+          points.some((p) => p.id === id)
+          ? { id }
+          : undefined;
+    if (!pick) {
+      if (id !== undefined) {
+        void vscode.window.showInformationMessage(t(lang, 'rewind.gone'));
+      }
+      return;
+    }
 
     // Le due voci sul codice compaiono solo se c'e' davvero qualcosa da rimettere,
     // esattamente come fa l'originale.
-    const hasFiles = this.checkpoints.filesAt(pick.index) > 0;
+    const hasFiles = this.checkpoints.filesAt(pick.id) > 0;
     type Action = 'both' | 'code' | 'talk';
     const choices: { label: string; action: Action }[] = [
       ...(hasFiles
@@ -684,7 +722,7 @@ export class ChatController {
     if (!what) return;
 
     if (what.action === 'both' || what.action === 'code') {
-      const { restored, skipped } = await this.checkpoints.restore(pick.index);
+      const { restored, skipped } = await this.checkpoints.restore(pick.id);
       if (skipped.length) {
         void vscode.window.showWarningMessage(
           t(lang, 'rewind.skipped', { n: String(restored), s: String(skipped.length) })

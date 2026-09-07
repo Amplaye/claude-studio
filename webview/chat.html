@@ -146,13 +146,21 @@
           </button>
         </div>
 
-        <!-- La mappa del turno: una tacca per passo, colorata per tipo. Serve a
-             vedere la forma di una risposta lunga senza scorrerla, e a saltare al
-             terzo file che ha toccato senza andarlo a cercare. -->
+        <!-- La mappa del turno: una banda per gruppo di passi dello stesso tipo,
+             alta quanti passi tiene. Serve a vedere la forma di una risposta lunga
+             senza scorrerla, e a saltare al terzo file che ha toccato senza andarlo
+             a cercare. Col puntatore sopra (o entrandoci col Tab) si apre e dice a
+             parole quello che chiusa dice col colore. -->
         <div class="logwrap">
-          <nav class="tmap few" id="tmap" aria-hidden="true"></nav>
-          <main class="log" id="log"></main>
+          <nav class="tmap few" id="tmap" data-i18n-label="map.title" aria-label="The shape of this turn"></nav>
+          <main class="log" id="log" role="log"></main>
         </div>
+
+        <!-- What a screen reader is told, and the only thing it is told.
+             Announcing the thread itself would read every streamed token out loud;
+             this says the one line the activity pill says — "Reading src/store.ts",
+             "Permission needed: Bash" — and only when it changes. -->
+        <p class="sr-only" id="say" role="status" aria-live="polite" aria-atomic="true"></p>
 
         <form class="composer" id="composer">
           <div class="menu" id="menu" hidden></div>

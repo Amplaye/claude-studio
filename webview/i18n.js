@@ -12,6 +12,7 @@
  *   data-i18n="key"        -> textContent
  *   data-i18n-title="key"  -> title attribute
  *   data-i18n-ph="key"     -> placeholder attribute
+ *   data-i18n-label="key"  -> aria-label attribute
  *
  * One more thing every string can ask for: {alt}. The key next to the spacebar is
  * called Alt on a PC and Option on a Mac, and a Mac writes it ⌥ with the letter
@@ -159,9 +160,23 @@
     // ---- the conversation ----
     'msg.reasoning': 'Reasoning',
     'msg.thinking': 'Claude is thinking…',
+    // ---- the map of the turn ----
+    'map.title': 'The shape of this turn',
+    'map.read': 'Read',
+    'map.write': 'Wrote',
+    'map.run': 'Ran',
+    'map.think': 'Thought',
+    'map.tool': 'Used a tool',
+    'map.user': 'You',
+    'map.say': 'Answered',
+    'map.ask': 'Asked you',
+    'map.fail': 'Went wrong',
+    'map.recap': 'Finished',
+    'map.other': 'Step',
     'msg.openInEditor': 'Open in the editor',
     'msg.lines': '{n} lines',
-    'msg.moreLines': '… {n} more lines',
+    'msg.moreLines': '… {n} more lines — click to see them',
+    'msg.rewind': 'Go back to just before this message',
     'msg.replaceAll': 'all occurrences replaced',
     'msg.item': '1 item',
     'msg.items': '{n} items',
@@ -395,9 +410,23 @@
 
     'msg.reasoning': 'Ragionamento',
     'msg.thinking': 'Claude sta pensando…',
+    // ---- la mappa del turno ----
+    'map.title': 'La forma di questo turno',
+    'map.read': 'Letto',
+    'map.write': 'Scritto',
+    'map.run': 'Eseguito',
+    'map.think': 'Ragionato',
+    'map.tool': 'Strumento',
+    'map.user': 'Tu',
+    'map.say': 'Risposto',
+    'map.ask': 'Ha chiesto',
+    'map.fail': 'Andato storto',
+    'map.recap': 'Finito',
+    'map.other': 'Passo',
     'msg.openInEditor': "Apri nell'editor",
     'msg.lines': '{n} righe',
-    'msg.moreLines': '… altre {n} righe',
+    'msg.moreLines': '… altre {n} righe — clicca per vederle',
+    'msg.rewind': 'Torna a un attimo prima di questo messaggio',
     'msg.replaceAll': 'sostituite tutte le occorrenze',
     'msg.item': '1 voce',
     'msg.items': '{n} voci',
@@ -529,6 +558,8 @@
     for (const n of r.querySelectorAll('[data-i18n]')) n.textContent = t(n.dataset.i18n);
     for (const n of r.querySelectorAll('[data-i18n-title]')) n.title = t(n.dataset.i18nTitle);
     for (const n of r.querySelectorAll('[data-i18n-ph]')) n.placeholder = t(n.dataset.i18nPh);
+    for (const n of r.querySelectorAll('[data-i18n-label]'))
+      n.setAttribute('aria-label', t(n.dataset.i18nLabel));
   }
 
   window.I18N = {

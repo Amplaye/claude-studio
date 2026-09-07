@@ -3,6 +3,7 @@
 // doesn't have to know anything about VSCode.
 import * as path from 'node:path';
 import * as vscode from 'vscode';
+import type { PickItem } from '../engine/protocol';
 
 /** A path can arrive relative or already absolute: here it always becomes absolute. */
 function toUri(p: string): vscode.Uri {
@@ -41,6 +42,67 @@ export function currentSelection(): Selected | undefined {
 // "@..." means making the disk grind for nothing.
 let cache: { at: number; files: string[] } = { at: 0, files: [] };
 const CACHE_MS = 30000;
+
+/**
+ * Quello che l'editor sa e un elenco di percorsi no: dove sta un nome.
+ *
+ * "@" cercava solo fra i percorsi, quindi allegare la funzione che si sta guardando
+ * voleva dire ricordarsi in quale file vive — e se lo si ricordasse non si starebbe
+ * cercando. I simboli li ha gia' indicizzati VSCode: sono gli stessi di Ctrl+T, li
+ * calcola il language server del progetto, e chiederli non costa niente.
+ *
+ * Quello che entra nel messaggio resta il percorso — e' l'unica cosa che "@" sa
+ * espandere, e il file intero e' quello che serve leggere. Il simbolo e' la chiave
+ * di ricerca, non il carico: nella riga si vede il nome e la riga esatta, cosi' sai
+ * quale dei quattro `parse` stai allegando.
+ */
+export async function findSymbols(q: string, limit = 12): Promise<PickItem[]> {
+  const needle = q.trim();
+  // Sotto le due lettere il provider risponde con mezzo progetto: e' rumore, non aiuto.
+  if (needle.length < 2) return [];
+  let found: vscode.SymbolInformation[] | undefined;
+  try {
+    found = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+      'vscode.executeWorkspaceSymbolProvider',
+      needle
+    );
+  } catch {
+    return []; // nessun language server per questo progetto: "@" resta quello di prima
+  }
+  if (!Array.isArray(found)) return [];
+  const out: PickItem[] = [];
+  for (const s of found) {
+    if (out.length >= limit) break;
+    const uri = s.location?.uri;
+    if (!uri || uri.scheme !== 'file') continue;
+    out.push({
+      path: vscode.workspace.asRelativePath(uri, false),
+      symbol: s.containerName ? `${s.containerName}.${s.name}` : s.name,
+      kind: SYMBOL_KIND[s.kind] || '',
+      line: (s.location.range?.start.line ?? 0) + 1,
+    });
+  }
+  return out;
+}
+
+/** I nomi dei tipi di simbolo, che l'enum di VSCode tiene solo come numeri. */
+const SYMBOL_KIND: Record<number, string> = {
+  [vscode.SymbolKind.File]: 'file',
+  [vscode.SymbolKind.Module]: 'module',
+  [vscode.SymbolKind.Namespace]: 'namespace',
+  [vscode.SymbolKind.Class]: 'class',
+  [vscode.SymbolKind.Method]: 'method',
+  [vscode.SymbolKind.Property]: 'property',
+  [vscode.SymbolKind.Field]: 'field',
+  [vscode.SymbolKind.Constructor]: 'constructor',
+  [vscode.SymbolKind.Enum]: 'enum',
+  [vscode.SymbolKind.Interface]: 'interface',
+  [vscode.SymbolKind.Function]: 'function',
+  [vscode.SymbolKind.Variable]: 'variable',
+  [vscode.SymbolKind.Constant]: 'const',
+  [vscode.SymbolKind.Struct]: 'struct',
+  [vscode.SymbolKind.TypeParameter]: 'type',
+};
 
 export async function findFiles(q: string, limit = 40): Promise<string[]> {
   const now = Date.now();
