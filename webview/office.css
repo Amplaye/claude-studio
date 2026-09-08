@@ -249,6 +249,10 @@ body.inoffice .top .activity {
 .of-wrap {
   flex: 1 1 auto;
   min-height: 0;
+  /* Il riquadro dentro cui sta il foglio della bacheca. Senza, un `inset: 0` non
+     trova niente di posizionato sopra di se' e si stende su tutta la finestra:
+     la chat accanto si sarebbe ritrovata al buio insieme alla stanza. */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -427,6 +431,20 @@ body.inoffice .top .activity {
 .of-guy.done .of-bubble {
   display: flex;
 }
+/* Tranne agli impiegati dei sub-agent. Non e' per fare pulizia: un sub-agent sta
+   lavorando per definizione — e' l'unico motivo per cui e' nella stanza — quindi
+   tre puntini che dicono "sta lavorando" non dicono niente che non si veda gia'.
+   E dicevano pure peggio: la nuvoletta sta di fianco alla testa, dov'era anche il
+   foglietto che uno si porta dietro, e le due finivano una sopra l'altra. Quello
+   che seguiva la gente per la stanza non era ne' una nuvoletta ne' un foglio: era
+   una macchia. Il foglio adesso sta in mano, e questa se ne va.
+
+   Va dopo la riga qui sopra e col suo stesso peso: `.of-staff .of-bubble` da solo
+   e' una classe di meno e perde, e una regola che perde in silenzio e' peggio di
+   una regola che non c'e'. */
+.of-guy.of-staff .of-bubble {
+  display: none;
+}
 .of-dots {
   display: none;
   gap: 1px;
@@ -516,6 +534,137 @@ body.inoffice .top .activity {
     inset 0 0 0 1px var(--claude-1),
     0 0 0 1px var(--claude-1),
     2px 2px 0 rgba(46, 28, 44, 0.5);
+}
+
+/* ---------- la bacheca, e quello che ci sta scritto ----------
+
+   Il bottone e' trasparente e sta appoggiato sul mobile: il disegno resta quello
+   della stanza, e quello che si aggiunge e' solo il segno che li' si puo'
+   cliccare. Un contorno, non un riquadro pieno — una bacheca coperta di colore e'
+   una bacheca che non si legge piu'. */
+
+.of-kanban {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.of-kanban:hover,
+.of-kanban:focus-visible {
+  outline: none;
+  /* Due anelli: uno chiaro attaccato al mobile e uno dell'accento fuori. Sul legno
+     arancione un anello solo, di qualunque colore, si perde nel mobile. */
+  box-shadow:
+    0 0 0 1px var(--paper),
+    0 0 0 2px var(--claude-1);
+}
+
+/* Il foglio che ne esce. Sta sopra la pianta e non accanto: e' una cosa che si
+   apre, si legge e si chiude, e la stanza sotto resta dov'era.
+
+   Qui si torna ai colori del tema: dentro c'e' la stessa lista di passi della
+   colonna del contesto, ed e' interfaccia — un elenco di task su un fondo di
+   moquette non e' un elenco, e' un cartello appeso in una stanza. */
+.of-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 9500;
+  /* Copre la stanza e non la fascia in cima: il bottone per tornare alla chat
+     resta raggiungibile anche con la bacheca aperta. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--of-buio) 68%, transparent);
+}
+.of-sheet[hidden] {
+  display: none;
+}
+.of-sheet-box {
+  display: flex;
+  flex-direction: column;
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.of-sheet-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.of-sheet-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.of-sheet-count {
+  font-size: 12px;
+  opacity: 0.72;
+}
+.of-sheet-count[hidden] {
+  display: none;
+}
+.of-sheet-x {
+  margin-left: auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.of-sheet-x:hover {
+  border-color: var(--line);
+  background: var(--hover);
+}
+.of-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+/* Una conversazione per volta, col suo nome sopra. Senza il nome sono tre liste di
+   passi una dietro l'altra, e non si sa piu' di chi sia nessuna — che e' esattamente
+   il difetto per cui i passi sono finiti dentro le card del contesto. */
+.of-sheet-who + .of-sheet-who {
+  border-top: 1px solid var(--line);
+}
+.of-sheet-name {
+  margin: 0;
+  padding: 10px 12px 0;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* La lista dentro e' `.taskroot`, vestita da tasks.css: qui si toglie solo l'aria
+   di sopra, che il nome ce l'ha gia'. */
+.of-sheet-tasks .taskroot {
+  padding-top: 6px;
+}
+.of-sheet-empty {
+  margin: 0;
+  padding: 16px 14px 18px;
+  font-size: 12px;
+}
+.of-sheet-empty[hidden] {
+  display: none;
 }
 
 /* ---------- ufficio vuoto ---------- */

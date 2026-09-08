@@ -123,9 +123,11 @@ const stage = document.getElementById('stage');
 const scrivanie = ROOM.monta(stage, '../webview/sv-room.png');
 
 /* Ogni mobile porta il suo numero, nell'ordine in cui sta scritto nella pianta:
-   e' il nome corto con cui dirsi quale togliere. */
-ROOM.PROPS.forEach((p, i) => {
-  const d = ROOM.SV[p.s];
+   e' il nome corto con cui dirsi quale togliere. In coda i due disegnati a mano —
+   il cestino e la macchina del caffe' — che nel foglio non ci sono e la misura ce
+   l'hanno addosso invece che nella mappa dei ritagli. */
+[...ROOM.PROPS, ...ROOM.DISEGNATI].forEach((p, i) => {
+  const d = ROOM.SV[p.s] || p;
   const n = el('div', 'num');
   n.textContent = i + 1;
   n.style.left = p.x + d.w / 2 + 'px';

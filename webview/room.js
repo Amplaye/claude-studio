@@ -80,15 +80,16 @@ window.ROOM = (() => {
     //     di SeasonVale ha uno schienale alto che dal davanti copre mezzo
     //     tavolo, e in una stanza vista dall'alto era l'unico mobile di
     //     traverso. ---
-    { s: 'cork', x: 67, b: 36 },
-    { s: 'board', x: 112, b: 36 },
+    // Una bacheca sola, e centrata sul muro come il tavolo e gli sgabelli sotto.
+    // La bacheca di sughero che le stava accanto era arredamento: aveva i suoi
+    // fogli gia' disegnati sopra, e due bacheche appaiate — una vera e una finta —
+    // erano soprattutto un modo di non far capire quale delle due si guarda.
+    { s: 'board', x: 66, b: 36 },
     { s: 'stoolRound', x: 81, b: 62 },
     { s: 'meetTable', x: 64, b: 84 },
     { s: 'stoolRound', x: 81, b: 100 },
     { s: 'plantPurple', x: 22, b: 110 },
-    // Il cestino. E' l'unico mobile aggiunto per una commissione e non per la
-    // pianta: senza, "buttare la carta" non ha dove andare.
-    { s: 'barrel', x: 140, b: 108 },
+    // Il cestino sta in `DISEGNATI`, qui sotto: nel foglio non c'e'.
 
     // --- in mezzo non c'e' niente: e' il passaggio, e serve libero ---
 
@@ -98,8 +99,9 @@ window.ROOM = (() => {
     // gia' pieno di roba disegnata non si sarebbe visto niente.
     { s: 'shelfJars', x: 258, b: 48 },
     { s: 'shelfEmpty', x: 288, b: 48 },
-    { s: 'cabinet', x: 318, b: 48 },
-    { s: 'nightstand', x: 348, b: 48 },
+    // La macchina del caffe' e il lavandino stanno in `DISEGNATI`: nel foglio non
+    // c'e' ne' l'una ne' l'altro, e finivano il primo su un armadietto e il
+    // secondo su un comodino.
     { s: 'stoolRound', x: 270, b: 96 },
     { s: 'meetTable', x: 288, b: 96 },
     { s: 'stoolRound', x: 340, b: 96 },
@@ -114,6 +116,38 @@ window.ROOM = (() => {
     { s: 'plantPurple', x: 24, b: 278 },
     { s: 'plantPurple', x: 351, b: 300 },
     { s: 'plantBlue', x: 349, b: 278 },
+  ];
+
+  /* ---- i mobili che nel foglio non ci sono ----
+   *
+   * SeasonVale e' una fattoria medievale: il cestino della carta e la macchina
+   * del caffe' non ce li ha. Al loro posto stavano i due ritagli che ci
+   * somigliavano di piu' — un barilotto e un armadietto — e si leggevano per
+   * quello che erano davvero, una cassa da magazzino e un armadio. Un mobile che
+   * la scena da' per esistente e che a guardarlo e' un altro mobile e' peggio
+   * che non averlo: meta' della vita di questa stanza gira attorno al caffe', e
+   * la macchina del caffe' non si vedeva da nessuna parte.
+   *
+   * Quindi si disegnano, con la stessa regola del computer: colori pieni a stop
+   * netti, mai una sfumatura, e la sagoma prima del dettaglio. Il disegno sta in
+   * `room.css`, che di questi due sa tutto; qui c'e' solo dove stanno e quanto
+   * sono grandi.
+   *
+   * `w` e `h` non sono un vezzo: servono a marcarli nella griglia di dove si
+   * mettono i piedi. Un mobile disegnato che non blocca e' un mobile che si
+   * attraversa.
+   */
+  const DISEGNATI = [
+    // Il cestino, in sala riunioni. E' l'unico mobile messo per una commissione e
+    // non per la pianta: senza, "buttare la carta" non ha dove andare.
+    { s: 'cestino', x: 141, b: 108, w: 12, h: 15 },
+    // La macchina del caffe', al bar, in fila con la dispensa e giusto sopra il
+    // punto dove ci si ferma a farselo.
+    { s: 'macchina', x: 319, b: 48, w: 24, h: 40 },
+    // E il lavandino in fondo alla fila, dove si va a lavare la tazza. Anche
+    // questo la scena lo dava per esistente: chi lava dice "la lavo e la rimetto"
+    // stando davanti a un comodino.
+    { s: 'lavandino', x: 348, b: 48, w: 18, h: 28 },
   ];
 
   /* Sei scrivanie, due file da tre, centrate sulla larghezza della stanza. Le
@@ -142,11 +176,12 @@ window.ROOM = (() => {
    * quattro colori e quattro stati, ed e' tutto quello che una bacheca dice
    * davvero anche quando i foglietti sono scritti.
    *
-   * Una sola, non tre. Le rosse in cima e le gialle sotto stanno benissimo sullo
-   * stesso legno: e' il colore a dividerle, e tre bacheche per una manciata di
-   * foglietti sono tre bacheche quasi vuote. La bacheca di sughero li' accanto
-   * resta quello che era, cioe' arredamento — ci sono gia' disegnati sopra i suoi
-   * fogli, e altri fogli veri sopra quelli finti non si leggerebbero.
+   * Una sola, e sul muro ce n'e' una sola. Le rosse in cima e le gialle sotto
+   * stanno benissimo sullo stesso legno: e' il colore a dividerle, e tre bacheche
+   * per una manciata di foglietti sono tre bacheche quasi vuote. La bacheca di
+   * sughero che le stava accanto non c'e' piu': aveva i suoi fogli gia' disegnati
+   * sopra, e appaiata a quella vera serviva soprattutto a non far capire quale
+   * delle due si guarda.
    *
    * `griglia` e' l'angolo in alto a sinistra del primo foglietto: da li' in poi
    * quattro per riga, passo otto in orizzontale e sei in verticale. `posto` e'
@@ -156,7 +191,10 @@ window.ROOM = (() => {
    * dietro al tavolo su cui dovrebbe stare.
    */
   const BACHECHE = {
-    muro: { griglia: [117, 10], posto: [134, 56], z: 37 },
+    // Il posto sta a destra della bacheca e non davanti: davanti c'e' gia' quello
+    // della commissione, e due che leggono lo stesso muro nello stesso punto sono
+    // una persona sola disegnata due volte.
+    muro: { griglia: [71, 10], posto: [112, 52], z: 37 },
     // Si archivia stando di fianco al tavolo e non davanti: davanti c'e' lo
     // sgabello, e un posto occupato da un mobile e' una persona che cammina
     // contro un angolo per sempre.
@@ -317,6 +355,7 @@ window.ROOM = (() => {
     const d = SV[p.s];
     blocca(p.x, p.b - d.h, d.w, d.h);
   }
+  for (const p of DISEGNATI) blocca(p.x, p.b - p.h, p.w, p.h);
   for (const d of DESKS) blocca(d.x, d.b - SH, SW, SH);
 
   const cella = (x, y) =>
@@ -439,6 +478,16 @@ window.ROOM = (() => {
       stage.append(depth(n, (w.r + w.h) * TILE));
     }
     for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
+    // I due disegnati a mano. Stessa regola: si appoggiano per terra dal bordo di
+    // sotto, e chi sta piu' in basso copre chi sta piu' in alto.
+    for (const p of DISEGNATI) {
+      const n = el('div', 'of-' + p.s);
+      n.style.left = p.x + 'px';
+      n.style.top = p.b - p.h + 'px';
+      n.style.width = p.w + 'px';
+      n.style.height = p.h + 'px';
+      stage.append(depth(n, p.b));
+    }
 
     // Le tazze sulla rastrelliera. Vanno appena sopra lo scaffale — che sta
     // contro il muro in fondo al bar — e sotto chi ci passa davanti.
@@ -918,6 +967,7 @@ window.ROOM = (() => {
     H,
     SV,
     PROPS,
+    DISEGNATI,
     DESKS,
     METE,
     DESTINAZIONI,

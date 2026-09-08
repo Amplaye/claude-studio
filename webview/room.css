@@ -290,6 +290,175 @@
   }
 }
 
+/* ---- il cestino della carta ----
+   Nel foglio non c'e': al suo posto stava un barilotto, e un barilotto in un
+   ufficio si legge come una cassa da magazzino. Dodici per quindici, e sono tre
+   pezzi: il bordo, il cesto a stecche e la carta che spunta.
+
+   Le stecche sono quello che lo fa cestino invece che secchio — un cilindro
+   pieno a questa misura e' un bidone, e un bidone accanto a un tavolo da riunione
+   e' un bidone. La carta che spunta e' l'altra meta': un cestino vuoto e' un
+   vaso. */
+.of-cestino {
+  position: absolute;
+  /* Il bordo: una riga di luce e due di corpo, largo quanto tutto l'elemento.
+     E' un pixel per parte piu' del cesto, ed e' tutta la rastremazione che a
+     questa misura ci sta — un trapezio vero vorrebbe una diagonale, e a pixel
+     una diagonale e' una scaletta sporca. */
+  background: linear-gradient(180deg, transparent 0 3px, #6b5460 3px 4px, #55424e 4px 6px, transparent 6px);
+  filter: drop-shadow(2px 2px 0 var(--shade));
+}
+.of-cestino::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 6px;
+  bottom: 0;
+  background: repeating-linear-gradient(90deg, #5b4854 0 1px, #3a2b35 1px 2px);
+  box-shadow: inset 0 0 0 1px var(--of-contorno);
+}
+/* La palla di carta appallottolata, appoggiata sul bordo. Sfalsata di un pixel a
+   sinistra: in mezzo e centrata sembra un pomello. */
+.of-cestino::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  width: 5px;
+  height: 4px;
+  background: #f5f1e6;
+  box-shadow: inset 0 0 0 1px rgba(46, 42, 38, 0.35);
+}
+
+/* ---- la macchina del caffe' ----
+   Nemmeno questa c'e' nel foglio, e al suo posto stava un armadietto — che
+   infatti si leggeva come un armadietto. E' il mobile attorno a cui gira meta'
+   della vita di questa stanza: chi si alza va a farsi un caffe', e ci andava
+   davanti a un armadio.
+
+   Ventiquattro per quaranta, e quello che la fa leggere e' la nicchia: un
+   parallelepipedo scuro contro il muro e' un frigorifero, un parallelepipedo
+   scuro col buco in mezzo e' una macchina del caffe'. Il resto — il display, la
+   spia, il beccuccio, la griglia — sono quattro pezzi da due pixel, e servono a
+   dire da che parte e' il davanti. */
+.of-macchina {
+  position: absolute;
+  /* Quattro strati, dal davanti al dietro: la griglia dove sgocciola, la
+     nicchia, il display e il corpo. Sono rettangoli di colore pieno messi a
+     misura, non elementi: quattro `<i>` dentro un mobile che non si muove mai
+     sarebbero quattro elementi per quattro rettangoli. */
+  background-image:
+    /* la griglia dove sgocciola: chiara, o dentro il buco non si vede */
+    linear-gradient(90deg, #8a7280 0 1px, #241c22 1px 2px),
+    linear-gradient(#241c22 0 0),
+    linear-gradient(#241c22 0 0),
+    linear-gradient(
+      180deg,
+      #6b5460 0 3px,
+      #3d2d38 3px 5px,
+      #55424e 5px 21px,
+      #624d5a 21px 33px,
+      #55424e 33px 38px,
+      #3d2d38 38px
+    );
+  background-size:
+    12px 1px,
+    14px 8px,
+    10px 4px,
+    100% 100%;
+  background-position:
+    6px 30px,
+    5px 23px,
+    4px 8px,
+    0 0;
+  background-repeat: repeat-x, no-repeat, no-repeat, no-repeat;
+  box-shadow: inset 0 0 0 1px var(--of-contorno);
+  filter: drop-shadow(2px 2px 0 var(--shade));
+}
+/* La spia, accanto al display. Lampeggia piano: e' l'unica cosa che dice che la
+   macchina e' accesa invece che parcheggiata li'. */
+.of-macchina::before {
+  content: '';
+  position: absolute;
+  left: 17px;
+  top: 9px;
+  width: 3px;
+  height: 2px;
+  background: var(--wood-hi);
+  animation: of-spia 2.4s steps(1) infinite;
+}
+@keyframes of-spia {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  70.01%,
+  100% {
+    opacity: 0.3;
+  }
+}
+/* Il beccuccio, che scende dentro la nicchia. Sta qui e non fra gli strati dello
+   sfondo perche' deve stare DAVANTI alla nicchia, e la nicchia e' uno sfondo:
+   quello che si disegna sopra uno sfondo e' un pseudo-elemento. */
+.of-macchina::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 21px;
+  width: 2px;
+  height: 3px;
+  background: #9aa7b0;
+  box-shadow: 0 0 0 1px var(--of-contorno);
+}
+
+/* ---- il lavandino ----
+   Terzo mobile che la scena dava per esistente e che nel foglio non c'e': chi
+   lava la tazza dice "la lavo e la rimetto" stando davanti a un comodino.
+
+   Diciotto per ventotto. Il mobiletto e' di legno come tutto il bancone, la vasca
+   e' incassata nel piano, e il rubinetto sporge sopra il piano contro il muro —
+   e' l'unico pezzo che sta piu' in alto del mobile, ed e' anche quello che fa
+   leggere il resto: un rettangolo scuro dentro un rettangolo arancione, da solo,
+   e' uno schermo. */
+.of-lavandino {
+  position: absolute;
+  /* Dal davanti al dietro: la vasca, la sua cornice, il becco che ci cade dentro,
+     la canna contro il muro e il mobiletto. */
+  background-image:
+    linear-gradient(#3f4a52 0 0),
+    linear-gradient(#2b333a 0 0),
+    linear-gradient(#5c6a72 0 0),
+    linear-gradient(#5c6a72 0 0),
+    linear-gradient(180deg, transparent 0 8px, var(--wood-hi) 8px 10px, var(--wood) 10px 24px, var(--wood-lo) 24px);
+  background-size:
+    8px 5px,
+    10px 7px,
+    2px 6px,
+    6px 3px,
+    100% 100%;
+  background-position:
+    5px 14px,
+    4px 13px,
+    9px 6px,
+    6px 5px,
+    0 0;
+  background-repeat: no-repeat;
+  filter: drop-shadow(2px 2px 0 var(--shade));
+}
+/* La cornice del mobiletto, e solo sua: comincia otto pixel piu' in basso
+   dell'elemento perche' sopra c'e' il rubinetto, e una cornice tirata su tutto
+   l'elemento gli avrebbe disegnato una scatola attorno. */
+.of-lavandino::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  bottom: 0;
+  box-shadow: inset 0 0 0 1px var(--of-contorno);
+}
+
 /* ---- la posta ----
    La busta che vola fra la porta e una scrivania. Quattordici per dieci, il
    lembo fatto con due linee che scendono dagli angoli di sopra e si incontrano
@@ -578,11 +747,17 @@
 .of-note.fatta {
   background: #a8e0b0;
 }
-/* Quello che uno si porta dietro: appeso alla spalla, e sopra la testa di chi ha
-   davanti — un foglio che passa dietro a una scrivania non e' in mano a nessuno. */
+/* Quello che uno si porta dietro: in mano, alla stessa altezza della tazza, e
+   sopra la testa di chi ha davanti — un foglio che passa dietro a una scrivania
+   non e' in mano a nessuno.
+
+   All'altezza della testa ci stava fino a ieri, ed era il posto sbagliato per due
+   motivi. E' dove sta anche la nuvoletta dei puntini: le due finivano una sopra
+   l'altra, e quello che seguiva la gente per la stanza non era ne' un foglio ne'
+   una nuvoletta, era una macchia. E comunque un foglio si tiene in mano. */
 .of-guy > .of-note {
-  left: 13px;
-  top: 2px;
+  left: 12px;
+  top: 13px;
   z-index: 20;
 }
 /* Piu' di dodici su una bacheca non ci stanno: da li' in poi si impilano

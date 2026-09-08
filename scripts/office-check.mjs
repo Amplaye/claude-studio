@@ -30,12 +30,16 @@
 //    nessuna al primo giro (se no aprire la scheda e' una raffica di buste), e
 //    tutte se ne vanno da sole quando sono atterrate;
 //  - i capi e i loro impiegati: ogni conversazione e' un capo, i sub-agent che
-//    apre sono i suoi, e ognuno deve stare accanto AL SUO — due capi vicini con
-//    gli impiegati mescolati sono due capi senza nessuno;
+//    apre sono i suoi, e finche' ci sono scrivanie libere si siedono — sei posti
+//    e due conversazioni vuol dire quattro scrivanie vuote, e un ufficio con
+//    quattro posti liberi e tre persone in piedi nella corsia non e' un ufficio
+//    pieno, e' un ufficio in attesa. Uno per scrivania, e lo schermo davanti
+//    acceso;
 //  - la bacheca: un foglietto per cosa da fare, e il colore dice quale. Quello
 //    che conta e' che il foglio sia UNO — quello che sta camminando in mano a
 //    qualcuno non deve stare anche appeso al muro, se no la bacheca conta due
-//    volte lo stesso lavoro;
+//    volte lo stesso lavoro. E che cliccandola esca quello che ci sta scritto:
+//    tutti i passi, capo per capo, e un modo di richiuderla;
 //  - l'aura del capo: chi ce l'ha a due passi ogni tanto gli tira una battuta, e
 //    il numero dentro la battuta e' vero — viene dal quadro delle task di quel
 //    capo li'. Un numero sbagliato in bocca a qualcuno e' peggio di nessun numero;
@@ -563,24 +567,58 @@ await tasks({
   },
   'capo-b': { items: [T('9', 'Impaginare', 'in_progress')], done: 0, total: 1, active: 0, busy: true },
 });
-// Il tempo di attraversare la stanza: entrano dalla porta, non compaiono al posto.
-await page.waitForTimeout(9000);
+// L'orecchio per l'aura del capo si mette adesso, prima ancora che arrivino:
+// chi tira una battuta poi sta zitto venticinque secondi, e mettendolo dopo
+// tutti i controlli qui sotto si finiva ad ascoltare proprio il silenzio di chi
+// aveva gia' parlato. Le nuvolette durano tre secondi e mezzo: guardare la
+// stanza alla fine di un'attesa vuol dire vedere solo chi parla in quell'istante,
+// quindi si raccolgono mentre compaiono.
+await page.evaluate(() => {
+  window.__dette = [];
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (n.classList && n.classList.contains('of-say') && n.parentElement.classList.contains('of-staff')) {
+          window.__dette.push(n.textContent);
+        }
+      }
+    }
+  }).observe(document.querySelector('.of-crowd'), { childList: true, subtree: true });
+});
+
+// Il tempo di attraversare la stanza: entrano dalla porta, non compaiono al
+// posto — e adesso il posto e' una scrivania in fondo al salone, che dalla
+// bacheca della sala riunioni e' mezza stanza in diagonale.
+await page.waitForTimeout(16000);
 t((await staff()) === 3, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 3');
 
-// Ognuno accanto al SUO capo: due capi vicini e gli impiegati mescolati sono due
-// capi senza nessuno.
-const vicini = await page.evaluate(() => {
-  const p = (n) => [parseFloat(n.style.left) + 8, parseFloat(n.style.top) + 24];
-  const capi = [...document.querySelectorAll('.of-guy:not(.of-staff)')].map(p);
+// E si siedono: due conversazioni prendono due scrivanie, le altre quattro
+// restano libere, e i tre impiegati se ne prendono una a testa. Il posto si
+// legge dalla posizione e non da un contatore: -1 vuol dire "in piedi in mezzo
+// alla stanza", che con quattro scrivanie vuote non deve succedere.
+const banchi = await page.evaluate(() => {
+  const posti = ROOM.DESKS.map((_, i) => ROOM.posto(i)).map((c) => [c.x + 8, c.y + 24]);
   return [...document.querySelectorAll('.of-staff')].map((s) => {
-    const [x, y] = p(s);
-    return Math.round(Math.min(...capi.map(([cx, cy]) => Math.hypot(cx - x, cy - y))));
+    const x = parseFloat(s.style.left) + 8;
+    const y = parseFloat(s.style.top) + 24;
+    return posti.findIndex(([px, py]) => Math.hypot(px - x, py - y) <= 2);
   });
 });
 t(
-  vicini.every((d) => d <= 48),
-  'un impiegato sta a ' + Math.max(...vicini) + ' pixel dal capo piu\' vicino'
+  banchi.every((i) => i >= 0),
+  "un impiegato e' rimasto in piedi con le scrivanie libere: " + banchi.join(', ')
 );
+t(
+  new Set(banchi).size === banchi.length,
+  "due impiegati sulla stessa scrivania: " + banchi.join(', ')
+);
+// E lo schermo davanti e' acceso. I monitor stanno nello stesso ordine delle
+// scrivanie: li mette `monta`, uno per posto, sempre gli stessi.
+const spenti = await page.evaluate((idx) => {
+  const mons = [...document.querySelectorAll('.of-mon')];
+  return idx.filter((i) => i >= 0 && !mons[i].classList.contains('working')).length;
+}, banchi);
+t(!spenti, spenti + ' scrivanie con qualcuno seduto e lo schermo spento');
 
 // Dentro i muri, come tutti gli altri.
 const fuoriStaff = await page.evaluate(() => {
@@ -619,6 +657,35 @@ t(
   'sulla bacheca c’e’ un foglietto che non e’ di nessuno stato: ' + f.muro
 );
 
+// ---- e la bacheca si apre ----
+//
+// Sul muro un foglietto e' cinque pixel per quattro: dice il suo colore e basta.
+// Cliccandola esce quello che c'e' scritto sopra, cioe' il piano di ogni
+// conversazione aperta — la stessa lista di passi che la chat mette nelle card del
+// contesto. Tre cose da guardare, e sono le tre che si rompono in silenzio: che le
+// righe ci siano tutte, che ognuna dica di chi e', e che il foglio si chiuda. Un
+// pannello che si apre sopra la stanza e non si chiude si e' appena mangiato
+// l'ufficio.
+await page.locator('.of-kanban').click();
+await page.waitForTimeout(300);
+const foglio = await page.evaluate(() => ({
+  aperto: !document.querySelector('.of-sheet').hidden,
+  nomi: [...document.querySelectorAll('.of-sheet-name')].map((n) => n.textContent),
+  righe: document.querySelectorAll('.of-sheet .tk-row').length,
+}));
+t(foglio.aperto, 'la bacheca non si apre a cliccarla');
+t(
+  foglio.nomi.join(' | ') === 'Prima conversazione | Seconda conversazione',
+  "il foglio non dice di chi sono i passi: " + foglio.nomi.join(' | ')
+);
+t(foglio.righe === 8, 'le righe sul foglio sono ' + foglio.righe + ' invece di 8');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+t(
+  await page.evaluate(() => document.querySelector('.of-sheet').hidden),
+  'la bacheca non si chiude con Esc'
+);
+
 // ---- l'aura del capo ----
 //
 // Chi lavora per qualcuno, se quel qualcuno ce l'ha a due passi, ogni tanto gli
@@ -629,21 +696,8 @@ t(
 //
 // Il conto dei fatti di capo-a e' tre, e la battuta col numero puo' dire solo
 // quello: un numero sbagliato in bocca a qualcuno e' peggio di nessun numero.
-// Le nuvolette durano tre secondi e mezzo: guardare la stanza alla fine
-// dell'attesa vuol dire vedere solo chi sta parlando in quell'istante. Si
-// raccolgono mentre compaiono.
-await page.evaluate(() => {
-  window.__dette = [];
-  new MutationObserver((muts) => {
-    for (const m of muts) {
-      for (const n of m.addedNodes) {
-        if (n.classList && n.classList.contains('of-say') && n.parentElement.classList.contains('of-staff')) {
-          window.__dette.push(n.textContent);
-        }
-      }
-    }
-  }).observe(document.querySelector('.of-crowd'), { childList: true, subtree: true });
-});
+// L'orecchio e' gia' aperto da quando sono entrati: qui si aspetta solo che ci
+// sia stato il tempo di dire qualcosa.
 await page.waitForTimeout(10000);
 const dette = await page.evaluate(() => window.__dette);
 t(dette.length > 0, 'nessuno ha aperto bocca in dieci secondi: l’aura del capo non gira');
@@ -676,6 +730,12 @@ await tasks({
 // scrivania in fondo a sinistra sono trecentosettanta pixel di strada.
 await page.waitForTimeout(22000);
 t((await staff()) === 1, 'chi ha finito non se n’e’ andato: restano ' + (await staff()) + ' invece di 1');
+// E la scrivania di chi se n'e' andato si spegne. Qui e' arrivato solo il quadro
+// delle task, che viaggia per conto suo: se lo schermo si spegnesse soltanto nel
+// giro dei consumi, resterebbe acceso davanti a una scrivania vuota fino al
+// prossimo aggiornamento. Tre: i due capi e l'unico impiegato rimasto.
+const accesi = await page.evaluate(() => document.querySelectorAll('.of-mon.on').length);
+t(accesi === 3, 'gli schermi accesi sono ' + accesi + ' invece di 3 — due capi e un impiegato');
 // E il foglio che portava e' finito dov'e' andato a finire: due in piu' nella
 // pila, e nessuno rimasto in mano a un fantasma.
 const g = await fogli();

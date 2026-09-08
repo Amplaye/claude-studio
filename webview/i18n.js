@@ -289,6 +289,10 @@
     'office.session': 'session {pct}',
     'office.week': 'week {pct}',
     'office.toChat': 'Chat',
+    'office.board': 'The board: everything there is to do',
+    'office.boardTitle': 'On the board',
+    'office.boardEmpty': 'Nothing on the board: no conversation has a plan open.',
+    'office.boardClose': 'Close',
   };
 
   const IT = {
@@ -532,6 +536,10 @@
     'office.session': 'sessione {pct}',
     'office.week': 'settimana {pct}',
     'office.toChat': 'Chat',
+    'office.board': 'La bacheca: tutto quello che c’e’ da fare',
+    'office.boardTitle': 'Sulla bacheca',
+    'office.boardEmpty': 'Sulla bacheca non c’e’ niente: nessuna conversazione ha un piano aperto.',
+    'office.boardClose': 'Chiudi',
   };
 
   const DICT = { en: EN, it: IT };

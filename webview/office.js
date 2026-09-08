@@ -70,6 +70,26 @@ window.OFFICE = (() => {
   const people = new Map();
   /** Chi siede dove: una volta preso il posto non lo si cambia a ogni giro. */
   let seats = [];
+  /** La bacheca aperta: il bottone sul mobile, il foglio che ci esce, e i suoi pezzi. */
+  let kanban;
+  let sheet;
+  let sheetBody;
+  let sheetTitle;
+  let sheetCount;
+  let sheetEmpty;
+  let sheetClose;
+  /** id conversazione -> il pezzo di elenco che le tocca, per ridipingerlo invece di rifarlo. */
+  const elenchi = new Map();
+
+  /** Un'icona dello sprite. Le SVG vanno create col namespace, o restano invisibili. */
+  function ico(name, cls) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', cls ? 'ico ' + cls : 'ico');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', '#ion-' + name);
+    svg.appendChild(use);
+    return svg;
+  }
 
   function build(container, post) {
     root = container;
@@ -148,7 +168,35 @@ window.OFFICE = (() => {
     empty = el('div', 'of-nobody');
     stage.append(bacheche, crowd, empty);
 
-    wrap.append(stage);
+    // La bacheca si clicca, e dentro c'e' quello che sul muro non ci sta scritto.
+    //
+    // Un foglietto e' cinque pixel per quattro: dice il suo colore e basta, ed e'
+    // giusto cosi' finche' la bacheca e' arredamento. Ma quello che ci sta appeso
+    // e' il piano vero di ogni conversazione aperta, e a un piano si vorrebbe
+    // poter dare un'occhiata.
+    //
+    // Il bottone e' un bottone vero appoggiato sopra il mobile, e non il mobile
+    // reso cliccabile: e' l'unico modo di averlo raggiungibile da tastiera senza
+    // rifare a mano il ruolo, il focus e i tasti che un <button> ha gia'.
+    const tela = stage.querySelector('.of-prop[data-k="board"]');
+    if (tela) {
+      kanban = el('button', 'of-kanban');
+      kanban.type = 'button';
+      kanban.style.left = tela.style.left;
+      kanban.style.top = tela.style.top;
+      kanban.style.width = tela.style.width;
+      kanban.style.height = tela.style.height;
+      // Sopra i foglietti, che stanno alla profondita' del mobile piu' uno.
+      kanban.style.zIndex = window.ROOM.BACHECHE.muro.z + 2;
+      kanban.onclick = () => apriBacheca(true);
+      stage.append(kanban);
+    }
+
+    sheet = costruisciFoglio();
+
+    // Il foglio sta dentro il riquadro della stanza e non dentro tutto l'ufficio:
+    // copre la pianta, non la fascia in cima.
+    wrap.append(stage, sheet);
     root.append(bar, wrap);
 
     new ResizeObserver(fit).observe(wrap);
@@ -165,8 +213,10 @@ window.OFFICE = (() => {
     window.I18N.onChange(() => {
       titleText.nodeValue = t('office.title');
       backText.textContent = t('office.toChat');
+      vestiBacheca();
       if (last) render(last);
     });
+    vestiBacheca();
   }
 
   let fitOn;
@@ -298,11 +348,57 @@ window.OFFICE = (() => {
     return chi;
   }
 
-  /** Il posto di questo impiegato: nella corsia accanto al suo capo. */
-  const postoStaff = (capo, i) => [
-    capo.casa.x + 8 + POSTI_STAFF[i][0],
-    capo.casa.y + 24 + POSTI_STAFF[i][1],
-  ];
+  /* ---- e le scrivanie che avanzano ----
+   *
+   * Sei scrivanie e una sola per conversazione: con due schede aperte quattro
+   * restavano vuote per sempre, e un ufficio con quattro posti liberi e tre
+   * persone in piedi in mezzo alla corsia non e' un ufficio pieno, e' un ufficio
+   * in attesa. Quindi chi lavora per qualcuno si siede.
+   *
+   * Si prende la scrivania libera piu' vicina al proprio capo, e non una a caso:
+   * e' quello che tiene insieme il gruppetto, e da lontano si vede ancora chi sta
+   * con chi. I capi vengono prima e non si discute — una scrivania presa da un
+   * impiegato la si lascia appena arriva una conversazione nuova, e da li' si
+   * torna a stare in piedi nella corsia.
+   */
+  /** chiave dell'impiegato -> scrivania. Un posto preso non si cambia sotto i piedi. */
+  const banchi = new Map();
+
+  /** Da' un banco a chi non ce l'ha, e lo toglie a chi non c'e' piu' o se l'e' visto soffiare. */
+  function assegnaBanchi(voluti) {
+    for (const [chiave, i] of banchi) {
+      if (!voluti.has(chiave) || seats[i]) banchi.delete(chiave);
+    }
+    const presi = new Set(banchi.values());
+    for (const [chiave, { capo }] of voluti) {
+      if (banchi.has(chiave) || !capo.casa) continue;
+      let scelto = -1;
+      let quanto = Infinity;
+      for (let i = 0; i < scrivanie.length; i++) {
+        if (seats[i] || presi.has(i)) continue;
+        const p = window.ROOM.posto(i);
+        const d = Math.hypot(p.x - capo.casa.x, p.y - capo.casa.y);
+        if (d < quanto) {
+          quanto = d;
+          scelto = i;
+        }
+      }
+      // Nessuna libera: si sta in piedi accanto al capo, come si e' sempre fatto.
+      if (scelto < 0) continue;
+      banchi.set(chiave, scelto);
+      presi.add(scelto);
+    }
+  }
+
+  /** Il posto di questo impiegato: la sua scrivania, o la corsia accanto al capo. */
+  function postoStaff(chiave, capo, i) {
+    const banco = banchi.get(chiave);
+    if (banco != null) {
+      const p = window.ROOM.posto(banco);
+      return [p.x + 8, p.y + 24];
+    }
+    return [capo.casa.x + 8 + POSTI_STAFF[i][0], capo.casa.y + 24 + POSTI_STAFF[i][1]];
+  }
 
   /**
    * Chi c'e' adesso, capo per capo.
@@ -348,7 +444,7 @@ window.OFFICE = (() => {
         paintBacheche();
       }
       window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
-      if (await window.ROOM.viaggio(chi.el, ...postoStaff(capo, i))) {
+      if (await window.ROOM.viaggio(chi.el, ...postoStaff(chi.chiave, capo, i))) {
         window.ROOM.vesti(chi.fig, chi.seme, 'digita');
       }
     } finally {
@@ -462,6 +558,120 @@ window.OFFICE = (() => {
     bacheche.replaceChildren(...out);
   }
 
+  // ---------- la bacheca, aperta ----------
+  //
+  // Sul muro un foglietto e' cinque pixel per quattro: dice il suo colore e basta.
+  // Cliccando la bacheca esce quello che c'e' scritto sopra — il piano di ogni
+  // conversazione aperta, capo per capo.
+  //
+  // Le liste non sono riscritte qui: sono `TaskPanel`, la stessa che la chat mette
+  // nella colonna del contesto. Due liste della stessa cosa si scollano al primo
+  // ritocco, e a quel punto dicono due verita' diverse sullo stesso lavoro.
+
+  function costruisciFoglio() {
+    const n = el('div', 'of-sheet');
+    n.hidden = true;
+    const box = el('div', 'of-sheet-box');
+    box.setAttribute('role', 'dialog');
+    // Non `aria-modal`: la chat accanto resta viva e ci si puo' scrivere, ed e' il
+    // punto di tutta la scheda. Quello che non deve restare raggiungibile e' la
+    // stanza sotto — ci si pensa con `inert` in `apriBacheca`, che e' anche l'unico
+    // modo di non far finire il fuoco su una persona nascosta dietro il buio.
+    box.setAttribute('aria-labelledby', 'ofSheetTitle');
+
+    const head = el('header', 'of-sheet-head');
+    sheetTitle = el('h2', 'of-sheet-title');
+    sheetTitle.id = 'ofSheetTitle';
+    sheetCount = el('span', 'of-sheet-count');
+    sheetClose = el('button', 'of-sheet-x');
+    sheetClose.type = 'button';
+    sheetClose.append(ico('close'));
+    sheetClose.onclick = () => apriBacheca(false);
+    head.append(sheetTitle, sheetCount, sheetClose);
+
+    sheetBody = el('div', 'of-sheet-body');
+    sheetEmpty = el('p', 'of-sheet-empty');
+    box.append(head, sheetBody, sheetEmpty);
+    n.append(box);
+
+    // Il fondo chiude, la scatola no: un clic dentro la lista non deve far sparire
+    // la lista che si sta leggendo.
+    n.onclick = (e) => e.target === n && apriBacheca(false);
+    // Esc chiude. Basta ascoltarlo qui dentro perche' aprendo il foglio il fuoco ci
+    // finisce dentro: un ascoltatore su tutto il documento avrebbe litigato con
+    // l'Esc della chat, che sta nella stessa pagina.
+    n.addEventListener('keydown', (e) => e.key === 'Escape' && apriBacheca(false));
+    return n;
+  }
+
+  /** Le parole del foglio, che cambiano con la lingua e non con i dati. */
+  function vestiBacheca() {
+    if (kanban) {
+      kanban.title = t('office.board');
+      kanban.setAttribute('aria-label', t('office.board'));
+    }
+    if (!sheet) return;
+    sheetTitle.textContent = t('office.boardTitle');
+    sheetClose.title = t('office.boardClose');
+    sheetClose.setAttribute('aria-label', t('office.boardClose'));
+    dipingiBacheca();
+  }
+
+  function apriBacheca(aperta) {
+    // Gia' com'e' richiesta: non si ridipinge e soprattutto non si sposta il fuoco.
+    if (!sheet || !sheet.hidden === aperta) return;
+    sheet.hidden = !aperta;
+    if (stage) stage.inert = aperta;
+    if (aperta) {
+      dipingiBacheca();
+      sheetClose.focus();
+    } else if (kanban) {
+      // Il fuoco torna da dove veniva: chi ha aperto col tasto non deve ritrovarsi
+      // in cima alla pagina.
+      kanban.focus();
+    }
+  }
+
+  function dipingiBacheca() {
+    if (!sheet || sheet.hidden) return;
+    // Solo le conversazioni che in ufficio ci sono davvero, e solo quelle che un
+    // piano ce l'hanno: un elenco rimasto nel quadro di una scheda chiusa e' una
+    // lista di lavoro di nessuno.
+    const vivi = [...people.keys()].filter((id) => ((board[id] || {}).items || []).length);
+    for (const [id, e] of elenchi) {
+      if (!vivi.includes(id)) {
+        e.sez.remove();
+        elenchi.delete(id);
+      }
+    }
+    let quante = 0;
+    let fatte = 0;
+    for (const id of vivi) {
+      let e = elenchi.get(id);
+      if (!e) {
+        const sez = el('section', 'of-sheet-who');
+        const nome = el('h3', 'of-sheet-name');
+        const dove = el('div', 'of-sheet-tasks');
+        sez.append(nome, dove);
+        // Come nella colonna del contesto: la lista e' `TaskPanel`, e se il foglio
+        // non e' stato caricato resta il nome, che e' meglio di una pagina rotta.
+        e = { sez, nome, pannello: window.TaskPanel ? window.TaskPanel(dove) : null };
+        elenchi.set(id, e);
+      }
+      // Riappendere una sezione che c'e' gia' la sposta invece di duplicarla: e'
+      // quello che tiene l'ordine del foglio uguale all'ordine delle scrivanie.
+      sheetBody.append(e.sez);
+      e.nome.textContent = people.get(id).pname.textContent;
+      if (e.pannello) e.pannello.render(board[id]);
+      quante += (board[id].items || []).length;
+      fatte += board[id].done || 0;
+    }
+    sheetCount.textContent = quante ? t('tasks.count', { done: fatte, total: quante }) : '';
+    sheetCount.hidden = !quante;
+    sheetEmpty.textContent = t('office.boardEmpty');
+    sheetEmpty.hidden = quante > 0;
+  }
+
   function paintStaff() {
     const voluti = volutiStaff();
 
@@ -471,6 +681,9 @@ window.OFFICE = (() => {
       if (!voluti.has(chiave) && !chi.esce) esce(chi);
     }
 
+    // Poi si vede chi si siede dove: prima i posti, e solo dopo dove va la gente.
+    assegnaBanchi(voluti);
+
     for (const [chiave, { capo, it, i }] of voluti) {
       let chi = staff.get(chiave);
       if (!chi) {
@@ -479,17 +692,42 @@ window.OFFICE = (() => {
         chi.andata = entra(chi, capo, i);
       } else if (!chi.va && !chi.esce) {
         // Il posto puo' cambiare sotto i piedi: un fratello che finisce fa
-        // scalare tutti gli altri di uno. Ci si sposta camminando, che a questa
-        // misura sono venti pixel e non si nota, invece di teletrasportarsi.
-        const [fx, fy] = postoStaff(capo, i);
-        if (Math.abs(parseFloat(chi.el.style.left) + 8 - fx) > 2) chi.andata = entra(chi, capo, i);
+        // scalare tutti gli altri di uno, e una conversazione nuova si riprende
+        // la scrivania. Ci si sposta camminando, invece di teletrasportarsi.
+        const [fx, fy] = postoStaff(chiave, capo, i);
+        const qx = parseFloat(chi.el.style.left) + 8;
+        const qy = parseFloat(chi.el.style.top) + 24;
+        // Sui due assi e non solo in orizzontale: due scrivanie della stessa
+        // colonna stanno una sotto l'altra, e a guardare solo la x il trasloco
+        // fra le due non parte mai.
+        if (Math.hypot(qx - fx, qy - fy) > 2) chi.andata = entra(chi, capo, i);
       }
       const cosa = it.activeForm || it.content || '';
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
     }
 
+    // E gli schermi delle scrivanie che non sono di nessun capo: acceso se ci si e'
+    // seduto un impiegato, spento se no. Uno schermo spento con davanti uno che
+    // batte a macchina e' un ufficio a cui e' saltata la corrente, e uno acceso
+    // davanti a una scrivania vuota e' peggio.
+    //
+    // Il giro si fa qui e non solo in `render`: il quadro delle task arriva per
+    // conto suo — cambia al ritmo di Claude e non a quello dei consumi — e chi se
+    // ne va di la' si porterebbe dietro uno schermo acceso fino al prossimo
+    // aggiornamento dei consumi. Quelle dei capi le lascia stare: sono di
+    // `render`, che sa se quella conversazione sta lavorando.
+    const occupate = new Set(banchi.values());
+    scrivanie.forEach((dk, i) => {
+      if (seats[i]) return;
+      dk.mon.classList.toggle('on', occupate.has(i));
+      dk.mon.classList.toggle('working', occupate.has(i));
+    });
+
     paintBacheche();
+    // E il foglio aperto, se e' aperto: e' la stessa roba dei foglietti sul muro,
+    // e non puo' restare indietro di un turno rispetto a loro.
+    dipingiBacheca();
   }
 
   // ---------- l'aura del capo ----------
@@ -524,8 +762,11 @@ window.OFFICE = (() => {
     'Trenta minuti per dire "vediamo"',
   ];
 
-  /** Quanto vicino deve stare il capo perche' valga la pena adularlo. */
-  const VICINO = 44;
+  /* Quanto vicino deve stare il capo perche' valga la pena adularlo. Adesso che
+     gli impiegati si siedono, "a due passi" non e' piu' solo la corsia: e' anche
+     la scrivania di fianco, che sta settanta pixel piu' sotto. Con quaranta la
+     battuta al capo non si sarebbe sentita quasi mai. */
+  const VICINO = 72;
   /** E quanto lontano perche' non senta. */
   const LONTANO = 96;
   /** Ogni quanto si guarda chi ha il capo accanto. */
@@ -749,6 +990,10 @@ window.OFFICE = (() => {
     // se una conversazione ha cambiato scrivania — o l'ha appena presa — i suoi
     // devono seguirla.
     paintStaff();
+
+    // I nomi sul foglio sono quelli delle targhette, e le targhette le ha appena
+    // riscritte `paintPerson`.
+    dipingiBacheca();
 
     count.textContent = t('office.count', { n: list.length });
     empty.textContent = t('office.empty');
