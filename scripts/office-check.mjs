@@ -19,7 +19,11 @@
 //  - i mobili e la gente sono sprite che devono essere arrivati davvero: un
 //    foglio non caricato lascia una stanza di rettangoli invisibili, e da fuori
 //    sembra solo un ufficio vuoto;
-//  - e nei mobili non ci si passa dentro. La stanza tiene una griglia di dove
+//  - e nei mobili non ci si passa dentro, e ogni posto dove la stanza puo'
+//    mandare qualcuno deve essere raggiungibile davvero — le mete, il bar, la
+//    bacheca, le commissioni. Una meta finita dentro un armadio e' una persona
+//    che cammina contro un angolo per sempre, e a occhio non si nota finche' non
+//    tocca a lei. La stanza tiene una griglia di dove
 //    si possono mettere i piedi, e nessuno deve mai trovarsi su una casella
 //    occupata: ne' da seduto, ne' in piedi in fondo al salone;
 //  - la posta: una busta per turno che comincia e una per turno che finisce,
@@ -233,7 +237,7 @@ t(plan.emptyShown, "l'ufficio vuoto non dice che e' vuoto");
 // potuto invece che sulla meta' — o arrivarci attraversando un tavolo.
 const strade = await page.evaluate(() => {
   const guai = [];
-  for (const [nome, [gx, gy]] of Object.entries(ROOM.METE)) {
+  for (const [nome, [gx, gy]] of Object.entries(ROOM.DESTINAZIONI)) {
     for (let i = 0; i < ROOM.DESKS.length; i++) {
       const casa = ROOM.posto(i);
       let qui = [casa.x + 8, casa.y + 24];

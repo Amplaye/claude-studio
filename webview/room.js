@@ -86,6 +86,9 @@ window.ROOM = (() => {
     { s: 'meetTable', x: 64, b: 84 },
     { s: 'stoolRound', x: 81, b: 100 },
     { s: 'plantPurple', x: 22, b: 110 },
+    // Il cestino. E' l'unico mobile aggiunto per una commissione e non per la
+    // pianta: senza, "buttare la carta" non ha dove andare.
+    { s: 'barrel', x: 140, b: 108 },
 
     // --- in mezzo non c'e' niente: e' il passaggio, e serve libero ---
 
@@ -131,15 +134,6 @@ window.ROOM = (() => {
   /** Dove siede chi lavora alla scrivania `i`: angolo in alto a sinistra della figura. */
   const posto = (i) => ({ x: DESKS[i].x + 16, y: DESKS[i].b + 16 - 24 });
 
-  /* Dove si va quando ci si alza. Sono punti dove si mettono i piedi, non
-     tragitti: la strada per arrivarci la trova la stanza, che sa dove sono i
-     mobili. Prima erano catene di tappe scritte a mano, e bastava spostare uno
-     scaffale perche' qualcuno ci camminasse dentro senza accorgersene.
-
-     Al bar ci sono due posti separati perche' due che ci vanno insieme sono una
-     pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
-     due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
-     tavolino la fascia libera e' due pixel e la stanza sigillata. */
   /* La bacheca, e il tavolo dove finisce quello che e' fatto.
    *
    * Un foglietto e' cinque per quattro con la puntina sopra, e non ci sta scritto
@@ -163,7 +157,10 @@ window.ROOM = (() => {
    */
   const BACHECHE = {
     muro: { griglia: [117, 10], posto: [134, 56], z: 37 },
-    archivio: { griglia: [80, 66], posto: [88, 98], z: 85 },
+    // Si archivia stando di fianco al tavolo e non davanti: davanti c'e' lo
+    // sgabello, e un posto occupato da un mobile e' una persona che cammina
+    // contro un angolo per sempre.
+    archivio: { griglia: [80, 66], posto: [124, 96], z: 85 },
   };
 
   /* ---- il bar, e le tazze che ci girano ----
@@ -191,6 +188,15 @@ window.ROOM = (() => {
   /** Presa, erogazione, lavaggio, deposito, e il broncio di chi non ne trova. */
   const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600 };
 
+  /* Dove si va quando ci si alza. Sono punti dove si mettono i piedi, non
+     tragitti: la strada per arrivarci la trova la stanza, che sa dove sono i
+     mobili. Prima erano catene di tappe scritte a mano, e bastava spostare uno
+     scaffale perche' qualcuno ci camminasse dentro senza accorgersene.
+
+     Al bar ci sono due posti separati perche' due che ci vanno insieme sono una
+     pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
+     due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
+     tavolino la fascia libera e' due pixel e la stanza sigillata. */
   const METE = {
     caffe: [280, 62],
     spuntino: [320, 62],
@@ -201,6 +207,35 @@ window.ROOM = (() => {
      ripetendo il nome e' tutto quello che serve — una tabella di probabilita'
      sarebbe la stessa cosa scritta in dieci righe. */
   const NOMI_METE = ['caffe', 'spuntino', 'caffe', 'spuntino', 'riunione'];
+
+  /* ---- le commissioni ----
+   *
+   * Le cose che in ufficio si fanno alzandosi e che non sono ne' lavoro ne'
+   * caffe': annaffiare le piante, guardare cosa c'e' in dispensa, leggere la
+   * bacheca, buttare la carta nel cestino.
+   *
+   * `posto` e' dove ci si ferma, `fx` dove va disegnato quello che si vede —
+   * niente, per l'annaffiatoio, che sta addosso a chi annaffia — e `durata`
+   * quanto ci si sta.
+   *
+   * Ce ne sono quattro tipi e non sette: finestre da aprire in questa pianta non
+   * ce ne sono, il boccione dell'acqua non c'e', e il sigaro del capo vorrebbe un
+   * ufficio del capo che qui non esiste. Una commissione senza il suo mobile e'
+   * una persona che mima.
+   */
+  const COMMISSIONI = [
+    { k: 'annaffia', posto: [48, 146], durata: 4500, dice: 'Queste crescono in fretta' },
+    { k: 'annaffia', posto: [330, 140], durata: 4500, dice: 'Un goccio d’acqua e via' },
+    { k: 'annaffia', posto: [48, 296], durata: 4500, dice: 'Tocca a te, bella' },
+    { k: 'annaffia', posto: [326, 296], durata: 4500, dice: 'Questa l’avevo dimenticata' },
+    { k: 'dispensa', posto: [272, 60], fx: [262, 22], durata: 3200, dice: 'C’e’ rimasto qualcosa?' },
+    { k: 'dispensa', posto: [272, 60], fx: [262, 22], durata: 3200, dice: 'Chi ha finito i biscotti?' },
+    { k: 'bacheca', posto: [60, 52], fx: [71, 16], durata: 4000, dice: 'Qualcosa di nuovo?' },
+    { k: 'cestino', posto: [126, 104], fx: [128, 84], durata: 2600, dice: 'Giornata di pulizie' },
+  ];
+  /** La prima dopo un po', poi ogni tanto: un ufficio non e' un cantiere. */
+  const PRIMA_COMMISSIONE = 18000;
+  const OGNI_COMMISSIONE = [14000, 32000];
 
   /* Quello che si dice in ufficio. Frasi corte apposta: a sei pixel una riga
      lunga esce dalla stanza, e comunque in piedi vicino alla macchinetta nessuno
@@ -224,6 +259,21 @@ window.ROOM = (() => {
     'Due minuti e ho finito',
     'Ci aggiorniamo dopo pranzo',
   ];
+
+  /* Tutti i posti dove la stanza puo' mandare qualcuno, in un elenco solo.
+     Non serve a far camminare nessuno — serve al controllo, ed e' l'unica cosa
+     che tiene onesta questa pianta man mano che ci si aggiungono mobili: una
+     meta finita dentro un armadio e' una persona che cammina contro un angolo
+     per sempre, e a occhio non si nota finche' non tocca a lei. */
+  const DESTINAZIONI = {
+    ...METE,
+    rastrelliera: BAR.rastrelliera,
+    macchina: BAR.macchina,
+    lavandino: BAR.lavandino,
+    bacheca: BACHECHE.muro.posto,
+    archivio: BACHECHE.archivio.posto,
+    ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
+  };
 
   // ---------- dove si puo' mettere i piedi ----------
   //
@@ -734,6 +784,72 @@ window.ROOM = (() => {
     }
   }
 
+  // ---------- le commissioni ----------
+  //
+  // Un giro a parte da quello del bar, e piu' lento: due volte al minuto scarse,
+  // e nemmeno sempre. Sono le cose che fanno sembrare abitato un ufficio proprio
+  // perche' non succedono spesso — una che annaffia le piante ogni dieci secondi
+  // non e' un ufficio, e' un giardino.
+
+  /** Le commissioni gia' prese: una persona per posto, o sono due che mimano. */
+  const prese = new Map();
+
+  /** Quello che si vede: le gocce addosso a chi annaffia, il resto sul mobile. */
+  function effetto(chi, c) {
+    if (c.k === 'annaffia') {
+      const n = el('i', 'of-annaffia');
+      n.append(el('i'), el('i'), el('i'));
+      chi.el.append(n);
+      return n;
+    }
+    const n = el('i', 'of-fx ' + c.k);
+    n.style.left = c.fx[0] + 'px';
+    n.style.top = c.fx[1] + 'px';
+    depth(n, c.fx[1] + 40);
+    palco.append(n);
+    return n;
+  }
+
+  async function commissione(chi, i) {
+    const c = COMMISSIONI[i];
+    prese.set(i, chi);
+    chi.fuori = true;
+    chi.meta = 'commissione';
+    chi.el.classList.add('fuori');
+    vesti(chi.fig, chi.seme, 'cammina');
+    let fx = null;
+    if (await vai(chi, ...c.posto)) {
+      vesti(chi.fig, chi.seme, 'fermo');
+      parla(chi, c.dice);
+      fx = effetto(chi, c);
+      await pausa(chi, c.durata);
+      vesti(chi.fig, chi.seme, 'cammina');
+    }
+    if (fx) fx.remove();
+    prese.delete(i);
+    if (chi.el.isConnected && chi.casa) await vai(chi, chi.casa.x + 8, chi.casa.y + 24, true);
+    posa(chi);
+    vesti(chi.fig, chi.seme, chi.posa);
+    chi.el.classList.remove('fuori');
+    chi.fuori = false;
+    chi.meta = null;
+    chi.ultimo = Date.now();
+  }
+
+  async function commissioni(elenco) {
+    await attesa(PRIMA_COMMISSIONE);
+    for (;;) {
+      // Due terzi delle volte, e non sempre: un turno saltato e' quello che
+      // rende il turno dopo una cosa che succede invece che un orario.
+      if (Math.random() < 0.65) {
+        const liberi = elenco().filter((c) => !c.fuori && !c.ferma && !c.lavora && c.casa);
+        const posti = COMMISSIONI.map((_, i) => i).filter((i) => !prese.has(i));
+        if (liberi.length && posti.length) commissione(caso(liberi), caso(posti));
+      }
+      await attesa(OGNI_COMMISSIONE[0] + Math.random() * (OGNI_COMMISSIONE[1] - OGNI_COMMISSIONE[0]));
+    }
+  }
+
   /** Le chiacchiere vanno per conto loro: si parla anche da seduti — ma non
       mentre si lavora, che e' il punto di tutto il resto. */
   async function chiacchiere(elenco) {
@@ -804,6 +920,7 @@ window.ROOM = (() => {
     PROPS,
     DESKS,
     METE,
+    DESTINAZIONI,
     BACHECHE,
     PORTA,
     SW,
@@ -843,6 +960,7 @@ window.ROOM = (() => {
     accendi(elenco) {
       vita(elenco);
       chiacchiere(elenco);
+      commissioni(elenco);
     },
   };
 })();

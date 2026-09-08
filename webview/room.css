@@ -425,6 +425,119 @@
   top: 14px;
 }
 
+/* ---- le commissioni ----
+   Quello che si vede mentre uno e' in piedi da qualche parte a fare una cosa.
+   Senza, una commissione e' una persona ferma in un angolo, che e' esattamente
+   quello che sembra: una persona che si e' impallata.
+
+   L'annaffiatoio sta addosso a chi annaffia — e' l'unica di queste che cammina
+   con la persona — mentre il resto e' appeso al mobile. */
+.of-annaffia {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 5px;
+  height: 3px;
+  background: #9aa7b0;
+  box-shadow:
+    inset 0 0 0 1px rgba(46, 42, 38, 0.3),
+    5px 0 0 0 #9aa7b0;
+}
+/* Tre gocce, sfalsate di un terzo di ciclo. Cadono ad accelerare: una goccia a
+   velocita' costante non e' una goccia, e' un trattino che scivola. */
+.of-annaffia i {
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  width: 1px;
+  height: 2px;
+  background: #5bb7e8;
+  animation: of-goccia 0.78s linear infinite;
+}
+.of-annaffia i:nth-child(2) {
+  animation-delay: 0.26s;
+}
+.of-annaffia i:nth-child(3) {
+  animation-delay: 0.52s;
+}
+@keyframes of-goccia {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(4px, 9px);
+    opacity: 0.4;
+  }
+}
+
+.of-fx {
+  position: absolute;
+  pointer-events: none;
+}
+/* La dispensa aperta: la luce che esce dai ripiani. Due bande piene a stop
+   netti e non una sfumatura — su un mobile gia' arancione una sfumatura calda
+   non si vede affatto, e comunque qui il rilievo si fa a righe di colore pieno,
+   non a gradienti. */
+.of-fx.dispensa {
+  width: 20px;
+  height: 15px;
+  background-color: rgba(255, 244, 196, 0.75);
+  background-image: linear-gradient(180deg, transparent 0 5px, rgba(46, 42, 38, 0.35) 5px 6px, transparent 6px 11px, rgba(46, 42, 38, 0.35) 11px 12px, transparent 12px);
+  box-shadow: 0 0 0 1px rgba(255, 244, 196, 0.35);
+  animation: of-sfarfallio 1.1s steps(2) infinite;
+}
+@keyframes of-sfarfallio {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  45% {
+    opacity: 0.9;
+  }
+}
+/* La bacheca che si legge: un riflesso che scorre riga per riga. */
+.of-fx.bacheca {
+  width: 2px;
+  height: 2px;
+  background: #fff7c8;
+  animation: of-lettura 2s steps(12) infinite;
+}
+@keyframes of-lettura {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(24px, 12px);
+  }
+}
+/* E la palla di carta che vola nel cestino: un arco, e poi ricomincia. */
+.of-fx.cestino {
+  width: 2px;
+  height: 2px;
+  background: #f5f1e6;
+  box-shadow: 0 0 0 1px rgba(46, 42, 38, 0.35);
+  animation: of-carta 1s ease-in infinite;
+}
+@keyframes of-carta {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(9px, -7px);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(16px, 6px);
+    opacity: 1;
+  }
+  76%,
+  100% {
+    opacity: 0;
+  }
+}
+
 /* ---- i foglietti ----
    Cinque per quattro con la puntina sopra, e niente scritto sopra: a questa
    misura il testo non c'e', e il colore dice quello che una bacheca dice
