@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.23.0
+
+- **L’ufficio è diventato un posto dove si lavora davvero.** La stanza non è più
+  otto rettangoli con dentro dei cerchi: pavimento e muri di assito, sei scrivanie
+  in due file, il bar col bancone e il tavolino, la sala riunioni, le piante negli
+  angoli. I mobili sono ritagliati dal foglio di SeasonVale; quelli che una fattoria
+  medievale non ha — il cestino della carta, la macchina del caffè, il lavandino —
+  sono disegnati in CSS a colori pieni, perché un mobile che la scena dà per
+  esistente e a guardarlo è un altro mobile è peggio che non averlo. La pianta, la
+  griglia dei passi e il giro di chi si alza stanno in un file solo (`webview/room.js`)
+  che si prendono sia l’ufficio sia la pagina di prova: due copie della stessa stanza
+  si scollano al primo mobile spostato.
+
+- **Ogni conversazione è un capo, e i suoi sub-agent vengono a lavorare.** I sub-agent
+  che una conversazione apre entrano dalla porta, si siedono alla scrivania libera più
+  vicina al loro capo — così il gruppetto resta un gruppetto — e riescono dalla porta
+  quando hanno finito. Due schede aperte sono due capi, ognuno coi suoi: è la gerarchia
+  vera, non una inventata per fare scena. Il legame era già sul filo e non lo sapeva
+  nessuno, il quadro delle task viaggia sotto lo stesso id della card.
+
+- **La bacheca, e i foglietti che se li porta chi lavora.** Al muro della sala riunioni
+  una bacheca, sul tavolo la pila di quello che è fatto. Un foglietto è cinque pixel per
+  quattro con la puntina: giallo da fare, rosso andato storto, verde archiviato, azzurro
+  in mano a chi lo sta facendo. Non si spostano da soli — un sub-agent stacca il suo, se
+  lo porta accanto al capo, e alla fine lo va a posare sull’archivio o lo riappende rosso.
+  Il foglio è uno solo e sta dove sta la persona che lo porta, quindi la bacheca non può
+  contare due volte lo stesso lavoro. Cliccandola esce il piano di ogni conversazione
+  aperta, la stessa lista di passi della colonna del contesto.
+
+- **Quattro tazze, e sono quelle.** Al bar la rastrelliera ne ha quattro. Chi va a
+  prendersi un caffè ne prende una, la porta alla macchina, e torna alla scrivania dove
+  la tazza resta a fumare accanto al monitor; al giro dopo se la riporta indietro e sei
+  volte su dieci la ricarica e basta. Quando le tazze finiscono la rastrelliera è vuota
+  davvero e chi arriva torna a mani vuote. Se una conversazione si chiude, la sua tazza
+  rientra nel conto.
+
+- **Le commissioni.** Annaffiare le piante, guardare in dispensa, leggere la bacheca,
+  buttare la carta nel cestino. Una ogni venti secondi scarsi e nemmeno sempre: sono le
+  cose che fanno sembrare abitato un ufficio proprio perché non succedono spesso. Solo
+  quattro, e solo quelle che hanno il loro mobile in questa pianta — una commissione
+  senza il suo mobile è una persona che mima.
+
+- **Chi lavora per qualcuno gli tira le battute, e alle spalle ne dice altre.** Un
+  impiegato fermo accanto al suo capo ogni tanto lo adula, e col numero vero dentro:
+  «già otto cose fatte, capo» lo dice solo se il quadro delle task ne conta otto chiuse
+  per quel capo lì. Se il capo è dall’altra parte della stanza — al bar, di solito — la
+  battuta diventa un’altra: è l’unico modo in cui un ufficio dice che il capo non c’è.
+
+- **Quello che succede si vede dall’altra parte della stanza.** Una busta parte dalla
+  porta verso una scrivania quando comincia un turno e torna indietro quando finisce:
+  uno schermo acceso dice com’è adesso, la busta dice il momento in cui è cambiato. Il
+  monitor di chi lavora adesso scrive per davvero, con due righe che salgono e il cursore
+  che lampeggia, e sotto la sedia c’è un alone che respira. Quando al contesto resta poco
+  compare la scatoletta viola: una barra rossa fra sei barre non si vede.
+
+- **Le persone nascono da un seme.** Non sono più tre caselle di un foglio uguali per
+  tutti: le disegna `npc.js` dall’id della conversazione, quindi la stessa conversazione
+  ritrova sempre la sua faccia anche fra una sessione e l’altra. Camicia e cravatta,
+  cardigan, giacca, polo, occhiali, barba, cuffie da call center, badge, sei toni di pelle
+  e otto pettinature. E tre andature invece di una posa sola — ferma, che digita, che
+  cammina — consegnate come strisce di fotogrammi che fa girare il CSS con `steps()`:
+  zero JavaScript per fotogramma, che con otto persone in una stanza vorrebbe dire otto
+  timer.
+
+- **Una fascia sola in cima.** Con l’ufficio aperto la scheda aveva due testate appaiate
+  che si ripetevano. Adesso la fascia dell’ufficio è due gruppi — a sinistra dove sei e
+  chi hai davanti, a destra i consumi e la via d’uscita — sullo stesso fondo dell’altra,
+  e la testata della chat lascia cadere i tre bottoni che di là ci sono già.
+
+- **Le foto di prova non vanno più dentro il pacchetto.** `dist/` è la cartella del build
+  ma è anche dove finiscono gli screenshot che si fanno mentre si lavora: quattro PNG di
+  lavoro viaggiavano dentro il `.vsix`.
+
 ## 0.22.2
 
 - **Il bottone dell’ufficio non si vedeva a tutto schermo.** Stava sulla testata che
