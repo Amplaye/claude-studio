@@ -168,6 +168,34 @@ export function updateCommand(
   return { cmd: cli.path, args: ['update'], shell: false };
 }
 
+/**
+ * npm's ENOTEMPTY. An install that broke halfway leaves its own copy of the package
+ * next to it, hidden — `.claude-code-XXXXXX` — and from then on every update dies
+ * moving the package on top of that leftover: the same error, every six hours,
+ * forever. Those leftovers are npm's own work, so they get swept away and the
+ * install is tried again. What never gets touched is the package itself: deleting a
+ * working CLI to repair an update is a cure worse than the illness.
+ *
+ * The paths come out of npm's own complaint — it prints both the package and the
+ * name it failed to move it to — so there is nothing to guess about where this
+ * machine keeps its globals.
+ */
+export function leftovers(out: string): string[] {
+  if (!out.includes('ENOTEMPTY')) return [];
+  const found = new Set<string>();
+  for (const m of out.matchAll(/npm (?:error|ERR!)\s+(?:path|dest)\s+(.+)/g)) {
+    const dir = path.dirname(m[1].trim());
+    let names: string[];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      continue; // not a folder we can look into: nothing to sweep here
+    }
+    for (const n of names) if (n.startsWith('.claude-code-')) found.add(path.join(dir, n));
+  }
+  return [...found];
+}
+
 async function updateCli(auto: boolean): Promise<string | undefined> {
   const cli = claudeCli();
   if (!cli) {
@@ -214,7 +242,21 @@ async function updateCli(auto: boolean): Promise<string | undefined> {
     return `Claude Code ${latest} is out (you have ${cli.version || '?'}): update it the way you installed it.`;
   }
 
-  const r = await run(how.cmd, how.args, { timeout: 10 * 60_000, shell: how.shell });
+  let r = await run(how.cmd, how.args, { timeout: 10 * 60_000, shell: how.shell });
+  if (!r.ok) {
+    // A failure of npm's own making: sweep away what it left behind and try once
+    // more, or the same error comes back at every check until somebody notices.
+    const junk = leftovers(r.out);
+    for (const dir of junk) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+        log(`removed what an interrupted npm left behind: ${dir}`);
+      } catch (e) {
+        log(`${dir} won't go: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (junk.length) r = await run(how.cmd, how.args, { timeout: 10 * 60_000, shell: how.shell });
+  }
   if (!r.ok) {
     // Said out loud, not just written in the log: an update that fails in silence
     // leaves you a version behind for good, and this is the version that matters.

@@ -45,7 +45,7 @@ vscode.workspace.getConfiguration = () => ({
 });
 install(vscode);
 
-const { sourceRoot, updateCommand } = require(bundle);
+const { sourceRoot, updateCommand, leftovers } = require(bundle);
 const ctx = { extension: { packageJSON: { name: 'claude-studio' } } };
 
 // ---- how the CLI gets updated, one way per kind of installation ----
@@ -94,6 +94,36 @@ for (const [what, value, want] of cases) {
   console.log(`${ok ? 'ok  ' : 'NO  '}${what}: ${got ?? '—'}`);
 }
 
+// ---- npm that broke halfway ----
+// An interrupted install leaves its own hidden copy next to the package, and from
+// then on every update dies on it: the same error every six hours until somebody
+// goes and looks. Those copies get swept away, the package never does.
+const scope = path.join(home, 'node_modules', '@anthropic-ai');
+const pkgDir = path.join(scope, 'claude-code');
+const junk = [path.join(scope, '.claude-code-cFVBZYCB'), path.join(scope, '.claude-code-Qb12xY')];
+for (const d of [pkgDir, ...junk]) {
+  fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, 'package.json'), '{}', 'utf8');
+}
+const enotempty = [
+  'npm error code ENOTEMPTY',
+  'npm error syscall rename',
+  'npm error path ' + pkgDir,
+  'npm error dest ' + junk[0],
+  'npm error errno -66',
+].join('\n');
+
+const sweeps = [
+  ["npm's leftovers go, the package stays", enotempty, junk],
+  ['another failure sweeps nothing', 'npm error code EACCES\nnpm error path ' + pkgDir, []],
+  ['nothing to read into: no crash', 'npm error code ENOTEMPTY\nnpm error path /nowhere/at/all/claude-code', []],
+];
+for (const [what, out, want] of sweeps) {
+  const got = leftovers(out).sort();
+  const ok = JSON.stringify(got) === JSON.stringify([...want].sort());
+  if (!ok) bad++;
+  console.log(`${ok ? 'ok  ' : 'NO  '}${what}: ${got.length} to remove`);
+}
 fs.rmSync(home, { recursive: true, force: true });
 if (bad) {
   console.error(`\n${bad} case(s) wrong: the update would go to the wrong place.`);
