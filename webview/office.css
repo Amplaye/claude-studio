@@ -21,7 +21,9 @@
 
 .office {
   /* Il legno dei mobili, per le poche cose di qui che devono stargli accanto:
-     il fondo del ritratto e il buio attorno alla pianta. Il resto della
+     il fondo del ritratto e il velo scuro sopra la stanza quando si apre un
+     pannello. Attorno alla pianta di buio non ce n'e' piu': quello che avanza
+     e' muro (.of-oltre in room.css). Il resto della
      tavolozza sta in room.css, dove sta la stanza. */
   --of-legno: #8a4e2c;
   --of-buio: #1d1512;
@@ -313,17 +315,20 @@ body.inoffice.linguette .top #btnNew {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 10px;
-  background: var(--of-buio); /* il buio attorno alla stanza */
+  /* Niente margine: la stanza arriva ai bordi della scheda. I dieci pixel di
+     prima erano la spalla su cui si appoggiava il filo scuro qui sotto, e
+     insieme facevano una cornice — una stanza in una cornice dentro una
+     scheda e' una cornice di troppo. Il bordo della scheda basta. */
+  /* Lo sfondo di quello che avanza non e' piu' il buio: e' il muro, e lo mette
+     .of-oltre in room.css. Una riga di sfondo qui la coprirebbe — e la stanza
+     tornerebbe una diapositiva in mezzo a due bande nere. */
 }
 
-/* La stanza e' in pixel fissi e si ingrandisce tutta insieme: vedi fit(). Il
-   filo scuro e l'ombra sono di qui e non di room.css: sono la cornice della
-   scheda, non un muro. */
-.of-stage {
-  outline: 2px solid var(--of-contorno);
-  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.6);
-}
+/* La stanza e' in pixel fissi e si ingrandisce tutta insieme: vedi fit().
+   Il filo scuro attorno e la sua ombra non ci sono piu': adesso che la stanza
+   tocca i bordi il filo verrebbe tagliato via su tre lati e disegnato sul
+   quarto, che e' peggio di non averlo, e un'ombra senza stacco non e'
+   un'ombra — e' una riga scura in fondo al muro. */
 
 /* ---------- le persone ---------- */
 

@@ -362,7 +362,9 @@ window.OFFICE = (() => {
     bar.append(title, gente, uso);
 
     // --- il piano ---
-    const wrap = el('div', 'of-wrap');
+    // 'of-oltre' e' la pelle di quello che avanza attorno alla stanza: muro, non
+    // buio. La misura e la fase gliele passa fit(), qui sotto.
+    const wrap = el('div', 'of-wrap of-oltre');
     stage = el('div', 'of-stage');
 
     // Gli sprite arrivano come URI della webview: il CSP non fa passare un
@@ -455,15 +457,31 @@ window.OFFICE = (() => {
 
   /**
    * La pianta e' in pixel fissi e si ingrandisce tutta insieme per riempire la
-   * scheda. Il fattore si arrotonda a quarti: su pixel art un ingrandimento con
-   * la virgola lunga fa mattonelle larghe una volta tre e una volta quattro, e
-   * il pavimento comincia a ondeggiare.
+   * scheda: si prende tutto lo spazio che ha, e quello che avanza avanza su un
+   * lato solo — quello che non comanda.
+   *
+   * Il fattore si arrotondava a quarti (su pixel art un ingrandimento con la
+   * virgola lunga fa mattonelle larghe una volta tre e una volta quattro) e
+   * arrotondava per difetto: a 2,708 la stanza veniva disegnata a 2,5, cioe'
+   * ottanta pixel di buio per lato in una scheda che li aveva tutti liberi.
+   * Il buio attorno si vede molto piu' dell'onda del pavimento, che a questi
+   * ingrandimenti non si nota. Un arrotondamento vale la pena solo se lo
+   * spazio che regala non lo si stava buttando via.
+   *
+   * Il tetto non e' un giudizio sul disegno, e' un fermo: nessuna scheda
+   * arriva a dodici.
    */
   function fit() {
     if (!fitOn) return;
     const raw = Math.min(fitOn.clientWidth / window.ROOM.W, fitOn.clientHeight / window.ROOM.H);
-    const k = Math.max(0.5, Math.min(5, Math.floor(raw * 4) / 4));
+    const k = Math.max(0.5, Math.min(12, raw));
     stage.style.transform = 'scale(' + k + ')';
+    // E quello che avanza lo prende il muro (.of-oltre in room.css): stesso
+    // passo delle travi vere e stessa fase, se no dove finisce la stanza si
+    // vede la riga.
+    fitOn.style.setProperty('--px', k + 'px');
+    fitOn.style.setProperty('--ox', (fitOn.clientWidth - window.ROOM.W * k) / 2 + 'px');
+    fitOn.style.setProperty('--oy', (fitOn.clientHeight - window.ROOM.H * k) / 2 + 'px');
   }
 
   // ---------- le persone ----------

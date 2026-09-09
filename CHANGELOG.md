@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.29.0
+
+- **L'ufficio riempie tutta la scheda.** La stanza si ingrandiva a scatti di un
+  quarto, e arrotondava per difetto: dove ci stava due volte e settanta veniva
+  disegnata due volte e mezzo, cioe' ottanta pixel di nero per lato in una scheda
+  che li aveva liberi. Adesso si prende tutto lo spazio che trova. E quello che
+  avanza — una scheda non ha quasi mai le proporzioni esatte della stanza — non
+  e' piu' nero: e' muro, lo stesso assito delle travi vere, con lo stesso passo e
+  a filo, cosi' dove finisce la stanza non si vede la giunta.
+
+- **Nel salone restano le piante, e basta.** L'archivio contro la parete lunga, la
+  stampante e il boccione dell'acqua sono durati una versione: nella stanza
+  grande — quella che si guarda per prima — i muri devono restare liberi, e
+  quello che ci sta contro la stringe. Se ne vanno con loro le due commissioni
+  che ci portavano. Restano invece i due mobili ai lati della lavagna, in sala
+  riunioni, dove il muro era davvero nudo.
+
 ## 0.28.0
 
 - **Il bottone delle impostazioni non spariva a caso: spariva mentre la

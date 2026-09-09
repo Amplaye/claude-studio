@@ -153,13 +153,6 @@ window.ROOM = (() => {
     // sfocato, e l'angolo smette di essere un angolo.
     { s: 'plantBlue', x: 22, b: 300 },
     { s: 'plantPurple', x: 351, b: 300 },
-    // Fra le due piante di sinistra c'erano centotrenta pixel di pavimento e
-    // nient'altro: la parete piu' lunga della stanza era anche l'unica senza
-    // niente addosso. Adesso e' l'archivio — armadio e scaffale, la stessa coppia
-    // della sala riunioni — e la corsia davanti resta com'era, perche' sono
-    // profondi ventotto e le scrivanie cominciano a sessantotto.
-    { s: 'cabinet', x: 18, b: 204 },
-    { s: 'shelfFull', x: 18, b: 258 },
   ];
 
   /* ---- i mobili che nel foglio non ci sono ----
@@ -192,16 +185,6 @@ window.ROOM = (() => {
     // questo la scena lo dava per esistente: chi lava dice "la lavo e la rimetto"
     // stando davanti a un comodino.
     { s: 'lavandino', x: 348, b: 48, w: 18, h: 28 },
-    // La stampante, contro la parete destra del salone. Nella stanza c'era gia'
-    // da un pezzo, ma solo a parole: "la stampante s'e' inceppata" e' una delle
-    // frasi che si dicono alla scrivania, e la si diceva di un mobile che non
-    // c'era. Un ufficio a sei scrivanie senza stampante e' l'unico al mondo.
-    { s: 'stampante', x: 344, b: 190, w: 22, h: 18 },
-    // E il boccione dell'acqua, piu' sotto sulla stessa parete. Questo lo
-    // chiedeva per iscritto il commento delle commissioni qui sotto — "il
-    // boccione dell'acqua non c'e'", messo come motivo di una commissione in
-    // meno. Adesso c'e', e la commissione e' quella.
-    { s: 'boccione', x: 348, b: 252, w: 14, h: 30 },
   ];
 
   /* Sei scrivanie, due file da tre, centrate nel salone. Le corsie fra una
@@ -392,11 +375,16 @@ window.ROOM = (() => {
    * niente, per l'annaffiatoio, che sta addosso a chi annaffia — e `durata`
    * quanto ci si sta.
    *
-   * Ce ne sono sei tipi: finestre da aprire in questa pianta non ce ne sono e il
-   * sigaro del capo vorrebbe un ufficio del capo che qui non esiste, ma la
-   * stampante e il boccione adesso stanno nella stanza — quindi ci si va. Una
-   * commissione senza il suo mobile e' una persona che mima, e un mobile senza la
-   * sua commissione e' arredamento: e' la stessa regola letta dai due lati.
+   * Ce ne sono quattro tipi e non sette: finestre da aprire in questa pianta non
+   * ce ne sono, il boccione dell'acqua non c'e', e il sigaro del capo vorrebbe un
+   * ufficio del capo che qui non esiste. Una commissione senza il suo mobile e'
+   * una persona che mima.
+   *
+   * Il boccione e la stampante c'erano stati, contro le pareti del salone, con la
+   * loro commissione ciascuno. Sono durati una versione: nel salone i muri devono
+   * restare liberi — e' la stanza grande, quella che si guarda per prima, e
+   * quello che ci sta contro i muri lo stringe. Ci restano le piante negli
+   * angoli, che ci stavano da sempre.
    */
   const COMMISSIONI = [
     { k: 'annaffia', posto: [48, 146], durata: 4500, dice: 'Queste crescono in fretta' },
@@ -407,16 +395,6 @@ window.ROOM = (() => {
     { k: 'dispensa', posto: [272, 60], fx: [262, 22], durata: 3200, dice: 'Chi ha finito i biscotti?' },
     { k: 'bacheca', posto: [60, 52], fx: [71, 16], durata: 4000, dice: 'Qualcosa di nuovo?' },
     { k: 'cestino', posto: [126, 104], fx: [128, 84], durata: 2600, dice: 'Giornata di pulizie' },
-    // Alla stampante ci si sta in piedi ad aspettare, che e' esattamente quello
-    // che si fa davanti a una stampante. Il posto e' alla sua sinistra: davanti
-    // c'e' il muro, e dietro non ci passa nessuno.
-    { k: 'stampa', posto: [332, 200], fx: [346, 184], durata: 3600, dice: 'Aspetto che finisca' },
-    { k: 'stampa', posto: [332, 200], fx: [346, 184], durata: 3600, dice: 'S’e’ inceppata di nuovo' },
-    // E al boccione, piu' sotto. Due frasi come per la dispensa: e' il posto dove
-    // ci si ferma senza un motivo, e sentirsi dire sempre la stessa cosa lo fa
-    // sembrare un orario invece di una pausa.
-    { k: 'acqua', posto: [332, 248], fx: [353, 226], durata: 3000, dice: 'Mi riempio la borraccia' },
-    { k: 'acqua', posto: [332, 248], fx: [353, 226], durata: 3000, dice: 'Due dita e torno' },
   ];
   /** La prima dopo un po', poi ogni tanto: un ufficio non e' un cantiere. */
   const PRIMA_COMMISSIONE = 18000;
