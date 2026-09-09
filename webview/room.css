@@ -368,6 +368,23 @@
   background: linear-gradient(180deg, #6b5560 0 1px, #3d2d38 1px);
   box-shadow: 0 1px 0 rgba(46, 28, 44, 0.45);
 }
+/* E da che parte guarda. Il disegno qui sopra e' un portatile visto da chi ce
+   l'ha davanti — tastiera vicina, schermo dietro — quindi vale per chi siede di
+   sotto. Attorno a un tavolo si siede da quattro parti, e senza queste tre righe
+   tre posti su quattro lavorano sul retro del proprio schermo.
+
+   Si gira l'elemento invece di ridisegnarlo: e' lo stesso portatile, e un
+   secondo disegno per lo stesso oggetto si scolla dal primo al primo ritocco.
+   L'animazione dello schermo tocca solo `filter`, quindi non se le litigano. */
+.of-portatile.su {
+  transform: scaleY(-1);
+}
+.of-portatile.sx {
+  transform: rotate(90deg);
+}
+.of-portatile.dx {
+  transform: rotate(-90deg);
+}
 
 /* ---- il cestino della carta ----
    Nel foglio non c'e': al suo posto stava un barilotto, e un barilotto in un

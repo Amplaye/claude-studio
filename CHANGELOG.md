@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.24.0
+
+- **THE OFFICE.** La fascia in cima dice solo dove sei e quanto contesto resta:
+  chi c'è si vede nella stanza, ripeterlo per nome era dirlo due volte. Il "Chat"
+  per uscire è passato nella testata, al posto del marchio.
+
+- **Tre sgabelli in più, a capotavola.** Due ai lati corti del tavolo della sala
+  riunioni, uno a quello del bar: sette posti oltre alle sei scrivanie, e li
+  prendono i sub-agent quando le scrivanie finiscono.
+
+- **In ufficio si lavora.** Alla scrivania si batte a macchina anche fra un turno
+  e l'altro, e ci si alza ogni due minuti invece che ogni cinque secondi. Che
+  Claude stia macinando *adesso* lo dicono l'anello verde, i puntini e lo schermo.
+
+- **Una bacheca sola.** Anche quello che è fatto sta sul muro con il resto: la
+  pila sul tavolo era un secondo posto dove andare a controllare le stesse cose.
+
+- **Quello che scrivi mentre lavora cambia il piano.** Un messaggio in coda resta
+  quindici secondi a portata di mano — si corregge, si ritira — e poi entra nel
+  turno *in corso* invece di aspettarne la fine. Aspettare la fine voleva dire
+  cambiare un piano quando non c'era più niente da cambiare.
+
+- **Le foto e il filmato del negozio sono rifatti**, con THE OFFICE dentro. E il
+  README è la metà: più immagini, meno righe.
+
 ## 0.23.0
 
 - **L’ufficio è diventato un posto dove si lavora davvero.** La stanza non è più

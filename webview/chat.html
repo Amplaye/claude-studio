@@ -24,6 +24,13 @@
                narrow face, while Claude works, the room it takes is worth more to
                the activity pill than to a name you've already read. -->
           <span class="brand"><svg class="ico"><use href="#ion-sparkles" /></svg><span class="brand-t">Studio</span></span>
+          <!-- La via d'uscita dall'ufficio. Sta qui e non nella fascia dell'ufficio
+               perche' quella fascia dice solo dove sei: il bottone sta in fila con
+               gli altri bottoni, al posto del marchio. Si accende solo dentro
+               l'ufficio — di fuori saresti gia' nella chat. -->
+          <button class="of-back" id="btnBackChat" type="button" data-i18n-label="office.toChat" aria-label="Chat">
+            <svg class="ico"><use href="#ion-chatbubble-ellipses" /></svg><span data-i18n="office.toChat">Chat</span>
+          </button>
           <span class="grow"></span>
           <!-- What it's doing right now, next to the mode switch: short on purpose —
                the state and the clock, nothing else. A chat that stays still for a
@@ -57,7 +64,7 @@
                quelli esistono solo per i pannelli della barra laterale: chi lavora
                nella scheda a tutto schermo non li vede mai, ed e' proprio chi
                guarderebbe l'ufficio. -->
-          <button class="iconbtn" id="btnOffice" data-i18n-title="top.office" title="The office" hidden>
+          <button class="iconbtn" id="btnOffice" data-i18n-title="top.office" title="THE OFFICE" hidden>
             <svg class="ico"><use href="#ion-people" /></svg>
           </button>
           <button class="iconbtn" id="btnTab" data-i18n-title="top.tab" title="Open as a tab">

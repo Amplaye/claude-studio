@@ -74,30 +74,52 @@ body.inoffice .rail {
    e' larga un terzo della scheda: quello che resta ha finalmente il posto per
    scriversi per esteso invece di stringersi fino a tagliare le parole.
 
-   - la parola del marchio: la fascia dell'ufficio dice gia' in che scheda sei, e
-     due nomi a mezzo metro l'uno dall'altro sono due nomi per una cosa sola. Il
-     segno resta: e' l'appiglio a sinistra della colonna, e senza la testata
-     comincia con un buco;
+   - il marchio: la fascia dell'ufficio dice gia' in che scheda sei, e due nomi a
+     mezzo metro l'uno dall'altro sono due nomi per una cosa sola. Al suo posto,
+     in testa alla fila, va la via d'uscita: e' la cosa che da qui dentro serve
+     davvero, ed e' l'unica delle tre che non ha un altro posto dove stare;
    - il bottone del contesto: la colonna del contesto qui e' spenta per scelta
      (la stanza dice le stesse cose a figure), quindi era un interruttore
      attaccato a niente;
    - il bottone dell'ufficio: nell'ufficio ci sei gia', e la via d'uscita e' il
-     "Chat" della fascia, sessanta pixel piu' in la'. Torna appena esci. */
-body.inoffice .top .brand-t,
+     "Chat" qui a sinistra. Torna appena esci. */
+body.inoffice .top .brand,
 body.inoffice .top #btnCtx,
 body.inoffice .top #btnOffice {
   display: none;
 }
-/* Quello che Claude sta facendo passa a sinistra, subito dopo il segno: e' la
-   riga che cambia da sola mentre guardi la stanza, e in fondo a destra fra i
-   bottoni si stringeva fino a mostrare solo l'orologio. Il segno tiene la testa
-   della fila — l'ordine si scrive tutto, se no basta che la pillola passi
-   davanti e il marchio finisce in mezzo. */
-body.inoffice .top .brand {
+/* Il "Chat" tiene la testa della fila, e quello che Claude sta facendo gli si
+   mette subito dopo: e' la riga che cambia da sola mentre guardi la stanza, e in
+   fondo a destra fra i bottoni si stringeva fino a mostrare solo l'orologio.
+   L'ordine si scrive tutto, se no basta che la pillola passi davanti. */
+body.inoffice .top .of-back {
+  display: inline-flex;
   order: -2;
 }
 body.inoffice .top .activity {
   order: -1;
+}
+/* Stretti e mentre lavora, il "Chat" perde la parola e resta il fumetto: e' la
+   stessa scaletta del marchio in chat.css, e per la stessa ragione. Quello che
+   si legge una volta sola fa posto alla pillola, che invece cambia mentre la
+   guardi — e sotto i 110 pixel la pillola smette di dire cosa sta succedendo e
+   mostra solo l'orologio. Sparire del tutto non puo': e' l'unica via d'uscita
+   dall'ufficio, e il nome se lo tiene in aria-label. */
+body.inoffice .top.busy .of-back span {
+  display: none;
+}
+body.inoffice .top.busy .of-back {
+  gap: 0;
+  padding: 0 8px;
+}
+/* E si fa da parte anche il bottone delle impostazioni. La colonna qui e' larga
+   come la barra laterale ma la fila ha un bottone in piu' — la via d'uscita, che
+   nella barra laterale non c'e' — e senza questo la pillola dello stato scende
+   sotto i cento pixel e torna a dire solo l'orologio. E' la stessa ragione per
+   cui di la' si fanno da parte la cronologia e la scheda: nel mezzo di un turno
+   il modello non si cambia, Alt+I e' li' comunque, e torna appena finisce. */
+body.inoffice .top.busy #btnCfg {
+  display: none;
 }
 
 /* Scheda stretta: non c'e' spazio per due colonne, e spezzare la chat a 200
@@ -131,13 +153,6 @@ body.inoffice .top .activity {
 .of-bar > * {
   max-height: var(--ctl);
 }
-/* I consumi no: sono tre righe — nome e numero, la barra, e quando si rinnova —
-   e trenta pixel le taglierebbero proprio l'ultima, che e' quella per cui la
-   barra esiste. La fascia resta alta uguale: due pixel di sbordo su un elemento
-   allineato al centro non spostano niente. */
-.of-bar > .of-uso {
-  max-height: none;
-}
 .of-lab {
   display: inline-flex;
   align-items: center;
@@ -147,173 +162,6 @@ body.inoffice .top .activity {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.of-count {
-  flex: 0 0 auto;
-  /* Su una riga sola: schiacciata fra il titolo e la fila della gente andava a
-     capo, e "2 alla" sopra "scrivania" non e' un conteggio, e' un incidente. */
-  white-space: nowrap;
-  font-size: 12px;
-  opacity: 0.72;
-}
-
-/* Chi comanda il piano: la stessa persona che sta seduta di la', ma grande
-   abbastanza da vederla in faccia. E' il modo piu' corto di dire con chi stai
-   parlando adesso — piu' corto di qualunque frase. */
-.of-boss {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: var(--ctl);
-  padding: 0 11px 0 0;
-  border: 1px solid var(--line);
-  /* Lo stesso raggio dei bottoni della testata, non la pillola: dentro c'e' un
-     ritratto quadrato appoggiato al bordo, e la pillola gli tagliava l'angolo. */
-  border-radius: 8px;
-  background: var(--hover);
-}
-.of-boss.busy {
-  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
-}
-.of-face {
-  position: relative;
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  overflow: hidden;
-  border-radius: 7px 0 0 7px;
-  background: var(--of-legno);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
-}
-/* La stessa faccia di chi sta seduto di la', al doppio: il fattore e' intero,
-   quindi restano pixel e non diventano una macchia. Ne entrano 32 di larghezza
-   in una casella da 28 — due di sbordo per lato, e si taglia dai piedi in giu',
-   che in un ritratto e' l'unica parte che non serve. */
-.of-face .of-body {
-  inset: 0;
-  width: auto;
-  height: auto;
-  /* Stessa striscia, ingrandita di due. Ridefinendo `--nw` qui i keyframes non
-     vanno riscritti: scorrono di 32 invece che di 16 da soli. */
-  --nw: calc(var(--nf, 1) * 32px);
-  background-position-y: top;
-  background-size: var(--nw) auto;
-  filter: none;
-}
-.of-boss-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-}
-.of-boss-name {
-  font-size: 11.5px;
-  font-weight: 800;
-  max-width: 190px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.of-boss-what {
-  font-size: 10.5px;
-  opacity: 0.66;
-}
-/* ---------- chi c'e', in fila ---------- */
-
-/* La fila delle persone. Si prende tutto lo spazio che avanza fra il ritratto e
-   i consumi, ed e' lei a spingere consumi e bottone contro il bordo destro.
-
-   Scorre in orizzontale invece di stringersi. Con dieci in ufficio i nomi si
-   sarebbero ridotti a due lettere — e due lettere non sono un nome — oppure
-   avrebbero schiacciato i consumi, e una barra tagliata dice una percentuale
-   che non e' quella vera. Meglio una fila che scorre. */
-.of-gente {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: var(--ctl);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
-}
-.of-gente::-webkit-scrollbar {
-  height: 4px;
-}
-.of-gente::-webkit-scrollbar-thumb {
-  border-radius: 2px;
-  background: var(--line);
-}
-.of-chi {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 8px 0 0;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.of-chi:hover {
-  background: var(--hover);
-  border-color: var(--claude-2);
-}
-.of-chi.busy {
-  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
-}
-/* Quella che stai guardando nella chat, e quella di cui hai aperto la scheda:
-   due cose diverse, due segni diversi. */
-.of-chi.focused {
-  background: color-mix(in srgb, var(--claude-2) 16%, transparent);
-}
-.of-chi.aperta {
-  border-color: var(--claude-2);
-  background: var(--hover);
-}
-.of-chi:focus-visible {
-  outline: 2px solid var(--claude-2);
-  outline-offset: 2px;
-}
-/* Gli impiegati rientrati di un filo sotto il loro capo: e' l'unica cosa che fa
-   leggere la fila come "questi lavorano per quello" invece che come un elenco. */
-.of-chi.of-sub {
-  margin-left: -2px;
-  opacity: 0.86;
-}
-.of-chi.of-sub .of-chi-nome {
-  font-weight: 600;
-}
-.of-chi-nome {
-  max-width: 132px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-/* La faccia, piccola. Stessa striscia della stanza al naturale — sedici pixel
-   dentro ventidue, tagliata dai piedi in giu' come nel ritratto grande. */
-.of-facciola {
-  position: relative;
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  overflow: hidden;
-  border-radius: 6px 0 0 6px;
-  background: var(--of-legno);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
-}
-.of-facciola .of-body {
-  inset: 0 0 auto 3px;
-  width: 16px;
-  height: 24px;
-  background-position-y: top;
-  filter: none;
-}
 
 /* ---------- i consumi ---------- */
 
@@ -322,23 +170,26 @@ body.inoffice .top .activity {
    momento in cui si svuota di colpo — il rinnovo — con la sola percentuale non
    si vedeva affatto.
 
-   Larghezza fissa: sono l'unica cosa della fascia che non si puo' stringere,
-   perche' una barra tagliata mostra una percentuale che non e' quella vera. E'
-   la fila della gente a scorrere, non loro. */
+   Larghezza fissa: una barra tagliata mostra una percentuale che non e' quella
+   vera, e a fianco della fascia non c'e' piu' niente che le possa stringere. */
 .of-uso {
   flex: 0 0 auto;
+  /* In cima non c'e' piu' la fila della gente a spingerli contro il bordo: senza
+     qualcosa che cresca in mezzo, il vuoto va scritto. */
+  margin-left: auto;
   display: flex;
+  /* Alti quanto la fascia e non un pixel di piu'. Le celle sono cresciute e
+     sbordano di un paio di pixel, centrati: la fascia resta in linea con la
+     testata della chat che le sta accanto, e uno scalino in mezzo allo schermo
+     si vede. */
+  height: var(--ctl);
   align-items: center;
   gap: 10px;
 }
 .of-cell {
-  width: 104px;
+  width: 132px;
   display: flex;
   flex-direction: column;
-  /* Un pixel e non due: tre righe piu' due spazi fanno esattamente i trenta di
-     --ctl, e la fascia resta alta come la testata della chat accanto. Con due,
-     l'ufficio stava due pixel piu' in basso della conversazione — e uno scalino
-     in mezzo allo schermo si vede. */
   gap: 1px;
   line-height: 1.15;
 }
@@ -347,21 +198,21 @@ body.inoffice .top .activity {
   align-items: baseline;
   justify-content: space-between;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .of-cell-lab {
-  opacity: 0.66;
+  opacity: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .of-cell-val {
   font-weight: 800;
-  font-size: 11px;
+  font-size: 12px;
 }
 .of-cell-bar {
   position: relative;
-  height: 5px;
+  height: 6px;
   border-radius: 3px;
   background: color-mix(in srgb, var(--ink) 14%, transparent);
   overflow: hidden;
@@ -386,70 +237,23 @@ body.inoffice .top .activity {
   }
 }
 .of-cell-reset {
-  font-size: 9px;
-  opacity: 0.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---------- e cosa sta facendo ---------- */
-
-/* La scheda che esce cliccando una pedina. Sta sopra la stanza e non dentro la
-   fascia: la fascia e' alta quanto un bottone, e quello che una persona sta
-   facendo e' una riga di testo vero che li' dentro non ci sta.
-
-   Non porta da nessuna parte: cliccare la persona nella stanza porta alla sua
-   conversazione, cliccarla in cima dice cosa sta facendo. Due domande diverse,
-   due posti diversi. */
-.of-scheda {
-  position: absolute;
-  z-index: 40;
-  width: 260px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.65);
-}
-.of-scheda-nome {
-  font-size: 12px;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.of-scheda-ruolo {
-  font-size: 10.5px;
-  opacity: 0.6;
-}
-/* Quello che sta facendo adesso. Va a capo, e non si taglia: e' l'unica riga
-   della scheda per cui la scheda esiste. */
-.of-scheda-cosa {
-  margin-top: 2px;
-  font-size: 11.5px;
-  line-height: 1.35;
-}
-.of-scheda-pct {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
   font-size: 10px;
-  opacity: 0.85;
+  opacity: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Il ritorno alla chat. Da qui dentro e' l'unica via d'uscita che si vede:
-   percio' ha una parola scritta sopra e non e' l'ennesima icona muta. */
+   percio' ha una parola scritta sopra e non e' l'ennesima icona muta. Vive nella
+   testata della chat, non nella fascia dell'ufficio, e resta spento finche'
+   l'ufficio non e' aperto: di fuori saresti gia' nella chat. */
 .of-back {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
-  /* Alto come i bottoni della testata accanto: e' l'unica cosa delle due fasce
-     che si trova in fila con qualcos'altro, e tre pixel di scarto si vedono. */
+  /* Alto come i bottoni fra cui sta: tre pixel di scarto in una fila di bottoni
+     si vedono. */
   height: var(--ctl);
   padding: 0 11px;
   border: 1px solid var(--line);
@@ -502,11 +306,10 @@ body.inoffice .top .activity {
   inset: 0;
 }
 
-/* I foglietti delle bacheche. Il contenitore non ha profondita' sua apposta —
+/* I foglietti della bacheca. Il contenitore non ha profondita' sua apposta —
    niente `z-index`, cosi' non fa contesto — perche' ogni foglio si prende quella
-   del mobile a cui e' appeso: la bacheca sta al muro, la pila sta sul tavolo, e
-   sono due profondita' diverse. Con una sola per tutti, la pila finiva dietro al
-   tavolo su cui doveva stare. */
+   del mobile a cui e' appeso, e chi ne appende uno da qualche altra parte non
+   deve venire a cambiare questa riga per farlo stare davanti al suo mobile. */
 .of-bacheche {
   position: absolute;
   inset: 0;

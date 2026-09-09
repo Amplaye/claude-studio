@@ -4,185 +4,87 @@
 
 # Claude Studio
 
-**Same Claude Code but, a better IDE!**
+**Same Claude Code. A place worth watching it work in.**
 
-The same Claude Code you already use — with a better place to use it.
+Same CLI, same account, same `CLAUDE.md`, same skills, same permissions.
+Nothing new to learn, nothing new to pay — and it keeps the CLI updated on its own.
 
 </div>
 
----
-
-## In two lines
-
-Claude Code is superb, and its VS Code panel is bare. Claude Studio replaces that
-panel: **same CLI, same account, same `CLAUDE.md`, same skills, same
-permissions** — nothing new to learn, nothing new to pay. What changes is what
-you see while it works.
-
-**It keeps itself current.** Claude Studio checks the Claude Code CLI and updates
-it on its own, so the newest models and features are there the day they ship —
-you never end up stuck on an old version.
-
 ![Claude Studio](https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/demo.gif)
 
-## What you get that you didn't have
+---
 
-**You see it working, second by second.** A strip above the box you type in says
-what it's on right now — *Reading src/store.ts*, *Reasoning…* — with a clock that
-ticks. No more staring at a still screen wondering if it's crashed.
+## THE OFFICE
 
-**Every change is a card, and cards stay shut.** A file edit arrives as a
-coloured diff you open when you want to. Nothing unfolds by itself and pushes
-your reading off the screen.
-
-**The whole list of steps, ticking itself off.** Before a job of any size Claude
-writes the plan down and it appears beside the conversation: every step, which one
-it's on right now, how many are done, how many are left — and, on the one that's
-running, roughly how far along it is. That last number is an estimate and says so:
-it's how long this step is taking against how long the ones already finished took,
-the way a download bar works. When Claude hasn't written a plan, the panel lists the
-steps it has actually taken instead, with the current one beating — so it is never
-just one line.
-
-**It asks before it touches anything.** *Allow* · *Always allow* · *Deny*. When
-it asks you to choose between options, there's always a line to write your own
-answer on — because the answer often isn't one of the three.
-
-**Attach any file. Not "any image" — any file.** This is the big one, and it is
-the thing the official panel will not do: there, the paperclip only opens
-pictures. Here it opens VS Code's own picker with **no filter on it at all**, so
-whatever is on your disk can go into the message:
-
-| | |
-|---|---|
-| **Documents** | PDF, Word (`.docx`), Pages, RTF, plain text, Markdown |
-| **Spreadsheets & data** | Excel (`.xlsx`, `.xls`), CSV, TSV, JSON, XML, YAML, `.sql` dumps, SQLite files |
-| **Slides** | PowerPoint (`.pptx`), Keynote |
-| **Images** | PNG, JPG, GIF, WebP — these Claude actually *looks* at, and you see them in the chat |
-| **Archives** | zip, tar, gz, 7z — hand over a whole folder in one go |
-| **Logs & config** | `.log`, `.env`, `.ini`, `.toml`, `.conf`, crash dumps, stack traces |
-| **Code** | any source file, in any language, from any project — not only the one you have open |
-| **Audio & video** | `.mp4`, `.mov`, `.mp3`, `.wav` — the path goes over, and Claude reaches for the right tool |
-| **Anything else** | there is no list to be on. If it is a file, it attaches. |
-
-Three ways in: the paperclip, **drag and drop straight onto the message**, or
-paste. Sizes are not a problem either — images travel as images, and everything
-else travels as a *path* that Claude opens with its own tools, so a
-forty-megabyte video never gets pushed through the chat. That is also the only
-approach that works for every format at once, which is exactly why it is the one
-used here.
-
-Attach several at a time and ask one question about all of them: *"read the PDF
-and the spreadsheet, watch the video, and tell me what doesn't match."*
-
-**You know which conversation finished.** With three of them open, a chime tells
-you *something* is ready, not *which* — and you go through the tabs one by one to
-find out. Now the one that finished says so: a dot on its tab, a green mark on
-its card. It goes out the moment you look at it.
-
-**The last message reads like an answer.** Headings, lists, tables, code: the
-recap at the end of a turn is laid out, not dumped as raw text.
-
-**You know how much room is left.** Context used, account limits, time to the
-next reset — for this conversation and for every other Claude you have open.
-
-## Try it in one minute
-
-```
-npm install -g @anthropic-ai/claude-code   # if you haven't already
-claude                                     # sign in once
-```
-
-Install Claude Studio, click the icon in the left bar, and type:
-
-> `Read @src/settings.tsx and add a dark/light switch that survives a restart.`
-
-You'll watch it read the file, propose the diff, ask before running the tests,
-and close with a recap of what changed.
+Every open conversation is a person at a desk. Sub-agents come in through the
+door, take their note off the board, sit down next to whoever opened them, and
+leave when they're done.
 
 <table>
 <tr>
-<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/streaming.png" alt="Live activity" /><br /><em>What it's doing, right now</em></td>
-<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/permessi.png" alt="Permissions and questions" /><br /><em>You decide — and you can write your own answer</em></td>
-</tr>
-<tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Model picker" /><br /><em>Opus 5, Fable 5, Sonnet 5, Haiku 4.5 — each its own colour</em></td>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context panel" /><br /><em>Context left, everywhere — and which one finished</em></td>
-</tr>
-<tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>PDF, Excel, Word, video, zip, logs — any file at all</em></td>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/suoni.png" alt="Sounds" /><br /><em>Even the lists are ours, and they open</em></td>
-</tr>
-<tr>
-<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/task.png" alt="Task list" /><br /><em>The steps, ticking themselves off as it goes</em></td>
-<td></td>
+<td width="64%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio.png" alt="THE OFFICE" /></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio-pianta.png" alt="The floor plan" /></td>
 </tr>
 </table>
 
+## While it works
+
+<table>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/streaming.png" alt="Live activity" /><br /><em>What it's on, right now</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/permessi.png" alt="Permissions" /><br /><em>Allow · Always · Deny — or write your own answer</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/task.png" alt="The plan" /><br /><em>The plan, ticking itself off</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/contesto.png" alt="Context" /><br /><em>Context left — and which one finished</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/modelli.png" alt="Models" /><br /><em>Opus 5 · Fable 5 · Sonnet 5 · Haiku 4.5</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/allegati.png" alt="Attachments" /><br /><em>PDF, Excel, Word, video, zip, logs</em></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/chat-full.png" alt="Full tab" /><br /><em>A full tab</em></td>
+<td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/pannello.png" alt="Sidebar" /><br /><em>…or the sidebar. Same conversation</em></td>
+</tr>
+</table>
+
+## Any file — not "any image"
+
+The official panel's paperclip only opens pictures. This one opens VS Code's own
+picker with no filter at all: PDF, Word, Excel, CSV, slides, zip, logs, audio,
+video, source, anything. Paperclip, drag and drop, or paste. Size is not a
+problem — images travel as images, everything else as a path Claude opens with
+its own tools.
+
 ## Three modes, one click
 
-| | |
-|---|---|
-| **Plan** | thinks, touches nothing |
-| **Ask** | checks with you before acting |
-| **Yolo** | gets on with it |
+| **Plan** | **Ask** | **Yolo** |
+|---|---|---|
+| touches nothing | asks first | gets on with it |
 
-Switch any time, even halfway through a conversation.
+## What's new in 0.24
 
-## The handy bits
-
-- **`@` for a file *or a function*, `/` for a command** — type `@parseToken` and you
-  get the file it lives in, with the line. Your skills and plugins are in the `/` menu.
-- **A ruler of the answer, down the left edge.** Every mark sits where its card
-  really is, so reading and thinking blur into one quiet ribbon and the things you'd
-  scroll back to — a file written, a command run, a question, a failure — stand out
-  of it at exactly the height you'd scroll to. A box shows the slice you're on.
-  Point at it and it opens into a list that says it all in words.
-- **A way back beside every message you sent.** It puts the files back the way they
-  were just before Claude touched them, and asks first.
-- **Type while it works and nothing is lost.** What you write waits in a tray above
-  the box that says how many there are and when they go — showing the photos and
-  files each one is carrying, so you don't forget. Change your mind and you can edit
-  one where it sits, without it losing its place in the queue; take one back and your
-  words return to the box.
-- **Paste an image**, **drop a file**, or use the paperclip — any format, any size.
-- **A chime and a notification** when it's done, if you've wandered off — and a
-  mark on the conversation that finished, so you know which one.
-- **24 past conversations** a click away, terminal ones included.
-- **Sidebar or full tab**, same conversation on both.
-- **English or Italian**, switched on the spot.
-- **Windows, macOS and Linux** — same interface, same shortcuts, written the way
-  your own keyboard writes them.
+- **THE OFFICE.** The strip on top says where you are and how much is left; who's
+  in is the room. Three more stools, at the heads of the tables.
+- **At the desk you work.** Getting up is a break now, not the default.
+- **One board.** What's done goes on the wall with the rest, not on a side table.
+- **What you type while it works changes the plan.** A queued message stays fifteen
+  seconds within reach — correct it, take it back — then it goes into the turn
+  that's *running*, instead of waiting for the end of it.
 
 ## Shortcuts
-
-Every shortcut works the same everywhere. Only the name of the modifier changes,
-and the interface already writes it the way your machine does — `Alt` on Windows
-and Linux, `⌥` (Option) on a Mac.
-
-| | Windows · Linux | macOS |
-|---|---|---|
-| New session in a new tab | `Alt+N` | `⌥N` |
-| Change mode (Plan · Ask · Yolo) | `Alt+M` | `⌥M` |
-| Conversations | `Alt+H` | `⌥H` |
-| Settings | `Alt+I` | `⌥I` |
-| Show or hide the context | `Alt+C` | `⌥C` |
-| Close this tab | `Alt+W` | `⌥W` |
-| Jump through the turn | `Alt+↑` · `Alt+↓` | `⌥↑` · `⌥↓` |
-| Stop | `Esc` | `Esc` |
-| A file, or a symbol · a command | `@` · `/` | `@` · `/` |
-
-And from anywhere in VS Code, with the chat not even focused:
 
 | | Windows · Linux | macOS |
 |---|---|---|
 | Open Claude Studio | `Ctrl+Alt+C` | `⌘⌥C` |
-| New session in a new tab | `Ctrl+Alt+N` | `⌘⌥N` |
+| New session, new tab | `Alt+N` | `⌥N` |
+| Mode · Conversations · Settings | `Alt+M` · `Alt+H` · `Alt+I` | `⌥M` · `⌥H` · `⌥I` |
+| Context · Close tab | `Alt+C` · `Alt+W` | `⌥C` · `⌥W` |
+| Jump through the turn · Stop | `Alt+↑` `Alt+↓` · `Esc` | `⌥↑` `⌥↓` · `Esc` |
+| A file or a symbol · a command | `@` · `/` | `@` · `/` |
 
-## Settings
-
-All under `claudeStudio`: path to the CLI, automatic updates, context window
-size, and whether the icon opens the sidebar or a full tab.
+English or Italian, switched on the spot. Windows, macOS and Linux.
 
 ---
 

@@ -153,11 +153,34 @@ type Outgoing = {
   files?: SentFile[];
   /** Era in fila dietro a un turno in corso: allora la sua uscita va annunciata. */
   queued: boolean;
+  /**
+   * Da quando puo' entrare in un turno che sta ancora andando.
+   *
+   * Aspettare la fine del turno voleva dire che quello che scrivi mentre Claude
+   * lavora non serve a niente finche' non ha finito di fare la cosa sbagliata: il
+   * piano lo cambi dopo, cioe' quando non c'e' piu' niente da cambiare. Ma partire
+   * all'istante toglie il ripensamento — e un messaggio scritto di fretta mentre
+   * guardi lavorare e' proprio quello che si vuole poter correggere.
+   *
+   * Quindi una finestra: la pastiglia resta li', si corregge e si ritira, e finita
+   * la finestra il messaggio entra nel turno in corso invece di aspettarne la fine.
+   * Ogni modifica la fa ripartire, perche' il tempo per ripensarci si conta da
+   * quando hai smesso di scrivere.
+   */
+  dopo?: number;
   /** Mandato dall'estensione, non da te: nel discorso non ci va. */
   silent?: boolean;
   /** Il checkpoint che ha aperto: viaggia con l'eco, non verso il motore. */
   cp?: number;
 };
+
+/**
+ * Quanto resta a portata di mano un messaggio scritto mentre Claude lavora.
+ *
+ * E' il tempo per rileggerlo e correggerlo. Scaduto, entra nel turno in corso: e'
+ * li' che serve, perche' un piano lo si cambia mentre si sta svolgendo, non dopo.
+ */
+const RIPENSAMENTO = 15000;
 
 let seq = 0;
 
@@ -214,6 +237,9 @@ export class Session {
    */
   private turning = false;
 
+  /** Il timer che apre la finestra del prossimo in fila. Uno solo: si rifa' a ogni modifica. */
+  private varco?: ReturnType<typeof setTimeout>;
+
   sessionId?: string;
   model = '';
   busy = false;
@@ -246,6 +272,9 @@ export class Session {
     // solo per le pastiglie, che sono roba da guardare.
     const queued = this.busy;
     const one: Outgoing = { id: `q${++seq}`, text, images, echo, files, queued, silent: !!silent, cp };
+    // La finestra e' solo per la roba tua: l'autofix non si corregge a mano, e non
+    // deve infilarsi in un turno in corso solo perche' e' scattato un timer.
+    if (queued && !silent) this.apri(one);
     this.pending.push(one);
     if (silent) {
       /* niente eco: chi l'ha mandato lo racconta a modo suo */
@@ -275,6 +304,19 @@ export class Session {
   }
 
   /**
+   * Fa ripartire il tempo del ripensamento, e si sveglia da sola quando e' finito.
+   *
+   * Il timer serve solo a bussare: chi decide e' `input`, che guarda l'ora. Uno solo
+   * per tutti perche' i messaggi partono in ordine — il secondo della fila non ha
+   * niente da fare finche' il primo non e' uscito.
+   */
+  private apri(one: Outgoing) {
+    one.dopo = Date.now() + RIPENSAMENTO;
+    clearTimeout(this.varco);
+    this.varco = setTimeout(() => this.wake?.(), RIPENSAMENTO);
+  }
+
+  /**
    * Cambiare le parole di un messaggio che non e' ancora partito, senza fargli
    * perdere il posto in fila.
    *
@@ -295,6 +337,8 @@ export class Session {
     const suffix = one.text.startsWith(was) ? one.text.slice(was.length) : '';
     one.text = (text + suffix).trim();
     one.echo = text;
+    // Corretto adesso: il tempo per ripensarci si conta da adesso.
+    if (one.queued) this.apri(one);
     return true;
   }
 
@@ -351,6 +395,7 @@ export class Session {
 
   dispose() {
     this.disposed = true;
+    clearTimeout(this.varco);
     this.wake?.();
     void this.interrupt();
   }
@@ -359,15 +404,22 @@ export class Session {
 
   private async *input(): AsyncGenerator<SDKUserMessage> {
     while (!this.disposed) {
-      // Un messaggio per volta, e il prossimo solo a turno finito.
+      // Un messaggio per volta, e il prossimo quando la sua finestra e' scaduta.
       //
-      // L'SDK tira da questo generatore appena puo': senza questa condizione il
+      // L'SDK tira da questo generatore appena puo': senza una condizione qui il
       // secondo messaggio partiva nello stesso istante in cui lo scrivevi, e la fila
       // la faceva la CLI per conto suo. Il risultato era una coda vera per mezzo
       // secondo — impossibile da vedere, impossibile da ritirare, e soprattutto non
-      // nostra. Tenendocela qui il messaggio resta a portata di mano finche' non tocca
-      // davvero a lui: si vede, si toglie, e l'ordine e' quello che hai scritto.
-      if (!this.pending.length || this.turning) {
+      // nostra. Tenendocela qui il messaggio resta a portata di mano finche' non
+      // tocca a lui: si vede, si corregge, si toglie.
+      //
+      // Ma "a lui" non e' piu' "a turno finito". Aspettare la fine voleva dire che
+      // quello che scrivi mentre Claude lavora arriva quando il lavoro e' gia' fatto,
+      // e a quel punto non cambia un piano: ne apre un altro. Adesso, passata la
+      // finestra del ripensamento, entra nel turno che sta andando — che e' il solo
+      // momento in cui puo' ancora cambiare quello che sta per succedere.
+      const next = this.pending[0];
+      if (!next || (this.turning && next.dopo != null && Date.now() < next.dopo)) {
         await new Promise<void>((r) => {
           this.wake = r;
         });

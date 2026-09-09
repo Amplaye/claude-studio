@@ -164,8 +164,7 @@ body.wide .composer {
    are really about is "narrow header, and it's working", and `:not(.wide)` was
    only ever a stand-in for it. Under 456px the container queries below take over
    on their own, because there the container really is this column. */
-body:not(.wide) .top.busy .brand,
-body.inoffice .top.busy .brand {
+body:not(.wide) .top.busy .brand {
   display: none;
 }
 /* and the pill closes up its own spacing to earn the last few characters */

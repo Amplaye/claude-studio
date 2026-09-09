@@ -94,7 +94,12 @@ window.ROOM = (() => {
     // sgabello, e attaccato com'era i piedi cadevano dentro l'ingombro del
     // tavolo — cioe' su una casella dove la stanza non manda nessuno.
     { s: 'stoolRound', x: 81, b: 52 },
+    // E due a capotavola, uno per lato corto. Il tavolo ne teneva due su quattro
+    // lati: i posti in piu' servono quando le scrivanie sono finite, e un capo
+    // tavola vuoto mentre qualcuno sta in piedi in corsia e' un posto sprecato.
+    { s: 'stoolRound', x: 45, b: 78 },
     { s: 'meetTable', x: 64, b: 84 },
+    { s: 'stoolRound', x: 117, b: 78 },
     { s: 'stoolRound', x: 81, b: 100 },
     { s: 'plantPurple', x: 22, b: 110 },
     // Il cestino sta in `DISEGNATI`, qui sotto: nel foglio non c'e'.
@@ -110,12 +115,18 @@ window.ROOM = (() => {
     // La macchina del caffe' e il lavandino stanno in `DISEGNATI`: nel foglio non
     // c'e' ne' l'una ne' l'altro, e finivano il primo su un armadietto e il
     // secondo su un comodino.
-    { s: 'stoolRound', x: 270, b: 96 },
-    { s: 'meetTable', x: 288, b: 96 },
-    // Davanti al tavolo e non piu' nell'angolo a destra: li' il posto a sedere
-    // finiva dentro l'ingombro della pianta, e uno sgabello su cui non ci si
-    // puo' sedere e' arredamento che occupa un posto.
+    // Il tavolo del bar sta sei pixel piu' in alto di prima, e i due capotavola
+    // cinque sopra il suo bordo di sotto: e' la misura che mette il sedile alla
+    // stessa altezza del piano. Prima uno dei due era attaccato al bordo e
+    // l'altro dieci pixel piu' su, e due posti a capotavola a due altezze diverse
+    // si leggono come due sgabelli lasciati li'.
+    { s: 'stoolRound', x: 270, b: 85 },
+    { s: 'meetTable', x: 288, b: 90 },
+    // Davanti al tavolo e non nell'angolo a destra: li' il posto a sedere finiva
+    // dentro l'ingombro della pianta, e uno sgabello su cui non ci si puo' sedere
+    // e' arredamento che occupa un posto.
     { s: 'stoolRound', x: 305, b: 108 },
+    { s: 'stoolRound', x: 341, b: 85 },
     { s: 'plantBlue', x: 350, b: 112 },
 
     // --- il salone: il verde sta contro i muri e negli angoli, il mezzo resta
@@ -190,17 +201,24 @@ window.ROOM = (() => {
 
   /* ---- e i posti che non sono scrivanie ----
    *
-   * Quattro sgabelli, e sono quelli che c'erano gia': due attorno al tavolo
-   * della sala riunioni, due a quello del bar. Finche' le scrivanie bastavano
-   * erano arredamento. Non bastano piu' — due schede aperte sono due capi e fino
-   * a otto sub-agent, e sei posti non tengono dieci persone — e un ufficio con
-   * quattro sedie vuote e quattro persone in piedi in corsia non e' un ufficio
-   * pieno, e' un ufficio che non sa dove metterle.
+   * Sette sgabelli: quattro c'erano gia' — due sui lati lunghi del tavolo della
+   * sala riunioni, due a quello del bar — e tre sono i capotavola, aggiunti
+   * perche' quattro finivano. Finche' le scrivanie bastavano erano arredamento.
+   * Non bastano piu' — due schede aperte sono due capi e fino a otto sub-agent,
+   * e sei posti non tengono dieci persone — e un ufficio con delle sedie vuote e
+   * qualcuno in piedi in corsia non e' un ufficio pieno, e' un ufficio che non sa
+   * dove metterlo.
    *
    * `x`/`y` e' l'angolo in alto a sinistra della figura, come `posto`. Sul
    * tavolo un computer non c'e' — e' un tavolo — quindi chi ci si siede se lo
    * porta: `lap` e' dove finisce il portatile e `lz` la profondita' del tavolo
    * piu' uno, perche' il portatile sta sul tavolo e non dietro.
+   *
+   * `verso` e' da che parte guarda lo schermo, cioe' dove siede il suo padrone.
+   * Il disegno di `room.css` e' un portatile visto da chi ce l'ha davanti: tenuto
+   * uguale per tutti, chi sta di sopra e chi sta a capotavola lavorava sul retro
+   * del proprio schermo. Quattro versi e quattro posti attorno a un tavolo: ogni
+   * portatile guarda la sua sedia.
    *
    * L'ordine e' quello in cui si riempiono, e i due della sala riunioni vengono
    * prima: e' la stanza chiusa, ed e' li' che ha senso mandare chi lavora per
@@ -243,15 +261,23 @@ window.ROOM = (() => {
 
   const SGABELLI = [
     // Sala riunioni, di qua e di la' del tavolo. Chi sta di sopra lo si vede a
-    // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro.
-    { x: 80, y: 76, lap: [82, 70], lz: 85 },
-    { x: 80, y: 28, lap: [82, 59], lz: 85 },
-    // Bar: uno di fianco al tavolino e uno davanti.
-    { x: 269, y: 72, lap: [290, 76], lz: 97 },
-    { x: 304, y: 84, lap: [306, 74], lz: 97 },
+    // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro. I due
+    // portatili non stanno affiancati ma uno dietro l'altro: il piano e' alto
+    // tredici pixel, e due schermi alti nove sulla stessa riga non ci stanno.
+    { x: 80, y: 76, lap: [82, 70], lz: 85, verso: 'giu' },
+    { x: 80, y: 28, lap: [82, 59], lz: 85, verso: 'su' },
+    // E i due capotavola, di fianco ai lati corti. Il portatile ce lo si mette
+    // davanti sul tavolo, dalla propria parte: due portatili nello stesso punto
+    // sono un portatile solo con due padroni.
+    { x: 44, y: 54, lap: [66, 60], lz: 85, verso: 'sx' },
+    { x: 116, y: 54, lap: [97, 60], lz: 85, verso: 'dx' },
+    // Bar: uno per capotavola e uno davanti.
+    { x: 269, y: 61, lap: [290, 66], lz: 91, verso: 'sx' },
+    { x: 304, y: 84, lap: [306, 68], lz: 91, verso: 'giu' },
+    { x: 340, y: 61, lap: [320, 66], lz: 91, verso: 'dx' },
   ];
 
-  /* La bacheca, e il tavolo dove finisce quello che e' fatto.
+  /* La bacheca, e basta.
    *
    * Un foglietto e' cinque per quattro con la puntina sopra, e non ci sta scritto
    * niente: a questa misura il testo non c'e' e il colore basta. Giallo da fare,
@@ -278,10 +304,6 @@ window.ROOM = (() => {
     // della commissione, e due che leggono lo stesso muro nello stesso punto sono
     // una persona sola disegnata due volte.
     muro: { griglia: [71, 10], posto: [112, 52], z: 37 },
-    // Si archivia stando di fianco al tavolo e non davanti: davanti c'e' lo
-    // sgabello, e un posto occupato da un mobile e' una persona che cammina
-    // contro un angolo per sempre.
-    archivio: { griglia: [80, 66], posto: [124, 96], z: 85 },
   };
 
   /* ---- il bar, e le tazze che ci girano ----
@@ -413,7 +435,6 @@ window.ROOM = (() => {
     lavandino: BAR.lavandino,
     porta: INGRESSO,
     bacheca: BACHECHE.muro.posto,
-    archivio: BACHECHE.archivio.posto,
     ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
     ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
   };
@@ -690,11 +711,22 @@ window.ROOM = (() => {
   const VELOCITA = 32;
   /** Due in giro insieme sono una pausa; tre che si incrociano sono confusione. */
   const MAX_FUORI = 2;
+  /* E quanto si sta al proprio posto prima di potersi rialzare.
+
+     Senza, con una conversazione sola aperta il giro qui sotto ripescava sempre
+     lo stesso: usciva, tornava, e cinque secondi dopo era di nuovo in corridoio
+     — cioe' un ufficio dove l'unico che c'e' non lavora mai. Il lavoro e' la
+     regola e la pausa l'eccezione, e due minuti al posto sono la differenza fra
+     "ogni tanto si alza" e "sta sempre in giro". */
+  const RIPOSO = 120000;
   /** Ogni quanto si guarda se Claude e' ripartito, mentre uno e' al bar. */
   const ORECCHIO = 250;
 
   const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
   const caso = (a) => a[Math.floor(Math.random() * a.length)];
+  /** Chi si puo' alzare adesso: ha un posto, non sta gia' fuori, non lavora, e ci e' stato un po'. */
+  const libero = (c) =>
+    !c.fuori && !c.ferma && !c.lavora && c.casa && Date.now() - (c.ultimo || 0) >= RIPOSO;
   const piedi = (chi) => [parseFloat(chi.el.style.left) + 8, parseFloat(chi.el.style.top) + 24];
 
   function muovi(chi, fx, fy) {
@@ -933,8 +965,8 @@ window.ROOM = (() => {
       const fuori = tutti.filter((c) => c.fuori);
       if (fuori.length >= MAX_FUORI) continue;
       // Chi lavora resta al suo posto: si va a cazzeggiare solo quando non c'e'
-      // niente da fare, come in ufficio.
-      const liberi = tutti.filter((c) => !c.fuori && !c.ferma && !c.lavora && c.casa);
+      // niente da fare, come in ufficio — e non due volte di fila.
+      const liberi = tutti.filter(libero);
       if (!liberi.length) continue;
       // Anche le mete girano, invece di uscire a caso: fra andata, sosta e
       // ritorno un giro dura mezzo minuto, quindi in una stanza guardata per un
@@ -1017,7 +1049,7 @@ window.ROOM = (() => {
       // Due terzi delle volte, e non sempre: un turno saltato e' quello che
       // rende il turno dopo una cosa che succede invece che un orario.
       if (Math.random() < 0.65) {
-        const liberi = elenco().filter((c) => !c.fuori && !c.ferma && !c.lavora && c.casa);
+        const liberi = elenco().filter(libero);
         const posti = COMMISSIONI.map((_, i) => i).filter((i) => !prese.has(i));
         if (liberi.length && posti.length) commissione(caso(liberi), caso(posti));
       }

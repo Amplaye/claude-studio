@@ -2766,6 +2766,9 @@
     if (document.body.classList.contains('inoffice')) return showOffice(false);
     vscode.postMessage({ cmd: 'openOffice' });
   });
+  // La stessa via d'uscita che stava nella fascia dell'ufficio, spostata fra i
+  // bottoni della testata: si vede solo da dentro l'ufficio (office.css).
+  $('btnBackChat').addEventListener('click', () => showOffice(false));
   $('btnTab').addEventListener('click', () => vscode.postMessage({ cmd: 'openTab' }));
 
   // ---------- opening and closing the tab ----------

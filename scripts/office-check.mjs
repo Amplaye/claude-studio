@@ -155,7 +155,7 @@ await post({ k: 'view', value: 'office' });
 await page.waitForTimeout(200);
 t(await inOffice(), "la scheda dell'ufficio non nasce sulla pianta");
 t(
-  await page.locator('.office .of-back').isVisible(),
+  await page.locator('.top .of-back').isVisible(),
   "dall'ufficio non si vede il bottone per tornare alla chat"
 );
 // La chat non sparisce: sta accanto alla pianta, ed e' il punto — l'ufficio e'
@@ -191,7 +191,7 @@ t(
 // E che non ripeta l'ufficio: dentro l'ufficio il bottone dell'ufficio non serve,
 // e quello del contesto accende una colonna che qui e' spenta per scelta.
 t(
-  await page.locator('.top .brand-t').isHidden(),
+  await page.locator('.top .brand').isHidden(),
   "la testata ripete il nome della scheda accanto a quello dell'ufficio"
 );
 for (const b of ['#btnOffice', '#btnCtx']) {
@@ -224,7 +224,7 @@ await post({ k: 'busy', value: false });
 await page.waitForTimeout(160);
 t(!strette.length, "la testata della chat non ci sta accanto all'ufficio: " + strette.join(' | '));
 
-await page.click('.office .of-back');
+await page.click('.top .of-back');
 await page.waitForTimeout(200);
 t(!(await inOffice()), "dall'ufficio non si torna alla chat");
 t(await page.locator('.shell').isVisible(), 'tornati dalla chat, la chat non c\'e\'');
@@ -682,7 +682,7 @@ const fogli = async () => ({
 const f = await fogli();
 t(f.fare === 2, 'i foglietti da fare sono ' + f.fare + ' invece di 2');
 t(f.storte === 1, 'i foglietti andati storti sono ' + f.storte + ' invece di 1');
-t(f.fatte === 2, 'la pila dell’archivio e’ di ' + f.fatte + ' invece di 2');
+t(f.fatte === 2, 'i foglietti fatti sono ' + f.fatte + ' invece di 2');
 t(f.mano === 3, 'i foglietti in mano sono ' + f.mano + ' invece di 3');
 t(
   f.muro === f.fare + f.storte + f.fatte,
@@ -757,9 +757,9 @@ await tasks({
   },
   'capo-b': { items: [T('9', 'Impaginare', 'in_progress')], done: 0, total: 1, active: 0, busy: true },
 });
-// Ventidue secondi e non undici: chi se ne va passa dal tavolo dell'archivio, e
-// il tavolo sta nella stanza in cima, dall'altra parte dell'unica porta. Da una
-// scrivania in fondo a sinistra sono trecentosettanta pixel di strada.
+// Ventidue secondi e non undici: chi se ne va riappende il foglio alla bacheca,
+// e la bacheca sta nella stanza in cima, dall'altra parte dell'unica porta. Da
+// una scrivania in fondo a sinistra sono trecentosettanta pixel di strada.
 await page.waitForTimeout(22000);
 t((await staff()) === 1, 'chi ha finito non se n’e’ andato: restano ' + (await staff()) + ' invece di 1');
 // E la scrivania di chi se n'e' andato si spegne. Qui e' arrivato solo il quadro
@@ -771,7 +771,7 @@ t(accesi === 3, 'gli schermi accesi sono ' + accesi + ' invece di 3 — due capi
 // E il foglio che portava e' finito dov'e' andato a finire: due in piu' nella
 // pila, e nessuno rimasto in mano a un fantasma.
 const g = await fogli();
-t(g.fatte === 4, 'i foglietti archiviati sono ' + g.fatte + ' invece di 4');
+t(g.fatte === 4, 'i foglietti fatti sulla bacheca sono ' + g.fatte + ' invece di 4');
 t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 
 // ---- e quando le scrivanie finiscono: gli sgabelli ----
@@ -782,9 +782,10 @@ t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 // posto": un ufficio dove qualcuno mima e' un ufficio rotto, e si nota da
 // lontano prima ancora di capire cosa si sta guardando.
 //
-// I posti in piu' sono i quattro sgabelli che c'erano gia' — due attorno al
-// tavolo della sala riunioni, due a quello del bar — e chi ci si siede si porta
-// il portatile, perche' sui tavoli un computer non c'e' e non deve esserci.
+// I posti in piu' sono i sette sgabelli attorno ai due tavoli — i lati lunghi e
+// i capotavola — e chi ci si siede si porta il portatile, perche' sui tavoli un
+// computer non c'e' e non deve esserci. Qui se ne riempiono quattro: gli altri
+// tre sono il margine, e servono quando le conversazioni aperte sono di piu'.
 //
 // Tre cose da guardare, e sono le tre che si rompono in silenzio: che nessuno
 // resti in piedi, che il posto a sedere non caschi dentro un mobile (se no la
@@ -840,65 +841,35 @@ t(!dove.dentro, dove.dentro + ' sgabelli hanno il posto a sedere dentro un mobil
 const portatili = await page.locator('.of-portatili .of-portatile').count();
 t(portatili === 4, 'i portatili aperti sui tavoli sono ' + portatili + ' invece di 4');
 
-// ---- e la fascia in cima dice chi c'e' ----
+// ---- e la fascia in cima dice dove sei, e quanto ne resta ----
 //
-// La stanza dice *che* qualcuno c'e'; da sedici pixel e visti dall'alto non dice
-// *chi*. La fila in cima ha i nomi scritti, e i sub-agent stanno subito dopo il
-// capo che li ha aperti — che e' la stessa gerarchia della stanza, detta in
-// parole.
-//
-// Tre cose da guardare. Che ci siano tutti: dieci persone in ufficio sono dieci
-// pedine, e una fila che ne mostra sei ha appena smesso di essere un elenco. Che
-// cliccarne una dica cosa sta facendo, che e' l'unica ragione per cui si clicca.
-// E che i consumi restino interi: sono l'unica cosa della fascia che non si puo'
-// stringere, perche' una barra tagliata mostra una percentuale che non e' quella
-// vera — con dieci nomi da mettere da qualche parte, e' la fila a scorrere.
+// Chi c'e' lo dice la stanza, che e' il punto di tutta la pianta: ripeterlo in
+// cima per nome voleva dire dirlo due volte, una delle due a sedici pixel. In
+// cima restano il nome del posto e i due consumi, spinti contro il bordo destro.
+// I consumi sono l'unica cosa della fascia che non si puo' stringere: una barra
+// tagliata mostra una percentuale che non e' quella vera.
 const fascia = await page.evaluate(() => {
   const uso = document.querySelector('.of-uso').getBoundingClientRect();
-  const gente = document.querySelector('.of-gente');
-  const back = document.querySelector('.of-back').getBoundingClientRect();
   const bar = document.querySelector('.of-bar').getBoundingClientRect();
   return {
-    pedine: document.querySelectorAll('.of-chi').length,
-    sub: document.querySelectorAll('.of-chi.of-sub').length,
-    // Scorre invece di stringersi: dieci pedine in questa larghezza non ci stanno.
-    scorre: gente.scrollWidth > gente.clientWidth,
+    nome: document.querySelector('.of-lab').textContent.trim(),
+    resti: ['.of-count', '.of-gente', '.of-boss', '.of-chi', '.of-scheda', '.of-bar .of-back'].filter(
+      (sel) => document.querySelector(sel)
+    ),
     usoLargo: Math.round(uso.width),
     // Le barre riempite davvero, e non due scatole vuote.
     fill: [...document.querySelectorAll('.of-uso .of-cell-fill')].map((f) => f.style.width),
-    // Il ritorno alla chat sta in fondo a destra, contro il bordo.
-    backADestra: Math.round(bar.right - back.right),
+    usoADestra: Math.round(bar.right - uso.right),
   };
 });
-t(fascia.pedine === 10, 'le pedine in cima sono ' + fascia.pedine + ' invece di 10');
-t(fascia.sub === 8, 'i sub-agent in cima sono ' + fascia.sub + ' invece di 8');
-t(fascia.scorre, 'la fila della gente non scorre: si e\u2019 stretta invece');
-t(fascia.usoLargo >= 200, 'i consumi sono stati schiacciati a ' + fascia.usoLargo + 'px');
+t(fascia.nome === 'The office', 'la fascia non dice come si chiama il posto: ' + fascia.nome);
+t(!fascia.resti.length, 'la fascia tiene ancora roba che la stanza dice gia’: ' + fascia.resti.join(' '));
+t(fascia.usoLargo >= 260, 'i consumi sono stati schiacciati a ' + fascia.usoLargo + 'px');
 t(
   fascia.fill.join(' ') === '34% 71%',
   'le barre dei consumi non dicono la percentuale: ' + fascia.fill.join(' ')
 );
-t(fascia.backADestra <= 16, 'il bottone della chat non e\u2019 contro il bordo destro');
-
-// E cliccando una pedina esce cosa sta facendo, adesso. Non porta da nessuna
-// parte: quello lo fa la persona nella stanza.
-await page.locator('.of-chi.of-sub').first().click();
-await page.waitForTimeout(200);
-const detta = await page.evaluate(() => ({
-  aperta: !document.querySelector('.of-scheda').hidden,
-  ruolo: document.querySelector('.of-scheda-ruolo').textContent,
-  cosa: document.querySelector('.of-scheda-cosa').textContent,
-}));
-t(detta.aperta, 'cliccando una pedina non esce niente');
-t(/Prima conversazione/.test(detta.ruolo), 'la scheda non dice per chi lavora: ' + detta.ruolo);
-t(/Cosa a/.test(detta.cosa), 'la scheda non dice cosa sta facendo: ' + detta.cosa);
-await page.keyboard.press('Escape');
-await page.waitForTimeout(200);
-t(
-  await page.evaluate(() => document.querySelector('.of-scheda').hidden),
-  'la scheda di chi si sta guardando non si chiude con Esc'
-);
-
+t(fascia.usoADestra <= 16, 'i consumi non sono contro il bordo destro');
 
 // E si chiudono quando ci si alza, non quando si e' usciti: un portatile acceso
 // su un tavolo vuoto e' peggio di nessun portatile. Qui non si aspetta che

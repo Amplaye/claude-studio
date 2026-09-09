@@ -18,7 +18,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const chatUrl = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 const ctxUrl = pathToFileURL(path.join(root, 'dist', 'preview-context.html')).href;
-const tasksUrl = pathToFileURL(path.join(root, 'dist', 'preview-tasks.html')).href;
 const out = path.join(root, 'docs', 'img');
 fs.mkdirSync(out, { recursive: true });
 
@@ -188,6 +187,64 @@ const ATTACHED = [
   { kind: 'file', path: 'C:/work/shop/design/mockups.zip', name: 'mockups.zip', size: 18_900_000 },
   { kind: 'file', path: 'C:/work/shop/logs/build.log', name: 'build.log', size: 91_000 },
 ];
+
+/**
+ * L'ufficio: una persona per conversazione aperta, e i suoi sub-agent attorno.
+ *
+ * Serve una stanza piena, non una stanza: quattro conversazioni e sei sub-agent
+ * riempiono le scrivanie e mandano gli altri sugli sgabelli dei due tavoli, che
+ * e' esattamente la cosa da far vedere — l'ufficio si comporta come un ufficio
+ * quando finiscono i posti buoni.
+ */
+const OFFICE_CTX = {
+  ...CTX,
+  cards: [
+    { ...CTX.cards[0], id: 'of-a', name: 'Dark/light switch', busy: true, focused: true },
+    { ...CTX.cards[1], id: 'of-b', name: 'Checkout, VAT rounding', busy: true, done: false },
+    { ...CTX.cards[1], id: 'of-c', name: 'Migrate the cart to the new API', busy: true, done: false, pct: 62, tabName: 'shop-9c' },
+    { ...CTX.cards[1], id: 'of-d', name: 'Release notes for 2.4', busy: false, done: true, recent: true, pct: 23, tabName: 'shop-4a' },
+  ],
+};
+
+const step = (id, content, status) => ({ id, content, status });
+
+const OFFICE_BOARD = {
+  'of-a': {
+    items: [
+      step('a1', 'Read the settings page', 'completed'),
+      step('a2', 'Add the switch', 'in_progress'),
+      step('a3', 'Save the choice', 'in_progress'),
+      step('a4', 'Write the test', 'pending'),
+    ],
+    done: 1,
+    total: 4,
+    active: 1,
+    busy: true,
+  },
+  'of-b': {
+    items: [
+      step('b1', 'Find the rounding', 'completed'),
+      step('b2', 'Fix the VAT column', 'in_progress'),
+      step('b3', 'Check the totals', 'in_progress'),
+      step('b4', 'Broken import', 'failed'),
+    ],
+    done: 1,
+    total: 4,
+    active: 1,
+    busy: true,
+  },
+  'of-c': {
+    items: [
+      step('c1', 'Map the old endpoints', 'completed'),
+      step('c2', 'Port the cart', 'in_progress'),
+      step('c3', 'Port the checkout', 'in_progress'),
+    ],
+    done: 1,
+    total: 3,
+    active: 1,
+    busy: true,
+  },
+};
 
 /** Types a message out one piece at a time, the way it arrives from the engine. */
 async function stream(post, id, kind, text, step = 26, pause = 45) {
@@ -422,34 +479,63 @@ await shot(browser, {
   console.log('docs/img/contesto.png');
 }
 
-// 6b. the task list, halfway through a job: two ticked off, one being worked on
+// 6b. the task list, halfway through a job: two ticked off, one being worked on.
+//     L'elenco non ha piu' una pagina sua: sta sotto l'ultima card del pannello
+//     del contesto, ed e' di li' che si fotografa.
 {
-  const page = await browser.newPage({ viewport: { width: 360, height: 300 }, colorScheme: 'dark' });
-  await page.goto(tasksUrl);
+  const page = await browser.newPage({ viewport: { width: 360, height: 760 }, colorScheme: 'dark' });
+  await page.goto(ctxUrl);
+  await page.evaluate((d) => window.postMessage({ k: 'data', d }, '*'), CTX);
+  await wait(500);
   const items = [
     { content: 'Read the invoice and the sheet', status: 'completed' },
     { content: 'Compare the totals', status: 'completed' },
     { content: 'Fix the VAT column', activeForm: 'Fixing the VAT column', status: 'in_progress' },
     { content: 'Write the summary', status: 'pending' },
   ];
+  // Il pannello vuole l'elenco per conversazione, non l'elenco e basta: la chiave
+  // e' l'id della card sotto cui va appeso.
   await page.evaluate(
     (d) => window.postMessage({ k: 'tasks', d }, '*'),
     {
-      items,
-      done: items.filter((i) => i.status === 'completed').length,
-      total: items.length,
-      active: items.findIndex((i) => i.status === 'in_progress'),
-      busy: true,
+      [CTX.cards[0].id]: {
+        items,
+        done: items.filter((i) => i.status === 'completed').length,
+        total: items.length,
+        active: items.findIndex((i) => i.status === 'in_progress'),
+        busy: true,
+      },
     }
   );
   await wait(1200);
-  await page.screenshot({ path: path.join(out, 'task.png') });
+  await page.locator('.taskroot').first().screenshot({ path: path.join(out, 'task.png') });
   await page.close();
   console.log('docs/img/task.png');
 }
 
 // 7. the sidebar, chat and context one under the other
 await shot(browser, { file: 'pannello.png', width: 480, height: 900, surface: 'view', upTo: 'permission' });
+
+// 8. THE OFFICE: la pianta a sinistra, la chat a destra, e una persona per
+//    conversazione aperta. Ci si arriva a piedi, quindi si aspetta: una foto
+//    scattata subito e' un ufficio vuoto con la porta che si apre.
+{
+  const page = await browser.newPage({ viewport: { width: 1500, height: 940 }, colorScheme: 'dark' });
+  await page.goto(chatUrl);
+  const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
+  await post({ k: 'hello', cwd: 'C:/work/shop', project: 'shop', cliVersion: '2.1.228', surface: 'panel' });
+  await wait(300);
+  await post({ k: 'view', value: 'office' });
+  await post({ k: 'ctx', d: OFFICE_CTX });
+  await post({ k: 'tasks', d: OFFICE_BOARD });
+  await wait(16000);
+  await page.screenshot({ path: path.join(out, 'ufficio.png') });
+  console.log('docs/img/ufficio.png');
+  // E la pianta da sola, che e' la foto che sta bene stretta in una tabella.
+  await page.locator('.of-stage').screenshot({ path: path.join(out, 'ufficio-pianta.png') });
+  console.log('docs/img/ufficio-pianta.png');
+  await page.close();
+}
 
 // ---------- the film ----------
 //
@@ -472,6 +558,7 @@ const TOUR = [
   ['Model, effort, thinking — every switch answers back', 'Modello, impegno, ragionamento — ogni switch risponde'],
   ['PDF, Excel, Word, video, zip, logs — any file at all', 'PDF, Excel, Word, video, zip, log — qualunque file'],
   ['Every conversation in sight — and which one finished', 'Tutte le conversazioni — e quale ha finito'],
+  ['THE OFFICE — every conversation at its own desk', 'THE OFFICE — ogni conversazione alla sua scrivania'],
 ];
 
 /**
@@ -673,6 +760,20 @@ async function caption(page, text) {
   // and now the other one finishes, on camera
   await post({ k: 'ctx', d: CTX });
   await wait(1900);
+
+  // ---- 10. THE OFFICE ----
+  //
+  // L'ultima battuta, e la piu' lunga: qui non c'e' niente da leggere, c'e' da
+  // guardare. La gente entra dalla porta e va a sedersi, e quel tragitto e' il
+  // punto — una stanza che si riempie da sola dice "queste sono le tue
+  // conversazioni" meglio di qualunque scritta.
+  await caption(page, '');
+  await post({ k: 'view', value: 'office' });
+  await post({ k: 'ctx', d: OFFICE_CTX });
+  await post({ k: 'tasks', d: OFFICE_BOARD });
+  await wait(600);
+  await cap(9);
+  await wait(8000);
   await caption(page, '');
   await wait(400);
 
@@ -690,10 +791,14 @@ async function caption(page, text) {
     // The marketplace only shows still images: the GIF is what gives it motion
     // there, so it has to stay small enough to load on a page nobody asked to
     // download a film from.
+    // Otto fotogrammi e centoventi caratteri di larghezza in meno di prima: il
+    // giro adesso dura quasi un minuto — c'e' dentro anche l'ufficio — e con le
+    // impostazioni di quando ne durava venti il file era il doppio. Sette mega di
+    // GIF su una pagina di negozio sono sette mega che nessuno ha chiesto.
     ff([
       '-y', '-i', src,
       '-vf',
-      'fps=10,scale=640:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3',
+      'fps=8,scale=520:-2:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=4',
       gif,
     ]);
     for (const f of [mp4, gif]) {
