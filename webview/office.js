@@ -55,6 +55,8 @@ window.OFFICE = (() => {
   let stage;
   let crowd;
   let empty;
+  let gente;
+  let scheda;
   let uso;
   let usoS;
   let usoW;
@@ -131,6 +133,174 @@ window.OFFICE = (() => {
     c.fill.style.background = barColor(pct);
   }
 
+  /* ---- chi c'e' in ufficio ----
+   *
+   * Le conversazioni e i sub-agent che hanno aperto, in un elenco solo, e i
+   * sub-agent subito dopo il capo che li ha chiamati: da fuori si legge chi
+   * lavora per chi senza doverlo scrivere da nessuna parte.
+   *
+   * La stanza li mostra gia', ma da sedici pixel visti dall'alto si vede *che*
+   * ci sono, non *chi* sono ne' cosa stanno facendo. Qui hanno un nome scritto e
+   * si cliccano.
+   *
+   * Su cosa stia lavorando una conversazione non e' il suo nome: e' il passo del
+   * piano che ha in corso adesso, cioe' la stessa riga che nella stanza qualcuno
+   * ha in mano sotto forma di foglietto. Se non ce n'e' uno aperto vale come sta
+   * — attiva, ferma, ha finito — che e' comunque la risposta a "cosa sta
+   * facendo".
+   */
+  function cheFa(id) {
+    const items = (board[id] && board[id].items) || [];
+    const viva = items.find((it) => it.status === 'in_progress');
+    return viva ? viva.activeForm || viva.content || '' : '';
+  }
+
+  const comeSta = (s) =>
+    s.busy ? t('ctx.busy') : s.done ? t('ctx.done') : s.recent ? t('ctx.recent') : t('ctx.idle');
+
+  function abitanti() {
+    const cards = (last && last.cards) || [];
+    const out = [];
+    for (const s of cards) {
+      const chi = people.get(s.id);
+      if (!chi) continue;
+      const aspetta = !!(s.asks && s.asks.length);
+      out.push({
+        key: 'c:' + s.id,
+        id: s.id,
+        nome: s.name,
+        seme: chi.seme,
+        posa: s.busy ? 'digita' : 'fermo',
+        stato: aspetta ? t('office.asking') : comeSta(s),
+        // Chi aspetta una risposta non "sta lavorando a" niente: sta aspettando
+        // te, ed e' la cosa piu' urgente che questa fila possa dire.
+        cosa: aspetta ? s.asks[0].title : cheFa(s.id) || comeSta(s),
+        pct: s.pct,
+        capo: null,
+        focused: !!s.focused,
+        busy: !!s.busy,
+        asking: aspetta,
+      });
+      // I suoi, attaccati a lui. Un sub-agent non ha un nome: ha una cosa da
+      // fare, ed e' quella a dire chi e'.
+      for (const [chiave, sub] of staff) {
+        // Chi sta uscendo non e' piu' in ufficio: e' ancora disegnato perche' sta
+        // attraversando la stanza, ma nella fila di chi c'e' non ci va.
+        if (sub.capoId !== s.id || sub.esce) continue;
+        out.push({
+          key: 's:' + chiave,
+          id: s.id,
+          nome: sub.cosa || sub.nome || '',
+          seme: sub.seme,
+          posa: 'digita',
+          stato: t('ctx.busy'),
+          cosa: sub.cosa || sub.nome || '',
+          pct: null,
+          capo: s.name,
+          focused: false,
+          busy: true,
+          asking: false,
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Le pedine della fila, per chiave: si ridipingono invece di rifarle. */
+  const pedine = new Map();
+  /** Chi si sta guardando adesso, se si sta guardando qualcuno. */
+  let guardato = null;
+
+  function paintGente() {
+    if (!gente) return;
+    const tutti = abitanti();
+    const vive = new Set(tutti.map((a) => a.key));
+    for (const [k, p] of pedine) {
+      if (!vive.has(k)) {
+        p.el.remove();
+        pedine.delete(k);
+      }
+    }
+    let prima = null;
+    for (const a of tutti) {
+      let p = pedine.get(a.key);
+      if (!p) {
+        const b = el('button', 'of-chi');
+        b.type = 'button';
+        const faccia = el('span', 'of-facciola');
+        const corpo = el('span', 'of-body');
+        faccia.append(corpo);
+        const nome = el('span', 'of-chi-nome');
+        b.append(faccia, nome);
+        b.onclick = () => apriScheda(a.key, b);
+        p = { el: b, corpo, nome };
+        pedine.set(a.key, p);
+      }
+      // Rimessa in fila senza toccarla se e' gia' al posto giusto: riappendere un
+      // elemento fa ripartire l'animazione della striscia, e una fila di facce
+      // che sbattono a ogni aggiornamento non si guarda.
+      const dopo = prima ? prima.el.nextSibling : gente.firstChild;
+      if (dopo !== p.el) gente.insertBefore(p.el, dopo);
+      prima = p;
+      window.ROOM.vesti(p.corpo, a.seme, a.posa);
+      p.nome.textContent = a.nome;
+      p.el.classList.toggle('of-sub', !!a.capo);
+      p.el.classList.toggle('focused', a.focused);
+      p.el.classList.toggle('busy', a.busy);
+      p.el.classList.toggle('asking', !!a.asking);
+      p.el.classList.toggle('aperta', guardato === a.key);
+      p.el.title = a.capo ? t('office.sub', { name: a.capo }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa;
+      p.el.setAttribute('aria-label', p.el.title);
+      p.el.setAttribute('aria-expanded', guardato === a.key ? 'true' : 'false');
+    }
+    paintScheda();
+  }
+
+  /* ---- e cosa sta facendo ----
+   *
+   * Cliccare una pedina apre una scheda sotto la fascia con quello che quella
+   * persona sta facendo adesso, e resta viva finche' e' aperta: il piano cambia
+   * al ritmo di Claude, e una scheda ferma al momento in cui l'hai aperta dice
+   * una cosa che non e' piu' vera.
+   *
+   * Cliccare il capo nella stanza porta alla sua conversazione; cliccarlo qui
+   * dice cosa sta facendo. Sono due domande diverse e hanno due posti diversi.
+   * Gli impiegati invece si aprono anche dalla stanza: dietro di loro non c'e'
+   * nessuna conversazione dove andare, e quello che hanno da dire e' tutto qui.
+   */
+  function apriScheda(key, ancora) {
+    guardato = guardato === key ? null : key;
+    if (guardato && ancora) {
+      // Sotto la pedina, ma mai oltre il bordo: una scheda che esce dalla scheda
+      // e' una scheda tagliata a meta'.
+      const b = ancora.getBoundingClientRect();
+      const r = root.getBoundingClientRect();
+      scheda.el.style.left = Math.max(8, Math.min(b.left - r.left, r.width - 268)) + 'px';
+      scheda.el.style.top = b.bottom - r.top + 6 + 'px';
+    }
+    paintGente();
+  }
+
+  function paintScheda() {
+    if (!scheda) return;
+    const a = guardato && abitanti().find((x) => x.key === guardato);
+    if (!a) {
+      guardato = null;
+      scheda.el.hidden = true;
+      return;
+    }
+    scheda.el.hidden = false;
+    scheda.nome.textContent = a.nome;
+    scheda.ruolo.textContent = a.capo ? t('office.sub', { name: a.capo }) : a.stato;
+    scheda.cosa.textContent = a.cosa;
+    scheda.pct.hidden = a.pct == null;
+    if (a.pct != null) {
+      scheda.pctVal.textContent = Math.round(a.pct) + '%';
+      scheda.pctFill.style.width = Math.max(0, Math.min(100, a.pct)) + '%';
+      scheda.pctFill.style.background = barColor(a.pct);
+    }
+  }
+
   function build(container, post) {
     root = container;
     send = post;
@@ -146,15 +316,50 @@ window.OFFICE = (() => {
     use.setAttribute('href', '#ion-people');
     ico.appendChild(use);
     title.append(ico, titleText);
+    /* Chi c'e', uno per uno, in mezzo alla fascia. Scorre in orizzontale invece
+       di stringersi: con dieci persone in ufficio i nomi si ridurrebbero a due
+       lettere — e due lettere non sono un nome — oppure schiaccerebbero i
+       consumi, e una barra tagliata dice una percentuale che non e' quella vera. */
+    gente = el('div', 'of-gente');
+    gente.setAttribute('role', 'list');
+
     uso = el('div', 'of-uso');
     usoS = cella();
     usoW = cella();
     uso.append(usoS.el, usoW.el);
 
-    // Il nome del posto e i consumi, e in mezzo niente: chi c'e' si vede nella
-    // stanza qui sotto, che e' il punto di tutta la pianta — ripeterlo in cima
-    // per nome era dire due volte la stessa cosa, una delle due a sedici pixel.
-    bar.append(title, uso);
+    /* La scheda di chi si sta guardando. Sta sopra la stanza e non dentro la
+       fascia: la fascia e' alta quanto un bottone, e quello che una persona sta
+       facendo e' una riga di testo vero che li' dentro non ci sta. */
+    const box = el('div', 'of-scheda');
+    box.hidden = true;
+    const sNome = el('div', 'of-scheda-nome');
+    const sRuolo = el('div', 'of-scheda-ruolo');
+    const sCosa = el('div', 'of-scheda-cosa');
+    const sPct = el('div', 'of-scheda-pct');
+    const sPctLab = el('span', null, t('office.ctxUsed'));
+    const sPctVal = el('span', 'of-scheda-val');
+    const sPctTop = el('div', 'of-cell-top');
+    sPctTop.append(sPctLab, sPctVal);
+    const sPctBar = el('div', 'of-cell-bar');
+    const sPctFill = el('div', 'of-cell-fill');
+    sPctBar.append(sPctFill);
+    sPct.append(sPctTop, sPctBar);
+    box.append(sNome, sRuolo, sCosa, sPct);
+    scheda = {
+      el: box,
+      nome: sNome,
+      ruolo: sRuolo,
+      cosa: sCosa,
+      pct: sPct,
+      pctLab: sPctLab,
+      pctVal: sPctVal,
+      pctFill: sPctFill,
+    };
+
+    // Il nome del posto, chi c'e', e i consumi. La fila in mezzo si prende lo
+    // spazio che avanza ed e' lei a spingere i consumi contro il bordo destro.
+    bar.append(title, gente, uso);
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');
@@ -209,7 +414,23 @@ window.OFFICE = (() => {
     // Il foglio sta dentro il riquadro della stanza e non dentro tutto l'ufficio:
     // copre la pianta, non la fascia in cima.
     wrap.append(stage, sheet);
-    root.append(bar, wrap);
+    root.append(bar, wrap, scheda.el);
+
+    // La scheda si chiude come si chiude una cosa aperta per sbaglio: col tasto
+    // che chiude tutto, o cliccando altrove. La pedina se la richiude da se',
+    // quindi qui si guarda solo che il clic non sia caduto ne' dentro la scheda
+    // ne' su una pedina — se no aprirne una la chiuderebbe subito dopo.
+    root.addEventListener('click', (e) => {
+      if (!guardato) return;
+      if (scheda.el.contains(e.target) || e.target.closest('.of-chi') || e.target.closest('.of-staff')) return;
+      guardato = null;
+      paintGente();
+    });
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !guardato) return;
+      guardato = null;
+      paintGente();
+    });
 
     new ResizeObserver(fit).observe(wrap);
     fitOn = wrap;
@@ -439,6 +660,10 @@ window.OFFICE = (() => {
     crowd.append(b);
     const nome = it.id || it.content;
     const chi = { chiave, capoId: capo.id, nome, el: b, fig: who, seme: capo.seme + '/' + nome };
+    // Dietro un impiegato non c'e' nessuna conversazione dove andare: cliccarlo
+    // dice cosa sta facendo, che e' l'unica cosa che ha da dire. Dalla fila in
+    // cima si arriva alla stessa scheda, e da li' anche con la tastiera.
+    b.onclick = () => apriScheda('s:' + chiave, b);
     window.ROOM.vesti(who, chi.seme, 'cammina');
     return chi;
   }
@@ -643,6 +868,9 @@ window.OFFICE = (() => {
     banchi.delete(chi.chiave);
     paintPortatili();
     paintBacheche();
+    // I sub-agent vanno e vengono al ritmo di Claude, non a quello dei consumi:
+    // la fila in cima li segue di qui, o resterebbe indietro di un giro.
+    paintGente();
   }
 
   // ---------- le bacheche ----------
@@ -964,6 +1192,9 @@ window.OFFICE = (() => {
     // E il foglio aperto, se e' aperto: e' la stessa roba dei foglietti sul muro,
     // e non puo' restare indietro di un turno rispetto a loro.
     dipingiBacheca();
+    // E la fila in cima: gli impiegati nascono e muoiono qui dentro, e senza
+    // questa riga la fila li scoprirebbe solo al prossimo giro dei consumi.
+    paintGente();
   }
 
   // ---------- l'aura del capo ----------
@@ -1295,6 +1526,8 @@ window.OFFICE = (() => {
 
     empty.textContent = t('office.empty');
     empty.hidden = list.length > 0;
+
+    paintGente();
 
     paintCella(usoS, 'ctx.session', d.usage?.session, d.sessionReset);
     paintCella(usoW, 'ctx.week', d.usage?.week, d.weekReset);

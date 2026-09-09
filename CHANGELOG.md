@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.27.0
+
+- **Torna la fila di chi c'e', in cima all'ufficio.** Le conversazioni e i
+  sub-agent che hanno aperto, uno per uno, con la loro faccia e il loro nome — i
+  sub-agent subito dopo il capo che li ha chiamati, cosi' si legge chi lavora per
+  chi. Cliccandone uno esce cosa sta facendo adesso: per una conversazione il
+  passo del piano che ha in corso, per un sub-agent il suo lavoro. Era stata
+  tolta nella 0.24 perche' "chi c'e' si vede nella stanza": ma nella stanza si
+  vede *che* c'e' qualcuno, non chi e' ne' cosa sta facendo.
+
+- **E gli impiegati si cliccano anche nella stanza.** Dietro un sub-agent non c'e'
+  nessuna conversazione dove andare: cliccarlo apre la stessa scheda della fila.
+
+- **La striscia delle conversazioni torna sotto la testata della chat**, dov'era:
+  in cima ci va la gente, non le linguette.
+
 ## 0.26.1
 
 - **La striscia delle conversazioni non arrivava mai.** Partiva alla nascita della

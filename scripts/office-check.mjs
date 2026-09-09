@@ -841,21 +841,23 @@ t(!dove.dentro, dove.dentro + ' sgabelli hanno il posto a sedere dentro un mobil
 const portatili = await page.locator('.of-portatili .of-portatile').count();
 t(portatili === 4, 'i portatili aperti sui tavoli sono ' + portatili + ' invece di 4');
 
-// ---- e la fascia in cima dice dove sei, e quanto ne resta ----
+// ---- e la fascia in cima dice dove sei, chi c'e' e quanto ne resta ----
 //
-// Chi c'e' lo dice la stanza, che e' il punto di tutta la pianta: ripeterlo in
-// cima per nome voleva dire dirlo due volte, una delle due a sedici pixel. In
-// cima restano il nome del posto e i due consumi, spinti contro il bordo destro.
-// I consumi sono l'unica cosa della fascia che non si puo' stringere: una barra
+// La stanza mostra gia' chi c'e', ma da sedici pixel visti dall'alto si vede
+// *che* ci sono, non *chi* sono ne' cosa stanno facendo. In cima c'e' la fila di
+// tutti — i sub-agent subito dopo il capo che li ha chiamati — e cliccandone uno
+// esce cosa sta facendo adesso. La fila scorre invece di stringersi: i consumi
+// sono l'unica cosa della fascia che non si puo' tagliare, perche' una barra
 // tagliata mostra una percentuale che non e' quella vera.
 const fascia = await page.evaluate(() => {
   const uso = document.querySelector('.of-uso').getBoundingClientRect();
   const bar = document.querySelector('.of-bar').getBoundingClientRect();
+  const gente = document.querySelector('.of-gente');
   return {
     nome: document.querySelector('.of-lab').textContent.trim(),
-    resti: ['.of-count', '.of-gente', '.of-boss', '.of-chi', '.of-scheda', '.of-bar .of-back'].filter(
-      (sel) => document.querySelector(sel)
-    ),
+    pedine: document.querySelectorAll('.of-chi').length,
+    sub: document.querySelectorAll('.of-chi.of-sub').length,
+    scorre: gente.scrollWidth > gente.clientWidth,
     usoLargo: Math.round(uso.width),
     // Le barre riempite davvero, e non due scatole vuote.
     fill: [...document.querySelectorAll('.of-uso .of-cell-fill')].map((f) => f.style.width),
@@ -863,13 +865,35 @@ const fascia = await page.evaluate(() => {
   };
 });
 t(fascia.nome === 'The office', 'la fascia non dice come si chiama il posto: ' + fascia.nome);
-t(!fascia.resti.length, 'la fascia tiene ancora roba che la stanza dice gia’: ' + fascia.resti.join(' '));
+t(fascia.pedine === 10, 'le pedine in cima sono ' + fascia.pedine + ' invece di 10');
+t(fascia.sub === 8, 'i sub-agent in cima sono ' + fascia.sub + ' invece di 8');
+t(fascia.scorre, 'la fila della gente non scorre: si e\u2019 stretta invece');
 t(fascia.usoLargo >= 260, 'i consumi sono stati schiacciati a ' + fascia.usoLargo + 'px');
 t(
   fascia.fill.join(' ') === '34% 71%',
   'le barre dei consumi non dicono la percentuale: ' + fascia.fill.join(' ')
 );
 t(fascia.usoADestra <= 16, 'i consumi non sono contro il bordo destro');
+
+// E cliccando una pedina esce cosa sta facendo, adesso. Non porta da nessuna
+// parte: alla conversazione ci porta il capo nella stanza, questa e' l'altra
+// domanda — e per un sub-agent e' l'unica che abbia una risposta.
+await page.locator('.of-chi.of-sub').first().click();
+await page.waitForTimeout(200);
+const detta = await page.evaluate(() => ({
+  aperta: !document.querySelector('.of-scheda').hidden,
+  ruolo: document.querySelector('.of-scheda-ruolo').textContent,
+  cosa: document.querySelector('.of-scheda-cosa').textContent,
+}));
+t(detta.aperta, 'cliccando una pedina non esce niente');
+t(/Prima conversazione/.test(detta.ruolo), 'la scheda non dice per chi lavora: ' + detta.ruolo);
+t(/Cosa a/.test(detta.cosa), 'la scheda non dice cosa sta facendo: ' + detta.cosa);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+t(
+  await page.evaluate(() => document.querySelector('.of-scheda').hidden),
+  'la scheda di chi si sta guardando non si chiude con Esc'
+);
 
 // E si chiudono quando ci si alza, non quando si e' usciti: un portatile acceso
 // su un tavolo vuoto e' peggio di nessun portatile. Qui non si aspetta che

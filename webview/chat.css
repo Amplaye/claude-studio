@@ -3578,16 +3578,3 @@ body.inoffice .top.busy .tok-n {
   border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
   background: color-mix(in srgb, var(--claude-1) 12%, transparent);
 }
-/* La striscia delle conversazioni, quando sta nella fascia dell'ufficio: la
-   pianta e' larga, e li' i nomi ci stanno per esteso invece di stringersi nella
-   colonna della chat. Il posto in mezzo alla fascia era vuoto apposta — "chi c'e'
-   si vede nella stanza" — ma chi c'e' e *dove stai scrivendo* sono due domande
-   diverse, e la seconda non aveva risposta da nessuna parte. */
-.of-bar .sesstabs {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: var(--ctl);
-  max-height: var(--ctl);
-  padding: 0;
-  margin: 0;
-}

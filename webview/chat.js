@@ -97,28 +97,6 @@
     box.append(add);
   }
 
-  /**
-   * Dove sta la striscia delle conversazioni.
-   *
-   * Nella fascia dell'ufficio quando la stanza e' aperta: e' la riga che si guarda
-   * per sapere chi c'e', ed e' larga tutta la pianta invece che la colonna della
-   * chat. Tornando alla chat torna sotto la testata, che li' e' l'unico posto che
-   * resta. Il nodo e' sempre lo stesso: due strisce sarebbero due elenchi da
-   * tenere d'accordo.
-   */
-  function placeTabs(on) {
-    const strip = $('sesstabs');
-    if (!strip) return;
-    const bar = on ? document.querySelector('#office .of-bar') : null;
-    if (bar) {
-      // Prima dei consumi, che stanno appiccicati al bordo destro.
-      if (strip.parentElement !== bar) bar.insertBefore(strip, bar.querySelector('.of-uso'));
-      return;
-    }
-    const col = document.querySelector('.chatcol');
-    if (col && strip.parentElement !== col) col.insertBefore(strip, $('drawer'));
-  }
-
   function icon(name, cls) {
     const svg = document.createElementNS(SVG, 'svg');
     svg.setAttribute('class', cls ? 'ico ' + cls : 'ico');
@@ -2872,7 +2850,6 @@
     }
     document.body.classList.toggle('inoffice', !!on);
     $('btnOffice').classList.toggle('on', !!on);
-    placeTabs(!!on);
     // Che questa scheda sia l'ufficio se lo ricorda la pagina: dopo un reload della
     // finestra e' l'unico appunto rimasto, ed e' quello che la fa tornare la stanza
     // invece di una scheda qualunque (vedi ChatPanel.register).
