@@ -21,11 +21,7 @@
  * senza una riga in piu'.
  */
 
-/* La tavolozza vale per la stanza e per il muro che le continua attorno quando
-   la scheda e' piu' larga di lei (vedi .of-oltre in fondo al foglio): un muro
-   con un arancione suo si vedrebbe come una cornice incollata sopra. */
-.of-stage,
-.of-oltre {
+.of-stage {
   --wood-hi: #ff9148;
   --wood: #e86837;
   --wood-lo: #b64335;
@@ -1011,44 +1007,4 @@
   height: 100%;
   width: 0;
   transition: width 0.5s ease;
-}
-
-/* ---- il muro, oltre la stanza ----
- *
- * La stanza e' un disegno di misura fissa, 384 per 320, e una scheda quasi mai
- * ha le stesse proporzioni: quello che avanzava avanzava nero, due bande ai
- * lati o sopra e sotto. Una stanza in mezzo a due bande nere non e' un ufficio
- * a tutto schermo, e' una diapositiva.
- *
- * Adesso avanza muro: lo stesso assito delle travi della stanza, con lo stesso
- * passo e nella stessa fase. --px e' quanto misura a schermo un pixel di
- * stanza (lo scrive fit(), che e' l'unico posto che sa l'ingrandimento), e --ox
- * e --oy sono i pixel che avanzano da un lato: di quanto va sfasato il disegno
- * perche' le travi vadano a filo con quelle vere. Sbagliata la fase si vede
- * una riga verticale dove finisce la stanza, che e' esattamente la cosa che si
- * voleva togliere.
- */
-.of-oltre {
-  --px: 1px;
-  --ox: 0px;
-  --oy: 0px;
-  background-color: var(--wall);
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      var(--wall-jo) 0 var(--px),
-      var(--wall-hi) var(--px) calc(2 * var(--px)),
-      transparent calc(2 * var(--px)) calc(8 * var(--px))
-    ),
-    repeating-linear-gradient(
-      180deg,
-      rgba(255, 215, 170, 0.1) 0 var(--px),
-      transparent var(--px) calc(5 * var(--px))
-    ),
-    repeating-linear-gradient(
-      180deg,
-      rgba(70, 35, 18, 0.12) 0 var(--px),
-      transparent var(--px) calc(7 * var(--px))
-    );
-  background-position: var(--ox) var(--oy);
 }

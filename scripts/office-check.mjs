@@ -178,6 +178,49 @@ t(
     ' contro ' +
     Math.round(split.office)
 );
+// ---- e la stanza riempie la scheda, comunque sia fatta la scheda ----
+//
+// La pianta e' un disegno di 384 per 320 e una scheda non ha quasi mai quelle
+// proporzioni: quello che avanzava avanzava nero, due bande ai lati o sopra e
+// sotto. Adesso la stanza cresce — pavimento in piu' nel corridoio e in fondo al
+// salone, e i muri di fuori che si spostano — quindi di bande non ne deve
+// restare piu' di due pixel, che sono l'arrotondamento.
+//
+// Due misure apposta, una larga e una alta: sono i due versi in cui la stanza
+// deve saper crescere, e un controllo solo ne proverebbe uno.
+const bande = [];
+for (const [vw, vh] of [
+  [1900, 1000],
+  [1200, 980],
+]) {
+  await page.setViewportSize({ width: vw, height: vh });
+  await page.waitForTimeout(220);
+  const m = await page.evaluate(() => {
+    const wrap = document.querySelector('.of-wrap').getBoundingClientRect();
+    const st = document.querySelector('.of-stage').getBoundingClientRect();
+    return {
+      x: Math.round((wrap.width - st.width) / 2),
+      y: Math.round((wrap.height - st.height) / 2),
+      w: window.ROOM.W,
+      h: window.ROOM.H,
+      w0: window.ROOM.W0,
+      h0: window.ROOM.H0,
+    };
+  });
+  if (m.x > 2 || m.y > 2)
+    bande.push(vw + 'x' + vh + ': avanza buio, ' + m.x + ' per lato e ' + m.y + ' sopra e sotto');
+  if (m.w < m.w0 || m.h < m.h0)
+    bande.push(vw + 'x' + vh + ': la stanza si e' + Q + ' rimpicciolita sotto il disegno');
+  // E deve essere cresciuta davvero in almeno un verso: se riempie la scheda
+  // restando 384x320 vuol dire che la scheda era esattamente quelle proporzioni,
+  // e queste due non lo sono.
+  if (m.w === m.w0 && m.h === m.h0)
+    bande.push(vw + 'x' + vh + ': la stanza non e' + Q + ' cresciuta di un pixel');
+}
+await page.setViewportSize({ width: 1500, height: 940 });
+await page.waitForTimeout(220);
+t(!bande.length, 'la stanza non riempie la scheda: ' + bande.join(' | '));
+
 // ---- e la testata della chat, adesso che e' una colonna stretta ----
 //
 // Con l'ufficio aperto la scheda e' larga ma la colonna della chat no: sta fra

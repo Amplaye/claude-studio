@@ -26,8 +26,53 @@ window.ROOM = (() => {
   const TILE = 16;
   const COLS = 24;
   const ROWS = 20;
-  const W = COLS * TILE;
-  const H = ROWS * TILE;
+
+  /* ---- la misura del disegno, e quella vera ----
+   *
+   * La pianta e' disegnata 384 per 320 e quella misura non cambia mai: e' il
+   * disegno. Quella vera puo' essere piu' grande, perche' una scheda non ha
+   * quasi mai le stesse proporzioni e quello che avanzava avanzava nero.
+   *
+   * Quello che si aggiunge non si aggiunge dappertutto. In larghezza va tutto
+   * nel corridoio in mezzo: le due stanze di sopra restano attaccate ai loro
+   * angoli — coi loro scaffali contro i loro muri — e il passaggio fra le due
+   * si allarga. In verticale va tutto nel salone, che e' la stanza senza niente
+   * contro i muri e quindi l'unica che puo' crescere senza staccare un mobile
+   * dalla parete a cui e' appoggiato.
+   */
+  const W0 = COLS * TILE;
+  const H0 = ROWS * TILE;
+  let W = W0;
+  let H = H0;
+  /** Quanto le si e' aggiunto, in pixel di stanza. Sempre pari: meta' serve. */
+  let GX = 0;
+  let GY = 0;
+
+  /* Dove va a finire un punto della pianta quando la stanza cresce: `a` vale 0
+     se sta col muro di sinistra (o di sopra), 1 se sta con quello di destra (o
+     di sotto), 0.5 se sta in mezzo e si sposta di meta'. */
+  const AX = (x, a) => x + GX * a;
+  const AY = (y, a) => y + GY * a;
+
+  /* E a quale muro sta un mobile lo dice gia' dove sta, senza bisogno di
+     scriverlo trenta volte: a sinistra del muro della sala riunioni sta col
+     muro di sinistra, oltre il muro del bar con quello di destra, e in mezzo —
+     nel corridoio — c'e' solo la porta, che infatti resta in mezzo. Nel salone
+     quello che sta sotto la meta' della stanza appartiene al muro di sotto.
+
+     Vale per i mobili e per i punti dove si va: gli sgabelli, le mete, le
+     commissioni. Non vale per le scrivanie, che non stanno contro niente — sono
+     un blocco in mezzo al salone, e in mezzo restano: vedi DESKS. */
+  const ancoraX = (x) => (x < 176 ? 0 : x >= 240 ? 1 : 0.5);
+  const ancoraY = (y) => (y >= 216 ? 1 : 0);
+  const pt = ([x, y]) => [AX(x, ancoraX(x)), AY(y, ancoraY(y))];
+
+  /* La pianta come sta adesso: le tavole qui sotto finiscono in `NOME0`, che e'
+     il disegno e non cambia mai, e ricalcola() ne ricava queste — le stesse cose
+     ai posti che occupano davvero. Tutto il resto della stanza legge queste, e
+     non si accorge di niente quando la stanza cresce. */
+  let WALLS, PROPS, DISEGNATI, DESKS, SGABELLI, BACHECHE, BAR, SCAFFALI;
+  let METE, COMMISSIONI, DESTINAZIONI, INGRESSO, VANO, PORTA;
 
   const SV = window.SV;
 
@@ -49,28 +94,33 @@ window.ROOM = (() => {
   //
   // I muri sono bande, `{c, r, w, h}` in caselle. I vani delle porte non sono un
   // tipo a parte: sono il pezzo di muro che non c'e'.
-  const WALLS = [
+  const MURI = [
     // Il muro di sopra ha un vano: due caselle in mezzo al corridoio fra la sala
     // riunioni e il bar, ed e' la porta d'ingresso. E' l'unico punto della
     // pianta dove il muro si apre su niente invece che su un'altra stanza —
     // dietro c'e' il resto del palazzo, che non si disegna.
-    { c: 0, r: 0, w: 12, h: 1 },
-    { c: 14, r: 0, w: 10, h: 1 },
-    { c: 0, r: ROWS - 1, w: COLS, h: 1 },
-    { c: 0, r: 0, w: 1, h: ROWS },
-    { c: COLS - 1, r: 0, w: 1, h: ROWS },
+    //
+    // `ax`/`ay` dicono di quanto si sposta lo spigolo in alto a sinistra quando
+    // la stanza cresce, `aw`/`ah` di quanto si allunga il muro. Il vano della
+    // porta sta in mezzo al corridoio: e' per questo che i due pezzi del muro di
+    // sopra si allungano di meta' ciascuno invece che uno solo di tutto.
+    { c: 0, r: 0, w: 12, h: 1, aw: 0.5 },
+    { c: 14, r: 0, w: 10, h: 1, ax: 0.5, aw: 0.5 },
+    { c: 0, r: ROWS - 1, w: COLS, h: 1, aw: 1, ay: 1 },
+    { c: 0, r: 0, w: 1, h: ROWS, ah: 1 },
+    { c: COLS - 1, r: 0, w: 1, h: ROWS, ax: 1, ah: 1 },
     // I due muri delle stanze in alto. Il buco fra i pezzi e' la porta: righe 3
     // e 4, ed e' da li' che si entra al bar e in riunione.
     { c: 10, r: 1, w: 1, h: 2 },
     { c: 10, r: 5, w: 1, h: 3 },
-    { c: 15, r: 1, w: 1, h: 2 },
-    { c: 15, r: 5, w: 1, h: 3 },
+    { c: 15, r: 1, w: 1, h: 2, ax: 1 },
+    { c: 15, r: 5, w: 1, h: 3, ax: 1 },
     // Il muro che divide le due stanze dal salone. Arriva fino a colonna 10,
     // dove trova lo spigolo della sala riunioni: fermandosi a 9 restava un buco
     // quadrato nell'angolo, il pezzo di muro che manca in una pianta disegnata a
     // mano. Il passaggio e' quello fra le due stanze, colonne 11-14.
     { c: 1, r: 7, w: 9, h: 1 },
-    { c: 15, r: 7, w: 8, h: 1 },
+    { c: 15, r: 7, w: 8, h: 1, ax: 1 },
   ];
 
   /* Un mobile: `s` il ritaglio, `x` il bordo sinistro e `b` il bordo di sotto,
@@ -79,7 +129,7 @@ window.ROOM = (() => {
      In pixel e non in caselle apposta: i mobili di SeasonVale non sono larghi un
      numero intero di caselle, e allinearli alla griglia li lasciava sbilenchi in
      mezzo alle stanze. Cosi' invece si centrano davvero. */
-  const PROPS = [
+  const PROPS0 = [
     // --- sala riunioni: due posti uno di fronte all'altro sui lati lunghi del
     //     tavolo, e la bacheca sul muro. Si siede su sgabelli e basta: la sedia
     //     di SeasonVale ha uno schienale alto che dal davanti copre mezzo
@@ -174,7 +224,7 @@ window.ROOM = (() => {
    * mettono i piedi. Un mobile disegnato che non blocca e' un mobile che si
    * attraversa.
    */
-  const DISEGNATI = [
+  const DISEGNATI0 = [
     // Il cestino, in sala riunioni. E' l'unico mobile messo per una commissione e
     // non per la pianta: senza, "buttare la carta" non ha dove andare.
     { s: 'cestino', x: 141, b: 108, w: 12, h: 15 },
@@ -198,7 +248,7 @@ window.ROOM = (() => {
      (dal muro di mezzo a quello in fondo) e il blocco ne occupa
      centotrentadue: ventidue sopra e ventidue sotto, che vuol dire venti piu'
      in basso di dov'erano. */
-  const DESKS = [
+  const DESKS0 = [
     { x: 68, b: 196 },
     { x: 168, b: 196 },
     { x: 268, b: 196 },
@@ -249,14 +299,20 @@ window.ROOM = (() => {
    * cornice, cioe' "fuori dallo schermo, verso chi guarda", ed e' da li' che
    * volano le buste. Questa e' una porta vera, con due ante che si aprono.
    */
-  const INGRESSO = [208, 30];
+  const INGRESSO0 = [208, 30];
   /** Il vano: bordo sinistro e larghezza, in pixel. Due caselle. */
-  const VANO = [192, 32];
+  const VANO0 = [192, 32];
   /** Quanto resta aperta dopo che qualcuno ci e' passato. */
   const PORTA_APERTA = 1600;
 
   let ante;
   let chiudiPorta;
+  /* I nodi della stanza, tenuti da parte: quando la stanza cambia misura non si
+     rifanno, si rimettono a posto. Vedi posiziona(). */
+  let nodiMuro = [];
+  let nodiProp = [];
+  let nodiDis = [];
+  let scrivanie = [];
 
   /**
    * Apre la porta, e la richiude da sola.
@@ -273,7 +329,7 @@ window.ROOM = (() => {
     chiudiPorta = setTimeout(() => ante.classList.remove('aperta'), PORTA_APERTA);
   }
 
-  const SGABELLI = [
+  const SGABELLI0 = [
     // Sala riunioni, di qua e di la' del tavolo. Chi sta di sopra lo si vede a
     // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro. I due
     // portatili non stanno affiancati ma uno dietro l'altro: il piano e' alto
@@ -313,7 +369,7 @@ window.ROOM = (() => {
    * ordina tutto sul bordo di sotto, e un foglio che non lo rispetta finisce
    * dietro al tavolo su cui dovrebbe stare.
    */
-  const BACHECHE = {
+  const BACHECHE0 = {
     // Il posto sta a destra della bacheca e non davanti: davanti c'e' gia' quello
     // della commissione, e due che leggono lo stesso muro nello stesso punto sono
     // una persona sola disegnata due volte.
@@ -334,9 +390,9 @@ window.ROOM = (() => {
    * invece che come un mobile.
    */
   const MAX_TAZZE = 4;
-  const BAR = { rastrelliera: [302, 60], macchina: [330, 60], lavandino: [356, 60] };
+  const BAR0 = { rastrelliera: [302, 60], macchina: [330, 60], lavandino: [356, 60] };
   /** Dove stanno le tazze sulla rastrelliera: due per ripiano. */
-  const SCAFFALI = [
+  const SCAFFALI0 = [
     [292, 22],
     [301, 22],
     [292, 32],
@@ -354,7 +410,7 @@ window.ROOM = (() => {
      pausa, mentre due fermi nello stesso punto sono una persona sola disegnata
      due volte. Si sta al bancone, fra la dispensa e il tavolino: davanti al
      tavolino la fascia libera e' due pixel e la stanza sigillata. */
-  const METE = {
+  const METE0 = {
     caffe: [280, 62],
     spuntino: [320, 62],
     riunione: [52, 100],
@@ -386,7 +442,7 @@ window.ROOM = (() => {
    * quello che ci sta contro i muri lo stringe. Ci restano le piante negli
    * angoli, che ci stavano da sempre.
    */
-  const COMMISSIONI = [
+  const COMMISSIONI0 = [
     { k: 'annaffia', posto: [48, 146], durata: 4500, dice: 'Queste crescono in fretta' },
     { k: 'annaffia', posto: [330, 140], durata: 4500, dice: 'Un goccio d’acqua e via' },
     { k: 'annaffia', posto: [48, 296], durata: 4500, dice: 'Tocca a te, bella' },
@@ -448,16 +504,6 @@ window.ROOM = (() => {
      che tiene onesta questa pianta man mano che ci si aggiungono mobili: una
      meta finita dentro un armadio e' una persona che cammina contro un angolo
      per sempre, e a occhio non si nota finche' non tocca a lei. */
-  const DESTINAZIONI = {
-    ...METE,
-    rastrelliera: BAR.rastrelliera,
-    macchina: BAR.macchina,
-    lavandino: BAR.lavandino,
-    porta: INGRESSO,
-    bacheca: BACHECHE.muro.posto,
-    ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
-    ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
-  };
 
   // ---------- dove si puo' mettere i piedi ----------
   //
@@ -475,11 +521,13 @@ window.ROOM = (() => {
   // stanno gia' in fondo alla figura: la testa che sfiora uno scaffale, vista
   // dall'alto, e' giusto cosi'.
   const CELLA = 8;
-  const GC = Math.ceil(W / CELLA);
-  const GR = Math.ceil(H / CELLA);
   const MEZZA_PERSONA = 8;
   const MEZZO_PASSO = 2;
-  const occupata = new Uint8Array(GC * GR);
+  /* Si rifa' da capo ogni volta che la stanza cambia misura: una griglia e' la
+     pianta contata in caselle, e una pianta piu' grande e' un'altra griglia. */
+  let GC = 0;
+  let GR = 0;
+  let occupata = new Uint8Array(0);
 
   function blocca(x, y, w, h) {
     const x0 = x - MEZZA_PERSONA;
@@ -496,17 +544,97 @@ window.ROOM = (() => {
     }
   }
 
-  for (const w of WALLS) blocca(w.c * TILE, w.r * TILE, w.w * TILE, w.h * TILE);
-  for (const p of PROPS) {
-    // Gli sgabelli no. Sono l'unico mobile su cui ci si mette SOPRA invece che
-    // attorno, e marcarli occupati voleva dire che il posto a sedere era una
-    // casella proibita: la strada si fermava accanto e non ci arrivava nessuno.
-    if (p.s === 'stoolRound') continue;
-    const d = SV[p.s];
-    blocca(p.x, p.b - d.h, d.w, d.h);
+  /**
+   * Rifa' la pianta ai posti che occupa adesso, e con lei la griglia dei passi.
+   *
+   * E' l'unico posto dove il disegno diventa misure vere: da qui in giu' nessuno
+   * sa piu' che la stanza puo' crescere, e nessuno deve saperlo. Si chiama al
+   * caricamento e a ogni cambio di misura, e non costa niente — sono una
+   * quarantina di mobili e una griglia di tremila caselle.
+   */
+  function ricalcola() {
+    W = W0 + GX;
+    H = H0 + GY;
+
+    WALLS = MURI.map((m) => ({
+      x: AX(m.c * TILE, m.ax || 0),
+      y: AY(m.r * TILE, m.ay || 0),
+      w: m.w * TILE + GX * (m.aw || 0),
+      h: m.h * TILE + GY * (m.ah || 0),
+    }));
+    PROPS = PROPS0.map((m) => ({ s: m.s, x: AX(m.x, ancoraX(m.x)), b: AY(m.b, ancoraY(m.b)) }));
+    DISEGNATI = DISEGNATI0.map((m) => ({
+      s: m.s,
+      x: AX(m.x, ancoraX(m.x)),
+      b: AY(m.b, ancoraY(m.b)),
+      w: m.w,
+      h: m.h,
+    }));
+    // Le scrivanie non stanno contro niente: sono un blocco in mezzo al salone, e
+    // in mezzo restano. E' l'unica cosa della pianta che si sposta di meta' in
+    // tutte e due le direzioni.
+    DESKS = DESKS0.map((d) => ({ x: AX(d.x, 0.5), b: AY(d.b, 0.5) }));
+    SGABELLI = SGABELLI0.map((g) => ({
+      x: AX(g.x, ancoraX(g.x)),
+      y: g.y,
+      lap: [AX(g.lap[0], ancoraX(g.lap[0])), g.lap[1]],
+      lz: g.lz,
+      verso: g.verso,
+    }));
+    BACHECHE = {
+      muro: {
+        griglia: pt(BACHECHE0.muro.griglia),
+        posto: pt(BACHECHE0.muro.posto),
+        z: BACHECHE0.muro.z,
+      },
+    };
+    BAR = Object.fromEntries(Object.entries(BAR0).map(([k, v]) => [k, pt(v)]));
+    SCAFFALI = SCAFFALI0.map(pt);
+    METE = Object.fromEntries(Object.entries(METE0).map(([k, v]) => [k, pt(v)]));
+    COMMISSIONI = COMMISSIONI0.map((c) => ({
+      ...c,
+      posto: pt(c.posto),
+      fx: c.fx ? pt(c.fx) : c.fx,
+    }));
+    INGRESSO = pt(INGRESSO0);
+    VANO = [AX(VANO0[0], ancoraX(VANO0[0])), VANO0[1]];
+    // La porta della posta non e' quella dei piedi: e' il bordo di sotto della
+    // cornice, cioe' fuori dallo schermo verso chi guarda, e sta sempre in mezzo.
+    PORTA = [W / 2, H - TILE];
+
+    /* Tutti i posti dove la stanza puo' mandare qualcuno, in un elenco solo.
+       Non serve a far camminare nessuno — serve al controllo, ed e' l'unica cosa
+       che tiene onesta questa pianta man mano che ci si aggiungono mobili: una
+       meta finita dentro un armadio e' una persona che cammina contro un angolo
+       per sempre, e a occhio non si nota finche' non tocca a lei. */
+    DESTINAZIONI = {
+      ...METE,
+      rastrelliera: BAR.rastrelliera,
+      macchina: BAR.macchina,
+      lavandino: BAR.lavandino,
+      porta: INGRESSO,
+      bacheca: BACHECHE.muro.posto,
+      ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
+      ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
+    };
+
+    GC = Math.ceil(W / CELLA);
+    GR = Math.ceil(H / CELLA);
+    occupata = new Uint8Array(GC * GR);
+    for (const w of WALLS) blocca(w.x, w.y, w.w, w.h);
+    for (const m of PROPS) {
+      // Gli sgabelli no. Sono l'unico mobile su cui ci si mette SOPRA invece che
+      // attorno, e marcarli occupati voleva dire che il posto a sedere era una
+      // casella proibita: la strada si fermava accanto e non ci arrivava nessuno.
+      if (m.s === 'stoolRound') continue;
+      const d = SV[m.s];
+      blocca(m.x, m.b - d.h, d.w, d.h);
+    }
+    for (const m of DISEGNATI) blocca(m.x, m.b - m.h, m.w, m.h);
+    for (const d of DESKS) blocca(d.x, d.b - SH, SW, SH);
   }
-  for (const p of DISEGNATI) blocca(p.x, p.b - p.h, p.w, p.h);
-  for (const d of DESKS) blocca(d.x, d.b - SH, SW, SH);
+
+  ricalcola();
 
   const cella = (x, y) =>
     Math.min(GR - 1, Math.max(0, Math.floor(y / CELLA))) * GC +
@@ -619,14 +747,11 @@ window.ROOM = (() => {
     stage.style.setProperty('--sheet-room', 'url("' + foglio + '")');
     stage.append(el('div', 'of-floor'));
 
-    for (const w of WALLS) {
+    nodiMuro = WALLS.map(() => {
       const n = el('div', 'of-wall');
-      n.style.left = w.c * TILE + 'px';
-      n.style.top = w.r * TILE + 'px';
-      n.style.width = w.w * TILE + 'px';
-      n.style.height = w.h * TILE + 'px';
-      stage.append(depth(n, (w.r + w.h) * TILE));
-    }
+      stage.append(n);
+      return n;
+    });
     /* La porta. Due ante che si aprono verso i due stipiti, e dietro il buio di
        quello che c'e' fuori. Nel foglio non c'e' — SeasonVale e' una fattoria —
        e comunque e' l'unica parte del muro che deve muoversi, il che vuol dire
@@ -637,21 +762,22 @@ window.ROOM = (() => {
        muro. */
     ante = el('div', 'of-porta');
     ante.append(el('i', 'anta sx'), el('i', 'anta dx'));
-    ante.style.left = VANO[0] + 'px';
-    ante.style.width = VANO[1] + 'px';
     stage.append(depth(ante, TILE));
 
-    for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
-    // I due disegnati a mano. Stessa regola: si appoggiano per terra dal bordo di
+    nodiProp = PROPS.map((m) => {
+      const n = prop(m.s, m.x, m.b);
+      stage.append(n);
+      return n;
+    });
+    // I disegnati a mano. Stessa regola: si appoggiano per terra dal bordo di
     // sotto, e chi sta piu' in basso copre chi sta piu' in alto.
-    for (const p of DISEGNATI) {
-      const n = el('div', 'of-' + p.s);
-      n.style.left = p.x + 'px';
-      n.style.top = p.b - p.h + 'px';
-      n.style.width = p.w + 'px';
-      n.style.height = p.h + 'px';
-      stage.append(depth(n, p.b));
-    }
+    nodiDis = DISEGNATI.map((m) => {
+      const n = el('div', 'of-' + m.s);
+      n.style.width = m.w + 'px';
+      n.style.height = m.h + 'px';
+      stage.append(n);
+      return n;
+    });
 
     // Le tazze sulla rastrelliera. Vanno appena sopra lo scaffale — che sta
     // contro il muro in fondo al bar — e sotto chi ci passa davanti.
@@ -660,8 +786,9 @@ window.ROOM = (() => {
     stage.append(rastrelliera);
     disegnaTazze();
 
-    return DESKS.map((d) => {
-      stage.append(prop('desk', d.x, d.b, 'of-desk'));
+    scrivanie = DESKS.map((d) => {
+      const banco = prop('desk', d.x, d.b, 'of-desk');
+      stage.append(banco);
       // Il computer non viene dal foglio: nel pacchetto non c'e' — e' una
       // fattoria medievale — e comunque e' l'unico mobile che deve accendersi,
       // il che vuol dire un colore che cambia e non un'immagine.
@@ -675,8 +802,82 @@ window.ROOM = (() => {
       // Lo schermo sta SOPRA il piano, non dietro: e' l'unica cosa della stanza
       // che non segue la riga, perche' e' appoggiato sul mobile che la occupa.
       stage.append(depth(mon, d.b + 1));
-      return { x: d.x, b: d.b, top: d.b - SH, mon };
+      return { x: d.x, b: d.b, top: d.b - SH, mon, banco };
     });
+    posiziona();
+    return scrivanie;
+  }
+
+  /**
+   * Rimette ogni cosa al posto che le tocca adesso.
+   *
+   * Non ricostruisce niente: i nodi sono sempre quelli, cambiano solo i numeri.
+   * E' quello che lascia crescere la stanza mentre la guardi senza che la gente
+   * rientri dalla porta a ogni pixel di finestra tirato.
+   */
+  function posiziona() {
+    if (!palco) return;
+    palco.style.width = W + 'px';
+    palco.style.height = H + 'px';
+    WALLS.forEach((w, i) => {
+      const n = nodiMuro[i];
+      n.style.left = w.x + 'px';
+      n.style.top = w.y + 'px';
+      n.style.width = w.w + 'px';
+      n.style.height = w.h + 'px';
+      depth(n, w.y + w.h);
+    });
+    PROPS.forEach((m, i) => {
+      const n = nodiProp[i];
+      const d = SV[m.s];
+      n.style.left = m.x + 'px';
+      n.style.top = m.b - d.h + 'px';
+      depth(n, m.b);
+    });
+    DISEGNATI.forEach((m, i) => {
+      const n = nodiDis[i];
+      n.style.left = m.x + 'px';
+      n.style.top = m.b - m.h + 'px';
+      depth(n, m.b);
+    });
+    DESKS.forEach((d, i) => {
+      const s = scrivanie[i];
+      s.x = d.x;
+      s.b = d.b;
+      s.top = d.b - SH;
+      s.banco.style.left = d.x + 'px';
+      s.banco.style.top = d.b - SH + 'px';
+      depth(s.banco, d.b);
+      s.mon.style.left = d.x + 15 + 'px';
+      s.mon.style.top = d.b - SH + 4 - 16 + 'px';
+      depth(s.mon, d.b + 1);
+    });
+    if (ante) {
+      ante.style.left = VANO[0] + 'px';
+      ante.style.width = VANO[1] + 'px';
+    }
+    // Le tazze stanno sulla rastrelliera, e la rastrelliera si e' spostata col bar.
+    disegnaTazze();
+  }
+
+  /**
+   * Cresce (o torna piccola) perche' ci stia una scheda larga `w` e alta `h`,
+   * misurate in pixel di stanza. Torna true se la misura e' cambiata davvero: chi
+   * chiama lo usa per rimettere a sedere la gente, che sta su coordinate sue.
+   *
+   * Sempre pari, perche' di quello che si aggiunge serve la meta': la porta sta in
+   * mezzo al corridoio e le scrivanie in mezzo al salone, e mezzo pixel dispari
+   * sposta una porta di mezzo pixel per sempre.
+   */
+  function cresci(w, h) {
+    const gx = Math.max(0, Math.floor((w - W0) / 2) * 2);
+    const gy = Math.max(0, Math.floor((h - H0) / 2) * 2);
+    if (gx === GX && gy === GY) return false;
+    GX = gx;
+    GY = gy;
+    ricalcola();
+    posiziona();
+    return true;
   }
 
   // ---------- come ci si veste ----------
@@ -1105,7 +1306,6 @@ window.ROOM = (() => {
   // che insegue una persona e' una busta che sbanda. L'arco lo fa `offset-path`:
   // una curva di due punti e un'animazione sola, invece di un timer che ridipinge
   // un elemento sessanta volte al secondo per un secondo e mezzo.
-  const PORTA = [W / 2, H - TILE];
   /** Quante ne stanno in aria insieme. Oltre, sono coriandoli. */
   const MAX_BUSTE = 8;
 
@@ -1137,26 +1337,56 @@ window.ROOM = (() => {
     stage.append(n);
   }
 
+  /* Quello che di qui esce e che cambia con la misura esce come funzione e non
+     come valore: un oggetto costruito una volta si porta dietro la pianta com'era
+     al caricamento, e chi lo legge dopo che la stanza e' cresciuta legge numeri
+     di una stanza che non esiste piu'. */
   return {
     TILE,
     COLS,
     ROWS,
-    W,
-    H,
+    /** La misura del disegno: quella che non cambia mai. */
+    W0,
+    H0,
+    get W() {
+      return W;
+    },
+    get H() {
+      return H;
+    },
     SV,
-    PROPS,
-    DISEGNATI,
-    DESKS,
-    SGABELLI,
-    INGRESSO,
+    get PROPS() {
+      return PROPS;
+    },
+    get DISEGNATI() {
+      return DISEGNATI;
+    },
+    get DESKS() {
+      return DESKS;
+    },
+    get SGABELLI() {
+      return SGABELLI;
+    },
+    get INGRESSO() {
+      return INGRESSO;
+    },
     apriPorta,
-    METE,
-    DESTINAZIONI,
-    BACHECHE,
-    PORTA,
+    get METE() {
+      return METE;
+    },
+    get DESTINAZIONI() {
+      return DESTINAZIONI;
+    },
+    get BACHECHE() {
+      return BACHECHE;
+    },
+    get PORTA() {
+      return PORTA;
+    },
     SW,
     SH,
     posto,
+    cresci,
     monta,
     posta,
     parla,
@@ -1185,7 +1415,9 @@ window.ROOM = (() => {
       disegnaTazze();
     },
     cammino,
-    occupata,
+    get occupata() {
+      return occupata;
+    },
     cella,
     /** Si accende una volta: da li' in poi la stanza vive da sola. */
     accendi(elenco) {

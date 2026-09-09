@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.30.0
+
+- **L'ufficio non e' piu' un disegno in mezzo a due bande nere: e' una stanza che
+  cresce.** La pianta resta disegnata 384 per 320, ma quella e' la misura del
+  disegno: quella vera si allarga fino a riempire la scheda. Il pavimento in
+  piu' non finisce a caso — in larghezza va tutto nel corridoio in mezzo, cosi'
+  le due stanze di sopra restano nei loro angoli coi loro scaffali contro i
+  loro muri; in altezza va tutto nel salone, che e' l'unica stanza senza niente
+  addosso ai muri. Le scrivanie restano in mezzo, le piante negli angoli, e i
+  muri di fuori si spostano con loro.
+
+- **E ci si cammina davvero, nella parte nuova.** Non e' uno sfondo allargato: la
+  griglia dei passi si rifa' con la stanza, quindi chi si alza gira anche nel
+  pezzo che prima non c'era, e la porta resta in mezzo al corridoio anche quando
+  il corridoio e' largo il doppio. Tirando la finestra la stanza si allarga sotto
+  gli occhi senza che nessuno rientri dalla porta.
+
+- Via il muro esteso della 0.29: riempiva lo stesso, ma era una cornice di legno
+  attorno a una stanza piccola, non una stanza piu' grande.
+
 ## 0.29.0
 
 - **L'ufficio riempie tutta la scheda.** La stanza si ingrandiva a scatti di un

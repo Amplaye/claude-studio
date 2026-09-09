@@ -362,9 +362,7 @@ window.OFFICE = (() => {
     bar.append(title, gente, uso);
 
     // --- il piano ---
-    // 'of-oltre' e' la pelle di quello che avanza attorno alla stanza: muro, non
-    // buio. La misura e la fase gliele passa fit(), qui sotto.
-    const wrap = el('div', 'of-wrap of-oltre');
+    const wrap = el('div', 'of-wrap');
     stage = el('div', 'of-stage');
 
     // Gli sprite arrivano come URI della webview: il CSP non fa passare un
@@ -456,32 +454,34 @@ window.OFFICE = (() => {
   let fitOn;
 
   /**
-   * La pianta e' in pixel fissi e si ingrandisce tutta insieme per riempire la
-   * scheda: si prende tutto lo spazio che ha, e quello che avanza avanza su un
-   * lato solo — quello che non comanda.
+   * La stanza riempie la scheda in due mosse.
    *
-   * Il fattore si arrotondava a quarti (su pixel art un ingrandimento con la
-   * virgola lunga fa mattonelle larghe una volta tre e una volta quattro) e
-   * arrotondava per difetto: a 2,708 la stanza veniva disegnata a 2,5, cioe'
-   * ottanta pixel di buio per lato in una scheda che li aveva tutti liberi.
-   * Il buio attorno si vede molto piu' dell'onda del pavimento, che a questi
-   * ingrandimenti non si nota. Un arrotondamento vale la pena solo se lo
-   * spazio che regala non lo si stava buttando via.
+   * Prima l'ingrandimento: quante volte ci sta il DISEGNO — 384 per 320, la
+   * misura che non cambia mai — nello spazio che c'e'. Poi la stanza cresce fino
+   * a riempire quello spazio a quell'ingrandimento: le si aggiunge pavimento nel
+   * corridoio in mezzo e in fondo al salone, e i muri di fuori si spostano con
+   * lui. Alla fine si rimisura, perche' una stanza cresciuta ci sta un pelo piu'
+   * larga di prima.
    *
-   * Il tetto non e' un giudizio sul disegno, e' un fermo: nessuna scheda
-   * arriva a dodici.
+   * L'ordine e' quello e non l'inverso: se si ingrandisse in base alla stanza
+   * cresciuta, la stanza crescerebbe in base a un ingrandimento che dipende da
+   * lei, e le due si rincorrerebbero.
+   *
+   * Il tetto non e' un giudizio sul disegno, e' un fermo: nessuna scheda arriva
+   * a dodici.
    */
   function fit() {
     if (!fitOn) return;
-    const raw = Math.min(fitOn.clientWidth / window.ROOM.W, fitOn.clientHeight / window.ROOM.H);
-    const k = Math.max(0.5, Math.min(12, raw));
+    const R = window.ROOM;
+    const largo = fitOn.clientWidth;
+    const alto = fitOn.clientHeight;
+    if (largo < 2 || alto < 2) return;
+    const k0 = Math.max(0.5, Math.min(12, Math.min(largo / R.W0, alto / R.H0)));
+    // La gente sta su coordinate sue — la scrivania, la targhetta — e quelle le
+    // sa solo chi disegna le persone: se la stanza si e' mossa, si ridisegna.
+    if (R.cresci(largo / k0, alto / k0) && last) render(last);
+    const k = Math.max(0.5, Math.min(12, Math.min(largo / R.W, alto / R.H)));
     stage.style.transform = 'scale(' + k + ')';
-    // E quello che avanza lo prende il muro (.of-oltre in room.css): stesso
-    // passo delle travi vere e stessa fase, se no dove finisce la stanza si
-    // vede la riga.
-    fitOn.style.setProperty('--px', k + 'px');
-    fitOn.style.setProperty('--ox', (fitOn.clientWidth - window.ROOM.W * k) / 2 + 'px');
-    fitOn.style.setProperty('--oy', (fitOn.clientHeight - window.ROOM.H * k) / 2 + 'px');
   }
 
   // ---------- le persone ----------
