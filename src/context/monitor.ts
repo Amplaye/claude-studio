@@ -421,14 +421,14 @@ export class ContextMonitor {
   }
 
   /** Clic su una card: ci si va davvero. */
-  async focus(id: string, office = false) {
+  async focus(id: string) {
     // Una delle nostre: si va esattamente alla scheda che la tiene, non "a Studio".
     // Con piu' schede aperte "apri Studio" ti portava alla prima, cioe' quasi mai a
     // quella su cui avevi appena cliccato; e guardando la sidebar ti apriva la chat
     // nella sidebar, lasciando la scheda dov'era.
     const host = owned.hosting(id);
     if (host) {
-      if (!ChatPanel.revealKey(host.key, office)) {
+      if (!ChatPanel.revealKey(host.key)) {
         await vscode.commands.executeCommand(
           ChatPanel.exists() ? 'claudeStudio.openTab' : 'claudeStudio.openSidebar'
         );

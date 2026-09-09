@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { owned } from '../context/owned';
 import type { ContextMonitor } from '../context/monitor';
 import { t } from '../shared/i18n';
-import { bindWebview } from './bind';
+import { bindWebview, type FaceHost } from './bind';
 import { ChatController } from './controller';
 
 const TYPE = 'claudeStudio.panel';
@@ -86,7 +86,7 @@ export class ChatPanel {
    * Opens a new independent tab, with its own controller and its own session. This
    * is the "+" in the header.
    */
-  static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor, office = false) {
+  static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
     const chat = new ChatController(ctx, { primary: false });
     // No number in the name: "Claude Studio #2" told you nothing, and three of them
     // side by side were three identical labels. The tab takes the conversation's
@@ -95,18 +95,15 @@ export class ChatPanel {
       enableScripts: true,
       retainContextWhenHidden: true,
     });
-    const tab = new ChatPanel(panel, ctx, chat, monitor, false);
-    // Aperta da dentro l'ufficio: la scheda nuova nasce sulla pianta, con la sua
-    // chat gia' accanto. Prima ti ritrovavi in una scheda vuota e senza stanza —
-    // conversazione nuova, ufficio sparito — e per scrivere a chiunque non fosse
-    // la prima toccava tornare alla chat normale.
-    if (office) tab.showOffice();
-    return tab;
+    return new ChatPanel(panel, ctx, chat, monitor, false);
   }
 
-  /** The tab that holds a given chat, for going back to it. */
+  /**
+   * La scheda che tiene una conversazione — anche se non e' quella che sta
+   * mostrando adesso: l'ufficio ne tiene quante ne apri, e sono tutte sue.
+   */
   static byKey(key: string): ChatPanel | undefined {
-    return [...ChatPanel.all].find((p) => p.chat.key === key);
+    return [...ChatPanel.all].find((p) => p.sessions.some((c) => c.key === key));
   }
 
   /** The Studio tab in front, if one is. */
@@ -115,14 +112,14 @@ export class ChatPanel {
   }
 
   /** Brings a specific chat's tab to the front. */
-  static revealKey(key: string, office = false): boolean {
+  static revealKey(key: string): boolean {
     const p = ChatPanel.byKey(key);
     if (!p) return false;
     p.panel.reveal(undefined, false);
-    // Ci sei arrivato cliccando una persona nella stanza: la scheda che si apre
-    // si mette sulla pianta anche lei. L'ufficio ti segue invece di chiudersi
-    // alle spalle.
-    if (office) p.showOffice();
+    // Portare davanti una conversazione che la scheda teneva dietro vuol dire
+    // mettercisi sopra, non solo mostrare la scheda: e' il clic su una persona
+    // dell'ufficio, che deve finire nella sua chat senza cambiare stanza.
+    p.show(key);
     return true;
   }
 
@@ -133,7 +130,15 @@ export class ChatPanel {
    */
   static closeKey(key: string): boolean {
     const p = ChatPanel.byKey(key);
-    if (!p || p.isPrimary) return false;
+    if (!p) return false;
+    // Una scheda che ne tiene tante chiude quella conversazione, non se stessa:
+    // chiudere l'ufficio perche' hai finito con una delle sei sarebbe chiudere la
+    // stanza per liberare una scrivania.
+    if (p.sessions.length > 1) {
+      p.closeSession(key);
+      return true;
+    }
+    if (p.isPrimary) return false;
     p.panel.dispose();
     return true;
   }
@@ -168,8 +173,24 @@ export class ChatPanel {
   ): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(TYPE, {
       async deserializeWebviewPanel(panel, state: unknown) {
-        const sid = (state as { sid?: unknown } | undefined)?.sid;
+        const st = (state ?? {}) as { sid?: unknown; office?: unknown; sids?: unknown };
+        const sid = st.sid;
         const id = typeof sid === 'string' ? sid : '';
+        // L'ufficio torna a essere l'ufficio, e con dentro le conversazioni che
+        // teneva. Senza questo un reload della finestra lo faceva tornare come una
+        // scheda qualsiasi con una conversazione sola: le altre restavano sul
+        // disco ma la stanza non le conosceva piu'.
+        if (st.office === true && !ChatPanel.officeTab) {
+          const own = new ChatController(ctx, { primary: false });
+          const tab = new ChatPanel(panel, ctx, own, monitor, false, true);
+          tab.showOffice();
+          void own.restoreSession(id);
+          const sids = Array.isArray(st.sids) ? st.sids : [];
+          for (const s of sids) {
+            if (typeof s === 'string' && s && s !== id) tab.adopt(s);
+          }
+          return;
+        }
         // La prima che torna e' la principale: e' quella che divide la conversazione
         // con la chat della sidebar, e l'unica che il resto dell'estensione sa dove
         // trovare (il badge, "apri", i comandi).
@@ -185,8 +206,25 @@ export class ChatPanel {
     });
   }
 
-  /** This tab's controller: secondary tabs have one of their own. */
-  readonly chat: ChatController;
+  /**
+   * La conversazione che questa scheda ha davanti adesso. Non e' piu' fissa: nella
+   * scheda dell'ufficio si cambia dalla striscia in cima, senza ricaricare niente.
+   */
+  chat: ChatController;
+  /**
+   * Tutte le conversazioni che vivono in questa scheda. Una sola, tranne
+   * l'ufficio: li' il "+" ne aggiunge una qui dentro invece di aprire una scheda —
+   * un ufficio solo, con dentro tutte le sessioni.
+   */
+  private readonly sessions: ChatController[] = [];
+  /** Cambia la conversazione della pagina. Lo da' bindWebview. */
+  private swapFace: (next: ChatController) => void = () => {};
+  /** Il filo verso la pagina, per la striscia. */
+  private post: (e: unknown) => void = () => {};
+  /** L'iscrizione al nome della conversazione di adesso: cambia con lei. */
+  private named: vscode.Disposable = { dispose() {} };
+  /** L'ultima striscia mandata, per non rimandarla uguale dieci volte al secondo. */
+  private lastTabs = '';
   /** true = primary tab, false = secondary tab (which has its own). */
   private readonly isPrimary: boolean;
   /** Rewrites the label from the conversation's name. */
@@ -221,7 +259,7 @@ export class ChatPanel {
 
   private constructor(
     private readonly panel: vscode.WebviewPanel,
-    ctx: vscode.ExtensionContext,
+    private readonly ctx: vscode.ExtensionContext,
     chat: ChatController,
     monitor: ContextMonitor | undefined,
     isPrimary: boolean,
@@ -229,20 +267,33 @@ export class ChatPanel {
     private readonly isOffice = false
   ) {
     this.chat = chat;
+    this.sessions.push(chat);
     this.isPrimary = isPrimary;
     if (isPrimary) ChatPanel.primary = this;
     if (isOffice) ChatPanel.officeTab = this;
     ChatPanel.all.add(this);
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
-    const { surface, listener } = bindWebview(
+    // Solo l'ufficio ospita: nelle altre schede il "+" continua ad aprire una
+    // scheda nuova, che li' e' quello che vuoi.
+    const host: FaceHost | undefined = isOffice
+      ? {
+          fresh: () => this.newSession(),
+          pick: (key) => this.show(key),
+          close: (key) => this.closeSession(key),
+        }
+      : undefined;
+    const { surface, listener, swap } = bindWebview(
       panel.webview,
       ctx,
       chat,
       'panel',
       monitor,
-      () => panel.visible
+      () => panel.visible,
+      host
     );
+    this.swapFace = swap;
+    this.post = (e) => surface.post(e as never);
     // Every tab says where it is: the context panel draws one card per conversation
     // and puts the "here" badge on the one you're actually looking at. It used to be
     // the primary only, so with three tabs open the badge never moved.
@@ -254,6 +305,7 @@ export class ChatPanel {
     // un pallino, sulla linguetta, esattamente dove stai gia' guardando per capire
     // quale scheda aprire. Sparisce appena quella scheda torna davanti.
     this.followName = () => {
+      const chat = this.chat;
       // La scheda dell'ufficio si chiama l'ufficio finche' la sua conversazione non
       // ha un nome suo. `name()` risponde 'Claude Studio' proprio quando non ce l'ha
       // ancora, ed e' l'unica etichetta che in una fila di linguette non dice niente.
@@ -263,7 +315,11 @@ export class ChatPanel {
       if (panel.title !== name) panel.title = name;
     };
     this.followName();
-    const named = chat.onTitle(this.followName);
+    this.named = chat.onTitle(this.followName);
+    // La striscia deve dire anche di quelle che stanno dietro: chi lavora, chi ha
+    // finito, chi aspetta un permesso. Quelle non passano da onTitle.
+    const roster = isOffice ? owned.onChange(() => this.sendTabs()) : { dispose() {} };
+    this.sendTabs();
     const state = panel.onDidChangeViewState(() => {
       owned.setFace(chat.key, 'panel', panel.active);
       if (panel.active) this.followName();
@@ -273,22 +329,110 @@ export class ChatPanel {
     });
     panel.onDidDispose(() => {
       state.dispose();
-      named.dispose();
+      roster.dispose();
+      this.named.dispose();
       listener.dispose();
-      owned.setFace(chat.key, 'panel', false);
-      chat.detach(surface);
+      owned.setFace(this.chat.key, 'panel', false);
+      this.chat.detach(surface);
       // Secondary tabs carry their controller with them: when they die, it dies too.
-      if (!isPrimary) chat.dispose();
+      // E l'ufficio se ne porta dietro quante ne teneva: sono nate qui.
+      if (!isPrimary) for (const c of this.sessions) c.dispose();
       // La principale no: la sua conversazione vive anche nella chat della sidebar, e
       // chiudere la scheda non e' chiudere la conversazione. Ma se la sidebar non c'e'
       // — ed e' il caso normale, visto che aprendo la scheda la sidebar si chiude da
       // sola — quella conversazione non e' piu' da nessuna parte, e la sua card resta
       // in elenco a dire "sei qui" mentre non c'e' nessun qui. Niente facce, niente
       // card. Riaprendo la scheda torna: la riattacca `readopt`.
-      else if (!chat.hasFaces()) owned.end(chat.key);
+      else if (!this.chat.hasFaces()) owned.end(this.chat.key);
       ChatPanel.all.delete(this);
       if (ChatPanel.primary === this) ChatPanel.primary = undefined;
       if (ChatPanel.officeTab === this) ChatPanel.officeTab = undefined;
     });
+  }
+
+  /**
+   * Mettiti su questa conversazione, che questa scheda tiene gia'.
+   *
+   * La pagina non si ricarica: si stacca quella di prima, lo schermo si azzera e
+   * la nuova si racconta da capo. E' il modo in cui un ufficio solo puo' tenere
+   * dentro tutte le conversazioni invece di aprire una stanza per ciascuna.
+   */
+  show(key: string) {
+    const next = this.sessions.find((c) => c.key === key);
+    if (!next || next === this.chat) return;
+    owned.setFace(this.chat.key, 'panel', false);
+    this.named.dispose();
+    this.chat = next;
+    this.swapFace(next);
+    owned.setFace(next.key, 'panel', this.panel.active);
+    this.named = next.onTitle(this.followName);
+    this.followName();
+    this.sendTabs();
+  }
+
+  /**
+   * Rimette dentro una conversazione che questa scheda teneva prima del reload.
+   * Non ci si va sopra: si riprende da dove eri, e le altre stanno nella striscia
+   * ad aspettare che le apri.
+   */
+  adopt(sid: string) {
+    const chat = new ChatController(this.ctx, { primary: false });
+    this.sessions.push(chat);
+    void chat.restoreSession(sid).then(() => this.sendTabs());
+  }
+
+  /** Una conversazione nuova, qui dentro, e ci si va subito. */
+  newSession() {
+    const chat = new ChatController(this.ctx, { primary: false });
+    this.sessions.push(chat);
+    this.show(chat.key);
+  }
+
+  /**
+   * Chiude una conversazione della scheda. L'ultima non si chiude: una scheda
+   * dell'ufficio senza nessuna conversazione e' una stanza senza chat, e da li'
+   * non si scriverebbe piu' niente.
+   */
+  closeSession(key: string) {
+    if (this.sessions.length < 2) return;
+    const i = this.sessions.findIndex((c) => c.key === key);
+    if (i < 0) return;
+    const [gone] = this.sessions.splice(i, 1);
+    // Se chiudevi quella che avevi davanti ci si sposta sulla vicina: quella
+    // prima, o la prima che resta.
+    if (this.chat === gone) this.show(this.sessions[Math.max(0, i - 1)].key);
+    gone.dispose();
+    this.sendTabs();
+  }
+
+  /**
+   * La striscia delle conversazioni di questa scheda, come la disegna la pagina.
+   * Solo l'ufficio la manda: le altre schede ne hanno una sola, e la striscia
+   * sarebbe una linguetta che ripete l'etichetta della scheda.
+   */
+  private sendTabs() {
+    if (!this.isOffice) return;
+    const live = owned.all();
+    const items = this.sessions.map((c) => {
+      const own = live.find((o) => o.key === c.key);
+      const given = c.name();
+      return {
+        key: c.key,
+        sid: own?.id ?? '',
+        // 'Claude Studio' e' quello che risponde name() quando un nome non ce
+        // l'ha ancora: nella striscia lo scrive la pagina, nella sua lingua.
+        name: given === 'Claude Studio' ? '' : given,
+        busy: !!own?.busy,
+        done: !!own?.done,
+        asking: !!own?.asks.length,
+        active: c === this.chat,
+      };
+    });
+    // owned cambia a ogni pezzo di risposta: senza questo la striscia si
+    // rimanderebbe intera dieci volte al secondo per non dire niente di nuovo.
+    const sig = JSON.stringify(items);
+    if (sig === this.lastTabs) return;
+    this.lastTabs = sig;
+    this.post({ k: 'tabs', items });
   }
 }

@@ -40,6 +40,10 @@
     'top.office': 'THE OFFICE',
     'top.tab': 'Open as a tab',
     'top.new': 'New session in a new tab ({alt}N)',
+    'top.tokens': '{tokens} of {limit} of context used — {pct}%',
+    'tabs.fresh': 'New',
+    'tabs.new': 'Another conversation, in this same tab',
+    'tabs.close': 'Close this conversation',
 
     // ---- history drawer ----
     'drawer.title': 'Conversations',
@@ -312,6 +316,10 @@
     'top.office': 'THE OFFICE',
     'top.tab': 'Apri come scheda',
     'top.new': 'Nuova sessione in una nuova scheda ({alt}N)',
+    'top.tokens': '{tokens} di {limit} di contesto usato — {pct}%',
+    'tabs.fresh': 'Nuova',
+    'tabs.new': 'Un’altra conversazione, in questa stessa scheda',
+    'tabs.close': 'Chiudi questa conversazione',
 
     'drawer.title': 'Conversazioni',
     'drawer.empty': 'Nessuna conversazione salvata per questo progetto.',

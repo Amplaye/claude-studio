@@ -13,6 +13,11 @@
   /** Every word you can read on this page goes through here. See i18n.js. */
   const t = (key, vars) => window.I18N.t(key, vars);
 
+  /** La conversazione che questa faccia ha davanti: la dice il filo `sid`. */
+  let mySid = '';
+  /** L'ultimo quadro dei consumi arrivato, per ridipingere senza aspettarne un altro. */
+  let lastCtx = null;
+
   // ---------- DOM helpers ----------
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -20,6 +25,77 @@
     if (text != null) e.textContent = text;
     return e;
   };
+
+  /**
+   * Quanto contesto si e' mangiato questa conversazione.
+   *
+   * Il numero c'era gia' — nella colonna delle conversazioni — ma nell'ufficio
+   * quella colonna e' spenta per scelta, e nella barra laterale sta sotto la
+   * piega: per sapere a che punto eri dovevi andartelo a cercare. Qui sta nella
+   * testata, accanto al nome, e non se ne va mai.
+   */
+  function paintTok() {
+    const box = $('tok');
+    if (!box) return;
+    const card = lastCtx && mySid ? (lastCtx.cards || []).find((c) => c.id === mySid) : null;
+    if (!card || card.pct == null) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const pct = Math.max(0, Math.min(100, card.pct));
+    $('tokPct').textContent = pct + '%';
+    // Lo stesso semaforo delle barre: il colore sta nel numero che cambia, non
+    // nella parola accanto.
+    $('tokPct').style.color = pct >= 80 ? 'var(--bad)' : pct >= 60 ? 'var(--warn)' : 'var(--ok)';
+    $('tokN').textContent = card.tokens + (lastCtx.limit ? ' / ' + lastCtx.limit : '');
+    box.title = t('top.tokens', { tokens: card.tokens, limit: lastCtx.limit || '', pct: pct });
+  }
+
+  /**
+   * La striscia delle conversazioni di questa scheda.
+   *
+   * La manda solo chi ne tiene piu' d'una, cioe' l'ufficio: una stanza sola con
+   * dentro tutte le sessioni, e queste sono le linguette per passare dall'una
+   * all'altra. Il pallino dice cosa le sta succedendo — sta lavorando, ha finito,
+   * ti aspetta — cosi' la si vede anche mentre guardi un'altra.
+   */
+  function paintTabs(items) {
+    const box = $('sesstabs');
+    if (!box) return;
+    box.textContent = '';
+    box.hidden = !items.length;
+    if (!items.length) return;
+    for (const it of items) {
+      const nome = it.name || t('tabs.fresh');
+      const chip = el('div', 'sesstab' + (it.active ? ' on' : ''));
+      const go = el('button', 'sesstab-go');
+      go.type = 'button';
+      go.title = nome;
+      const stato = it.asking ? ' ask' : it.busy ? ' busy' : it.done ? ' done' : '';
+      go.append(el('span', 'sesstab-dot' + stato), el('span', 'sesstab-n', nome));
+      go.addEventListener('click', () => vscode.postMessage({ cmd: 'pickSession', key: it.key }));
+      chip.append(go);
+      // L'ultima non si chiude: una scheda senza conversazioni non e' piu' una chat.
+      if (items.length > 1) {
+        const x = el('button', 'sesstab-x');
+        x.type = 'button';
+        x.title = t('tabs.close');
+        x.setAttribute('aria-label', t('tabs.close'));
+        x.append(icon('close'));
+        x.addEventListener('click', () => vscode.postMessage({ cmd: 'closeSession', key: it.key }));
+        chip.append(x);
+      }
+      box.append(chip);
+    }
+    const add = el('button', 'sesstab-add');
+    add.type = 'button';
+    add.title = t('tabs.new');
+    add.setAttribute('aria-label', t('tabs.new'));
+    add.append(icon('add'));
+    add.addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
+    box.append(add);
+  }
 
   function icon(name, cls) {
     const svg = document.createElementNS(SVG, 'svg');
@@ -1629,6 +1705,10 @@
         log.classList.add('fresh-open');
         break;
       case 'reset':
+        // Conversazione cambiata: il conto di prima non e' piu' il tuo. Torna al
+        // primo quadro dei consumi che arriva, con l'id nuovo.
+        mySid = '';
+        paintTok();
         blocks.clear();
         tools.clear();
         asks.clear();
@@ -1666,6 +1746,8 @@
         showHistory(m.items || []);
         break;
       case 'ctx':
+        lastCtx = m.d;
+        paintTok();
         rail.render(m.d);
         // Stessi dati, seconda faccia: la colonna dice quanto contesto resta a
         // ognuna, l'ufficio dice chi c'e' e chi sta lavorando. Si ridipinge anche
@@ -1733,6 +1815,19 @@
       // una sola in piedi. Vuota = schermata nuova, niente da riaprire.
       case 'sid':
         vscode.setState(Object.assign({}, vscode.getState() || {}, { sid: m.id || '' }));
+        mySid = m.id || '';
+        paintTok();
+        break;
+      case 'tabs':
+        paintTabs(m.items || []);
+        // Le conversazioni della scheda si mettono da parte: dopo un reload della
+        // finestra le chiavi non esistono piu', gli id sul disco si'. E' quello che
+        // permette all'ufficio di tornare con dentro la stessa gente.
+        vscode.setState(
+          Object.assign({}, vscode.getState() || {}, {
+            sids: (m.items || []).map((x) => x.sid).filter(Boolean),
+          })
+        );
         break;
       case 'user': {
         const n = el('div', 'msg user');
@@ -2737,10 +2832,7 @@
     });
   }
 
-  /** Stai guardando la stanza? Allora quello che apri si apre li' dentro. */
-  const inOffice = () => document.body.classList.contains('inoffice');
-
-  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab', office: inOffice() }));
+  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
   // ---------- l'ufficio ----------
   //
   // Non e' piu' una scheda a parte: e' l'altra faccia di questa, e il bottone la
@@ -2758,6 +2850,10 @@
     }
     document.body.classList.toggle('inoffice', !!on);
     $('btnOffice').classList.toggle('on', !!on);
+    // Che questa scheda sia l'ufficio se lo ricorda la pagina: dopo un reload della
+    // finestra e' l'unico appunto rimasto, ed e' quello che la fa tornare la stanza
+    // invece di una scheda qualunque (vedi ChatPanel.register).
+    vscode.setState(Object.assign({}, vscode.getState() || {}, { office: !!on }));
     // Acceso mentre era spento non aveva misure: il piano si adatta ora che ce le ha.
     if (on && window.OFFICE) window.OFFICE.resize();
   }
@@ -3498,7 +3594,7 @@
         // A new session is a new tab, not this one wiped: whatever is running here
         // keeps running.
         e.preventDefault();
-        vscode.postMessage({ cmd: 'newTab', office: inOffice() });
+        vscode.postMessage({ cmd: 'newTab' });
         return;
       case 'h':
         e.preventDefault();

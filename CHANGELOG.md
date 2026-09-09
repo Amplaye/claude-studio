@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.26.0
+
+- **Un ufficio solo, con dentro tutte le conversazioni.** Il "+" non apre piu' una
+  seconda stanza: apre una conversazione qui dentro, e sotto la testata c'e' la
+  striscia delle linguette per passare dall'una all'altra. Ogni linguetta ha il
+  suo pallino — sta lavorando, ha finito, ti aspetta — cosi' sai cosa succede
+  nelle altre mentre ne guardi una. Cliccando una persona nella stanza ci si va
+  allo stesso modo, senza cambiare scheda. E l'ufficio torna tale anche dopo un
+  reload della finestra, con dentro le conversazioni che teneva.
+
+- **Quanto contesto hai consumato, sempre in vista.** Nella testata, accanto al
+  nome: percentuale e token, col semaforo delle barre. Il numero c'era gia' ma
+  stava nella colonna delle conversazioni, che nell'ufficio e' spenta per scelta:
+  per sapere a che punto eri dovevi andartelo a cercare.
+
 ## 0.25.0
 
 - **L'ufficio non si chiude piu' alle tue spalle.** Aprendo una conversazione

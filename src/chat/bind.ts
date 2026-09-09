@@ -12,15 +12,32 @@ import { chats } from './controller';
 import { owned } from '../context/owned';
 import type { ChatController, Surface } from './controller';
 
+/**
+ * Chi ospita questa faccia, quando ne ospita piu' d'una.
+ *
+ * L'ufficio e' una scheda sola con dentro tutte le conversazioni: il "+" non apre
+ * una scheda nuova, apre una conversazione qui; e la striscia in cima le cambia.
+ * Le schede normali non passano niente e si comportano come sempre.
+ */
+export interface FaceHost {
+  /** Una conversazione nuova, dentro questa stessa scheda. */
+  fresh(): void;
+  /** Mettiti su questa. */
+  pick(key: string): void;
+  /** Chiudi questa. */
+  close(key: string): void;
+}
+
 export function bindWebview(
   webview: vscode.Webview,
   ctx: vscode.ExtensionContext,
-  chat: ChatController,
+  initial: ChatController,
   kind: Surface['kind'],
   monitor?: ContextMonitor,
   /** Is this face on screen? The chime needs to know: see sound.ts. */
-  visible: () => boolean = () => true
-): { surface: Surface; listener: vscode.Disposable } {
+  visible: () => boolean = () => true,
+  host?: FaceHost
+): { surface: Surface; listener: vscode.Disposable; swap(next: ChatController): void } {
   webview.options = {
     enableScripts: true,
     localResourceRoots: [
@@ -51,6 +68,13 @@ export function bindWebview(
     // da nessuna immagine.
     roomPng: 'sv-room.png',
   });
+
+  /**
+   * La conversazione che questa pagina ha davanti adesso. E' una variabile e non
+   * un parametro fisso perche' l'ufficio la cambia senza ricaricare la pagina: chi
+   * risponde ai messaggi qui sotto legge sempre quella di adesso.
+   */
+  let chat = initial;
 
   const surface: Surface = {
     kind,
@@ -119,9 +143,17 @@ export function bindWebview(
         void vscode.commands.executeCommand('claudeStudio.office');
         return;
       case 'newTab':
-        // Chiesta da dentro l'ufficio, la scheda nuova si apre nell'ufficio: la
-        // conversazione cambia, il posto dove stai no.
-        void vscode.commands.executeCommand('claudeStudio.openNewTab', !!m.office);
+        // In una scheda che tiene piu' conversazioni la nuova nasce qui dentro:
+        // l'ufficio e' uno solo, e aprirne un secondo per scrivere altrove era
+        // esattamente quello che non doveva succedere.
+        if (host) host.fresh();
+        else void vscode.commands.executeCommand('claudeStudio.openNewTab');
+        return;
+      case 'pickSession':
+        host?.pick(m.key);
+        return;
+      case 'closeSession':
+        host?.close(m.key);
         return;
       case 'closeTab':
         // From the tab only: in the sidebar the button isn't there at all, and
@@ -168,7 +200,7 @@ export function bindWebview(
         void monitor?.rename(m.id);
         return;
       case 'focus':
-        void monitor?.focus(m.id, !!m.office);
+        void monitor?.focus(m.id);
         return;
       case 'close':
         void monitor?.close(m.id);
@@ -190,6 +222,19 @@ export function bindWebview(
 
   return {
     surface,
+    /**
+     * Cambia la conversazione senza ricaricare la pagina: la vecchia si stacca, lo
+     * schermo si azzera e la nuova si racconta da capo (`hello` rimanda mode,
+     * preferenze, trascrizione e id). E' quello che fa la striscia dell'ufficio.
+     */
+    swap(next: ChatController) {
+      if (next === chat) return;
+      chat.detach(surface);
+      chat = next;
+      void webview.postMessage({ k: 'reset' });
+      chat.attach(surface);
+      chat.hello(surface);
+    },
     listener: {
       dispose() {
         ctxSub?.dispose();

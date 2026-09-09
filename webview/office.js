@@ -304,7 +304,7 @@ window.OFFICE = (() => {
     // dati di adesso: la persona si costruisce una volta e vive finche' vive la
     // conversazione, quello che aspetta cambia a ogni giro.
     b.onclick = () =>
-      chi.asks.length ? apriDomande(chi.id) : send({ cmd: 'focus', id: chi.id, office: true });
+      chi.asks.length ? apriDomande(chi.id) : send({ cmd: 'focus', id: chi.id });
 
     return chi;
   }

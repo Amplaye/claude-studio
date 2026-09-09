@@ -375,7 +375,35 @@ export type Wire =
   | { k: 'busy'; value: boolean }
   | { k: 'error'; message: string }
   // A new conversation draws the empty screen again, so it gets a new tip with it.
-  | { k: 'reset'; tip?: { en: string; it: string } | null };
+  | { k: 'reset'; tip?: { en: string; it: string } | null }
+  /**
+   * Le conversazioni che vivono dentro questa stessa scheda.
+   *
+   * Una sola scheda, tante conversazioni: e' l'ufficio. La stanza e' una, e
+   * cambiare persona non deve aprire una seconda stanza — la pagina disegna una
+   * striscia di linguette e si passa dall'una all'altra restando dove sei. Le
+   * schede normali non ricevono mai questo filo, e la striscia non compare.
+   */
+  | { k: 'tabs'; items: TabItem[] };
+
+/** Una conversazione nella striscia: come si chiama e cosa le sta succedendo. */
+export interface TabItem {
+  /** La chiave del controller: e' quello che si rimanda indietro per cambiare. */
+  key: string;
+  /**
+   * L'id della conversazione, vuoto se non ne ha ancora uno. La pagina se lo mette
+   * da parte: dopo un reload della finestra le chiavi non valgono piu' niente, e
+   * questo e' l'unico modo di ritrovare le conversazioni che la scheda teneva.
+   */
+  sid: string;
+  /** Il nome, vuoto se non ne ha ancora uno (la pagina scrive "nuova"). */
+  name: string;
+  busy: boolean;
+  done: boolean;
+  /** Ferma su un permesso: aspetta te. */
+  asking: boolean;
+  active: boolean;
+}
 
 /**
  * Una riga del menu che si apre scrivendo "@".
@@ -449,9 +477,12 @@ export type Cmd =
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
-  // `office`: la chiedi da dentro l'ufficio, e la scheda nuova nasce li' dentro
-  // invece di buttarti fuori. Vedi ChatPanel.openNew.
-  | { cmd: 'newTab'; office?: boolean }
+  // In una scheda che tiene piu' conversazioni — l'ufficio — questa non apre una
+  // scheda nuova: apre una conversazione nuova li' dentro. Vedi FaceHost.
+  | { cmd: 'newTab' }
+  // La striscia delle conversazioni di questa scheda: mettiti su quella, o chiudila.
+  | { cmd: 'pickSession'; key: string }
+  | { cmd: 'closeSession'; key: string }
   // "Portami all'ufficio": non gira questa scheda, ne chiede una sua.
   | { cmd: 'openOffice' }
   // The page has already played its exit animation: here it really closes.

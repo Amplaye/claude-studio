@@ -64,8 +64,8 @@ export function activate(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('claudeStudio.openTabBeside', () =>
       ChatPanel.open(ctx, chat, vscode.ViewColumn.Beside, monitor)
     ),
-    vscode.commands.registerCommand('claudeStudio.openNewTab', (office?: boolean) =>
-      ChatPanel.openNew(ctx, monitor, !!office)
+    vscode.commands.registerCommand('claudeStudio.openNewTab', () =>
+      ChatPanel.openNew(ctx, monitor)
     ),
     vscode.commands.registerCommand('claudeStudio.newSession', () => chat.newSession()),
     // Rinomina la conversazione della scheda in primo piano — o della sidebar, se e'

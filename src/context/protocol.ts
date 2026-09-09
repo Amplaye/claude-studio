@@ -83,7 +83,7 @@ export type CtxCmd =
   | { cmd: 'ready' }
   | { cmd: 'refresh' }
   | { cmd: 'rename'; id: string }
-  | { cmd: 'focus'; id: string; office?: boolean }
+  | { cmd: 'focus'; id: string }
   // Questa conversazione hai finito di guardarla: via la card, e con lei quello che
   // la teneva viva. Vedi ContextMonitor.close.
   | { cmd: 'close'; id: string }

@@ -3418,3 +3418,163 @@ body.inoffice .top.busy .modeseg-btn:not(.on) span {
   width: 17px;
   height: 17px;
 }
+/* ---- quanto ne hai consumato ----
+
+   Il numero c'era gia', ma stava nella colonna delle conversazioni: nell'ufficio
+   quella colonna e' spenta per scelta e nella barra laterale sta sotto la piega,
+   quindi per sapere a che punto eri dovevi andartelo a cercare. Qui sta in fila
+   col nome, si legge di sfuggita mentre scrivi, e non se ne va mai.
+
+   Il colore sta nella percentuale — la cosa che cambia — e non nel totale. */
+.tok {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--ctl);
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: var(--card);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.tok[hidden] {
+  display: none;
+}
+.tok-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tok-n {
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
+/* Stretti — la colonna dell'ufficio, o la barra laterale — resta la percentuale:
+   e' quella che dice quanto manca. Il totale in cifre e' il dettaglio, e il
+   dettaglio e' la prima cosa che si toglie quando lo spazio finisce. */
+@media (max-width: 460px) {
+  .tok-n {
+    display: none;
+  }
+}
+body.inoffice .top.busy .tok-n {
+  display: none;
+}
+
+/* ---- le conversazioni di questa scheda ----
+
+   Ne ha piu' d'una solo l'ufficio: una stanza sola con dentro tutte le sessioni,
+   e queste sono le linguette per passare dall'una all'altra senza aprire una
+   seconda stanza. Il pallino dice cosa sta succedendo a ognuna anche mentre ne
+   guardi un'altra: sta lavorando, ha finito, ti aspetta. */
+.sesstabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 var(--pad) 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.sesstabs[hidden] {
+  display: none;
+}
+.sesstab {
+  /* Non si stringono: la striscia scorre. Quattro linguette schiacciate in una
+     colonna stretta diventano quattro nomi tagliati alla seconda lettera, che e'
+     peggio di doverle scorrere. */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: var(--card);
+}
+/* Quella che stai guardando: la stessa terracotta della conversazione in corso
+   nella colonna, cosi' "sei qui" si dice sempre nello stesso modo. */
+.sesstab.on {
+  border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 14%, var(--card));
+}
+.sesstab-go {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 148px;
+  padding: 4px 6px 4px 10px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: 500 11.5px var(--sans);
+  cursor: pointer;
+}
+.sesstab-n {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.sesstab-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 34%, transparent);
+}
+.sesstab-dot.busy {
+  background: var(--claude-1);
+  animation: sesstab-pulse 1.4s ease-in-out infinite;
+}
+.sesstab-dot.done {
+  background: var(--ok);
+}
+/* Ti aspetta: rosso e lampeggiante, come il punto esclamativo nella stanza. Una
+   conversazione ferma su un permesso e' l'unica che non va avanti da sola. */
+.sesstab-dot.ask {
+  background: var(--bad);
+  animation: sesstab-pulse 1s steps(1) infinite;
+}
+@keyframes sesstab-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.sesstab-x {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  opacity: 0.5;
+  font-size: 10px;
+  cursor: pointer;
+}
+.sesstab-x:hover {
+  opacity: 1;
+  color: var(--bad);
+}
+.sesstab-add {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px dashed var(--line);
+  border-radius: 50%;
+  background: none;
+  color: var(--fg);
+  cursor: pointer;
+}
+.sesstab-add:hover {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--claude-1) 62%, transparent);
+  background: color-mix(in srgb, var(--claude-1) 12%, transparent);
+}

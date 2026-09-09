@@ -31,6 +31,13 @@
           <button class="of-back" id="btnBackChat" type="button" data-i18n-label="office.toChat" aria-label="Chat">
             <svg class="ico"><use href="#ion-chatbubble-ellipses" /></svg><span data-i18n="office.toChat">Chat</span>
           </button>
+          <!-- Quanto ne hai consumato, sempre in vista. Sta a sinistra, in fila
+               con il nome, perche' e' una cosa che si guarda di sfuggita mentre
+               scrivi: nell'ufficio la colonna del contesto e' spenta e senza
+               questo non c'era piu' nessun posto dove leggerlo. -->
+          <span class="tok" id="tok" hidden>
+            <span class="tok-pct" id="tokPct"></span><span class="tok-n" id="tokN"></span>
+          </span>
           <span class="grow"></span>
           <!-- What it's doing right now, next to the mode switch: short on purpose —
                the state and the clock, nothing else. A chat that stays still for a
@@ -74,6 +81,12 @@
             <svg class="ico"><use href="#ion-add" /></svg>
           </button>
         </header>
+
+        <!-- Le conversazioni che vivono in questa scheda. Ne ha piu' d'una solo
+             l'ufficio: una stanza sola, e qui dentro si passa da una scrivania
+             all'altra senza aprirne una seconda. Nelle altre schede questo filo
+             non arriva mai e la striscia non c'e'. -->
+        <div class="sesstabs" id="sesstabs" hidden></div>
 
         <div class="drawer" id="drawer" hidden>
           <div class="drawer-head">
