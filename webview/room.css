@@ -290,6 +290,40 @@
   }
 }
 
+/* ---- il portatile ----
+   Sui tavoli un computer non c'e', e non deve esserci: sono tavoli. Ma chi ci si
+   siede a lavorare deve avere qualcosa davanti, se no batte a macchina sul
+   legno. Tredici per nove, e sono due pezzi soli: lo schermo alzato e la
+   tastiera davanti. Stessa regola del monitor — colori pieni a stop netti, mai
+   una sfumatura, e la sagoma prima del dettaglio.
+
+   Piu' basso del monitor apposta: un portatile che a schermo e' alto come un
+   monitor e' un monitor con la tastiera attaccata, e a sedici pixel di persona
+   la differenza fra i due la fa solo l'altezza. */
+.of-portatile {
+  position: absolute;
+  width: 13px;
+  height: 9px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #d8e08a 0 2px, var(--olive) 2px 4px, var(--olive-lo) 4px 6px, transparent 6px);
+  box-shadow:
+    inset 0 0 0 1px #4a3a44,
+    inset 0 0 0 2px var(--of-contorno);
+  animation: of-screen 2.6s ease-in-out infinite;
+}
+/* La tastiera: la lastra davanti allo schermo, un pixel piu' stretta per lato.
+   E' quella a dire "portatile" e non "televisore appoggiato sul tavolo". */
+.of-portatile::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  width: 15px;
+  height: 3px;
+  background: linear-gradient(180deg, #6b5560 0 1px, #3d2d38 1px);
+  box-shadow: 0 1px 0 rgba(46, 28, 44, 0.45);
+}
+
 /* ---- il cestino della carta ----
    Nel foglio non c'e': al suo posto stava un barilotto, e un barilotto in un
    ufficio si legge come una cassa da magazzino. Dodici per quindici, e sono tre

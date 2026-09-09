@@ -165,8 +165,11 @@ window.OFFICE = (() => {
     // I foglietti stanno appesi ai muri, quindi sotto la gente: uno che passa
     // davanti alla bacheca la copre, ed e' giusto cosi'.
     bacheche = el('div', 'of-bacheche');
+    // I portatili stanno sui tavoli, quindi sotto la gente che ci si siede
+    // davanti: e' la profondita' del singolo pezzo a decidere, non il gruppo.
+    portatili = el('div', 'of-portatili');
     empty = el('div', 'of-nobody');
-    stage.append(bacheche, crowd, empty);
+    stage.append(bacheche, portatili, crowd, empty);
 
     // La bacheca si clicca, e dentro c'e' quello che sul muro non ci sta scritto.
     //
@@ -361,10 +364,18 @@ window.OFFICE = (() => {
    * impiegato la si lascia appena arriva una conversazione nuova, e da li' si
    * torna a stare in piedi nella corsia.
    */
-  /** chiave dell'impiegato -> scrivania. Un posto preso non si cambia sotto i piedi. */
+  /** chiave dell'impiegato -> posto. Un posto preso non si cambia sotto i piedi. */
   const banchi = new Map();
 
-  /** Da' un banco a chi non ce l'ha, e lo toglie a chi non c'e' piu' o se l'e' visto soffiare. */
+  /* I posti sono in fila uno solo: prima le sei scrivanie, poi i quattro
+     sgabelli. Un indice solo perche' `banchi` ne tiene uno solo, e due elenchi
+     paralleli sarebbero due modi di dire "il posto numero tre". */
+  const posti = () => scrivanie.length + window.ROOM.SGABELLI.length;
+  const sgabello = (i) => i >= scrivanie.length;
+  const postoBanco = (i) =>
+    sgabello(i) ? window.ROOM.SGABELLI[i - scrivanie.length] : window.ROOM.posto(i);
+
+  /** Da' un posto a chi non ce l'ha, e lo toglie a chi non c'e' piu' o se l'e' visto soffiare. */
   function assegnaBanchi(voluti) {
     for (const [chiave, i] of banchi) {
       if (!voluti.has(chiave) || seats[i]) banchi.delete(chiave);
@@ -374,30 +385,67 @@ window.OFFICE = (() => {
       if (banchi.has(chiave) || !capo.casa) continue;
       let scelto = -1;
       let quanto = Infinity;
-      for (let i = 0; i < scrivanie.length; i++) {
+      for (let i = 0; i < posti(); i++) {
         if (seats[i] || presi.has(i)) continue;
-        const p = window.ROOM.posto(i);
-        const d = Math.hypot(p.x - capo.casa.x, p.y - capo.casa.y);
+        const p = postoBanco(i);
+        // Le scrivanie vengono prima degli sgabelli a qualunque distanza: un
+        // posto col computer e' un posto migliore di uno col portatile, e la
+        // sala riunioni si riempie solo quando il salone e' pieno davvero.
+        const d = Math.hypot(p.x - capo.casa.x, p.y - capo.casa.y) + (sgabello(i) ? 1e4 : 0);
         if (d < quanto) {
           quanto = d;
           scelto = i;
         }
       }
-      // Nessuna libera: si sta in piedi accanto al capo, come si e' sempre fatto.
+      // Nessuno libero: si sta in piedi accanto al capo, come si e' sempre fatto.
       if (scelto < 0) continue;
       banchi.set(chiave, scelto);
       presi.add(scelto);
     }
   }
 
-  /** Il posto di questo impiegato: la sua scrivania, o la corsia accanto al capo. */
+  /** Il posto di questo impiegato: il suo, o la corsia accanto al capo. */
   function postoStaff(chiave, capo, i) {
     const banco = banchi.get(chiave);
     if (banco != null) {
-      const p = window.ROOM.posto(banco);
+      const p = postoBanco(banco);
       return [p.x + 8, p.y + 24];
     }
     return [capo.casa.x + 8 + POSTI_STAFF[i][0], capo.casa.y + 24 + POSTI_STAFF[i][1]];
+  }
+
+  /* ---- i portatili ----
+   *
+   * Sul tavolo della sala riunioni un computer non c'e', ed e' giusto che non ci
+   * sia: e' un tavolo. Ma uno seduto a un tavolo vuoto che batte a macchina e'
+   * uno che mima, ed e' esattamente la cosa che questo ufficio non deve fare —
+   * quindi chi si siede su uno sgabello se lo porta.
+   *
+   * Si ridipingono tutti da `banchi` invece di appiccicarne uno a ciascuno: un
+   * portatile non e' di nessuno, e' del posto. Cosi' non c'e' un ciclo di vita da
+   * tenere in pari, e un portatile dimenticato acceso su un tavolo vuoto non
+   * puo' esistere.
+   *
+   * Solo per chi e' arrivato davvero: comparire sul tavolo mentre chi lo porta e'
+   * ancora per strada e' lo stesso errore del foglietto appeso al muro e in mano
+   * a qualcuno nello stesso momento.
+   */
+  let portatili;
+
+  function paintPortatili() {
+    if (!portatili) return;
+    const out = [];
+    for (const [chiave, i] of banchi) {
+      const chi = staff.get(chiave);
+      if (!sgabello(i) || !chi || chi.va || chi.esce) continue;
+      const g = window.ROOM.SGABELLI[i - scrivanie.length];
+      const n = el('i', 'of-portatile');
+      n.style.left = g.lap[0] + 'px';
+      n.style.top = g.lap[1] + 'px';
+      n.style.zIndex = g.lz;
+      out.push(n);
+    }
+    portatili.replaceChildren(...out);
   }
 
   /**
@@ -451,6 +499,8 @@ window.OFFICE = (() => {
       // Qualunque cosa succeda per strada, "sta arrivando" deve smettere di
       // essere vero: chi resta in arrivo per sempre non se ne va piu'.
       chi.va = false;
+      // E il portatile si apre adesso, che e' quando si e' seduti.
+      paintPortatili();
     }
   }
 
@@ -464,6 +514,8 @@ window.OFFICE = (() => {
    */
   async function esce(chi) {
     chi.esce = true;
+    // Il portatile si chiude quando ci si alza, non quando si e' usciti.
+    paintPortatili();
     // Prima si aspetta che abbia finito di arrivare. Un sub-agent puo' chiudersi
     // mentre chi lo porta e' ancora per strada, e due tragitti sullo stesso
     // elemento se lo litigano un tratto per uno: la persona rimbalza e non arriva
@@ -480,6 +532,9 @@ window.OFFICE = (() => {
     }
     chi.el.remove();
     staff.delete(chi.chiave);
+    // Il posto torna libero, e il portatile se ne va col suo padrone.
+    banchi.delete(chi.chiave);
+    paintPortatili();
     paintBacheche();
   }
 
@@ -724,6 +779,7 @@ window.OFFICE = (() => {
       dk.mon.classList.toggle('working', occupate.has(i));
     });
 
+    paintPortatili();
     paintBacheche();
     // E il foglio aperto, se e' aperto: e' la stessa roba dei foglietti sul muro,
     // e non puo' restare indietro di un turno rispetto a loro.

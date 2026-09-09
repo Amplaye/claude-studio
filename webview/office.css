@@ -287,6 +287,16 @@ body.inoffice .top .activity {
   pointer-events: none;
 }
 
+/* I portatili sui tavoli. Stessa regola dei foglietti: niente profondita' sul
+   contenitore, perche' ognuno si prende quella del tavolo su cui sta — il
+   tavolo della sala riunioni e quello del bar sono due profondita' diverse, e
+   con una sola per tutti uno dei due finirebbe dietro al suo tavolo. */
+.of-portatili {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* La figura la disegna room.css: qui c'e' solo quello che ne fa un bottone. */
 .of-guy {
   color: var(--ink);

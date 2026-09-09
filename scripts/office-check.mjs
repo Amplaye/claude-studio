@@ -30,7 +30,9 @@
 //    nessuna al primo giro (se no aprire la scheda e' una raffica di buste), e
 //    tutte se ne vanno da sole quando sono atterrate;
 //  - i capi e i loro impiegati: ogni conversazione e' un capo, i sub-agent che
-//    apre sono i suoi, e finche' ci sono scrivanie libere si siedono — sei posti
+//    apre sono i suoi, e finche' c'e' un posto libero si siedono — prima le
+//    scrivanie, poi i quattro sgabelli attorno ai due tavoli, col portatile
+//    davanti perche' sui tavoli un computer non c'e' — sei posti
 //    e due conversazioni vuol dire quattro scrivanie vuote, e un ufficio con
 //    quattro posti liberi e tre persone in piedi nella corsia non e' un ufficio
 //    pieno, e' un ufficio in attesa. Uno per scrivania, e lo schermo davanti
@@ -742,6 +744,89 @@ const g = await fogli();
 t(g.fatte === 4, 'i foglietti archiviati sono ' + g.fatte + ' invece di 4');
 t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 
+// ---- e quando le scrivanie finiscono: gli sgabelli ----
+//
+// Due schede aperte con quattro sub-agent per una sono dieci persone, e le
+// scrivanie sono sei. Prima gli ultimi quattro restavano in piedi nelle corsie a
+// battere a macchina sul vuoto, che e' il modo peggiore di dire "non c'e' piu'
+// posto": un ufficio dove qualcuno mima e' un ufficio rotto, e si nota da
+// lontano prima ancora di capire cosa si sta guardando.
+//
+// I posti in piu' sono i quattro sgabelli che c'erano gia' — due attorno al
+// tavolo della sala riunioni, due a quello del bar — e chi ci si siede si porta
+// il portatile, perche' sui tavoli un computer non c'e' e non deve esserci.
+//
+// Tre cose da guardare, e sono le tre che si rompono in silenzio: che nessuno
+// resti in piedi, che il posto a sedere non caschi dentro un mobile (se no la
+// strada si ferma accanto e non ci arriva nessuno), e che i portatili siano
+// tanti quanti gli sgabelli occupati.
+const otto = (p) => [1, 2, 3, 4].map((n) => T(p + n, 'Cosa ' + p + n, 'in_progress'));
+await tasks({
+  'capo-a': { items: otto('a'), done: 0, total: 4, active: 0, busy: true },
+  'capo-b': { items: otto('b'), done: 0, total: 4, active: 0, busy: true },
+});
+// Piu' dei sedici di prima: adesso sono otto ad attraversare la stanza, e gli
+// ultimi partono dalla bacheca solo dopo aver staccato il loro foglietto.
+await page.waitForTimeout(24000);
+t((await staff()) === 8, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 8');
+
+const dove = await page.evaluate(() => {
+  const posti = [...ROOM.DESKS.map((_, i) => ROOM.posto(i)), ...ROOM.SGABELLI].map((c) => [
+    c.x + 8,
+    c.y + 24,
+  ]);
+  return {
+    scrivanie: ROOM.DESKS.length,
+    // -1 vuol dire "in piedi in mezzo alla stanza": con otto posti liberi e otto
+    // persone non deve succedere a nessuno.
+    posti: [...document.querySelectorAll('.of-staff')].map((s) => {
+      const x = parseFloat(s.style.left) + 8;
+      const y = parseFloat(s.style.top) + 24;
+      return posti.findIndex(([px, py]) => Math.hypot(px - x, py - y) <= 2);
+    }),
+    // E il posto a sedere e' pavimento vero. Uno sgabello e' l'unico mobile su
+    // cui ci si mette sopra invece che attorno: se torna a contare come
+    // ostacolo, la strada si ferma accanto e chi ci va resta in piedi di fianco
+    // per sempre — e a occhio sembra solo uno fermo lì.
+    dentro: ROOM.SGABELLI.filter((g) => ROOM.occupata[ROOM.cella(g.x + 8, g.y + 24)]).length,
+  };
+});
+t(
+  dove.posti.every((i) => i >= 0),
+  "un impiegato e' rimasto in piedi con gli sgabelli liberi: " + dove.posti.join(', ')
+);
+t(
+  new Set(dove.posti).size === dove.posti.length,
+  'due impiegati sullo stesso posto: ' + dove.posti.join(', ')
+);
+t(
+  dove.posti.filter((i) => i >= dove.scrivanie).length === 4,
+  'gli impiegati finiti sugli sgabelli sono ' +
+    dove.posti.filter((i) => i >= dove.scrivanie).length +
+    ' invece di 4'
+);
+t(!dove.dentro, dove.dentro + ' sgabelli hanno il posto a sedere dentro un mobile');
+
+const portatili = await page.locator('.of-portatili .of-portatile').count();
+t(portatili === 4, 'i portatili aperti sui tavoli sono ' + portatili + ' invece di 4');
+
+// E si chiudono quando ci si alza, non quando si e' usciti: un portatile acceso
+// su un tavolo vuoto e' peggio di nessun portatile. Qui non si aspetta che
+// arrivino alla bacheca — basta che si siano alzati.
+await tasks({
+  'capo-a': { items: otto('a'), done: 0, total: 4, active: 0, busy: true },
+  'capo-b': {
+    items: [1, 2, 3, 4].map((n) => T('b' + n, 'Cosa b' + n, 'completed')),
+    done: 4,
+    total: 4,
+    active: -1,
+    busy: false,
+  },
+});
+await page.waitForTimeout(1500);
+const rimasti = await page.locator('.of-portatile').count();
+t(!rimasti, rimasti + ' portatili rimasti aperti su un tavolo dove non c’e’ piu’ nessuno');
+
 // ---- le tazze ----
 //
 // Quattro, e sono quelle: girano fra la rastrelliera, la mano di chi le porta e
@@ -773,5 +858,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, la bacheca, l’aura del capo e le tazze'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la bacheca, l’aura del capo e le tazze'
 );

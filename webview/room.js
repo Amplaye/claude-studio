@@ -85,7 +85,10 @@ window.ROOM = (() => {
     // fogli gia' disegnati sopra, e due bacheche appaiate — una vera e una finta —
     // erano soprattutto un modo di non far capire quale delle due si guarda.
     { s: 'board', x: 66, b: 36 },
-    { s: 'stoolRound', x: 81, b: 62 },
+    // Tirato indietro di dieci pixel dal tavolo: chi ci si siede ha i piedi sullo
+    // sgabello, e attaccato com'era i piedi cadevano dentro l'ingombro del
+    // tavolo — cioe' su una casella dove la stanza non manda nessuno.
+    { s: 'stoolRound', x: 81, b: 52 },
     { s: 'meetTable', x: 64, b: 84 },
     { s: 'stoolRound', x: 81, b: 100 },
     { s: 'plantPurple', x: 22, b: 110 },
@@ -104,7 +107,10 @@ window.ROOM = (() => {
     // secondo su un comodino.
     { s: 'stoolRound', x: 270, b: 96 },
     { s: 'meetTable', x: 288, b: 96 },
-    { s: 'stoolRound', x: 340, b: 96 },
+    // Davanti al tavolo e non piu' nell'angolo a destra: li' il posto a sedere
+    // finiva dentro l'ingombro della pianta, e uno sgabello su cui non ci si
+    // puo' sedere e' arredamento che occupa un posto.
+    { s: 'stoolRound', x: 305, b: 108 },
     { s: 'plantBlue', x: 350, b: 112 },
 
     // --- il salone: il verde sta contro i muri e negli angoli, il mezzo resta
@@ -167,6 +173,35 @@ window.ROOM = (() => {
 
   /** Dove siede chi lavora alla scrivania `i`: angolo in alto a sinistra della figura. */
   const posto = (i) => ({ x: DESKS[i].x + 16, y: DESKS[i].b + 16 - 24 });
+
+  /* ---- e i posti che non sono scrivanie ----
+   *
+   * Quattro sgabelli, e sono quelli che c'erano gia': due attorno al tavolo
+   * della sala riunioni, due a quello del bar. Finche' le scrivanie bastavano
+   * erano arredamento. Non bastano piu' — due schede aperte sono due capi e fino
+   * a otto sub-agent, e sei posti non tengono dieci persone — e un ufficio con
+   * quattro sedie vuote e quattro persone in piedi in corsia non e' un ufficio
+   * pieno, e' un ufficio che non sa dove metterle.
+   *
+   * `x`/`y` e' l'angolo in alto a sinistra della figura, come `posto`. Sul
+   * tavolo un computer non c'e' — e' un tavolo — quindi chi ci si siede se lo
+   * porta: `lap` e' dove finisce il portatile e `lz` la profondita' del tavolo
+   * piu' uno, perche' il portatile sta sul tavolo e non dietro.
+   *
+   * L'ordine e' quello in cui si riempiono, e i due della sala riunioni vengono
+   * prima: e' la stanza chiusa, ed e' li' che ha senso mandare chi lavora per
+   * qualcun altro. Il bar e' il posto dove si finisce quando la riunione e'
+   * piena, che e' esattamente quello che succede in un ufficio vero.
+   */
+  const SGABELLI = [
+    // Sala riunioni, di qua e di la' del tavolo. Chi sta di sopra lo si vede a
+    // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro.
+    { x: 80, y: 76, lap: [82, 70], lz: 85 },
+    { x: 80, y: 28, lap: [82, 59], lz: 85 },
+    // Bar: uno di fianco al tavolino e uno davanti.
+    { x: 269, y: 72, lap: [290, 76], lz: 97 },
+    { x: 304, y: 84, lap: [306, 74], lz: 97 },
+  ];
 
   /* La bacheca, e il tavolo dove finisce quello che e' fatto.
    *
@@ -310,6 +345,7 @@ window.ROOM = (() => {
     lavandino: BAR.lavandino,
     bacheca: BACHECHE.muro.posto,
     archivio: BACHECHE.archivio.posto,
+    ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
     ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
   };
 
@@ -352,6 +388,10 @@ window.ROOM = (() => {
 
   for (const w of WALLS) blocca(w.c * TILE, w.r * TILE, w.w * TILE, w.h * TILE);
   for (const p of PROPS) {
+    // Gli sgabelli no. Sono l'unico mobile su cui ci si mette SOPRA invece che
+    // attorno, e marcarli occupati voleva dire che il posto a sedere era una
+    // casella proibita: la strada si fermava accanto e non ci arrivava nessuno.
+    if (p.s === 'stoolRound') continue;
     const d = SV[p.s];
     blocca(p.x, p.b - d.h, d.w, d.h);
   }
@@ -969,6 +1009,7 @@ window.ROOM = (() => {
     PROPS,
     DISEGNATI,
     DESKS,
+    SGABELLI,
     METE,
     DESTINAZIONI,
     BACHECHE,
