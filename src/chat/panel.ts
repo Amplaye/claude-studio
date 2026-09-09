@@ -278,6 +278,12 @@ export class ChatPanel {
     // scheda nuova, che li' e' quello che vuoi.
     const host: FaceHost | undefined = isOffice
       ? {
+          ready: () => {
+            // Quella di prima non l'ha sentita nessuno: si riparte da zero, se no
+            // `sendTabs` la crede gia' consegnata e non la rimanda.
+            this.lastTabs = '';
+            this.sendTabs();
+          },
           fresh: () => this.newSession(),
           pick: (key) => this.show(key),
           close: (key) => this.closeSession(key),

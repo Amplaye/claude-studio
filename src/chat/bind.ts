@@ -20,6 +20,15 @@ import type { ChatController, Surface } from './controller';
  * Le schede normali non passano niente e si comportano come sempre.
  */
 export interface FaceHost {
+  /**
+   * La pagina e' in piedi e sta ascoltando.
+   *
+   * Serve perche' un messaggio mandato a una webview che non ha ancora caricato
+   * non viene messo in coda: si perde. La striscia partiva alla nascita della
+   * scheda — cioe' sempre troppo presto — e non ripartiva piu', perche' da li' in
+   * poi non cambiava niente da ridire. Risultato: nessuna striscia.
+   */
+  ready(): void;
   /** Una conversazione nuova, dentro questa stessa scheda. */
   fresh(): void;
   /** Mettiti su questa. */
@@ -102,6 +111,7 @@ export function bindWebview(
       case 'ready':
         chat.attach(surface);
         chat.hello(surface);
+        host?.ready();
         if (kind === 'panel' && monitor && !ctxSub) {
           ctxSub = monitor.subscribe((d) => void webview.postMessage({ k: 'ctx', d } as CtxToChat));
         }

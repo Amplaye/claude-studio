@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.1
+
+- **La striscia delle conversazioni non arrivava mai.** Partiva alla nascita della
+  scheda, cioe' prima che la pagina fosse in piedi: un messaggio mandato a una
+  webview che non ha ancora caricato si perde, e da li' in poi non c'era piu'
+  niente di nuovo da ridire, quindi non ripartiva. Ora la si rimanda quando e' la
+  pagina a dire che sta ascoltando.
+
+- **E adesso sta nella fascia dell'ufficio**, in mezzo, dove c'era il vuoto: la
+  pianta e' larga e i nomi ci stanno per esteso. Tornando alla chat la striscia
+  torna sotto la testata — e' sempre la stessa, si sposta.
+
 ## 0.26.0
 
 - **Un ufficio solo, con dentro tutte le conversazioni.** Il "+" non apre piu' una
