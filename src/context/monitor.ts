@@ -234,6 +234,7 @@ export class ContextMonitor {
           done: mine.done,
           recent: now - mine.updatedAt < RECENT_MS,
           focused: false,
+          asks: mine.asks,
         },
       });
     }
@@ -261,6 +262,9 @@ export class ContextMonitor {
           done: false,
           recent: idle < RECENT_MS,
           focused: false,
+          // Di una scheda dell'estensione ufficiale non sappiamo cosa stia
+          // aspettando: il filo dei permessi passa dalla nostra chat, non dal disco.
+          asks: [],
         },
       });
     }
@@ -417,14 +421,14 @@ export class ContextMonitor {
   }
 
   /** Clic su una card: ci si va davvero. */
-  async focus(id: string) {
+  async focus(id: string, office = false) {
     // Una delle nostre: si va esattamente alla scheda che la tiene, non "a Studio".
     // Con piu' schede aperte "apri Studio" ti portava alla prima, cioe' quasi mai a
     // quella su cui avevi appena cliccato; e guardando la sidebar ti apriva la chat
     // nella sidebar, lasciando la scheda dov'era.
     const host = owned.hosting(id);
     if (host) {
-      if (!ChatPanel.revealKey(host.key)) {
+      if (!ChatPanel.revealKey(host.key, office)) {
         await vscode.commands.executeCommand(
           ChatPanel.exists() ? 'claudeStudio.openTab' : 'claudeStudio.openSidebar'
         );

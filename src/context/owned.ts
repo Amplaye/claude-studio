@@ -14,6 +14,21 @@
 // one wearing the badge.
 import type { Wire } from '../engine/protocol';
 
+/**
+ * Una domanda ferma in attesa di te: un permesso da dare, un piano da approvare,
+ * una scelta da fare. Finche' c'e', quella conversazione non va avanti — ed e'
+ * l'unica cosa che succede in ufficio di cui non ti accorgi guardando la stanza,
+ * perche' chi aspetta sta fermo esattamente come chi ha finito.
+ */
+export interface OwnAsk {
+  id: string;
+  kind: string;
+  /** Cosa chiede, in una riga. */
+  title: string;
+  /** Il dettaglio: il comando, la descrizione, o le domande una dietro l'altra. */
+  detail: string;
+}
+
 export interface OwnSession {
   id: string;
   cwd: string;
@@ -40,6 +55,8 @@ export interface OwnSession {
   doneAt: number;
   /** Which chat this belongs to: the key that reveals its face again. */
   key: string;
+  /** Quello che sta aspettando da te, adesso. Vuoto = non aspetta niente. */
+  asks: OwnAsk[];
 }
 
 /** Where a conversation is on screen. */
@@ -131,6 +148,23 @@ class OwnedSessions {
     return true;
   }
 
+  /**
+   * Cosa aspetta questa conversazione. L'elenco arriva gia' fatto dalla chat, che
+   * e' l'unica che sa cosa c'e' in sospeso: qui si tiene solo per farlo arrivare
+   * alla stanza e alle card.
+   */
+  setAsks(key: string, asks: OwnAsk[]) {
+    const s = this.byKey.get(key);
+    if (!s) return;
+    // Stesso elenco di prima: niente giro di ridisegni. Una domanda in attesa non
+    // cambia per conto suo, e ridipingere la stanza a vuoto la fa scattare.
+    const same =
+      s.asks.length === asks.length && s.asks.every((a, i) => a.id === asks[i].id);
+    if (same) return;
+    s.asks = asks;
+    this.changed();
+  }
+
   /** Questa conversazione ha finito mentre guardavi altrove? */
   isDone(key: string): boolean {
     return !!this.byKey.get(key)?.done;
@@ -166,6 +200,7 @@ class OwnedSessions {
       done: false,
       doneAt: 0,
       key,
+      asks: [],
     });
     this.changed();
   }
@@ -198,6 +233,7 @@ class OwnedSessions {
           done: false,
           doneAt: 0,
           key,
+          asks: [],
         });
         break;
       }
@@ -254,6 +290,7 @@ class OwnedSessions {
 function blank(cwd: string, key: string): OwnSession {
   const now = Date.now();
   return {
+    asks: [],
     id: '',
     cwd,
     model: '',

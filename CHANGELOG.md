@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.25.0
+
+- **L'ufficio non si chiude piu' alle tue spalle.** Aprendo una conversazione
+  nuova da dentro la stanza, la scheda che nasce e' anche lei nella stanza: prima
+  ti ritrovavi in una scheda vuota e senza ufficio, e per scrivere a chiunque non
+  fosse la prima conversazione toccava tornare alla chat normale. Lo stesso vale
+  per il clic su una persona: la sua conversazione si apre in ufficio, non fuori.
+
+- **Chi ti sta aspettando adesso si vede.** Una conversazione ferma su un
+  permesso sta seduta identica a una che ha finito, e quella domanda poteva
+  restare li' un'ora. Ora sopra la testa lampeggia un punto esclamativo e la
+  targhetta sulla scrivania si accende; cliccando la persona esce il foglio con
+  quello che ti sta chiedendo, e da li' si risponde — consenti o nega — senza
+  passare dalla sua chat. Alle domande a scelta multipla si risponde di la',
+  dove ci sono le scelte: il foglio ti ci porta.
+
+- **Le conversazioni sotto la sesta esistevano ma non si potevano raggiungere.**
+  Nella scheda a tutto schermo la colonna delle conversazioni era `display:
+  block`, e l'elenco dentro cresceva oltre il fondo della colonna, che lo
+  tagliava: niente barra di scorrimento e nessun modo di arrivarci. Adesso scorre,
+  e la barra si prende il suo posto invece di comparire e sparire.
+
+- **Le barre di contesto hanno una cornice**, e il cursore della barra di
+  scorrimento un colore che si vede: era il grigio delle righine di separazione,
+  ridotto a quattro pixel.
+
+- **L'aggiornamento della CLI non si incaglia piu'** su quello che un `npm i -g`
+  interrotto si lascia dietro: i suoi resti si spazzano via e l'installazione si
+  riprova una volta sola.
+
 ## 0.24.0
 
 - **THE OFFICE.** La fascia in cima dice solo dove sei e quanto contesto resta:

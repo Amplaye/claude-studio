@@ -86,7 +86,7 @@ export class ChatPanel {
    * Opens a new independent tab, with its own controller and its own session. This
    * is the "+" in the header.
    */
-  static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
+  static openNew(ctx: vscode.ExtensionContext, monitor?: ContextMonitor, office = false) {
     const chat = new ChatController(ctx, { primary: false });
     // No number in the name: "Claude Studio #2" told you nothing, and three of them
     // side by side were three identical labels. The tab takes the conversation's
@@ -95,7 +95,13 @@ export class ChatPanel {
       enableScripts: true,
       retainContextWhenHidden: true,
     });
-    return new ChatPanel(panel, ctx, chat, monitor, false);
+    const tab = new ChatPanel(panel, ctx, chat, monitor, false);
+    // Aperta da dentro l'ufficio: la scheda nuova nasce sulla pianta, con la sua
+    // chat gia' accanto. Prima ti ritrovavi in una scheda vuota e senza stanza —
+    // conversazione nuova, ufficio sparito — e per scrivere a chiunque non fosse
+    // la prima toccava tornare alla chat normale.
+    if (office) tab.showOffice();
+    return tab;
   }
 
   /** The tab that holds a given chat, for going back to it. */
@@ -109,10 +115,14 @@ export class ChatPanel {
   }
 
   /** Brings a specific chat's tab to the front. */
-  static revealKey(key: string): boolean {
+  static revealKey(key: string, office = false): boolean {
     const p = ChatPanel.byKey(key);
     if (!p) return false;
     p.panel.reveal(undefined, false);
+    // Ci sei arrivato cliccando una persona nella stanza: la scheda che si apre
+    // si mette sulla pianta anche lei. L'ufficio ti segue invece di chiudersi
+    // alle spalle.
+    if (office) p.showOffice();
     return true;
   }
 

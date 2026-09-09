@@ -168,6 +168,14 @@ body {
   padding-bottom: var(--pad);
   overflow-y: auto;
   overflow-x: hidden;
+  /* La barra di scorrimento si prende il suo posto, e cosi' si vede sempre. Senza
+     questo Chromium la disegna sopra il contenuto e la fa sparire appena smetti di
+     scorrere: in una colonna di conversazioni, l'unica cosa che diceva che sotto ce
+     n'erano altre spariva un secondo dopo essere comparsa. Stesso trucco della lista
+     dei passi qui sotto: il posto lo prende dal margine della colonna, non dalle
+     card, che restano larghe uguale. */
+  margin-right: calc(-1 * var(--sbw));
+  scrollbar-gutter: stable;
 }
 
 .ctx .cards {
@@ -341,7 +349,7 @@ body {
 .ctx .tabpill {
   flex: 0 0 auto;
   padding: 0 5px;
-  border: 1px solid var(--line);
+  border: 1px solid color-mix(in srgb, var(--fg) 24%, transparent);
   border-radius: 5px;
   font-family: var(--mono);
   font-size: 11px;
@@ -380,11 +388,15 @@ body {
   min-width: 0;
   font-size: 11.5px;
 }
+/* Il bordo non e' decorazione: una barra quasi vuota senza bordo e' una riga di
+   fondo che si confonde con la card, e "2%" e "niente dato" si somigliano
+   troppo. Con la cornice la barra c'e' sempre, e dentro si vede quanto e' piena. */
 .ctx .bar {
   position: relative;
-  height: 6px;
+  height: 8px;
   margin-top: 8px;
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
   background: color-mix(in srgb, var(--ink) 14%, transparent);
   overflow: hidden;
 }

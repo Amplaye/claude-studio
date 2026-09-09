@@ -72,8 +72,15 @@ body {
 .rail {
   display: none;
 }
+/* `flex`, non `block`. La colonna e' anche `.ctx`, e `.ctx` e' una colonna
+   flessibile dentro cui l'elenco delle conversazioni si prende l'altezza che
+   avanza e scorre. Con `block` quel `flex: 1 1 auto` non voleva dire piu' niente:
+   l'elenco cresceva quanto il suo contenuto, la colonna lo tagliava
+   (`overflow: hidden`) e dalla sesta conversazione in giu' non c'era ne' barra di
+   scorrimento ne' modo di arrivarci. Nella barra laterale il difetto non c'era,
+   perche' li' questa riga non esiste. */
 body.wide.rail-on .rail {
-  display: block;
+  display: flex;
 }
 @media (max-width: 899px) {
   body.wide.rail-on .rail {

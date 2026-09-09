@@ -2737,7 +2737,10 @@
     });
   }
 
-  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab' }));
+  /** Stai guardando la stanza? Allora quello che apri si apre li' dentro. */
+  const inOffice = () => document.body.classList.contains('inoffice');
+
+  $('btnNew').addEventListener('click', () => vscode.postMessage({ cmd: 'newTab', office: inOffice() }));
   // ---------- l'ufficio ----------
   //
   // Non e' piu' una scheda a parte: e' l'altra faccia di questa, e il bottone la
@@ -3495,7 +3498,7 @@
         // A new session is a new tab, not this one wiped: whatever is running here
         // keeps running.
         e.preventDefault();
-        vscode.postMessage({ cmd: 'newTab' });
+        vscode.postMessage({ cmd: 'newTab', office: inOffice() });
         return;
       case 'h':
         e.preventDefault();

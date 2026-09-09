@@ -31,6 +31,12 @@ export interface CtxCard {
   done: boolean;
   recent: boolean;
   focused: boolean;
+  /**
+   * Le domande ferme in attesa di te. Chi aspetta un permesso sta fermo come chi
+   * ha finito, e senza questo la stanza non ha modo di dirlo: la conversazione
+   * resta li' per sempre e tu non te ne accorgi mai.
+   */
+  asks: { id: string; kind: string; title: string; detail: string }[];
 }
 
 export interface CtxData {
@@ -77,8 +83,11 @@ export type CtxCmd =
   | { cmd: 'ready' }
   | { cmd: 'refresh' }
   | { cmd: 'rename'; id: string }
-  | { cmd: 'focus'; id: string }
+  | { cmd: 'focus'; id: string; office?: boolean }
   // Questa conversazione hai finito di guardarla: via la card, e con lei quello che
   // la teneva viva. Vedi ContextMonitor.close.
   | { cmd: 'close'; id: string }
-  | { cmd: 'diagnose' };
+  | { cmd: 'diagnose' }
+  // Rispondere a una domanda da fuori dalla sua chat: dalla stanza, cliccando la
+  // persona che aspetta. `sid` e' la conversazione, `id` la domanda.
+  | { cmd: 'answerAsk'; sid: string; id: string; choice: 'allow' | 'deny' };

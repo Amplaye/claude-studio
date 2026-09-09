@@ -75,6 +75,12 @@ window.OFFICE = (() => {
   let sheetClose;
   /** id conversazione -> il pezzo di elenco che le tocca, per ridipingerlo invece di rifarlo. */
   const elenchi = new Map();
+  /** Cosa mostra il foglio adesso: la bacheca, o le domande di qualcuno. */
+  let foglioSu = 'bacheca';
+  /** E di chi sono, quelle domande. */
+  let foglioChi = '';
+  /** Le domande gia' disegnate, per non rifare il foglio quando non e' cambiato niente. */
+  let firmaDomande = '';
 
   /** Un'icona dello sprite. Le SVG vanno create col namespace, o restano invisibili. */
   function ico(name, cls) {
@@ -254,13 +260,15 @@ window.OFFICE = (() => {
     const tuse = document.createElementNS('http://www.w3.org/2000/svg', 'use');
     tuse.setAttribute('href', '#ion-checkmark');
     tick.appendChild(tuse);
-    bubble.append(dots, tick);
+    // Il punto esclamativo di chi ti sta aspettando. Sta nella stessa nuvoletta dei
+    // puntini e della spunta perche' e' la stessa cosa — cosa sta facendo adesso —
+    // e perche' quel posto e' l'unico attorno alla testa che nessun mobile copre.
+    const bang = el('span', 'of-bang', '!');
+    bubble.append(dots, tick, bang);
 
     // La scatoletta del contesto quasi finito. Sta addosso alla persona e non
     // sulla targhetta perche' e' una cosa che succede a lei, non al suo posto.
     b.append(el('span', 'of-ring'), who, bubble, el('span', 'of-crunch'));
-    b.onclick = () => send({ cmd: 'focus', id: s.id });
-
     // La targhetta non sta dentro la persona: sta sulla scrivania, e ci resta
     // anche quando chi ci lavora e' andato al bar. Appesa addosso se ne andava
     // in giro con lei, e mezza stanza si ritrovava un nome che le volava sopra
@@ -275,7 +283,7 @@ window.OFFICE = (() => {
 
     // La forma che vuole room.js — `el`, `fig`, `seme`, `casa`, `posa`, `ferma`
     // — piu' quello che serve solo di qua.
-    return {
+    const chi = {
       id: s.id,
       el: b,
       fig: who,
@@ -286,7 +294,19 @@ window.OFFICE = (() => {
       plate,
       pname,
       pfill,
+      asks: [],
     };
+
+    // Un clic normale porta alla sua conversazione — e ci porta restando in
+    // ufficio. Ma se quella persona sta aspettando una risposta, il clic apre
+    // prima la domanda: e' l'unica cosa che si puo' fare da qui e che senza di
+    // questo non faresti mai, perche' non sapresti che c'e'. Legge `chi` e non i
+    // dati di adesso: la persona si costruisce una volta e vive finche' vive la
+    // conversazione, quello che aspetta cambia a ogni giro.
+    b.onclick = () =>
+      chi.asks.length ? apriDomande(chi.id) : send({ cmd: 'focus', id: chi.id, office: true });
+
+    return chi;
   }
 
   // ---------- la porta ----------
@@ -743,20 +763,99 @@ window.OFFICE = (() => {
       kanban.setAttribute('aria-label', t('office.board'));
     }
     if (!sheet) return;
-    sheetTitle.textContent = t('office.boardTitle');
     sheetClose.title = t('office.boardClose');
     sheetClose.setAttribute('aria-label', t('office.boardClose'));
-    dipingiBacheca();
+    dipingiFoglio();
+  }
+
+  /**
+   * Le domande di una persona, aperte.
+   *
+   * Stesso foglio della bacheca: due finestre uguali per due elenchi sarebbero due
+   * volte lo stesso codice, e la seconda invecchierebbe.
+   */
+  function apriDomande(id) {
+    if (!sheet) return;
+    foglioSu = 'domande';
+    foglioChi = id;
+    firmaDomande = '';
+    sheet.hidden = false;
+    if (stage) stage.inert = true;
+    dipingiFoglio();
+    sheetClose.focus();
+  }
+
+  /** Un bottone del foglio delle domande. */
+  function bottone(chiave, cls, fn) {
+    const b = el('button', 'of-ask-btn ' + cls, t(chiave));
+    b.type = 'button';
+    b.onclick = fn;
+    return b;
+  }
+
+  function dipingiDomande() {
+    if (!sheet || sheet.hidden) return;
+    const chi = people.get(foglioChi);
+    const asks = (chi && chi.asks) || [];
+    // Il foglio si ridipinge a ogni giro dei consumi, che sono un paio di secondi:
+    // rifare i bottoni sotto il dito significa perdere il clic a meta'. Si rifa'
+    // solo quando le domande sono davvero cambiate — ed e' proprio quello che deve
+    // succedere quando ne rispondi una.
+    const firma = asks.map((a) => a.id).join('|');
+    if (firma === firmaDomande) return;
+    firmaDomande = firma;
+    sheetTitle.textContent = t('office.askTitle', { name: chi ? chi.pname.textContent : '' });
+    sheetCount.hidden = true;
+    // Le sezioni della bacheca restano in `elenchi`: staccarle di qui non le perde,
+    // e ci pensa lei a riappenderle quando il foglio torna a essere la bacheca.
+    sheetBody.textContent = '';
+    for (const a of asks) {
+      const sez = el('section', 'of-ask-item');
+      sez.append(el('h3', 'of-ask-title', a.title));
+      if (a.detail) sez.append(el('p', 'of-ask-detail', a.detail));
+      const riga = el('div', 'of-ask-row');
+      // Alle domande a scelta multipla non si risponde di qui: le scelte le disegna
+      // la chat, e un "consenti" senza scelta sarebbe una risposta vuota mandata al
+      // modello. Di qui si va di la', che e' un passo e non un vicolo cieco.
+      if (a.kind !== 'question') {
+        riga.append(bottone('office.askAllow', 'si', () => send({ cmd: 'answerAsk', sid: foglioChi, id: a.id, choice: 'allow' })));
+      }
+      riga.append(bottone('office.askDeny', 'no', () => send({ cmd: 'answerAsk', sid: foglioChi, id: a.id, choice: 'deny' })));
+      riga.append(
+        bottone('office.askOpen', 'va', () => {
+          const chiave = foglioChi;
+          apriBacheca(false);
+          send({ cmd: 'focus', id: chiave, office: true });
+        })
+      );
+      sez.append(riga);
+      sheetBody.append(sez);
+    }
+    sheetEmpty.textContent = t('office.askEmpty');
+    sheetEmpty.hidden = asks.length > 0;
+  }
+
+  /** Il foglio ridipinge quello che ci sta dentro adesso. */
+  function dipingiFoglio() {
+    if (foglioSu === 'domande') dipingiDomande();
+    else dipingiBacheca();
   }
 
   function apriBacheca(aperta) {
     // Gia' com'e' richiesta: non si ridipinge e soprattutto non si sposta il fuoco.
-    if (!sheet || !sheet.hidden === aperta) return;
+    if (!sheet || (!sheet.hidden === aperta && foglioSu === 'bacheca')) return;
+    const tornaA = foglioChi;
+    foglioSu = 'bacheca';
+    foglioChi = '';
     sheet.hidden = !aperta;
     if (stage) stage.inert = aperta;
     if (aperta) {
-      dipingiBacheca();
+      dipingiFoglio();
       sheetClose.focus();
+    } else if (tornaA && people.has(tornaA)) {
+      // Chiuse le domande il fuoco torna sulla persona da cui erano uscite, non in
+      // cima alla stanza.
+      people.get(tornaA).el.focus();
     } else if (kanban) {
       // Il fuoco torna da dove veniva: chi ha aperto col tasto non deve ritrovarsi
       // in cima alla pagina.
@@ -765,7 +864,8 @@ window.OFFICE = (() => {
   }
 
   function dipingiBacheca() {
-    if (!sheet || sheet.hidden) return;
+    if (!sheet || sheet.hidden || foglioSu !== 'bacheca') return;
+    sheetTitle.textContent = t('office.boardTitle');
     // Solo le conversazioni che in ufficio ci sono davvero, e solo quelle che un
     // piano ce l'hanno: un elenco rimasto nel quadro di una scheda chiusa e' una
     // lista di lavoro di nessuno.
@@ -1068,6 +1168,10 @@ window.OFFICE = (() => {
       window.ROOM.vesti(chi.fig, chi.seme, chi.posa);
     }
 
+    // Cosa aspetta da te. Prima della classe: il clic la legge da qui.
+    chi.asks = s.asks || [];
+    b.classList.toggle('asking', chi.asks.length > 0);
+    chi.plate.classList.toggle('asking', chi.asks.length > 0);
     b.classList.toggle('own', !!s.own);
     b.classList.toggle('busy', !!s.busy);
     b.classList.toggle('done', !s.busy && !!s.done);
@@ -1082,7 +1186,9 @@ window.OFFICE = (() => {
     chi.pname.textContent = s.name;
     chi.pfill.style.width = (s.pct == null ? 0 : Math.max(0, Math.min(100, s.pct))) + '%';
     chi.pfill.style.background = barColor(s.pct);
-    const state = s.busy
+    const state = chi.asks.length
+      ? t('office.asking')
+      : s.busy
       ? t('ctx.busy')
       : s.done
         ? t('ctx.done')
@@ -1183,8 +1289,9 @@ window.OFFICE = (() => {
     paintStaff();
 
     // I nomi sul foglio sono quelli delle targhette, e le targhette le ha appena
-    // riscritte `paintPerson`.
-    dipingiBacheca();
+    // riscritte `paintPerson`. E se il foglio sta mostrando delle domande, si
+    // ridipinge lui: una a cui hai appena risposto deve sparire da sola.
+    dipingiFoglio();
 
     empty.textContent = t('office.empty');
     empty.hidden = list.length > 0;

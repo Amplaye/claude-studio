@@ -449,7 +449,9 @@ export type Cmd =
   | { cmd: 'interrupt' }
   | { cmd: 'newSession' }
   | { cmd: 'openTab' }
-  | { cmd: 'newTab' }
+  // `office`: la chiedi da dentro l'ufficio, e la scheda nuova nasce li' dentro
+  // invece di buttarti fuori. Vedi ChatPanel.openNew.
+  | { cmd: 'newTab'; office?: boolean }
   // "Portami all'ufficio": non gira questa scheda, ne chiede una sua.
   | { cmd: 'openOffice' }
   // The page has already played its exit animation: here it really closes.

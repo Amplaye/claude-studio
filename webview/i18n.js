@@ -290,6 +290,12 @@
     'office.boardTitle': 'On the board',
     'office.boardEmpty': 'Nothing on the board: no conversation has a plan open.',
     'office.boardClose': 'Close',
+    'office.asking': 'waiting for an answer',
+    'office.askTitle': '{name} is asking you',
+    'office.askAllow': 'Allow',
+    'office.askDeny': 'Deny',
+    'office.askOpen': 'Open the conversation',
+    'office.askEmpty': 'Nothing waiting for an answer any more.',
   };
 
   const IT = {
@@ -534,6 +540,12 @@
     'office.boardTitle': 'Sulla bacheca',
     'office.boardEmpty': 'Sulla bacheca non c’e’ niente: nessuna conversazione ha un piano aperto.',
     'office.boardClose': 'Chiudi',
+    'office.asking': 'aspetta una risposta',
+    'office.askTitle': '{name} ti sta chiedendo',
+    'office.askAllow': 'Consenti',
+    'office.askDeny': 'Nega',
+    'office.askOpen': 'Apri la conversazione',
+    'office.askEmpty': 'Non c’e’ piu’ niente in attesa di risposta.',
   };
 
   const DICT = { en: EN, it: IT };

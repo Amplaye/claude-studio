@@ -8,6 +8,8 @@ import { renderPage } from '../shared/html';
 import { openFile } from './editor';
 import { sound } from './sound';
 import { tasks } from '../tasks/store';
+import { chats } from './controller';
+import { owned } from '../context/owned';
 import type { ChatController, Surface } from './controller';
 
 export function bindWebview(
@@ -117,7 +119,9 @@ export function bindWebview(
         void vscode.commands.executeCommand('claudeStudio.office');
         return;
       case 'newTab':
-        void vscode.commands.executeCommand('claudeStudio.openNewTab');
+        // Chiesta da dentro l'ufficio, la scheda nuova si apre nell'ufficio: la
+        // conversazione cambia, il posto dove stai no.
+        void vscode.commands.executeCommand('claudeStudio.openNewTab', !!m.office);
         return;
       case 'closeTab':
         // From the tab only: in the sidebar the button isn't there at all, and
@@ -164,7 +168,7 @@ export function bindWebview(
         void monitor?.rename(m.id);
         return;
       case 'focus':
-        void monitor?.focus(m.id);
+        void monitor?.focus(m.id, !!m.office);
         return;
       case 'close':
         void monitor?.close(m.id);
@@ -172,6 +176,15 @@ export function bindWebview(
       case 'diagnose':
         void monitor?.diagnose();
         return;
+      // Una risposta data dalla stanza. La domanda non e' di questa chat — e' della
+      // persona che hai cliccato — quindi si consegna alla sua, per id di
+      // conversazione. Se quella chat non c'e' piu', non succede niente: la domanda
+      // e' morta con lei.
+      case 'answerAsk': {
+        const host = owned.hosting(m.sid);
+        if (host) chats.get(host.key)?.answer(m.id, m.choice);
+        return;
+      }
     }
   });
 

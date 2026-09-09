@@ -1013,9 +1013,11 @@ export class ChatController {
         if (done) return;
         done = true;
         this.pending.delete(req.id);
+        this.syncAsks();
         resolve(r);
       };
       this.pending.set(req.id, { req, kind, settle });
+      this.syncAsks();
 
       // Se il turno viene interrotto la domanda non ha piu' senso: si toglie di
       // mezzo la scheda invece di lasciarla appesa per sempre.
@@ -1044,6 +1046,34 @@ export class ChatController {
       });
     });
   };
+
+  /**
+   * Chi sta aspettando te, detto a voce alta.
+   *
+   * Una conversazione ferma su un permesso e' identica a una che ha finito: sta
+   * li'. Il suono passa, la scheda e' dietro le altre, e quella domanda puo'
+   * restare senza risposta per un'ora. L'elenco lo tiene `pending`, che e' l'unica
+   * verita' — di qui esce solo una copia leggibile, per la stanza e per le card.
+   *
+   * Sempre da `pending`: cosi' un annullamento, un passaggio a yolo o un turno
+   * interrotto lo spengono da soli, senza doversene ricordare in tre posti.
+   */
+  private syncAsks() {
+    owned.setAsks(
+      this.key,
+      [...this.pending.values()].map((p) => {
+        const qs = p.kind === 'question' ? questionsOf(p.req.input) : [];
+        return {
+          id: p.req.id,
+          kind: p.kind,
+          title: p.req.title || p.req.displayName || p.req.tool,
+          detail: qs.length
+            ? qs.map((q) => q.question).join(' · ')
+            : p.req.description || (p.kind === 'tool' ? summarize(p.req.input) : ''),
+        };
+      })
+    );
+  }
 
   answer(id: string, choice: 'allow' | 'always' | 'deny', answers?: Record<string, string>) {
     const p = this.pending.get(id);
