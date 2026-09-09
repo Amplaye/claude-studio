@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.31.1
+
+- Stessa 0.31.0 di qui sotto — che sullo store non c'e' mai arrivata — con la
+  dipendenza dell'SDK del CLI aggiornata alla 0.3.267.
+
 ## 0.31.0
 
 - **Otto scrivanie invece di sei, quattro per fila.** Il salone e' lo stesso: i
