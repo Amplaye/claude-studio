@@ -69,10 +69,10 @@ body.inoffice .rail {
   display: none;
 }
 
-/* Con l'ufficio aperto la testata della chat lascia cadere tre cose, e sono
-   tutte e tre roba che di la' c'e' gia' o che li' non fa piu' niente. La colonna
-   e' larga un terzo della scheda: quello che resta ha finalmente il posto per
-   scriversi per esteso invece di stringersi fino a tagliare le parole.
+/* Con l'ufficio aperto la testata della chat lascia cadere quattro cose, e sono
+   tutte e quattro roba che di la' c'e' gia' o che li' non fa piu' niente. La
+   colonna e' larga un terzo della scheda: quello che resta ha finalmente il
+   posto per scriversi per esteso invece di stringersi fino a tagliare le parole.
 
    - il marchio: la fascia dell'ufficio dice gia' in che scheda sei, e due nomi a
      mezzo metro l'uno dall'altro sono due nomi per una cosa sola. Al suo posto,
@@ -82,10 +82,14 @@ body.inoffice .rail {
      (la stanza dice le stesse cose a figure), quindi era un interruttore
      attaccato a niente;
    - il bottone dell'ufficio: nell'ufficio ci sei gia', e la via d'uscita e' il
-     "Chat" qui a sinistra. Torna appena esci. */
+     "Chat" qui a sinistra. Torna appena esci;
+   - "apri come scheda": l'ufficio E' una scheda, e ci sei dentro. Era gia'
+     l'unico bottone della fila che non apriva niente, ed e' quello che paga il
+     posto delle impostazioni — vedi qui sotto. */
 body.inoffice .top .brand,
 body.inoffice .top #btnCtx,
-body.inoffice .top #btnOffice {
+body.inoffice .top #btnOffice,
+body.inoffice .top #btnTab {
   display: none;
 }
 /* Il "Chat" tiene la testa della fila, e quello che Claude sta facendo gli si
@@ -112,15 +116,30 @@ body.inoffice .top.busy .of-back {
   gap: 0;
   padding: 0 8px;
 }
-/* E si fa da parte anche il bottone delle impostazioni. La colonna qui e' larga
-   come la barra laterale ma la fila ha un bottone in piu' — la via d'uscita, che
-   nella barra laterale non c'e' — e senza questo la pillola dello stato scende
-   sotto i cento pixel e torna a dire solo l'orologio. E' la stessa ragione per
-   cui di la' si fanno da parte la cronologia e la scheda: nel mezzo di un turno
-   il modello non si cambia, Alt+I e' li' comunque, e torna appena finisce. */
-body.inoffice .top.busy #btnCfg {
+/* Il "+" della testata, quando sotto c'e' la striscia delle conversazioni. I
+   due mandano lo stesso identico comando — 'newTab' tutti e due — e nell'ufficio
+   stanno uno sopra l'altro a dodici pixel di distanza: e' lo stesso bottone
+   disegnato due volte. Resta quello della striscia, che sta in mezzo alle
+   linguette che apre. Alt+N vale sempre.
+
+   Quando la striscia non c'e' — l'ufficio vuoto, che una conversazione non ce
+   l'ha ancora — il "+" della testata resta: e' l'unico modo di aprirne una col
+   mouse. */
+body.inoffice.linguette .top #btnNew {
   display: none;
 }
+
+/* Le impostazioni restano, sempre. Prima sparivano mentre il turno lavorava —
+   la fila qui ha un bottone in piu' della barra laterale, la via d'uscita, e
+   qualcosa doveva pagare i trenta pixel della pillola dello stato — ma un
+   bottone che c'e' su una conversazione ferma e non c'e' su quella accanto non
+   si legge come una fila che si stringe: si legge come un guasto. Nell'ufficio
+   le conversazioni stanno una accanto all'altra, ed e' proprio li' che il
+   confronto salta all'occhio.
+
+   I trenta pixel li paga "apri come scheda", tolto qui sopra: qui dentro non
+   apriva niente, e si toglie una volta sola e per un motivo suo, invece di far
+   sparire un comando vero a seconda di quello che Claude sta facendo. */
 
 /* Scheda stretta: non c'e' spazio per due colonne, e spezzare la chat a 200
    pixel non aiuta nessuno. L'ufficio si prende tutto, come faceva prima. */

@@ -194,13 +194,47 @@ t(
   await page.locator('.top .brand').isHidden(),
   "la testata ripete il nome della scheda accanto a quello dell'ufficio"
 );
-for (const b of ['#btnOffice', '#btnCtx']) {
+for (const b of ['#btnOffice', '#btnCtx', '#btnTab']) {
   t(
     await page.locator('.top ' + b).isHidden(),
     "la testata ripete un comando che l'ufficio ha gia': " + b
   );
 }
+// Con la striscia delle conversazioni sotto, come sta sempre nell'ufficio: e'
+// lei a portare il "+" che apre la prossima, e finche' c'e' quello della testata
+// e' lo stesso bottone due volte. Va messa prima di misurare la riga, se no si
+// misura una testata che nell'ufficio non esiste.
+await post({ k: 'tabs', items: [{ key: 'a', name: 'Una conversazione', active: true }] });
+await page.waitForTimeout(120);
+t(
+  await page.locator('.top #btnNew').isHidden(),
+  'la testata ripete il "+" della striscia delle conversazioni'
+);
+t(
+  await page.locator('.sesstabs .sesstab-add').isVisible(),
+  'la striscia delle conversazioni ha perso il suo "+"'
+);
+// E senza striscia il "+" della testata torna: e' l'unico modo, col mouse, di
+// aprire una conversazione in un ufficio che non ne ha nemmeno una.
+await post({ k: 'tabs', items: [] });
+await page.waitForTimeout(120);
+t(
+  await page.locator('.top #btnNew').isVisible(),
+  "l'ufficio vuoto non ha nessun modo di aprire una conversazione"
+);
+await post({ k: 'tabs', items: [{ key: 'a', name: 'Una conversazione', active: true }] });
+await page.waitForTimeout(120);
+
 await post({ k: 'busy', value: true });
+// E le impostazioni restano al loro posto mentre lavora. Sparivano: la fila si
+// stringeva e pagava con quel bottone, ma nell'ufficio le conversazioni si
+// vedono una accanto all'altra, e un comando che c'e' su quella ferma e non su
+// quella che lavora non si legge come una fila stretta — si legge come un
+// guasto. Chi l'ha visto ha chiesto di aggiustare "il bottone rotto".
+t(
+  await page.locator('.top #btnCfg').isVisible(),
+  'il bottone delle impostazioni sparisce mentre la conversazione lavora'
+);
 const strette = [];
 for (const w of [1100, 1300, 1500, 1800]) {
   await page.setViewportSize({ width: w, height: 940 });

@@ -65,6 +65,12 @@
     if (!box) return;
     box.textContent = '';
     box.hidden = !items.length;
+    // Detto anche addosso al corpo della pagina: la striscia sta SOTTO la
+    // testata, e il CSS non sa guardare indietro fra fratelli. Alla testata
+    // serve saperlo — quando la striscia c'e', il suo "+" e' lo stesso di
+    // quello qui in fondo alla riga (tutti e due mandano 'newTab'), e due volte
+    // lo stesso bottone a un centimetro di distanza sono uno di troppo.
+    document.body.classList.toggle('linguette', items.length > 0);
     if (!items.length) return;
     for (const it of items) {
       const nome = it.name || t('tabs.fresh');

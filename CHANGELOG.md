@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.28.0
+
+- **Il bottone delle impostazioni non spariva a caso: spariva mentre la
+  conversazione lavorava.** Nell'ufficio la fila dei comandi si stringeva e
+  pagava con quello, e siccome li' dentro le conversazioni si vedono una accanto
+  all'altra il risultato era un bottone presente su quella ferma e assente su
+  quella che lavora — che non si legge come una fila stretta, si legge come un
+  guasto. Adesso resta sempre. Il posto lo pagano due comandi che nell'ufficio
+  erano una ripetizione: "apri come scheda" (l'ufficio *e'* una scheda, ci sei
+  dentro) e il "+" della testata, che manda lo stesso identico comando del "+"
+  della striscia delle conversazioni dodici pixel piu' sotto. Quando la striscia
+  non c'e' — ufficio vuoto — il "+" della testata resta dov'era.
+
+- **L'ufficio si arreda.** Tre pareti su quattro erano nude: la piu' lunga del
+  salone non aveva niente addosso per centotrenta pixel di fila, e la sala
+  riunioni aveva la lavagna e due mezze pareti vuote ai lati. Adesso c'e'
+  l'archivio — armadio e scaffale, di qua e di la' — e contro la parete destra
+  del salone due mobili che la stanza dava per esistenti da un pezzo senza
+  averli: **la stampante** ("la stampante s'e' inceppata" e' una delle frasi che
+  si dicono alla scrivania, e la si diceva di un mobile che non c'era) e **il
+  boccione dell'acqua**.
+
+- **E ci si va davvero.** Un mobile dove non va mai nessuno e' arredamento:
+  quindi le commissioni dell'ufficio adesso sono sei tipi e non quattro. Chi si
+  alza puo' andare ad aspettare in piedi che la stampante finisca — e vedere il
+  foglio che esce — o a riempirsi la borraccia al boccione.
+
 ## 0.27.0
 
 - **Torna la fila di chi c'e', in cima all'ufficio.** Le conversazioni e i
