@@ -162,6 +162,44 @@
   filter: drop-shadow(2px 2px 0 var(--shade));
 }
 
+/* ---- quello che si muove da solo ----
+   Tre fotogrammi che girano, e le posizioni nel foglio arrivano da room.js: qui
+   non si puo' sapere dove sta l'acqua dentro sv-room.png. `step-end` e non una
+   dissolvenza — a pixel un fotogramma o c'e' o non c'e', e due frame mescolati
+   sono una macchia. Nove decimi di secondo per giro: l'acqua di una fontanella
+   si muove, non lampeggia. */
+.of-anima {
+  animation: of-anima 900ms step-end infinite;
+}
+@keyframes of-anima {
+  0% {
+    background-position: var(--f1);
+  }
+  33% {
+    background-position: var(--f2);
+  }
+  66% {
+    background-position: var(--f3);
+  }
+}
+
+/* ---- la ghiaia dell'atrio ----
+   Non viene dal foglio: la genera `ghiaia.js` dal seme, e arriva come un PNG a
+   quattro volte la misura. `background-size: 100% 100%` lo rimpicciolisce
+   esattamente di quattro, che con `pixelated` vuol dire un pixel logico per
+   pixel di stanza — nessuna interpolazione, nessun bordo sfocato. L'indirizzo lo
+   mette room.js addosso all'elemento: e' l'unica cosa che questo foglio non puo'
+   sapere. */
+.of-ghiaia {
+  position: absolute;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  /* Niente ombra: e' l'unica cosa della stanza che sta DENTRO il pavimento e non
+     sopra, e un'ombra portata la solleverebbe di due pixel — cioe' la
+     trasformerebbe in una fioriera appoggiata. */
+}
+
 /* ---- il computer ----
    Nel pacchetto non c'e' — e' una fattoria medievale — e comunque e' l'unico
    mobile che deve accendersi, il che vuol dire un colore che cambia e non

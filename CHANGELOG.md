@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.31.0
+
+- **Otto scrivanie invece di sei, quattro per fila.** Il salone e' lo stesso: i
+  centosessanta pixel che restano fra le quattro scrivanie si dividono in cinque
+  passaggi da trentadue, i due margini e le tre corsie. Trentadue e' due persone
+  di larghezza, che e' il minimo perche' una corsia resti una corsia — e
+  guarda caso e' anche il punto esatto dove si mettono in piedi gli impiegati
+  accanto al capo.
+
+- **In mezzo all'atrio, davanti alla porta, c'e' una fontanella.** Di pietra,
+  dentro un anello di sassi bianchi interrato nel pavimento. L'acqua nella vasca
+  si muove: tre fotogrammi che girano, ed e' l'unica cosa di questa stanza che si
+  anima anche quando non c'e' nessuno. Quel pezzo di pavimento e' il primo che si
+  vede entrando ed era vuoto da sempre.
+
+- **Sei piante diverse invece della stessa due volte.** C'erano due soli
+  cespugli in vaso — quello viola e quello azzurro — ripetuti in tutti e sei gli
+  angoli: in una stanza dove ogni persona nasce diversa dalla sua vicina, la
+  pianta era l'unica cosa che si vedeva tre volte uguale. Adesso ci sono anche
+  l'aloe, i fiori nel vaso alto, la ciotola di foglie larghe e quella d'erba.
+
+- **Fra la bacheca e il tavolo delle riunioni non c'e' piu' niente.** Ci stava
+  uno sgabello, e chi ci si sedeva dava le spalle al muro coprendo per meta'
+  l'unica cosa di quella stanza che si guarda da lontano. Un posto a sedere
+  davanti a un pannello non e' un posto a sedere, e' una tenda.
+
+- **E in ufficio si parla molto di piu'.** I mucchi di frasi erano da sei o sette
+  per posto: chi guardava la stanza per qualche minuto le sentiva tutte e poi le
+  risentiva, e da li' in poi non e' piu' un ufficio — e' un carillon. Adesso sono
+  venticinque a testa al bar, in riunione e alla scrivania, e hanno un mucchio
+  loro anche le commissioni, il giro del caffe', le battute al capo e quelle
+  dette alle sue spalle.
+
 ## 0.30.0
 
 - **L'ufficio non e' piu' un disegno in mezzo a due bande nere: e' una stanza che

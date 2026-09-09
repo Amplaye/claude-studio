@@ -16,7 +16,8 @@
  *
  * I mobili sono ritagli di SeasonVale (`interiors/All Tileset`), impacchettati
  * in un foglio solo da `scripts/sv-sheet.mjs`, che scrive anche la mappa dei
- * nomi in `sv-room.js`. Le persone no: quelle le disegna `npc.js` dal seme.
+ * nomi in `sv-room.js`. Le persone no: quelle le disegna `npc.js` dal seme, e la
+ * ghiaia dell'atrio nemmeno — quella la fa `ghiaia.js`, dallo stesso seme.
  *
  * Misure: tutto in pixel di stanza, 384x320. Un mobile non e' grande quanto la
  * sua casella — SeasonVale li disegna alti, perche' si vede anche il fianco —
@@ -140,10 +141,12 @@ window.ROOM = (() => {
     // fogli gia' disegnati sopra, e due bacheche appaiate — una vera e una finta —
     // erano soprattutto un modo di non far capire quale delle due si guarda.
     { s: 'board', x: 66, b: 36 },
-    // Tirato indietro di dieci pixel dal tavolo: chi ci si siede ha i piedi sullo
-    // sgabello, e attaccato com'era i piedi cadevano dentro l'ingombro del
-    // tavolo — cioe' su una casella dove la stanza non manda nessuno.
-    { s: 'stoolRound', x: 81, b: 52 },
+    // Fra la bacheca e il tavolo non ci va niente. Ci stava uno sgabello — il
+    // quarto posto del tavolo, quello di sopra — e sedersi li' voleva dire dare
+    // le spalle al muro con la bacheca a venti pixel dalla nuca: chi ci stava
+    // copriva per meta' l'unica cosa di questa stanza che si guarda da lontano.
+    // Un posto a sedere davanti a un pannello non e' un posto a sedere, e' una
+    // tenda.
     // E due a capotavola, uno per lato corto. Il tavolo ne teneva due su quattro
     // lati: i posti in piu' servono quando le scrivanie sono finite, e un capo
     // tavola vuoto mentre qualcuno sta in piedi in corsia e' un posto sprecato.
@@ -151,7 +154,6 @@ window.ROOM = (() => {
     { s: 'meetTable', x: 64, b: 84 },
     { s: 'stoolRound', x: 117, b: 78 },
     { s: 'stoolRound', x: 81, b: 100 },
-    { s: 'plantPurple', x: 22, b: 110 },
     // E ai due capi del muro di sopra i mobili dell'ufficio: lo scaffale dei
     // faldoni a sinistra, l'armadio a destra. Non sono arredamento — sono le due
     // mezze pareti che restavano nude ai fianchi della lavagna, e una sala
@@ -191,18 +193,47 @@ window.ROOM = (() => {
     // e' arredamento che occupa un posto.
     { s: 'stoolRound', x: 305, b: 108 },
     { s: 'stoolRound', x: 341, b: 85 },
-    { s: 'plantBlue', x: 350, b: 112 },
 
-    // --- il salone: il verde sta contro i muri e negli angoli, il mezzo resta
-    //     camminabile. Gli angoli in fondo sono l'unico posto di una stanza dove
-    //     una pianta non e' mai d'intralcio a nessuno. ---
+    /* --- il verde ---
+     *
+     * Sei piante e sei sagome diverse. Erano due ritagli soli — lo stesso
+     * cespuglio nel vaso viola e nel vaso azzurro — ripetuti in tutti e sei gli
+     * angoli: in una stanza dove ogni persona nasce diversa dalla sua vicina,
+     * la pianta era l'unica cosa che si vedeva tre volte uguale.
+     *
+     * I quattro vasi nuovi vengono da un altro pacchetto (la casa di craftpix,
+     * `b` in sv-sheet): e' l'unico che ha piante da appartamento invece che
+     * cespugli di campagna. Sono piccoli e appoggiati per terra, quindi il fatto
+     * che la loro palette sia un filo piu' fredda non si legge come un altro
+     * disegno — si legge come un vaso comprato da un'altra parte, che e'
+     * esattamente quello che sono le piante di un ufficio vero. */
+    { s: 'vasoAloe', x: 23, b: 110 },
+    { s: 'vasoFiori', x: 353, b: 112 },
     { s: 'plantPurple', x: 22, b: 150 },
     { s: 'plantBlue', x: 350, b: 150 },
     // Una per angolo e non due. Appaiate erano una siepe: due piante alte una
     // accanto all'altra nello stesso angolo si leggono come un solo cespuglio
     // sfocato, e l'angolo smette di essere un angolo.
-    { s: 'plantBlue', x: 22, b: 300 },
-    { s: 'plantPurple', x: 351, b: 300 },
+    { s: 'vasoFoglie', x: 22, b: 300 },
+    { s: 'vasoErba', x: 350, b: 300 },
+
+    /* --- e la fontanella, in mezzo all'atrio ---
+     *
+     * Al centro del corridoio davanti alla porta d'ingresso. E' l'unica cosa di
+     * questa pianta che non sta contro un muro, ed e' voluto: quello e' l'unico
+     * pezzo di pavimento che si vede per intero entrando, e finora era vuoto.
+     *
+     * `anima` sono i tre fotogrammi dell'acqua. E' l'unica cosa della stanza che
+     * si muove da sola anche quando non c'e' nessuno — e in un ufficio vuoto e'
+     * proprio quello a farlo sembrare un posto e non una figura.
+     *
+     * ⚠️ Sedici pixel di larghezza, e non puo' crescere. Il corridoio, alla
+     * misura del disegno, e' largo sessantaquattro pixel fra i due muri; la
+     * griglia dei passi gonfia ogni ostacolo di mezza persona per parte, e fra i
+     * muri gonfiati restano sei caselle. Un ostacolo da ventiquattro le mangia
+     * tutte e sei e sigilla la stanza: dalla porta non si entra piu' e dentro non
+     * si esce, e non lo si vede finche' non tocca a qualcuno. */
+    { s: 'fontana1', x: 200, b: 76, anima: ['fontana1', 'fontana2', 'fontana3'] },
   ];
 
   /* ---- i mobili che nel foglio non ci sono ----
@@ -223,6 +254,10 @@ window.ROOM = (() => {
    * `w` e `h` non sono un vezzo: servono a marcarli nella griglia di dove si
    * mettono i piedi. Un mobile disegnato che non blocca e' un mobile che si
    * attraversa.
+   *
+   * Da qui passa anche la ghiaia dell'atrio, che pero' non e' disegnata in
+   * `room.css` ma generata dal seme da `ghiaia.js` — mille sassi non si scrivono
+   * a mano. Chi ha `seme` se lo fa dare da li' invece che dal foglio di stile.
    */
   const DISEGNATI0 = [
     // Il cestino, in sala riunioni. E' l'unico mobile messo per una commissione e
@@ -235,9 +270,22 @@ window.ROOM = (() => {
     // questo la scena lo dava per esistente: chi lava dice "la lavo e la rimetto"
     // stando davanti a un comodino.
     { s: 'lavandino', x: 348, b: 48, w: 18, h: 28 },
+
+    /* ---- la ghiaia dell'atrio ----
+     *
+     * L'anello di sassi bianchi attorno alla fontanella: e' l'unica cosa
+     * disegnata invece che ritagliata, perche' nel pacchetto un'aiuola vista
+     * dall'alto non c'e'. Piatta e senza bordo in rilievo: sta DENTRO il
+     * pavimento, e un bordo la farebbe diventare una fioriera.
+     *
+     * `piatto` vuol dire due cose che, per una cosa dentro il pavimento, sono la
+     * stessa: si disegna sotto tutto — e chi ci cammina sopra le passa sopra,
+     * non dietro — e non ferma nessuno. A fermare i piedi e' la fontanella, che
+     * e' un mobile suo. */
+    { s: 'ghiaia', seme: 'atrio', x: 194, b: 82, w: 28, h: 12, piatto: true },
   ];
 
-  /* Sei scrivanie, due file da tre, centrate nel salone. Le corsie fra una
+  /* Otto scrivanie, due file da quattro, centrate nel salone. Le corsie fra una
      colonna e l'altra sono quelle da cui si sale al passaggio: e' il motivo per
      cui non sono attaccate fra loro.
 
@@ -247,14 +295,29 @@ window.ROOM = (() => {
      quarantadue pixel di pavimento vuoto. Il salone e' alto centosettantasei
      (dal muro di mezzo a quello in fondo) e il blocco ne occupa
      centotrentadue: ventidue sopra e ventidue sotto, che vuol dire venti piu'
-     in basso di dov'erano. */
+     in basso di dov'erano.
+
+     Erano sei, tre per fila, e il conto orizzontale era comodo: cinquantadue di
+     margine e cinquantadue di corsia. Con quattro per fila il salone e' lo
+     stesso — dentro i muri sono trecentocinquantadue pixel — e quattro
+     scrivanie da quarantotto ne prendono centonovantadue: i centosessanta che
+     restano si dividono in cinque passaggi da trentadue, i due margini e le tre
+     corsie. Trentadue e' esattamente due persone di larghezza, che e' il minimo
+     perche' una corsia sia una corsia e non una fessura.
+
+     E il conto torna anche per chi ci sta in piedi accanto: gli impiegati si
+     mettono a quaranta pixel dai piedi del capo (`POSTI_STAFF` in office.js), e
+     quaranta e' il centro della corsia sia a destra che a sinistra di qualunque
+     scrivania di questa griglia. */
   const DESKS0 = [
-    { x: 68, b: 196 },
-    { x: 168, b: 196 },
-    { x: 268, b: 196 },
-    { x: 68, b: 266 },
-    { x: 168, b: 266 },
-    { x: 268, b: 266 },
+    { x: 48, b: 196 },
+    { x: 128, b: 196 },
+    { x: 208, b: 196 },
+    { x: 288, b: 196 },
+    { x: 48, b: 266 },
+    { x: 128, b: 266 },
+    { x: 208, b: 266 },
+    { x: 288, b: 266 },
   ];
 
   const SW = SV.desk.w;
@@ -330,12 +393,10 @@ window.ROOM = (() => {
   }
 
   const SGABELLI0 = [
-    // Sala riunioni, di qua e di la' del tavolo. Chi sta di sopra lo si vede a
-    // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro. I due
-    // portatili non stanno affiancati ma uno dietro l'altro: il piano e' alto
-    // tredici pixel, e due schermi alti nove sulla stessa riga non ci stanno.
+    // Sala riunioni: uno solo sul lato lungo, quello di sotto. Quello di sopra
+    // c'era e non c'e' piu': stava fra il tavolo e la bacheca, e chi ci sedeva
+    // dava le spalle al muro coprendo il pannello. Vedi la nota in PROPS0.
     { x: 80, y: 76, lap: [82, 70], lz: 85, verso: 'giu' },
-    { x: 80, y: 28, lap: [82, 59], lz: 85, verso: 'su' },
     // E i due capotavola, di fianco ai lati corti. Il portatile ce lo si mette
     // davanti sul tavolo, dalla propria parte: due portatili nello stesso punto
     // sono un portatile solo con due padroni.
@@ -400,6 +461,38 @@ window.ROOM = (() => {
   ];
   /** Presa, erogazione, lavaggio, deposito, e il broncio di chi non ne trova. */
   const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600 };
+  /* E quello che si dice al bar mentre lo si fa. Un mucchio per gesto: la
+     ricarica, il lavaggio, la tazza presa dalla rastrelliera e il broncio di
+     chi non ne trova. Sono i quattro momenti del giro del caffe', e uno che
+     dice sempre la stessa riga davanti alla stessa macchina e' un'insegna
+     luminosa, non una persona. */
+  const AL_BAR = {
+    ricarica: [
+      'Me ne faccio un altro',
+      'Il secondo. Forse il terzo',
+      'Questo e’ l’ultimo, giuro',
+      'Ancora mezza tazza',
+      'Ricarico e torno',
+    ],
+    lava: [
+      'La lavo e la rimetto',
+      'Due secondi e la lascio pulita',
+      'La rendo meglio di com’era',
+      'Almeno la mia la lavo',
+    ],
+    prende: [
+      'Ne metto su uno',
+      'Questa sembra pulita',
+      'La mia era l’altra',
+      'Ci vuole, a quest’ora',
+    ],
+    vuoto: [
+      'Non c’e’ piu’ una tazza pulita',
+      'Sono sparite tutte',
+      'Qualcuno le tiene in ostaggio',
+      'Nemmeno una. Bene.',
+    ],
+  };
 
   /* Dove si va quando ci si alza. Sono punti dove si mettono i piedi, non
      tragitti: la strada per arrivarci la trova la stanza, che sa dove sono i
@@ -442,15 +535,67 @@ window.ROOM = (() => {
    * quello che ci sta contro i muri lo stringe. Ci restano le piante negli
    * angoli, che ci stavano da sempre.
    */
+  /* `dice` e' un mucchio come le altre: la stessa commissione capita a giri di
+     distanza, e sentirsi dire due volte "tocca a te, bella" davanti alla stessa
+     pianta e' il momento in cui si capisce che e' un'animazione. */
+  const ANNAFFIA = [
+    'Queste crescono in fretta',
+    'Un goccio d’acqua e via',
+    'Tocca a te, bella',
+    'Questa l’avevo dimenticata',
+    'Ha sete piu’ di me',
+    'Meno di ieri, pero’',
+    'Chi ti ha ridotta cosi’?',
+    'Una foglia gialla. Vabbe’',
+    'Ci vorrebbe piu’ luce',
+    'Sei l’unica che ascolta',
+  ];
   const COMMISSIONI0 = [
-    { k: 'annaffia', posto: [48, 146], durata: 4500, dice: 'Queste crescono in fretta' },
-    { k: 'annaffia', posto: [330, 140], durata: 4500, dice: 'Un goccio d’acqua e via' },
-    { k: 'annaffia', posto: [48, 296], durata: 4500, dice: 'Tocca a te, bella' },
-    { k: 'annaffia', posto: [326, 296], durata: 4500, dice: 'Questa l’avevo dimenticata' },
-    { k: 'dispensa', posto: [272, 60], fx: [262, 22], durata: 3200, dice: 'C’e’ rimasto qualcosa?' },
-    { k: 'dispensa', posto: [272, 60], fx: [262, 22], durata: 3200, dice: 'Chi ha finito i biscotti?' },
-    { k: 'bacheca', posto: [60, 52], fx: [71, 16], durata: 4000, dice: 'Qualcosa di nuovo?' },
-    { k: 'cestino', posto: [126, 104], fx: [128, 84], durata: 2600, dice: 'Giornata di pulizie' },
+    { k: 'annaffia', posto: [48, 146], durata: 4500, dice: ANNAFFIA },
+    { k: 'annaffia', posto: [330, 140], durata: 4500, dice: ANNAFFIA },
+    { k: 'annaffia', posto: [48, 296], durata: 4500, dice: ANNAFFIA },
+    { k: 'annaffia', posto: [326, 296], durata: 4500, dice: ANNAFFIA },
+    {
+      k: 'dispensa',
+      posto: [272, 60],
+      fx: [262, 22],
+      durata: 3200,
+      dice: [
+        'C’e’ rimasto qualcosa?',
+        'Chi ha finito i biscotti?',
+        'Solo quelli integrali. Certo',
+        'Qui dentro c’e’ il vuoto',
+        'Mangio e non lo dico',
+        'Questi scadono domani',
+      ],
+    },
+    {
+      k: 'bacheca',
+      posto: [60, 52],
+      fx: [71, 16],
+      durata: 4000,
+      dice: [
+        'Qualcosa di nuovo?',
+        'Questo giallo e’ mio?',
+        'Ce n’e’ uno di troppo',
+        'Chi l’ha spostato?',
+        'Leggo e faccio finta',
+        'Sempre le stesse tre cose',
+      ],
+    },
+    {
+      k: 'cestino',
+      posto: [126, 104],
+      fx: [128, 84],
+      durata: 2600,
+      dice: [
+        'Giornata di pulizie',
+        'Questo non serve piu’',
+        'Via, che ingombra',
+        'Stampato per niente',
+        'Meta’ scrivania sgombra',
+      ],
+    },
   ];
   /** La prima dopo un po', poi ogni tanto: un ufficio non e' un cantiere. */
   const PRIMA_COMMISSIONE = 18000;
@@ -466,7 +611,14 @@ window.ROOM = (() => {
    * uno sta.
    *
    * Frasi corte apposta: a sei pixel una riga lunga esce dalla stanza, e comunque
-   * in piedi vicino alla macchinetta nessuno fa un discorso.
+   * in piedi vicino alla macchinetta nessuno fa un discorso. Trenta caratteri e'
+   * il tetto, ed e' una misura non un gusto.
+   *
+   * E mucchi larghi. Erano sei o sette per posto: chi guarda l'ufficio per
+   * qualche minuto le sentiva tutte e poi le risentiva, e da li' in poi non e'
+   * piu' un ufficio — e' un carillon. Venticinque per posto vuol dire che nella
+   * stessa mezz'ora una frase ripetuta si nota appena, che e' esattamente quanto
+   * si nota in un ufficio vero.
    */
   const FRASI = {
     bar: [
@@ -475,8 +627,26 @@ window.ROOM = (() => {
       "Il latte e' finito. Di nuovo",
       'Chi ha preso la mia tazza?',
       'Questo sa di bruciato',
-      "Ne resta per uno solo",
+      'Ne resta per uno solo',
       'Cinque minuti e arrivo',
+      'Doppio, oggi',
+      'Macchiato, se c’e’ il latte',
+      'Lo zucchero e’ finito ieri',
+      'Questa macchina ha vita sua',
+      'Aspetto che scenda',
+      'Pausa breve, giuro',
+      'Ne faccio uno anche a te',
+      'Buono oggi. Strano',
+      'Chi lava le tazze qui?',
+      'Il biscotto e’ un pasto',
+      'Dieci minuti e torno',
+      'Serve una macchina nuova',
+      'Decaffeinato dopo le cinque',
+      'Tocca a te comprarlo',
+      'La cialda era l’ultima',
+      'Meglio di quello di ieri',
+      'Chi l’ha lasciata cosi’?',
+      'Bevo e torno di la’',
     ],
     riunione: [
       'Punto veloce alle tre?',
@@ -485,6 +655,24 @@ window.ROOM = (() => {
       'Lo mettiamo a backlog',
       'Chi verbalizza?',
       'Giro di tavolo veloce',
+      'Facciamo cinque minuti',
+      'Ricapitoliamo dall’inizio',
+      'Chi se ne prende carico?',
+      'Lo vediamo la prossima volta',
+      'Serve una decisione, oggi',
+      'Sono d’accordo a meta’',
+      'Mettiamolo per iscritto',
+      'Manca solo l’ultimo punto',
+      'Sforiamo di dieci minuti',
+      'Il proiettore non parte',
+      'Ci sentiamo tutti?',
+      'Passo la parola',
+      'Rimandiamo a lunedi’',
+      'Un ultimo giro e chiudiamo',
+      'Chi manda il recap?',
+      'Prendo nota',
+      'Torniamo al punto',
+      'Va scritto sulla bacheca',
     ],
     scrivania: [
       'In locale funzionava',
@@ -494,6 +682,27 @@ window.ROOM = (() => {
       'Domani ci penso',
       'Ho la call fra dieci minuti',
       "Venerdi' non si rilascia",
+      'Finite le idee, non il lavoro',
+      'Riavvio e riprovo',
+      'Era un punto e virgola',
+      'Chi ha toccato la mia riga?',
+      'Adesso gira',
+      'Compila. Non chiedermi come',
+      'Manca solo di provarlo',
+      'Ho perso mezz’ora per niente',
+      'Lo chiudo prima di pranzo',
+      'Mi serve un secondo parere',
+      'Terza volta che la rileggo',
+      'Salvo e ne parliamo',
+      'La sedia si abbassa da sola',
+      'Il file era gia’ aperto',
+      'Non lo tocco fino a lunedi’',
+      'Ci vuole meno a rifarlo',
+      'Chi ha scritto questo? Io.',
+      'Mando e poi caffe’',
+      'Ancora una prova e chiudo',
+      'Sto aspettando la risposta',
+      'Ho tutto in testa, giuro',
     ],
   };
   /** Di cosa si parla dove: la meta dove si e' andati lo dice gia'. */
@@ -562,13 +771,11 @@ window.ROOM = (() => {
       w: m.w * TILE + GX * (m.aw || 0),
       h: m.h * TILE + GY * (m.ah || 0),
     }));
-    PROPS = PROPS0.map((m) => ({ s: m.s, x: AX(m.x, ancoraX(m.x)), b: AY(m.b, ancoraY(m.b)) }));
+    PROPS = PROPS0.map((m) => ({ ...m, x: AX(m.x, ancoraX(m.x)), b: AY(m.b, ancoraY(m.b)) }));
     DISEGNATI = DISEGNATI0.map((m) => ({
-      s: m.s,
+      ...m,
       x: AX(m.x, ancoraX(m.x)),
       b: AY(m.b, ancoraY(m.b)),
-      w: m.w,
-      h: m.h,
     }));
     // Le scrivanie non stanno contro niente: sono un blocco in mezzo al salone, e
     // in mezzo restano. E' l'unica cosa della pianta che si sposta di meta' in
@@ -630,7 +837,14 @@ window.ROOM = (() => {
       const d = SV[m.s];
       blocca(m.x, m.b - d.h, d.w, d.h);
     }
-    for (const m of DISEGNATI) blocca(m.x, m.b - m.h, m.w, m.h);
+    // I disegnati bloccano quanto sono grandi, tranne quelli piatti: la ghiaia
+    // dell'atrio sta dentro il pavimento, e su un pezzo di pavimento ci si
+    // cammina. A fermare i piedi li' in mezzo e' la fontanella, che e' un
+    // mobile del foglio e si e' gia' contata sopra.
+    for (const m of DISEGNATI) {
+      if (m.piatto) continue;
+      blocca(m.x, m.b - m.h, m.w, m.h);
+    }
     for (const d of DESKS) blocca(d.x, d.b - SH, SW, SH);
   }
 
@@ -766,6 +980,17 @@ window.ROOM = (() => {
 
     nodiProp = PROPS.map((m) => {
       const n = prop(m.s, m.x, m.b);
+      // Chi ha dei fotogrammi li porta come tre posizioni del foglio, e a farle
+      // girare ci pensa il CSS: nessun timer, e una cosa che si muove anche
+      // mentre nessuno la guarda. Le coordinate le sa solo questa riga — il
+      // foglio di stile non puo' sapere dove sta l'acqua dentro sv-room.png.
+      if (m.anima) {
+        n.classList.add('of-anima');
+        m.anima.forEach((k, i) => {
+          const d = SV[k];
+          n.style.setProperty('--f' + (i + 1), -d.x + 'px ' + -d.y + 'px');
+        });
+      }
       stage.append(n);
       return n;
     });
@@ -775,6 +1000,11 @@ window.ROOM = (() => {
       const n = el('div', 'of-' + m.s);
       n.style.width = m.w + 'px';
       n.style.height = m.h + 'px';
+      // La ghiaia non e' un disegno del foglio di stile: e' un PNG generato dal
+      // seme, e ci arriva come indirizzo. Si chiede una volta sola — il
+      // generatore tiene quello che ha gia' fatto — e da li' in poi la stanza
+      // puo' rimontarsi quante volte vuole.
+      if (m.seme) n.style.backgroundImage = 'url("' + window.GHIAIA.disegna(m.seme, m.w, m.h) + '")';
       stage.append(n);
       return n;
     });
@@ -838,7 +1068,10 @@ window.ROOM = (() => {
       const n = nodiDis[i];
       n.style.left = m.x + 'px';
       n.style.top = m.b - m.h + 'px';
-      depth(n, m.b);
+      // Quello che sta dentro il pavimento non ha profondita': sta sotto tutti,
+      // come il pavimento stesso. Ordinarlo sul bordo di sotto vorrebbe dire
+      // vederlo passare davanti ai piedi di chi ci cammina in mezzo.
+      depth(n, m.piatto ? 1 : m.b);
     });
     DESKS.forEach((d, i) => {
       const s = scrivanie[i];
@@ -1082,13 +1315,13 @@ window.ROOM = (() => {
     if (chi.tazza) {
       if (Math.random() < 0.6) {
         if (await vai(chi, ...BAR.macchina, true)) {
-          parla(chi, 'Me ne faccio un altro');
+          parla(chi, caso(AL_BAR.ricarica));
           await attesa(TEMPI.fa);
         }
         return;
       }
       if (await vai(chi, ...BAR.lavandino, true)) {
-        parla(chi, 'La lavo e la rimetto');
+        parla(chi, caso(AL_BAR.lava));
         await attesa(TEMPI.lava);
       }
       if (await vai(chi, ...BAR.rastrelliera, true)) {
@@ -1107,7 +1340,7 @@ window.ROOM = (() => {
     // La rastrelliera vuota e' vuota davvero: e' il conto a farla vuota, e sono
     // le stesse quattro tazze che girano da mezz'ora.
     if (tazzePulite <= 0) {
-      parla(chi, 'Non c’e’ piu’ una tazza pulita');
+      parla(chi, caso(AL_BAR.vuoto));
       await attesa(TEMPI.broncio);
       return;
     }
@@ -1121,7 +1354,7 @@ window.ROOM = (() => {
     }
     prendi(chi);
     if (await vai(chi, ...BAR.macchina, true)) {
-      parla(chi, 'Ne metto su uno');
+      parla(chi, caso(AL_BAR.prende));
       await attesa(TEMPI.fa);
     }
   }
@@ -1248,7 +1481,7 @@ window.ROOM = (() => {
     let fx = null;
     if (await vai(chi, ...c.posto)) {
       vesti(chi.fig, chi.seme, 'fermo');
-      parla(chi, c.dice);
+      parla(chi, caso([].concat(c.dice)));
       fx = effetto(chi, c);
       await pausa(chi, c.durata);
       vesti(chi.fig, chi.seme, 'cammina');

@@ -31,10 +31,10 @@
 //    tutte se ne vanno da sole quando sono atterrate;
 //  - i capi e i loro impiegati: ogni conversazione e' un capo, i sub-agent che
 //    apre sono i suoi, e finche' c'e' un posto libero si siedono — prima le
-//    scrivanie, poi i quattro sgabelli attorno ai due tavoli, col portatile
-//    davanti perche' sui tavoli un computer non c'e' — sei posti
-//    e due conversazioni vuol dire quattro scrivanie vuote, e un ufficio con
-//    quattro posti liberi e tre persone in piedi nella corsia non e' un ufficio
+//    scrivanie, poi i sei sgabelli attorno ai due tavoli, col portatile
+//    davanti perche' sui tavoli un computer non c'e' — otto posti
+//    e due conversazioni vuol dire sei scrivanie vuote, e un ufficio con
+//    sei posti liberi e tre persone in piedi nella corsia non e' un ufficio
 //    pieno, e' un ufficio in attesa. Uno per scrivania, e lo schermo davanti
 //    acceso;
 //  - la bacheca: un foglietto per cosa da fare, e il colore dice quale. Quello
@@ -57,7 +57,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const url = pathToFileURL(path.join(root, 'dist', 'preview.html')).href;
 
 /** Le scrivanie della pianta: room.js ne mette una per posto, sempre le stesse. */
-const DESKS = 6;
+const DESKS = 8;
 
 const card = (over = {}) => ({
   id: 'aaaa',
@@ -329,6 +329,31 @@ t(plan.mons === DESKS, 'i monitor sono ' + plan.mons + ', le scrivanie ' + DESKS
 // per uno: le scrivanie contano, i muri e il pavimento no.
 t(plan.props > 20, 'la stanza e\' spoglia: solo ' + plan.props + ' mobili');
 t(/url\(/.test(plan.sheet), 'i mobili non hanno il foglio di sprite: ' + plan.sheet);
+
+// ---- la fontanella dell'atrio ----
+//
+// E' l'unica cosa della stanza che si muove da sola anche quando non c'e'
+// nessuno, e si muove perche' room.js le mette addosso tre posizioni del foglio
+// che il CSS fa girare. Se un giorno cambiano i nomi dei ritagli, le tre
+// variabili restano vuote: l'animazione continua a girare e l'acqua sta ferma —
+// che a occhio e' identico a una fontanella spenta, cioe' non si nota.
+const acqua = await page.evaluate(() => {
+  const n = document.querySelector('.of-anima');
+  if (!n) return null;
+  const s = getComputedStyle(n);
+  return {
+    frames: ['--f1', '--f2', '--f3'].map((k) => s.getPropertyValue(k).trim()),
+    ghiaia: !!document.querySelector('.of-ghiaia'),
+  };
+});
+t(!!acqua, "la fontanella dell'atrio non c'e'");
+if (acqua) {
+  t(
+    acqua.frames.every((f) => /px/.test(f)) && new Set(acqua.frames).size === 3,
+    "l'acqua della fontanella non ha tre fotogrammi diversi: " + acqua.frames.join(' | ')
+  );
+  t(acqua.ghiaia, "la ghiaia attorno alla fontanella non c'e'");
+}
 t(!plan.people, "c'e' gente in ufficio senza nemmeno una conversazione aperta");
 t(plan.emptyShown, "l'ufficio vuoto non dice che e' vuoto");
 
@@ -339,31 +364,48 @@ t(plan.emptyShown, "l'ufficio vuoto non dice che e' vuoto");
 // mobile spostato di traverso anche se in quel minuto nessuno ci passava.
 // Due modi di sbagliare: non arrivarci — e allora la strada finisce dove ha
 // potuto invece che sulla meta' — o arrivarci attraversando un tavolo.
-const strade = await page.evaluate(() => {
-  const guai = [];
-  for (const [nome, [gx, gy]] of Object.entries(ROOM.DESTINAZIONI)) {
-    for (let i = 0; i < ROOM.DESKS.length; i++) {
-      const casa = ROOM.posto(i);
-      let qui = [casa.x + 8, casa.y + 24];
-      const via = ROOM.cammino(qui[0], qui[1], gx, gy);
-      let sporco = 0;
-      for (const t of via) {
-        const n = Math.max(1, Math.ceil(Math.hypot(t[0] - qui[0], t[1] - qui[1]) / 2));
-        for (let k = 0; k <= n; k++) {
-          const x = qui[0] + ((t[0] - qui[0]) * k) / n;
-          const y = qui[1] + ((t[1] - qui[1]) * k) / n;
-          if (ROOM.occupata[ROOM.cella(x, y)]) sporco++;
+//
+// E si guarda due volte: alla misura che ha adesso e a quella del disegno.
+// La stanza cresce riempiendo il corridoio in mezzo, quindi in una scheda larga
+// il corridoio e' largo e ci si passa comunque: e' alla misura minima —
+// sessantaquattro pixel fra i due muri — che un mobile messo li' in mezzo puo'
+// sigillare la stanza. La fontanella sta esattamente li', e senza questo
+// secondo giro un mobile troppo largo passerebbe il controllo e romperebbe
+// l'ufficio solo a chi tiene la scheda stretta.
+const strade = (minima) =>
+  page.evaluate((min) => {
+    const prima = [ROOM.W, ROOM.H];
+    if (min) ROOM.cresci(ROOM.W0, ROOM.H0);
+    const guai = [];
+    for (const [nome, [gx, gy]] of Object.entries(ROOM.DESTINAZIONI)) {
+      for (let i = 0; i < ROOM.DESKS.length; i++) {
+        const casa = ROOM.posto(i);
+        let qui = [casa.x + 8, casa.y + 24];
+        const via = ROOM.cammino(qui[0], qui[1], gx, gy);
+        let sporco = 0;
+        for (const t of via) {
+          const n = Math.max(1, Math.ceil(Math.hypot(t[0] - qui[0], t[1] - qui[1]) / 2));
+          for (let k = 0; k <= n; k++) {
+            const x = qui[0] + ((t[0] - qui[0]) * k) / n;
+            const y = qui[1] + ((t[1] - qui[1]) * k) / n;
+            if (ROOM.occupata[ROOM.cella(x, y)]) sporco++;
+          }
+          qui = t;
         }
-        qui = t;
+        if (sporco) guai.push(nome + ' dalla scrivania ' + i + ': passa dentro un mobile');
+        else if (Math.hypot(qui[0] - gx, qui[1] - gy) > 1)
+          guai.push(nome + ' dalla scrivania ' + i + ': si ferma prima');
       }
-      if (sporco) guai.push(nome + " dalla scrivania " + i + ": passa dentro un mobile");
-      else if (Math.hypot(qui[0] - gx, qui[1] - gy) > 1)
-        guai.push(nome + " dalla scrivania " + i + ": si ferma prima");
     }
-  }
-  return guai;
-});
-t(!strade.length, 'la strada non porta dove deve: ' + strade.join(' | '));
+    // Si rimette com'era prima di uscire: qui dentro la stanza si e' rimpicciolita
+    // per davvero, e una stanza lasciata piccola sfalsa tutti i controlli dopo.
+    if (min) ROOM.cresci(prima[0], prima[1]);
+    return guai;
+  }, minima);
+const larga = await strade(false);
+t(!larga.length, 'la strada non porta dove deve: ' + larga.join(' | '));
+const stretta = await strade(true);
+t(!stretta.length, 'col disegno alla misura minima la strada non porta dove deve: ' + stretta.join(' | '));
 
 // ---- quattro conversazioni, quattro persone ----
 const four = [
@@ -701,10 +743,10 @@ await page.evaluate(() => {
 await page.waitForTimeout(16000);
 t((await staff()) === 3, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 3');
 
-// E si siedono: due conversazioni prendono due scrivanie, le altre quattro
+// E si siedono: due conversazioni prendono due scrivanie, le altre sei
 // restano libere, e i tre impiegati se ne prendono una a testa. Il posto si
 // legge dalla posizione e non da un contatore: -1 vuol dire "in piedi in mezzo
-// alla stanza", che con quattro scrivanie vuote non deve succedere.
+// alla stanza", che con sei scrivanie vuote non deve succedere.
 const banchi = await page.evaluate(() => {
   const posti = ROOM.DESKS.map((_, i) => ROOM.posto(i)).map((c) => [c.x + 8, c.y + 24]);
   return [...document.querySelectorAll('.of-staff')].map((s) => {
@@ -854,15 +896,17 @@ t(g.mano === 1, 'restano ' + g.mano + ' foglietti in mano invece di 1');
 // ---- e quando le scrivanie finiscono: gli sgabelli ----
 //
 // Due schede aperte con quattro sub-agent per una sono dieci persone, e le
-// scrivanie sono sei. Prima gli ultimi quattro restavano in piedi nelle corsie a
+// scrivanie sono otto. Prima gli ultimi restavano in piedi nelle corsie a
 // battere a macchina sul vuoto, che e' il modo peggiore di dire "non c'e' piu'
 // posto": un ufficio dove qualcuno mima e' un ufficio rotto, e si nota da
 // lontano prima ancora di capire cosa si sta guardando.
 //
-// I posti in piu' sono i sette sgabelli attorno ai due tavoli — i lati lunghi e
-// i capotavola — e chi ci si siede si porta il portatile, perche' sui tavoli un
-// computer non c'e' e non deve esserci. Qui se ne riempiono quattro: gli altri
-// tre sono il margine, e servono quando le conversazioni aperte sono di piu'.
+// I posti in piu' sono i sei sgabelli attorno ai due tavoli — i lati lunghi e i
+// capotavola — e chi ci si siede si porta il portatile, perche' sui tavoli un
+// computer non c'e' e non deve esserci. Qui se ne riempiono due: due capi si
+// prendono due scrivanie, gli otto impiegati le sei che restano e poi due
+// sgabelli. Gli altri quattro sono il margine, e servono quando le
+// conversazioni aperte sono di piu'.
 //
 // Tre cose da guardare, e sono le tre che si rompono in silenzio: che nessuno
 // resti in piedi, che il posto a sedere non caschi dentro un mobile (se no la
@@ -907,16 +951,23 @@ t(
   new Set(dove.posti).size === dove.posti.length,
   'due impiegati sullo stesso posto: ' + dove.posti.join(', ')
 );
+// Dieci persone in tutto — due capi e otto impiegati — e le scrivanie sono
+// DESKS: quelli che avanzano finiscono sugli sgabelli. Il numero si ricava,
+// non si scrive: aggiungere una scrivania non deve voler dire ricordarsi di
+// venire a cambiare un 2 qui sotto.
+const restano = 10 - DESKS;
+const suSgabello = dove.posti.filter((i) => i >= dove.scrivanie).length;
 t(
-  dove.posti.filter((i) => i >= dove.scrivanie).length === 4,
-  'gli impiegati finiti sugli sgabelli sono ' +
-    dove.posti.filter((i) => i >= dove.scrivanie).length +
-    ' invece di 4'
+  suSgabello === restano,
+  'gli impiegati finiti sugli sgabelli sono ' + suSgabello + ' invece di ' + restano
 );
 t(!dove.dentro, dove.dentro + ' sgabelli hanno il posto a sedere dentro un mobile');
 
 const portatili = await page.locator('.of-portatili .of-portatile').count();
-t(portatili === 4, 'i portatili aperti sui tavoli sono ' + portatili + ' invece di 4');
+t(
+  portatili === restano,
+  'i portatili aperti sui tavoli sono ' + portatili + ' invece di ' + restano
+);
 
 // ---- e la fascia in cima dice dove sei, chi c'e' e quanto ne resta ----
 //

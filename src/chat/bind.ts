@@ -68,6 +68,7 @@ export function bindWebview(
     chimeJs: 'chime.js',
     svRoomJs: 'sv-room.js',
     npcJs: 'npc.js',
+    ghiaiaJs: 'ghiaia.js',
     roomJs: 'room.js',
     officeJs: 'office.js',
     chatJs: 'chat.js',

@@ -702,9 +702,9 @@ window.OFFICE = (() => {
   /** chiave dell'impiegato -> posto. Un posto preso non si cambia sotto i piedi. */
   const banchi = new Map();
 
-  /* I posti sono in fila uno solo: prima le sei scrivanie, poi i quattro
-     sgabelli. Un indice solo perche' `banchi` ne tiene uno solo, e due elenchi
-     paralleli sarebbero due modi di dire "il posto numero tre". */
+  /* I posti sono in fila uno solo: prima le otto scrivanie, poi i sei sgabelli
+     attorno ai due tavoli. Un indice solo perche' `banchi` ne tiene uno solo, e
+     due elenchi paralleli sarebbero due modi di dire "il posto numero tre". */
   const posti = () => scrivanie.length + window.ROOM.SGABELLI.length;
   const sgabello = (i) => i >= scrivanie.length;
   const postoBanco = (i) =>
@@ -1226,16 +1226,35 @@ window.OFFICE = (() => {
   // chiuse per quel capo li'. Senza il numero vero e' un cartello; col numero
   // vero e' un ufficio.
 
-  /* Le prime due dicono il numero, e si usano solo se il numero c'e'. Adulare
-     qualcuno per zero cose fatte non e' adulare, e' prendere in giro. */
-  const ADULAZIONE = [
+  /* Quelle col numero stanno in un mucchio a parte, e si usano solo se il
+     numero c'e'. Adulare qualcuno per zero cose fatte non e' adulare, e'
+     prendere in giro — e prima erano le prime due di un elenco solo, tagliate
+     via con uno `slice(2)`: bastava aggiungere una frase in cima per rimettere
+     uno zero in bocca a qualcuno senza accorgersene. */
+  const ADULAZIONE_N = [
     'Gia’ {n} cose fatte, capo. Aumento?',
     '{n} task chiuse, capo!',
+    'Capo, {n} in mattinata!',
+    'Ne ha chiuse {n}. Io zero',
+    'Con {n} cosi’, chi ci prende?',
+  ];
+  const ADULAZIONE = [
     'Gran visione come sempre, capo',
     'Stavo giusto per farlo anch’io!',
     'Bella la cravatta oggi, capo',
     'Che ritmo, capo',
     'Il miglior capo di sempre. Davvero.',
+    'Come fa, capo?',
+    'Lo dicevo io che era la strada',
+    'Se lo dice lei, capo',
+    'Ci avevo pensato anch’io. Dopo',
+    'Ha sempre ragione, capo',
+    'Glielo tengo io il posto',
+    'Segno tutto, capo',
+    'Riposi, capo, faccio io',
+    'Impossibile fare meglio',
+    'Le porto un caffe’?',
+    'Il team la adora, capo',
   ];
   /* Quello che dice chi sta lavorando: la sua task, detta come la direbbe una
      persona.
@@ -1260,8 +1279,29 @@ window.OFFICE = (() => {
     'Ci sto lavorando',
     'Questa la chiudo io',
     'Un attimo e ho finito',
+    'Meta’ fatta',
+    'Non e’ come sembrava',
+    'Sto capendo dove sta',
+    'Un ultimo controllo',
+    'Ci vuole ancora un po’',
+    'Va meglio di ieri',
+    'Quasi. Ma quasi davvero',
+    'Ho trovato il punto',
+    'Adesso torna',
+    'Riprovo e vediamo',
+    'Piu’ facile del previsto',
+    'Manca solo la prova',
   ];
-  const SULLAVORO = ['Sto su {c}', 'Mi son preso {c}', '{c}, ci sono quasi', 'Faccio {c} e chiudo'];
+  const SULLAVORO = [
+    'Sto su {c}',
+    'Mi son preso {c}',
+    '{c}, ci sono quasi',
+    'Faccio {c} e chiudo',
+    'Tocca a me {c}',
+    '{c}. Poi si vede',
+    'Sono dentro {c}',
+    '{c}, quasi fatto',
+  ];
 
   function suLavoro(cosa) {
     const c = (cosa || '').trim();
@@ -1279,6 +1319,20 @@ window.OFFICE = (() => {
     'Dice sempre di si’ e poi cambia idea',
     'Ha annaffiato una pianta. La sua.',
     'Trenta minuti per dire "vediamo"',
+    'Al bar da mezz’ora, eh',
+    'Chi glielo dice che e’ sbagliato?',
+    'Ha letto la mail? Ne dubito',
+    'Parla con la fontanella',
+    'Riunione per decidere la riunione',
+    'Lo dice a tutti tranne che a me',
+    'Ha scritto lui questo? Ma va’',
+    'Torna sempre quando ho finito',
+    'Il suo schermo e’ sempre spento',
+    'Un giorno lo dico in faccia',
+    'Fa il giro largo per non passarmi',
+    'Ha imparato una parola nuova',
+    'Prende appunti e non li rilegge',
+    'Delega anche il caffe’',
   ];
 
   /* Quanto vicino deve stare il capo perche' valga la pena adularlo. Adesso che
@@ -1314,7 +1368,7 @@ window.OFFICE = (() => {
       if (d <= VICINO && Math.random() < 0.6) {
         chi.zitto = ora;
         const fatte = (board[chi.capoId] && board[chi.capoId].done) || 0;
-        const pescate = fatte > 0 ? ADULAZIONE : ADULAZIONE.slice(2);
+        const pescate = fatte > 0 ? ADULAZIONE_N.concat(ADULAZIONE) : ADULAZIONE;
         window.ROOM.parla(chi, caso(pescate).replace('{n}', fatte));
       } else if (d > LONTANO && Math.random() < 0.35) {
         chi.zitto = ora;

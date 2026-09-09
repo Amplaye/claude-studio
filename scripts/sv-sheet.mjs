@@ -32,11 +32,22 @@ const PACK = 'C:/Users/Steward/Documents/SeasonVale Materials';
  * Il pacchetto ne ha tre di famiglie che non si parlano: questa (`All Tileset`,
  * palette Resurrect-64, legno caldo), una piu' scura in `plants/` e una a 48
  * per RPG Maker. Mescolarle si vede subito — due marroni diversi nella stessa
- * stanza — quindi si sta in una corsia sola. Questa, perche' il suo legno
- * arancio e' gia' la terracotta del CRM.
+ * stanza — quindi i mobili stanno in una corsia sola. Questa, perche' il suo
+ * legno arancio e' gia' la terracotta del CRM.
+ *
+ * L'eccezione sono le quattro piante da appartamento, che questa famiglia non
+ * ha: ha due cespugli in vaso e basta, e sei angoli con due cespugli sono la
+ * stessa pianta tre volte. Vengono da `b`, e la regola regge lo stesso perche'
+ * sono oggetti piccoli, appoggiati per terra, senza legno addosso — e' il legno
+ * a fare a pugni fra un pacchetto e l'altro, non le foglie.
  */
 const SRC = {
   a: PACK + '/interiors/All Tileset/16x16.png',
+  // La casa moderna di craftpix: e' l'unico pacchetto con delle piante da
+  // appartamento vere — ciotole e vasi, non cespugli di campagna. Palette piu'
+  // fredda della fattoria, ma sono oggetti piccoli e appoggiati per terra: sul
+  // pavimento scuro del salone stanno accanto ai mobili senza litigarci.
+  b: PACK + '/craftpix-net-654184-main-characters-home-free-top-down-pixel-art-asset/PNG/Interior.png',
 };
 
 /**
@@ -88,6 +99,21 @@ const CUT = {
   // --- verde ---
   plantPurple: ['a', 273, 164, 15, 21], // cespuglio nel vaso viola
   plantBlue: ['a', 288, 164, 16, 21], // cespuglio nel vaso azzurro
+  // Le piante da appartamento: ciotola di foglie larghe, ciotola d'erba, aloe
+  // nel vaso di coccio, fiori nel vaso alto. Quattro sagome diverse, che a
+  // sedici pixel e' l'unica cosa che distingue una pianta da un'altra.
+  vasoFoglie: ['b', 8, 375, 16, 17],
+  vasoErba: ['b', 39, 377, 16, 17],
+  vasoAloe: ['b', 145, 378, 14, 15],
+  vasoFiori: ['b', 66, 373, 10, 19],
+
+  // --- e quello che sta in mezzo all'atrio ---
+  //
+  // La fontanella e' tre fotogrammi: l'acqua nella vasca si muove, ed e' l'unica
+  // cosa di questa stanza che si muove da sola senza che ci sia nessuno.
+  fontana1: ['a', 368, 162, 16, 25],
+  fontana2: ['a', 384, 162, 16, 25],
+  fontana3: ['a', 400, 162, 16, 25],
 };
 
 const b64 = (p) => 'data:image/png;base64,' + fs.readFileSync(p).toString('base64');
