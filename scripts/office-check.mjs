@@ -112,6 +112,27 @@ const tasks = (d) => post({ k: 'tasks', d });
 const lastSent = () => page.evaluate(() => (window.__sent || []).at(-1));
 const sent = (cmd) => page.evaluate((c) => (window.__sent || []).some((m) => m.cmd === c), cmd);
 const inOffice = () => page.evaluate(() => document.body.classList.contains('inoffice'));
+// In ufficio si entra dalla porta e ci si arriva a piedi, uno alla volta: chi
+// guarda la stanza duecento millisecondi dopo aver aperto quattro conversazioni
+// vede quattro persone impilate sulla soglia, non quattro alle loro scrivanie.
+// Quindi si aspetta che siano entrate — e che se ne siano andate, che e' la
+// stessa cosa all'incontrario.
+const fermi = async () => {
+  // Un respiro prima di guardare: il messaggio arriva alla pagina e il ridisegno
+  // parte dopo, e chi controlla subito trova la stanza di un attimo fa — cioe'
+  // nessuno ancora sulla soglia, e se ne va convinto che sia tutto a posto.
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 60; i++) {
+    const q = await page.evaluate(
+      () => document.querySelectorAll('.of-guy.soglia, .of-guy.in-arrivo, .of-guy.via').length
+    );
+    if (!q) return;
+    await page.waitForTimeout(400);
+  }
+  fails.push("c'e' ancora qualcuno sulla porta dopo ventiquattro secondi");
+};
+/** Chi c'e' davvero: chi sta uscendo e' ancora disegnato, ma non e' piu' di casa. */
+const QUI = '.of-guy:not(.via)';
 
 // La scheda si annuncia come scheda: e' quello che tira fuori il bottone
 // dell'ufficio, che nella barra laterale non c'e'.
@@ -275,7 +296,16 @@ const four = [
   card({ id: 'd', name: 'Ferma da un pezzo', pct: 7 }),
 ];
 await ctx(data(four));
-await page.waitForTimeout(200);
+// La porta si apre davvero. E' l'unica parte del muro che si muove, e se
+// restasse chiusa mentre entrano quattro persone sarebbero quattro che
+// attraversano il legno. Mezzo secondo: la prima e' gia' sulla soglia, e la
+// porta resta aperta un secondo e mezzo dopo ogni passaggio.
+await page.waitForTimeout(500);
+t(
+  (await page.locator('.of-porta.aperta').count()) > 0,
+  'la porta non si apre quando entra qualcuno'
+);
+await fermi();
 await page.evaluate(() => document.querySelectorAll('.of-guy').forEach((p) => (p.dataset.stamp = 'first')));
 
 const room = await page.evaluate(() => {
@@ -422,11 +452,11 @@ t(go?.cmd === 'focus' && go.id === 'a', "cliccare una persona non porta di la': 
 // cambia da sola.
 const banchiPrima = (await posti()).banchi;
 await ctx(data([four[0], four[2], four[3], card({ id: 'e', name: 'Appena arrivata', recent: true })]));
-await page.waitForTimeout(200);
-const reseat = await page.evaluate(() => ({
-  n: document.querySelectorAll('.of-guy').length,
+await fermi();
+const reseat = await page.evaluate((q) => ({
+  n: document.querySelectorAll(q).length,
   names: [...document.querySelectorAll('.of-name')].map((n) => n.textContent),
-}));
+}), QUI);
 t(reseat.n === 4, 'dopo il cambio le persone sono ' + reseat.n);
 t(!reseat.names.includes("Ha finito"), "chi ha chiuso la conversazione e' rimasto seduto");
 t(
@@ -438,10 +468,10 @@ t(
 await ctx(
   data(Array.from({ length: DESKS + 6 }, (_, i) => card({ id: 'x' + i, name: 'Conversazione ' + i, recent: true })))
 );
-await page.waitForTimeout(250);
-const full = await page.evaluate(() => {
+await fermi();
+const full = await page.evaluate((q) => {
   const floor = document.querySelector('.of-floor').getBoundingClientRect();
-  const ps = [...document.querySelectorAll('.of-guy')];
+  const ps = [...document.querySelectorAll(q)];
   return {
     n: ps.length,
     out: ps.filter((p) => {
@@ -449,7 +479,7 @@ const full = await page.evaluate(() => {
       return r.left < floor.left || r.right > floor.right;
     }).length,
   };
-});
+}, QUI);
 t(full.n === DESKS + 6, 'con ' + (DESKS + 6) + ' conversazioni le persone sono ' + full.n);
 t(!full.out, full.out + ' persone in piedi finiscono fuori dal muro');
 
@@ -465,12 +495,12 @@ t(!full.out, full.out + ' persone in piedi finiscono fuori dal muro');
 // un ufficio morto, e un ufficio morto e' il modo piu' facile di far lavorare
 // tutti.
 const seduti = () =>
-  page.evaluate(() => [...document.querySelectorAll('.of-guy')].map((p) => p.style.left + ',' + p.style.top));
+  page.evaluate((q) => [...document.querySelectorAll(q)].map((p) => p.style.left + ',' + p.style.top), QUI);
 const cinque = (over) =>
   Array.from({ length: 5 }, (_, i) => card({ id: 'w' + i, name: 'Conversazione ' + i, recent: true, ...over }));
 
 await ctx(data(cinque()));
-await page.waitForTimeout(400);
+await fermi();
 const fermiA = await seduti();
 await page.waitForTimeout(9000);
 const dopoA = await seduti();
@@ -482,9 +512,9 @@ t(
 // Si svuota prima di rifare: chi era in corridoio sparisce con la sua
 // conversazione, e le cinque nuove nascono tutte sedute al posto loro.
 await ctx(data([]));
-await page.waitForTimeout(400);
+await fermi();
 await ctx(data(cinque({ busy: true })));
-await page.waitForTimeout(400);
+await fermi();
 const fermiB = await seduti();
 await page.waitForTimeout(9000);
 const dopoB = await seduti();
@@ -539,7 +569,7 @@ t((await buste()) === 0, 'le buste restano appese in aria: ' + (await buste()));
 // Qui si guarda quello che a occhio non si nota finche' non da' fastidio: che
 // arrivino, che siano quelli giusti (solo quelli in corso), che stiano vicini al
 // loro capo e non a un altro, e che se ne vadano davvero.
-const staff = () => page.locator('.of-staff').count();
+const staff = () => page.locator('.of-staff:not(.via)').count();
 const T = (id, content, status) => ({ id, content, status });
 
 await ctx(data([]));
@@ -550,7 +580,7 @@ await ctx(
     card({ id: 'capo-b', name: 'Seconda conversazione', busy: true }),
   ])
 );
-await page.waitForTimeout(300);
+await fermi();
 await tasks({
   'capo-a': {
     items: [
@@ -810,6 +840,66 @@ t(!dove.dentro, dove.dentro + ' sgabelli hanno il posto a sedere dentro un mobil
 const portatili = await page.locator('.of-portatili .of-portatile').count();
 t(portatili === 4, 'i portatili aperti sui tavoli sono ' + portatili + ' invece di 4');
 
+// ---- e la fascia in cima dice chi c'e' ----
+//
+// La stanza dice *che* qualcuno c'e'; da sedici pixel e visti dall'alto non dice
+// *chi*. La fila in cima ha i nomi scritti, e i sub-agent stanno subito dopo il
+// capo che li ha aperti — che e' la stessa gerarchia della stanza, detta in
+// parole.
+//
+// Tre cose da guardare. Che ci siano tutti: dieci persone in ufficio sono dieci
+// pedine, e una fila che ne mostra sei ha appena smesso di essere un elenco. Che
+// cliccarne una dica cosa sta facendo, che e' l'unica ragione per cui si clicca.
+// E che i consumi restino interi: sono l'unica cosa della fascia che non si puo'
+// stringere, perche' una barra tagliata mostra una percentuale che non e' quella
+// vera — con dieci nomi da mettere da qualche parte, e' la fila a scorrere.
+const fascia = await page.evaluate(() => {
+  const uso = document.querySelector('.of-uso').getBoundingClientRect();
+  const gente = document.querySelector('.of-gente');
+  const back = document.querySelector('.of-back').getBoundingClientRect();
+  const bar = document.querySelector('.of-bar').getBoundingClientRect();
+  return {
+    pedine: document.querySelectorAll('.of-chi').length,
+    sub: document.querySelectorAll('.of-chi.of-sub').length,
+    // Scorre invece di stringersi: dieci pedine in questa larghezza non ci stanno.
+    scorre: gente.scrollWidth > gente.clientWidth,
+    usoLargo: Math.round(uso.width),
+    // Le barre riempite davvero, e non due scatole vuote.
+    fill: [...document.querySelectorAll('.of-uso .of-cell-fill')].map((f) => f.style.width),
+    // Il ritorno alla chat sta in fondo a destra, contro il bordo.
+    backADestra: Math.round(bar.right - back.right),
+  };
+});
+t(fascia.pedine === 10, 'le pedine in cima sono ' + fascia.pedine + ' invece di 10');
+t(fascia.sub === 8, 'i sub-agent in cima sono ' + fascia.sub + ' invece di 8');
+t(fascia.scorre, 'la fila della gente non scorre: si e\u2019 stretta invece');
+t(fascia.usoLargo >= 200, 'i consumi sono stati schiacciati a ' + fascia.usoLargo + 'px');
+t(
+  fascia.fill.join(' ') === '34% 71%',
+  'le barre dei consumi non dicono la percentuale: ' + fascia.fill.join(' ')
+);
+t(fascia.backADestra <= 16, 'il bottone della chat non e\u2019 contro il bordo destro');
+
+// E cliccando una pedina esce cosa sta facendo, adesso. Non porta da nessuna
+// parte: quello lo fa la persona nella stanza.
+await page.locator('.of-chi.of-sub').first().click();
+await page.waitForTimeout(200);
+const detta = await page.evaluate(() => ({
+  aperta: !document.querySelector('.of-scheda').hidden,
+  ruolo: document.querySelector('.of-scheda-ruolo').textContent,
+  cosa: document.querySelector('.of-scheda-cosa').textContent,
+}));
+t(detta.aperta, 'cliccando una pedina non esce niente');
+t(/Prima conversazione/.test(detta.ruolo), 'la scheda non dice per chi lavora: ' + detta.ruolo);
+t(/Cosa a/.test(detta.cosa), 'la scheda non dice cosa sta facendo: ' + detta.cosa);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+t(
+  await page.evaluate(() => document.querySelector('.of-scheda').hidden),
+  'la scheda di chi si sta guardando non si chiude con Esc'
+);
+
+
 // E si chiudono quando ci si alza, non quando si e' usciti: un portatile acceso
 // su un tavolo vuoto e' peggio di nessun portatile. Qui non si aspetta che
 // arrivino alla bacheca — basta che si siano alzati.
@@ -858,5 +948,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la bacheca, l’aura del capo e le tazze'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la fascia in cima, la bacheca, l’aura del capo e le tazze'
 );

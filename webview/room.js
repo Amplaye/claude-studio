@@ -50,7 +50,12 @@ window.ROOM = (() => {
   // I muri sono bande, `{c, r, w, h}` in caselle. I vani delle porte non sono un
   // tipo a parte: sono il pezzo di muro che non c'e'.
   const WALLS = [
-    { c: 0, r: 0, w: COLS, h: 1 },
+    // Il muro di sopra ha un vano: due caselle in mezzo al corridoio fra la sala
+    // riunioni e il bar, ed e' la porta d'ingresso. E' l'unico punto della
+    // pianta dove il muro si apre su niente invece che su un'altra stanza —
+    // dietro c'e' il resto del palazzo, che non si disegna.
+    { c: 0, r: 0, w: 12, h: 1 },
+    { c: 14, r: 0, w: 10, h: 1 },
     { c: 0, r: ROWS - 1, w: COLS, h: 1 },
     { c: 0, r: 0, w: 1, h: ROWS },
     { c: COLS - 1, r: 0, w: 1, h: ROWS },
@@ -118,10 +123,11 @@ window.ROOM = (() => {
     //     una pianta non e' mai d'intralcio a nessuno. ---
     { s: 'plantPurple', x: 22, b: 150 },
     { s: 'plantBlue', x: 350, b: 150 },
+    // Una per angolo e non due. Appaiate erano una siepe: due piante alte una
+    // accanto all'altra nello stesso angolo si leggono come un solo cespuglio
+    // sfocato, e l'angolo smette di essere un angolo.
     { s: 'plantBlue', x: 22, b: 300 },
-    { s: 'plantPurple', x: 24, b: 278 },
     { s: 'plantPurple', x: 351, b: 300 },
-    { s: 'plantBlue', x: 349, b: 278 },
   ];
 
   /* ---- i mobili che nel foglio non ci sono ----
@@ -156,16 +162,24 @@ window.ROOM = (() => {
     { s: 'lavandino', x: 348, b: 48, w: 18, h: 28 },
   ];
 
-  /* Sei scrivanie, due file da tre, centrate sulla larghezza della stanza. Le
-     corsie fra una colonna e l'altra sono quelle da cui si sale al passaggio:
-     e' il motivo per cui non sono attaccate fra loro. */
+  /* Sei scrivanie, due file da tre, centrate nel salone. Le corsie fra una
+     colonna e l'altra sono quelle da cui si sale al passaggio: e' il motivo per
+     cui non sono attaccate fra loro.
+
+     In orizzontale erano gia' centrate — cinquantadue di margine per parte — ma
+     in verticale no: il blocco partiva dalla targhetta della prima fila, che
+     stava due pixel sotto il muro, e sotto la seconda fila avanzavano
+     quarantadue pixel di pavimento vuoto. Il salone e' alto centosettantasei
+     (dal muro di mezzo a quello in fondo) e il blocco ne occupa
+     centotrentadue: ventidue sopra e ventidue sotto, che vuol dire venti piu'
+     in basso di dov'erano. */
   const DESKS = [
-    { x: 68, b: 176 },
-    { x: 168, b: 176 },
-    { x: 268, b: 176 },
-    { x: 68, b: 246 },
-    { x: 168, b: 246 },
-    { x: 268, b: 246 },
+    { x: 68, b: 196 },
+    { x: 168, b: 196 },
+    { x: 268, b: 196 },
+    { x: 68, b: 266 },
+    { x: 168, b: 266 },
+    { x: 268, b: 266 },
   ];
 
   const SW = SV.desk.w;
@@ -193,6 +207,40 @@ window.ROOM = (() => {
    * qualcun altro. Il bar e' il posto dove si finisce quando la riunione e'
    * piena, che e' esattamente quello che succede in un ufficio vero.
    */
+  /* ---- la porta ----
+   *
+   * Il vano sta a meta' del muro di sopra, nel corridoio fra le due stanze, e
+   * `INGRESSO` e' dove si mettono i piedi appena dentro: da li' si entra e da li'
+   * si esce, e non c'e' un altro modo di arrivare in questa stanza.
+   *
+   * Non e' la stessa `PORTA` della posta: quella e' il bordo di sotto della
+   * cornice, cioe' "fuori dallo schermo, verso chi guarda", ed e' da li' che
+   * volano le buste. Questa e' una porta vera, con due ante che si aprono.
+   */
+  const INGRESSO = [208, 30];
+  /** Il vano: bordo sinistro e larghezza, in pixel. Due caselle. */
+  const VANO = [192, 32];
+  /** Quanto resta aperta dopo che qualcuno ci e' passato. */
+  const PORTA_APERTA = 1600;
+
+  let ante;
+  let chiudiPorta;
+
+  /**
+   * Apre la porta, e la richiude da sola.
+   *
+   * Chi entra e chi esce la chiama e basta: non c'e' un conto di quanti ci sono
+   * dentro il vano, perche' non serve — ogni passaggio rimanda avanti la
+   * chiusura, e una porta che resta aperta un secondo di troppo mentre entra il
+   * secondo di due e' esattamente quello che fa una porta vera.
+   */
+  function apriPorta() {
+    if (!ante) return;
+    ante.classList.add('aperta');
+    clearTimeout(chiudiPorta);
+    chiudiPorta = setTimeout(() => ante.classList.remove('aperta'), PORTA_APERTA);
+  }
+
   const SGABELLI = [
     // Sala riunioni, di qua e di la' del tavolo. Chi sta di sopra lo si vede a
     // mezzo busto: il tavolo gli copre le gambe, ed e' giusto — sta dietro.
@@ -310,28 +358,48 @@ window.ROOM = (() => {
   const PRIMA_COMMISSIONE = 18000;
   const OGNI_COMMISSIONE = [14000, 32000];
 
-  /* Quello che si dice in ufficio. Frasi corte apposta: a sei pixel una riga
-     lunga esce dalla stanza, e comunque in piedi vicino alla macchinetta nessuno
-     fa un discorso. Sono le frasi che si sentono davvero, quelle che uno
-     riconosce senza doverle leggere due volte. */
-  const FRASI = [
-    "Vado a fare un caffe'",
-    'Prendi qualcosa anche tu?',
-    "Il latte e' finito. Di nuovo",
-    'Cinque minuti e arrivo',
-    'Te la giro per mail',
-    'Lo mettiamo a backlog',
-    "La stampante s'e' inceppata",
-    'Punto veloce alle tre?',
-    'Ho la call fra dieci minuti',
-    "Venerdi' non si rilascia",
-    'In locale funzionava',
-    'Chi ha preso la mia tazza?',
-    'Domani ci penso',
-    'Era una mail, non una call',
-    'Due minuti e ho finito',
-    'Ci aggiorniamo dopo pranzo',
-  ];
+  /* Quello che si dice in ufficio, e dove lo si dice.
+   *
+   * Erano un mucchio solo, pescate a caso, e si vedeva: uno fermo alla
+   * macchinetta diceva "la stampante s'e' inceppata" e uno seduto alla scrivania
+   * "il latte e' finito". Frasi giuste dette nel posto sbagliato, che e' il modo
+   * piu' veloce di far sembrare finto un posto — una battuta fuori luogo si nota
+   * prima di qualunque dettaglio del disegno. Adesso il mucchio lo sceglie dove
+   * uno sta.
+   *
+   * Frasi corte apposta: a sei pixel una riga lunga esce dalla stanza, e comunque
+   * in piedi vicino alla macchinetta nessuno fa un discorso.
+   */
+  const FRASI = {
+    bar: [
+      "Vado a fare un caffe'",
+      'Prendi qualcosa anche tu?',
+      "Il latte e' finito. Di nuovo",
+      'Chi ha preso la mia tazza?',
+      'Questo sa di bruciato',
+      "Ne resta per uno solo",
+      'Cinque minuti e arrivo',
+    ],
+    riunione: [
+      'Punto veloce alle tre?',
+      'Era una mail, non una call',
+      'Ci aggiorniamo dopo pranzo',
+      'Lo mettiamo a backlog',
+      'Chi verbalizza?',
+      'Giro di tavolo veloce',
+    ],
+    scrivania: [
+      'In locale funzionava',
+      "La stampante s'e' inceppata",
+      'Te la giro per mail',
+      'Due minuti e ho finito',
+      'Domani ci penso',
+      'Ho la call fra dieci minuti',
+      "Venerdi' non si rilascia",
+    ],
+  };
+  /** Di cosa si parla dove: la meta dove si e' andati lo dice gia'. */
+  const DOVE = { caffe: 'bar', spuntino: 'bar', riunione: 'riunione' };
 
   /* Tutti i posti dove la stanza puo' mandare qualcuno, in un elenco solo.
      Non serve a far camminare nessuno — serve al controllo, ed e' l'unica cosa
@@ -343,6 +411,7 @@ window.ROOM = (() => {
     rastrelliera: BAR.rastrelliera,
     macchina: BAR.macchina,
     lavandino: BAR.lavandino,
+    porta: INGRESSO,
     bacheca: BACHECHE.muro.posto,
     archivio: BACHECHE.archivio.posto,
     ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
@@ -517,6 +586,20 @@ window.ROOM = (() => {
       n.style.height = w.h * TILE + 'px';
       stage.append(depth(n, (w.r + w.h) * TILE));
     }
+    /* La porta. Due ante che si aprono verso i due stipiti, e dietro il buio di
+       quello che c'e' fuori. Nel foglio non c'e' — SeasonVale e' una fattoria —
+       e comunque e' l'unica parte del muro che deve muoversi, il che vuol dire
+       una cosa disegnata e non un ritaglio.
+
+       Profondita' del muro: chi ci passa in mezzo ha i piedi piu' in basso e
+       quindi le passa davanti, che e' giusto — sta entrando, non uscendo dal
+       muro. */
+    ante = el('div', 'of-porta');
+    ante.append(el('i', 'anta sx'), el('i', 'anta dx'));
+    ante.style.left = VANO[0] + 'px';
+    ante.style.width = VANO[1] + 'px';
+    stage.append(depth(ante, TILE));
+
     for (const p of PROPS) stage.append(prop(p.s, p.x, p.b));
     // I due disegnati a mano. Stessa regola: si appoggiano per terra dal bordo di
     // sotto, e chi sta piu' in basso copre chi sta piu' in alto.
@@ -676,11 +759,14 @@ window.ROOM = (() => {
      misura sono due rettangoli bianchi, e nessuno legge due rettangoli bianchi.
 
      `testo` si passa quando quello che si dice dipende da chi lo dice — le
-     battute che si tirano al capo, per esempio. Senza, si pesca dal mucchio. */
+     battute che si tirano al capo, o la task che si sta facendo. Senza, si pesca
+     dal mucchio del posto dove uno sta. */
   function parla(chi, testo) {
     if (chi.dice || !chi.el.isConnected) return;
     const n = el('div', 'of-say');
-    n.textContent = testo || caso(FRASI);
+    // Senza testo si pesca dal mucchio di dove si sta: al bar si parla di caffe',
+    // in riunione di riunioni, e alla propria scrivania del proprio lavoro.
+    n.textContent = testo || caso(FRASI[DOVE[chi.meta] || 'scrivania']);
     chi.el.append(n);
     chi.dice = n;
     setTimeout(() => {
@@ -1010,6 +1096,8 @@ window.ROOM = (() => {
     DISEGNATI,
     DESKS,
     SGABELLI,
+    INGRESSO,
+    apriPorta,
     METE,
     DESTINAZIONI,
     BACHECHE,

@@ -56,9 +56,11 @@ window.OFFICE = (() => {
   let crowd;
   let empty;
   let count;
-  let chips;
-  let chipS;
-  let chipW;
+  let gente;
+  let uso;
+  let usoS;
+  let usoW;
+  let scheda;
   let boss;
   let bossFace;
   let bossName;
@@ -91,6 +93,200 @@ window.OFFICE = (() => {
     return svg;
   }
 
+  /* ---- i consumi, come li dice il pannello del contesto ----
+   *
+   * Erano due pillole con dentro un numero, e un numero da solo non dice quanto
+   * manca: "sessione 34%" letto di sfuggita puo' voler dire tutto. La barra lo
+   * dice senza leggere — e il momento in cui si svuota di colpo e' il rinnovo,
+   * che con la sola percentuale non si vedeva affatto.
+   *
+   * Stessa ricetta del pannello: il colore sta nella barra e non nel testo, e la
+   * scia parte solo quando la barra si muove davvero.
+   */
+  function cella() {
+    const box = el('div', 'of-cell');
+    const top = el('div', 'of-cell-top');
+    const lab = el('span', 'of-cell-lab');
+    const val = el('span', 'of-cell-val');
+    top.append(lab, val);
+    const bar = el('div', 'of-cell-bar');
+    const fill = el('div', 'of-cell-fill');
+    fill.addEventListener('animationend', () => fill.classList.remove('glide'));
+    bar.append(fill);
+    const reset = el('div', 'of-cell-reset');
+    box.append(top, bar, reset);
+    return { el: box, lab, val, fill, reset };
+  }
+
+  function paintCella(c, chiave, pct, quando) {
+    c.lab.textContent = t(chiave);
+    c.val.textContent = pct == null ? '—' : Math.round(pct) + '%';
+    c.reset.textContent = quando ? t('ctx.resets', { when: quando }) : '';
+    const w = (pct == null ? 0 : Math.max(0, Math.min(100, pct))) + '%';
+    if (c.fill.style.width !== w) {
+      c.fill.classList.remove('glide');
+      void c.fill.offsetWidth;
+      c.fill.classList.add('glide');
+      c.fill.style.width = w;
+    }
+    c.fill.style.background = barColor(pct);
+  }
+
+  /* ---- chi c'e' in ufficio ----
+   *
+   * Le conversazioni e i loro sub-agent in un elenco solo, e i sub-agent subito
+   * dopo il capo che li ha aperti: da fuori si legge chi lavora per chi senza
+   * doverlo scrivere da nessuna parte.
+   *
+   * Su cosa stia lavorando una conversazione non e' il suo nome: e' il passo del
+   * piano che ha in corso adesso, cioe' la stessa riga che nella stanza sta in
+   * mano a qualcuno sotto forma di foglietto. Se non ce n'e' uno aperto vale
+   * come sta — attiva, ferma, ha finito — che e' comunque la risposta a "cosa
+   * sta facendo".
+   */
+  function cheFa(id) {
+    const items = (board[id] && board[id].items) || [];
+    const viva = items.find((it) => it.status === 'in_progress');
+    return viva ? viva.activeForm || viva.content || '' : '';
+  }
+
+  const comeSta = (s) =>
+    s.busy ? t('ctx.busy') : s.done ? t('ctx.done') : s.recent ? t('ctx.recent') : t('ctx.idle');
+
+  function abitanti() {
+    const cards = (last && last.cards) || [];
+    const out = [];
+    for (const s of cards) {
+      const chi = people.get(s.id);
+      if (!chi) continue;
+      out.push({
+        key: 'c:' + s.id,
+        nome: s.name,
+        seme: chi.seme,
+        posa: s.busy ? 'digita' : 'fermo',
+        stato: comeSta(s),
+        cosa: cheFa(s.id) || comeSta(s),
+        pct: s.pct,
+        capo: null,
+        focused: !!s.focused,
+        busy: !!s.busy,
+      });
+      // I suoi, attaccati a lui. Un sub-agent non ha un nome: ha una cosa da
+      // fare, ed e' quella a dire chi e'.
+      for (const [chiave, sub] of staff) {
+        // Chi sta uscendo non e' piu' in ufficio: e' ancora disegnato perche' sta
+        // attraversando la stanza, ma nella fila di chi c'e' non ci va.
+        if (sub.capoId !== s.id || sub.esce) continue;
+        out.push({
+          key: 's:' + chiave,
+          nome: sub.cosa || sub.nome || '',
+          seme: sub.seme,
+          posa: 'digita',
+          stato: t('ctx.busy'),
+          cosa: sub.cosa || sub.nome || '',
+          pct: null,
+          capo: s.name,
+          focused: false,
+          busy: true,
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Le pedine della fila, per chiave: si ridipingono invece di rifarle. */
+  const pedine = new Map();
+  /** Chi si sta guardando adesso, se si sta guardando qualcuno. */
+  let guardato = null;
+
+  function paintGente() {
+    if (!gente) return;
+    const tutti = abitanti();
+    const vive = new Set(tutti.map((a) => a.key));
+    for (const [k, p] of pedine) {
+      if (!vive.has(k)) {
+        p.el.remove();
+        pedine.delete(k);
+      }
+    }
+    let prima = null;
+    for (const a of tutti) {
+      let p = pedine.get(a.key);
+      if (!p) {
+        const b = el('button', 'of-chi');
+        b.type = 'button';
+        const faccia = el('span', 'of-facciola');
+        const corpo = el('span', 'of-body');
+        faccia.append(corpo);
+        const nome = el('span', 'of-chi-nome');
+        b.append(faccia, nome);
+        b.onclick = () => apriScheda(a.key, b);
+        p = { el: b, corpo, nome };
+        pedine.set(a.key, p);
+      }
+      // Rimessa in fila senza toccarla se e' gia' al posto giusto: riappendere un
+      // elemento fa ripartire l'animazione della striscia, e una fila di facce
+      // che sbattono a ogni aggiornamento non si guarda.
+      const dopo = prima ? prima.el.nextSibling : gente.firstChild;
+      if (dopo !== p.el) gente.insertBefore(p.el, dopo);
+      prima = p;
+      window.ROOM.vesti(p.corpo, a.seme, a.posa);
+      p.nome.textContent = a.nome;
+      p.el.classList.toggle('of-sub', !!a.capo);
+      p.el.classList.toggle('focused', a.focused);
+      p.el.classList.toggle('busy', a.busy);
+      p.el.classList.toggle('aperta', guardato === a.key);
+      p.el.title = a.capo ? t('office.sub', { name: a.capo }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa;
+      p.el.setAttribute('aria-label', p.el.title);
+      p.el.setAttribute('aria-expanded', guardato === a.key ? 'true' : 'false');
+    }
+    paintScheda();
+  }
+
+  /* ---- e cosa sta facendo ----
+   *
+   * Cliccare una pedina apre una scheda sotto la fascia con quello che quella
+   * persona sta facendo adesso, e resta viva finche' e' aperta: il piano cambia
+   * al ritmo di Claude, e una scheda ferma al momento in cui l'hai aperta dice
+   * una cosa che non e' piu' vera.
+   *
+   * Cliccare la persona nella stanza porta alla sua conversazione; cliccarla qui
+   * dice cosa sta facendo. Sono due domande diverse e hanno due posti diversi:
+   * da qui non si va da nessuna parte, si guarda.
+   */
+  function apriScheda(key, ancora) {
+    guardato = guardato === key ? null : key;
+    if (guardato && ancora) {
+      // Sotto la pedina, ma mai oltre il bordo: una scheda che esce dalla scheda
+      // e' una scheda tagliata a meta'.
+      const b = ancora.getBoundingClientRect();
+      const r = root.getBoundingClientRect();
+      scheda.el.style.left = Math.max(8, Math.min(b.left - r.left, r.width - 268)) + 'px';
+      scheda.el.style.top = b.bottom - r.top + 6 + 'px';
+    }
+    paintGente();
+  }
+
+  function paintScheda() {
+    if (!scheda) return;
+    const a = guardato && abitanti().find((x) => x.key === guardato);
+    if (!a) {
+      guardato = null;
+      scheda.el.hidden = true;
+      return;
+    }
+    scheda.el.hidden = false;
+    scheda.nome.textContent = a.nome;
+    scheda.ruolo.textContent = a.capo ? t('office.sub', { name: a.capo }) : a.stato;
+    scheda.cosa.textContent = a.cosa;
+    scheda.pct.hidden = a.pct == null;
+    if (a.pct != null) {
+      scheda.pctVal.textContent = Math.round(a.pct) + '%';
+      scheda.pctFill.style.width = Math.max(0, Math.min(100, a.pct)) + '%';
+      scheda.pctFill.style.background = barColor(a.pct);
+    }
+  }
+
   function build(container, post) {
     root = container;
     send = post;
@@ -107,10 +303,25 @@ window.OFFICE = (() => {
     ico.appendChild(use);
     title.append(ico, titleText);
     count = el('span', 'of-count');
-    chips = el('span', 'of-chips');
-    chipS = el('span', 'of-chip');
-    chipW = el('span', 'of-chip');
-    chips.append(chipS, chipW);
+
+    /* Chi c'e' in ufficio, uno per uno: le conversazioni e i sub-agent che hanno
+       aperto. La stanza li mostra gia' — ma da sedici pixel e visti dall'alto si
+       vede *che* ci sono, non *chi* sono, e per sapere su cosa sta lavorando
+       quello in fondo a destra bisognava andarselo a cercare. Qui hanno un nome
+       scritto e si cliccano.
+
+       Scorre in orizzontale invece di stringersi: con dieci persone in ufficio i
+       nomi si sarebbero ridotti a due lettere, e due lettere non sono un nome.
+       Ed e' la riga che tiene i consumi interi — sono l'unica cosa della fascia
+       che non si puo' tagliare, perche' una barra tagliata dice una percentuale
+       sbagliata. */
+    gente = el('div', 'of-gente');
+    gente.setAttribute('role', 'list');
+
+    uso = el('div', 'of-uso');
+    usoS = cella();
+    usoW = cella();
+    uso.append(usoS.el, usoW.el);
 
     // Il bottone per tornare alla chat classica. Sta qui e non fra i comandi di
     // VS Code perche' l'ufficio riempie la scheda: quando ci sei dentro, questa
@@ -145,7 +356,41 @@ window.OFFICE = (() => {
     // e lasciava il ritratto a galleggiare in mezzo alla fascia attaccato a
     // niente. Il ritratto e' la conversazione che hai davanti, quindi sta con il
     // resto di "chi c'e'", non da solo.
-    bar.append(title, count, boss, el('span', 'of-grow'), chips, back);
+    // Due gruppi e niente in mezzo: a sinistra dove sei e chi c'e', a destra i
+    // consumi e la via d'uscita. In mezzo la fila della gente, che si prende
+    // tutto lo spazio che avanza — ed e' lei a spingere i consumi e il bottone
+    // contro il bordo destro, senza bisogno di un vuoto messo apposta.
+    bar.append(title, count, boss, gente, uso, back);
+
+
+    /* La scheda di chi si sta guardando. Sta sopra la stanza e non dentro la
+       fascia: la fascia e' alta quanto un bottone, e quello che una persona sta
+       facendo e' una riga di testo vero che li' dentro non ci sta. */
+    const box = el('div', 'of-scheda');
+    box.hidden = true;
+    const sNome = el('div', 'of-scheda-nome');
+    const sRuolo = el('div', 'of-scheda-ruolo');
+    const sCosa = el('div', 'of-scheda-cosa');
+    const sPct = el('div', 'of-scheda-pct');
+    const sPctLab = el('span', null, t('office.ctxUsed'));
+    const sPctVal = el('span', 'of-scheda-val');
+    const sPctTop = el('div', 'of-cell-top');
+    sPctTop.append(sPctLab, sPctVal);
+    const sPctBar = el('div', 'of-cell-bar');
+    const sPctFill = el('div', 'of-cell-fill');
+    sPctBar.append(sPctFill);
+    sPct.append(sPctTop, sPctBar);
+    box.append(sNome, sRuolo, sCosa, sPct);
+    scheda = {
+      el: box,
+      nome: sNome,
+      ruolo: sRuolo,
+      cosa: sCosa,
+      pct: sPct,
+      pctLab: sPctLab,
+      pctVal: sPctVal,
+      pctFill: sPctFill,
+    };
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');
@@ -200,7 +445,23 @@ window.OFFICE = (() => {
     // Il foglio sta dentro il riquadro della stanza e non dentro tutto l'ufficio:
     // copre la pianta, non la fascia in cima.
     wrap.append(stage, sheet);
-    root.append(bar, wrap);
+    root.append(bar, wrap, scheda.el);
+
+    // Si chiude come si chiude una cosa aperta per sbaglio: col tasto che chiude
+    // tutto, o cliccando altrove. La pedina se la richiude da se', quindi qui si
+    // guarda solo che il clic non sia caduto ne' dentro la scheda ne' su una
+    // pedina — se no aprirne una la chiuderebbe subito dopo averla aperta.
+    root.addEventListener('click', (e) => {
+      if (!guardato) return;
+      if (scheda.el.contains(e.target) || e.target.closest('.of-chi')) return;
+      guardato = null;
+      paintGente();
+    });
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !guardato) return;
+      guardato = null;
+      paintGente();
+    });
 
     new ResizeObserver(fit).observe(wrap);
     fitOn = wrap;
@@ -287,6 +548,83 @@ window.OFFICE = (() => {
     };
   }
 
+  // ---------- la porta ----------
+  //
+  // In ufficio si entra da una porta sola, e si esce dalla stessa. Prima non era
+  // cosi': i capi comparivano gia' seduti alla loro scrivania e sparivano da
+  // seduti, e gli impiegati nascevano davanti alla bacheca. Comparire e sparire
+  // sul posto e' la cosa che fa sembrare una stanza uno schermo: chi arriva non
+  // e' arrivato da nessuna parte.
+  //
+  // La porta e' larga due caselle e si entra uno alla volta. Quattro
+  // conversazioni aperte tutte insieme — che e' quello che succede riaprendo la
+  // scheda — sarebbero quattro persone nello stesso punto della soglia, cioe'
+  // una persona sola disegnata quattro volte.
+
+  /** Quanto passa fra uno che entra e il prossimo. */
+  const PASSO_PORTA = 700;
+  /** E quanto ci si mette a sparire di la', una volta sulla soglia. */
+  const SOGLIA = 320;
+  let ultimaEntrata = 0;
+
+  /** Il proprio turno sulla soglia: si aspetta che l'abbia liberata chi c'era. */
+  function turnoPorta() {
+    const ora = Date.now();
+    const quando = Math.max(ora, ultimaEntrata + PASSO_PORTA);
+    ultimaEntrata = quando;
+    return attesa(quando - ora);
+  }
+
+  /** Mette qualcuno sulla soglia, fermo e non ancora visibile. */
+  function soglia(chi) {
+    const [px, py] = window.ROOM.INGRESSO;
+    chi.el.style.left = px - 8 + 'px';
+    chi.el.style.top = py - 24 + 'px';
+    chi.el.style.zIndex = py;
+    // `fuori` e' la parola che la stanza gia' conosce per "sta camminando, non
+    // spostarlo": senza, il primo ridisegno lo teletrasporta al suo posto e la
+    // camminata dalla porta non parte mai.
+    chi.fuori = true;
+    chi.el.classList.add('fuori', 'soglia');
+    // Vestito subito, anche se non si vede ancora: un elemento senza sprite che
+    // diventa visibile a meta' camminata e' una persona che si materializza in
+    // corridoio.
+    window.ROOM.vesti(chi.fig, chi.seme, 'fermo');
+  }
+
+  /**
+   * Entra dalla porta e cammina fino a `[fx, fy]`.
+   *
+   * Torna falso se per strada e' sparito: chi apre e chiude una conversazione in
+   * due secondi lascia qualcuno a meta' corridoio, e da li' in poi non c'e' piu'
+   * nessuno da far arrivare.
+   */
+  async function entrata(chi, fx, fy) {
+    soglia(chi);
+    await turnoPorta();
+    if (!chi.el.isConnected) return false;
+    window.ROOM.apriPorta();
+    chi.el.classList.remove('soglia');
+    chi.el.classList.add('in-arrivo');
+    window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
+    const ok = await window.ROOM.viaggio(chi.el, fx, fy);
+    chi.el.classList.remove('fuori', 'in-arrivo');
+    chi.fuori = false;
+    return ok;
+  }
+
+  /** E se ne va dalla stessa porta, che e' l'unica che c'e'. */
+  async function uscita(chi) {
+    chi.fuori = true;
+    chi.el.classList.add('fuori', 'via');
+    window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
+    await window.ROOM.viaggio(chi.el, ...window.ROOM.INGRESSO);
+    window.ROOM.apriPorta();
+    chi.el.classList.add('soglia');
+    await attesa(SOGLIA);
+    chi.el.remove();
+  }
+
   // ---------- gli impiegati ----------
   //
   // Una conversazione e' un capo, e i sub-agent che apre sono i suoi impiegati.
@@ -338,13 +676,6 @@ window.OFFICE = (() => {
     bubble.append(dots);
     b.append(el('span', 'of-ring'), who, bubble);
     crowd.append(b);
-    // Nasce davanti alla bacheca, non sulla porta: un sub-agent non arriva da
-    // fuori, viene fuori da una cosa da fare — e quella cosa da fare e' li'
-    // appesa. Il primo gesto e' staccarla.
-    const [px, py] = window.ROOM.BACHECHE.muro.posto;
-    b.style.left = px - 8 + 'px';
-    b.style.top = py - 24 + 'px';
-    b.style.zIndex = py;
     const nome = it.id || it.content;
     const chi = { chiave, capoId: capo.id, nome, el: b, fig: who, seme: capo.seme + '/' + nome };
     window.ROOM.vesti(who, chi.seme, 'cammina');
@@ -482,6 +813,11 @@ window.OFFICE = (() => {
     chi.va = true;
     try {
       if (!chi.foglio) {
+        // Prima la porta, poi la bacheca. Un sub-agent non si materializza
+        // davanti al muro dove sta il suo foglietto: entra come entrano tutti, e
+        // il foglietto va a prenderselo — che e' anche il motivo per cui la
+        // bacheca sta nella stanza in cima e non sopra le scrivanie.
+        if (!(await entrata(chi, ...window.ROOM.BACHECHE.muro.posto))) return;
         await attesa(GESTO);
         // Da qui in poi il foglietto e' suo: sta appeso addosso e cammina con
         // lui. E finche' ce l'ha in mano dalla bacheca sparisce — se no lo stesso
@@ -529,6 +865,19 @@ window.OFFICE = (() => {
     const dove = it && it.status === 'failed' ? 'muro' : 'archivio';
     if (await window.ROOM.viaggio(chi.el, ...window.ROOM.BACHECHE[dove].posto)) {
       await attesa(GESTO);
+      // Il foglio si posa qui, e da qui in poi e' del muro o della pila. Portarlo
+      // in mano fino alla porta voleva dire lo stesso foglio appeso e in mano a
+      // qualcuno nello stesso momento — che e' l'unico modo in cui questa
+      // bacheca conta due volte lo stesso lavoro.
+      if (chi.foglio) {
+        chi.foglio.remove();
+        chi.foglio = null;
+      }
+      staff.delete(chi.chiave);
+      paintBacheche();
+      // E poi si esce, dalla porta, come si e' entrati. Sparire davanti alla
+      // bacheca voleva dire che chi finiva svaniva dentro il muro.
+      if (chi.el.isConnected) await uscita(chi);
     }
     chi.el.remove();
     staff.delete(chi.chiave);
@@ -758,6 +1107,9 @@ window.OFFICE = (() => {
         if (Math.hypot(qx - fx, qy - fy) > 2) chi.andata = entra(chi, capo, i);
       }
       const cosa = it.activeForm || it.content || '';
+      // Se la tiene addosso: e' quello che dice quando parla del suo lavoro, ed e'
+      // quello che si legge cliccandolo nella fascia in cima.
+      chi.cosa = cosa;
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
     }
@@ -808,6 +1160,40 @@ window.OFFICE = (() => {
     'Che ritmo, capo',
     'Il miglior capo di sempre. Davvero.',
   ];
+  /* Quello che dice chi sta lavorando: la sua task, detta come la direbbe una
+     persona.
+
+     Il testo arriva dal piano vero — "Cercando i file di configurazione" — e
+     quello e' gia' italiano, scritto per essere letto. Ma non sempre: a volte
+     dentro c'e' un percorso, un comando, un pezzo di riga. Una nuvoletta con
+     dentro `src/webview/office.js` non e' una persona che parla, e in ufficio
+     nessuno parla in bash — quindi quando il testo non si legge come una frase
+     si dice invece come sta andando, che e' l'altra meta' di quello che una
+     persona dice davvero del proprio lavoro.
+
+     La prova e' grezza apposta: i segni da terminale, le estensioni, e la
+     lunghezza. Una nuvoletta e' `nowrap` a sei pixel — trentadue caratteri sono
+     gia' un centinaio di pixel, e da li' in poi esce dalla stanza. */
+  const CODICE =
+    /[^A-Za-zÀ-ÿ0-9 ,.:;!?'’-]|[.][a-z]{1,4}|(^| )-|(^| )(npm|git|cd|ls|rm|sudo|http|const|function)( |$)/i;
+  const AVANTI = [
+    'Ci sono quasi',
+    "E' piu' lunga del previsto",
+    'Dammi due minuti',
+    'Ci sto lavorando',
+    'Questa la chiudo io',
+    'Un attimo e ho finito',
+  ];
+  const SULLAVORO = ['Sto su {c}', 'Mi son preso {c}', '{c}, ci sono quasi', 'Faccio {c} e chiudo'];
+
+  function suLavoro(cosa) {
+    const c = (cosa || '').trim();
+    if (!c || c.length > 18 || CODICE.test(c)) return caso(AVANTI);
+    // Iniziale minuscola: "Cercando i file" dentro "Sto su ..." con la maiuscola
+    // sembra una citazione, non una cosa detta.
+    return caso(SULLAVORO).replace('{c}', c[0].toLowerCase() + c.slice(1));
+  }
+
   const PETTEGOLEZZI = [
     'Ma una riga l’ha mai scritta?',
     'Un altro punto veloce da un’ora',
@@ -856,6 +1242,12 @@ window.OFFICE = (() => {
       } else if (d > LONTANO && Math.random() < 0.35) {
         chi.zitto = ora;
         window.ROOM.parla(chi, caso(PETTEGOLEZZI));
+      } else if (Math.random() < 0.25) {
+        // Ne' vicino al capo ne' abbastanza lontano da sparlarne: allora si parla
+        // di quello che si sta facendo, che e' quello di cui parla davvero chi sta
+        // lavorando. Il capo e' un argomento, non l'unico.
+        chi.zitto = ora;
+        window.ROOM.parla(chi, suLavoro(chi.cosa));
       }
     }
   }
@@ -983,9 +1375,14 @@ window.OFFICE = (() => {
         // porta via dal conto, e dopo qualche giro la rastrelliera resta vuota
         // senza che nessuno abbia bevuto niente.
         window.ROOM.congeda(chi);
-        chi.el.remove();
         chi.plate.remove();
         people.delete(id);
+        // Non sparisce da seduto: si alza e se ne va dalla porta, che e' l'unica
+        // che c'e'. Fuori da `people` la stanza non lo tocca piu' — non lo manda
+        // al bar e non lo rimette a sedere — e l'elemento resta in vita giusto il
+        // tempo di attraversare la stanza. La targhetta invece va via subito: e'
+        // della scrivania, e la scrivania e' gia' libera.
+        uscita(chi);
       }
     }
 
@@ -995,25 +1392,46 @@ window.OFFICE = (() => {
       if (!chi) {
         chi = buildPerson(s);
         people.set(s.id, chi);
+        // Sulla soglia e non ancora visibile: da li' entra, come tutti.
+        soglia(chi);
       }
       let seat = seats.indexOf(s.id);
       if (seat < 0) {
         seat = seats.indexOf(null);
         if (seat >= 0) seats[seat] = s.id;
       }
-      if (seat < 0 && !chi.fuori) {
-        // In fila lungo il muro in fondo, dove il corridoio e' libero. Sei per
-        // fila e distanti cinquantaquattro: e' la larghezza della targhetta,
-        // ed e' quella a decidere, non la persona — piu' stretti i nomi si
-        // coprono a vicenda e la fila diventa una macchia bianca. Si parte da
-        // cinquantasei per non finire dentro la pianta dell'angolo.
-        // ponytail: oltre una fila si va a capo, e la seconda fila finisce
-        // addosso alle scrivanie. Tredici conversazioni insieme non le ha nessuno.
-        chi.el.style.left = 56 + (spare % 6) * 54 + 'px';
-        chi.el.style.top = 266 - Math.floor(spare++ / 6) * 26 + 'px';
-        chi.el.style.zIndex = parseFloat(chi.el.style.top) + 24;
+      // In fila lungo il muro in fondo, dove il corridoio e' libero. Sei per
+      // fila e distanti cinquantaquattro: e' la larghezza della targhetta, ed e'
+      // quella a decidere, non la persona — piu' stretti i nomi si coprono a
+      // vicenda e la fila diventa una macchia bianca. Si parte da cinquantasei
+      // per non finire dentro la pianta dell'angolo.
+      // ponytail: oltre una fila si va a capo, e la seconda fila finisce addosso
+      // alle scrivanie. Tredici conversazioni insieme non le ha nessuno.
+      //
+      // Duecentosettantasei e non piu' duecentosessantasei: le scrivanie sono
+      // scese di venti, e a restare dov'era la fila finiva addosso alle spalle
+      // di chi sta seduto nell'ultima.
+      let fila = null;
+      if (seat < 0) {
+        fila = [56 + (spare % 6) * 54, 276 - Math.floor(spare++ / 6) * 26];
+        if (chi.entrato && !chi.fuori) {
+          chi.el.style.left = fila[0] + 'px';
+          chi.el.style.top = fila[1] + 'px';
+          chi.el.style.zIndex = fila[1] + 24;
+        }
       }
       paintPerson(chi, s, seat);
+      // La prima volta ci si arriva a piedi, dalla porta. Comparire gia' seduti
+      // e' la cosa che fa sembrare una stanza uno schermo: chi arriva non e'
+      // arrivato da nessuna parte. `casa` la sa solo `paintPerson`, quindi la
+      // camminata parte da qui e non da dove si costruisce la persona.
+      if (!chi.entrato) {
+        chi.entrato = true;
+        const dove = chi.casa ? [chi.casa.x + 8, chi.casa.y + 24] : [fila[0] + 8, fila[1] + 24];
+        entrata(chi, ...dove).then(() => {
+          if (chi.el.isConnected) window.ROOM.vesti(chi.fig, chi.seme, chi.posa);
+        });
+      }
     }
 
     // Il monitor acceso e' della scrivania, non della persona: e' quello che si
@@ -1055,10 +1473,12 @@ window.OFFICE = (() => {
     empty.textContent = t('office.empty');
     empty.hidden = list.length > 0;
 
-    const pct = (v) => (v == null ? '—' : Math.round(v) + '%');
-    chipS.textContent = t('office.session', { pct: pct(d.usage?.session) });
-    chipW.textContent = t('office.week', { pct: pct(d.usage?.week) });
-    chips.hidden = !d.usage;
+    paintCella(usoS, 'ctx.session', d.usage?.session, d.sessionReset);
+    paintCella(usoW, 'ctx.week', d.usage?.week, d.weekReset);
+    uso.hidden = !d.usage;
+
+    // E chi c'e' in ufficio, con quello che sta facendo adesso.
+    paintGente();
   }
 
   return {
@@ -1075,7 +1495,11 @@ window.OFFICE = (() => {
      */
     renderTasks(d) {
       board = d || {};
-      if (root) paintStaff();
+      if (!root) return;
+      paintStaff();
+      // Il quadro viaggia per conto suo: i sub-agent nascono e muoiono al ritmo di
+      // Claude, non a quello dei consumi. La fila in cima deve saperlo subito.
+      paintGente();
     },
     /** Tornato a schermo dopo essere stato via: la misura di prima non vale piu'. */
     resize: fit,

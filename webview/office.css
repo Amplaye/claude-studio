@@ -131,6 +131,13 @@ body.inoffice .top .activity {
 .of-bar > * {
   max-height: var(--ctl);
 }
+/* I consumi no: sono tre righe — nome e numero, la barra, e quando si rinnova —
+   e trenta pixel le taglierebbero proprio l'ultima, che e' quella per cui la
+   barra esiste. La fascia resta alta uguale: due pixel di sbordo su un elemento
+   allineato al centro non spostano niente. */
+.of-bar > .of-uso {
+  max-height: none;
+}
 .of-lab {
   display: inline-flex;
   align-items: center;
@@ -140,10 +147,11 @@ body.inoffice .top .activity {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.of-grow {
-  flex: 1 1 auto;
-}
 .of-count {
+  flex: 0 0 auto;
+  /* Su una riga sola: schiacciata fra il titolo e la fila della gente andava a
+     capo, e "2 alla" sopra "scrivania" non e' un conteggio, e' un incidente. */
+  white-space: nowrap;
   font-size: 12px;
   opacity: 0.72;
 }
@@ -208,14 +216,232 @@ body.inoffice .top .activity {
   font-size: 10.5px;
   opacity: 0.66;
 }
-.of-chip {
-  margin-left: 6px;
-  padding: 2px 9px;
+/* ---------- chi c'e', in fila ---------- */
+
+/* La fila delle persone. Si prende tutto lo spazio che avanza fra il ritratto e
+   i consumi, ed e' lei a spingere consumi e bottone contro il bordo destro.
+
+   Scorre in orizzontale invece di stringersi. Con dieci in ufficio i nomi si
+   sarebbero ridotti a due lettere — e due lettere non sono un nome — oppure
+   avrebbero schiacciato i consumi, e una barra tagliata dice una percentuale
+   che non e' quella vera. Meglio una fila che scorre. */
+.of-gente {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--ctl);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.of-gente::-webkit-scrollbar {
+  height: 4px;
+}
+.of-gente::-webkit-scrollbar-thumb {
+  border-radius: 2px;
+  background: var(--line);
+}
+.of-chi {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px 0 0;
   border: 1px solid var(--line);
-  border-radius: var(--pill);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
   font-size: 11px;
   font-weight: 700;
+  cursor: pointer;
 }
+.of-chi:hover {
+  background: var(--hover);
+  border-color: var(--claude-2);
+}
+.of-chi.busy {
+  border-color: color-mix(in srgb, var(--ok) 55%, transparent);
+}
+/* Quella che stai guardando nella chat, e quella di cui hai aperto la scheda:
+   due cose diverse, due segni diversi. */
+.of-chi.focused {
+  background: color-mix(in srgb, var(--claude-2) 16%, transparent);
+}
+.of-chi.aperta {
+  border-color: var(--claude-2);
+  background: var(--hover);
+}
+.of-chi:focus-visible {
+  outline: 2px solid var(--claude-2);
+  outline-offset: 2px;
+}
+/* Gli impiegati rientrati di un filo sotto il loro capo: e' l'unica cosa che fa
+   leggere la fila come "questi lavorano per quello" invece che come un elenco. */
+.of-chi.of-sub {
+  margin-left: -2px;
+  opacity: 0.86;
+}
+.of-chi.of-sub .of-chi-nome {
+  font-weight: 600;
+}
+.of-chi-nome {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* La faccia, piccola. Stessa striscia della stanza al naturale — sedici pixel
+   dentro ventidue, tagliata dai piedi in giu' come nel ritratto grande. */
+.of-facciola {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  overflow: hidden;
+  border-radius: 6px 0 0 6px;
+  background: var(--of-legno);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.28);
+}
+.of-facciola .of-body {
+  inset: 0 0 auto 3px;
+  width: 16px;
+  height: 24px;
+  background-position-y: top;
+  filter: none;
+}
+
+/* ---------- i consumi ---------- */
+
+/* Due celle, ognuna con la sua barra. Erano due pillole con dentro un numero, e
+   un numero da solo non dice quanto manca: la barra lo dice senza leggere, e il
+   momento in cui si svuota di colpo — il rinnovo — con la sola percentuale non
+   si vedeva affatto.
+
+   Larghezza fissa: sono l'unica cosa della fascia che non si puo' stringere,
+   perche' una barra tagliata mostra una percentuale che non e' quella vera. E'
+   la fila della gente a scorrere, non loro. */
+.of-uso {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.of-cell {
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  /* Un pixel e non due: tre righe piu' due spazi fanno esattamente i trenta di
+     --ctl, e la fascia resta alta come la testata della chat accanto. Con due,
+     l'ufficio stava due pixel piu' in basso della conversazione — e uno scalino
+     in mezzo allo schermo si vede. */
+  gap: 1px;
+  line-height: 1.15;
+}
+.of-cell-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10px;
+}
+.of-cell-lab {
+  opacity: 0.66;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.of-cell-val {
+  font-weight: 800;
+  font-size: 11px;
+}
+.of-cell-bar {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  overflow: hidden;
+}
+.of-cell-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+/* La scia parte solo quando la barra si muove davvero: una luce che passa a ogni
+   ridisegno e' un lampeggio, non un cambiamento. */
+.of-cell-fill.glide {
+  animation: of-glide 0.7s ease-out;
+}
+@keyframes of-glide {
+  from {
+    filter: brightness(1.5);
+  }
+  to {
+    filter: brightness(1);
+  }
+}
+.of-cell-reset {
+  font-size: 9px;
+  opacity: 0.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- e cosa sta facendo ---------- */
+
+/* La scheda che esce cliccando una pedina. Sta sopra la stanza e non dentro la
+   fascia: la fascia e' alta quanto un bottone, e quello che una persona sta
+   facendo e' una riga di testo vero che li' dentro non ci sta.
+
+   Non porta da nessuna parte: cliccare la persona nella stanza porta alla sua
+   conversazione, cliccarla in cima dice cosa sta facendo. Due domande diverse,
+   due posti diversi. */
+.of-scheda {
+  position: absolute;
+  z-index: 40;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.65);
+}
+.of-scheda-nome {
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.of-scheda-ruolo {
+  font-size: 10.5px;
+  opacity: 0.6;
+}
+/* Quello che sta facendo adesso. Va a capo, e non si taglia: e' l'unica riga
+   della scheda per cui la scheda esiste. */
+.of-scheda-cosa {
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.of-scheda-pct {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
 /* Il ritorno alla chat. Da qui dentro e' l'unica via d'uscita che si vede:
    percio' ha una parola scritta sopra e non e' l'ennesima icona muta. */
 .of-back {
@@ -295,6 +521,18 @@ body.inoffice .top .activity {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+/* Sulla soglia: c'e' ma non si vede ancora. E' il mezzo secondo fra "la porta
+   si sta aprendo" e "e' entrato", e serve perche' la porta e' una sola e si
+   entra uno alla volta — chi aspetta il suo turno non deve stare li' impilato
+   sopra chi sta passando. Vale anche all'uscita, all'incontrario.
+
+   Opacita' e non `display`: un elemento tolto dal flusso perde la transizione,
+   e la camminata dopo partirebbe da un teletrasporto. */
+.of-guy.soglia {
+  opacity: 0;
+  transition: opacity 0.28s ease;
 }
 
 /* La figura la disegna room.css: qui c'e' solo quello che ne fa un bottone. */
