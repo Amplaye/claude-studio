@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.31.3
+
+- **L'aggiornamento automatico non si blocca piu' da solo.** Quando usciva un
+  Agent SDK nuovo, l'updater lo installava nel sorgente, alzava la versione in
+  `package.json` e lasciava le due modifiche li', da committare. Al giro dopo
+  trovava il sorgente con delle modifiche dentro — le sue — e si fermava su
+  «source has uncommitted changes: we wait for it to be in order». Per sempre,
+  sulle macchine dove nessuno fa rilasci: niente piu' `git pull`, niente piu'
+  aggiornamenti. Adesso l'SDK va solo in `node_modules` e la versione della build
+  sta in `package.json` solo finche' la build gira: il sorgente resta com'e' in
+  git. Se VS Code si chiude a meta' build, il giro dopo rimette a posto il file
+  prima di guardare.
+
+- **Le build per l'SDK non rubano piu' il numero al rilascio vero.** Si chiamano
+  `0.31.4-sdk.0.3.276`: sopra la versione installata, sotto la 0.31.4 vera, che
+  quindi quando arriva entra. Prima si chiamavano 0.31.2 e basta, e la 0.31.2
+  vera avrebbe trovato il posto gia' preso: per questo si salta a 0.31.3.
+
+- Dipendenza dell'SDK del CLI aggiornata alla 0.3.270.
+
 ## 0.31.1
 
 - Stessa 0.31.0 di qui sotto — che sullo store non c'e' mai arrivata — con la

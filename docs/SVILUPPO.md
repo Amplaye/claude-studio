@@ -380,6 +380,14 @@ ore, Claude Studio guarda da solo se c'e' qualcosa di piu' nuovo:
   quello cotto in questa build. Se nel sorgente c'e' lavoro non committato non
   tocca niente e riprova al giro dopo.
 
+  Il sorgente lo lascia **com'e' in git**. L'SDK nuovo va solo in `node_modules`
+  (`npm install --no-save`), e la versione della build sta in `package.json`
+  solo finche' la build gira: sopra un sorgente 0.31.1 si chiama
+  `0.31.2-sdk.0.3.270`, cioe' sopra quella installata e sotto la prossima vera,
+  che quando arriva entra. Prima l'updater lasciava nel sorgente le sue modifiche
+  da committare e al giro dopo si fermava su quelle — per sempre, sulle macchine
+  dove nessuno fa rilasci.
+
 Si guida da `claudeStudio.autoUpdate` (`auto` fa, `check` avvisa e basta, `off`
 sta zitto) e dal comando **Claude Studio: Controlla gli aggiornamenti**, che non
 aspetta il giro delle sei ore. Il registro sta in Output → *Claude Studio —

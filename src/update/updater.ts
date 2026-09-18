@@ -33,6 +33,8 @@ const EVERY_MS = 6 * 60 * 60 * 1000;
 /** At startup we wait a bit: VSCode's opening has better things to do. */
 const FIRST_DELAY_MS = 30_000;
 const LAST_KEY = 'claudeStudio.lastUpdateCheck';
+/** What a build for a newer SDK has to put back in package.json, should it be cut short. */
+const RESTORE_KEY = 'claudeStudio.sdkBuildRestore';
 
 type Mode = 'auto' | 'check' | 'off';
 
@@ -122,6 +124,19 @@ export function newer(a: string, b: string): boolean {
     if (p !== q) return p > q;
   }
   return false;
+}
+
+/**
+ * The version of a build made here for a newer Agent SDK: a pre-release of the next
+ * patch — `0.31.2-sdk.0.3.270` on top of a 0.31.1 source. It has to go above what is
+ * installed, or VS Code takes it for the same package and leaves the old one where it
+ * is; and it has to stay below the next real release, which will be called 0.31.2. A
+ * plain 0.31.2 of our own used to take that number, and the real 0.31.2 then counted
+ * as already installed: it never got in.
+ */
+export function sdkBuildVersion(source: string, sdk: string): string {
+  const [major = 0, minor = 0, patch = 0] = source.split(/[.+-]/).map((x) => Number(x) || 0);
+  return `${major}.${minor}.${patch + 1}-sdk.${sdk}`;
 }
 
 /** The SDK version baked into this build. */
@@ -269,20 +284,70 @@ async function updateCli(auto: boolean): Promise<string | undefined> {
 }
 
 /**
+ * `npm run package` with `version` in package.json for as long as the build runs, and
+ * the file exactly as it was afterwards, byte for byte. Should VS Code close in the
+ * middle, `finally` never runs: so what to put back is written down first, and the
+ * next check puts it back before it looks at the source (`putBack`).
+ */
+async function packageAs(ctx: vscode.ExtensionContext, root: string, version: string): Promise<RunResult> {
+  const build = () => run('npm', ['run', 'package'], { cwd: root, timeout: 15 * 60_000 });
+  const file = path.join(root, 'package.json');
+  const original = fs.readFileSync(file, 'utf8');
+  const pkg = JSON.parse(original) as Record<string, unknown>;
+  if (pkg.version === version) return build();
+
+  const temp = JSON.stringify({ ...pkg, version }, null, 2) + '\n';
+  await ctx.globalState.update(RESTORE_KEY, { file, original, temp });
+  fs.writeFileSync(file, temp, 'utf8');
+  try {
+    return await build();
+  } finally {
+    fs.writeFileSync(file, original, 'utf8');
+    await ctx.globalState.update(RESTORE_KEY, undefined);
+  }
+}
+
+/**
+ * A build cut short leaves its own version in package.json. That one is ours to take
+ * back — but only while the file is still exactly what we wrote: if somebody has
+ * touched it since, it is their work now, and it stays where it is.
+ */
+function putBack(ctx: vscode.ExtensionContext) {
+  const left = ctx.globalState.get<{ file: string; original: string; temp: string }>(RESTORE_KEY);
+  if (!left) return;
+  try {
+    if (fs.readFileSync(left.file, 'utf8') === left.temp) {
+      fs.writeFileSync(left.file, left.original, 'utf8');
+      log('package.json put back as it was: the last build had been cut short.');
+    }
+  } catch {
+    // gone or unreadable: nothing of ours left to put back
+  }
+  void ctx.globalState.update(RESTORE_KEY, undefined);
+}
+
+/**
  * The extension, for whoever develops it. It gets rebuilt from source when there's a
  * real reason: a `git pull` brought a higher version, or an Agent SDK newer than the
  * one baked into this build came out. Without a reason nothing gets touched:
  * recompiling for sport would mean asking you to reload the window every six hours.
  *
+ * Either way the source is left exactly as git has it. It didn't use to be: the SDK
+ * went into package.json and the lockfile, the version went up, and both stayed there
+ * to be committed — so the next check found a source with changes in it, its own, and
+ * stopped at "we wait for it to be in order". For good, on any machine where nobody
+ * makes the releases that would have committed them away.
+ *
  * Without a source folder there is nothing to do and nothing is wrong: the extension
  * came from the Marketplace and VS Code updates it by itself.
  */
-async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Promise<string | undefined> {
+export async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Promise<string | undefined> {
   const root = sourceRoot(ctx);
   if (!root) {
     log('installed as it is: VS Code takes care of updating the extension.');
     return;
   }
+  putBack(ctx);
 
   // If there's half-finished work in the source, nothing gets touched here: no pull,
   // no npm install, no rebuild. Rebuilding from a dirty source would mean shipping
@@ -305,7 +370,7 @@ async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Pro
   const here = String(ctx.extension.packageJSON.version ?? '');
 
   let why = '';
-  let bump = false;
+  let sdk = '';
 
   if (newer(srcVersion, here)) {
     why = `version ${srcVersion} (this one runs ${here})`;
@@ -313,14 +378,7 @@ async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Pro
     const latestSdk = await latestOnNpm(SDK_PKG);
     if (latestSdk && newer(latestSdk, bundledSdk())) {
       why = `Agent SDK ${latestSdk} (this one has ${bundledSdk() || '?'})`;
-      bump = true;
-      if (auto) {
-        const inst = await run('npm', ['install', `${SDK_PKG}@latest`], { cwd: root, timeout: 10 * 60_000 });
-        if (!inst.ok) {
-          log(`npm install of the SDK failed:\n${inst.out}`);
-          return;
-        }
-      }
+      sdk = latestSdk;
     }
   }
 
@@ -331,17 +389,19 @@ async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Pro
   log(`extension to rebuild: ${why}`);
   if (!auto) return `Claude Studio update available: ${why}.`;
 
-  // Il numero deve salire, altrimenti VSCode considera il pacchetto lo stesso di
-  // prima e non lo rimpiazza.
-  if (bump && pkg) {
-    const parts = srcVersion.split('.');
-    parts[2] = String((Number(parts[2]) || 0) + 1);
-    pkg.version = parts.join('.');
-    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', 'utf8');
-    log(`version bumped to ${pkg.version}`);
+  let version = srcVersion;
+  if (sdk) {
+    // --no-save: into node_modules, and nowhere else. package.json and the lockfile
+    // stay as git has them.
+    const inst = await run('npm', ['install', '--no-save', `${SDK_PKG}@${sdk}`], { cwd: root, timeout: 10 * 60_000 });
+    if (!inst.ok) {
+      log(`npm install of the SDK failed:\n${inst.out}`);
+      return;
+    }
+    version = sdkBuildVersion(srcVersion, sdk);
   }
 
-  const built = await run('npm', ['run', 'package'], { cwd: root, timeout: 15 * 60_000 });
+  const built = await packageAs(ctx, root, version);
   if (!built.ok) {
     log(`build failed:\n${built.out}`);
     return;
@@ -352,9 +412,8 @@ async function updateExtension(ctx: vscode.ExtensionContext, auto: boolean): Pro
     return;
   }
   await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(vsix));
-  log(`installed ${pkg?.version ?? srcVersion}.`);
-  if (bump) log('the version number and the lockfile are still to be committed in the source.');
-  return `Claude Studio updated to ${pkg?.version ?? srcVersion}. Reload the window to use it.`;
+  log(`installed ${version}.`);
+  return `Claude Studio updated to ${version}. Reload the window to use it.`;
 }
 
 // ---- il giro completo ----------------------------------------------------
