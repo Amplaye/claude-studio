@@ -1345,7 +1345,7 @@
     n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? Math.round(n / 1000) + 'k' : String(n);
 
   /**
-   * "claude-opus-5[1m]" → "Opus 5". No list of models in here: whatever the engine
+   * "claude-opus-5-5[1m]" → "Opus 5.5". No list of models in here: whatever the engine
    * answers with reads the same way the cards do, and a model that ships tomorrow
    * needs nobody to come and add it. The date some ids carry ("-20250929") is
    * dropped: it's an id, not something you read at the end of a turn.
@@ -2996,26 +2996,27 @@
 
   /**
    * "Opus" on its own doesn't say which Opus. But the number is already there in
-   * the resolved model — claude-opus-5 — so we take it from there instead of
-   * keeping a list here that goes stale: the day the CLI resolves to claude-opus-6,
-   * the card will say "Opus 6" all by itself, without touching a thing.
+   * the resolved model — claude-opus-5-5 → 5.5 — and failing that in the CLI's own
+   * description ("Opus 5.5 with 1M context · …"). Nothing is written down here: a
+   * version kept by hand in this file is exactly how the card went on saying
+   * "Opus 5" the day the CLI moved to 5.5. If neither says it, the card says "Opus".
    */
-  const FALLBACK_VER = { opus: '5' };
-
-  function versioned(name, resolved) {
+  function versioned(name, resolved, description) {
     if (!name || /\d/.test(name)) return name; // it already has the version
-    const key = name.trim().toLowerCase();
-    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const hit = String(resolved || '')
+    const esc = name.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // A minor version is one or two digits: in claude-sonnet-4-20250514 the
+    // "-20250514" is a date, not a ".20250514".
+    const id = String(resolved || '')
       .toLowerCase()
-      .match(new RegExp(esc + '-(\\d+(?:-\\d+)?)'));
-    const ver = hit ? hit[1].replace(/-/g, '.') : FALLBACK_VER[key];
-    return ver ? name + ' ' + ver : name;
+      .match(new RegExp(esc + '-(\\d+)(?:-(\\d{1,2}))?(?!\\d)'));
+    if (id) return name + ' ' + id[1] + (id[2] ? '.' + id[2] : '');
+    const said = String(description || '').match(new RegExp('\\b' + esc + '\\s+(\\d+(?:\\.\\d+)?)', 'i'));
+    return said ? name + ' ' + said[1] : name;
   }
 
   function modelName(m) {
     const b = bareName(m);
-    return { name: versioned(b.name, m.resolved), note: b.note };
+    return { name: versioned(b.name, m.resolved, m.description), note: b.note };
   }
 
   /**
@@ -3494,6 +3495,10 @@
       requestAnimationFrame(placeAllSegs);
       dealCfg();
       wake();
+      // The cards must be the models of the CLI installed now. A list said by an older
+      // CLI has already been taken away by the extension; this is the moment to ask
+      // for the real one (see ChatController.freshModels).
+      vscode.postMessage({ cmd: 'models' });
     } else {
       // Closing animation: the panel slides away, then hides.
       btnCfg.classList.remove('on');

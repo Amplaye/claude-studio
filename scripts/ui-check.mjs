@@ -585,18 +585,26 @@ for (const surface of ['view', 'panel']) {
     items: [
       {
         value: 'default', label: 'Default (recommended)',
-        description: 'Opus 5 · Best for everyday, complex tasks',
-        resolved: 'claude-opus-5[1m]',
+        description: 'Opus 5.5 · Best for everyday, complex tasks',
+        resolved: 'claude-opus-5-5[1m]',
         efforts: ['low', 'medium', 'high', 'xhigh', 'max'], adaptive: true, recommended: true,
       },
-      { value: 'opus', label: 'Opus', description: 'The smartest.', resolved: 'claude-opus-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
-      { value: 'sonnet', label: 'Sonnet', description: 'The balanced one.', resolved: 'claude-sonnet-4-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
-      { value: 'haiku', label: 'Haiku', description: 'The fastest.', resolved: 'claude-haiku-4-5', efforts: [], adaptive: false, recommended: false },
+      { value: 'opus', label: 'Opus', description: 'The smartest.', resolved: 'claude-opus-5-5', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      // No number in the resolved model: the version comes from the CLI's own words.
+      { value: 'sonnet', label: 'Sonnet', description: 'Sonnet 5 · The balanced one.', resolved: 'sonnet', efforts: ['low', 'medium', 'high'], adaptive: true, recommended: false },
+      { value: 'haiku', label: 'Haiku', description: 'The fastest.', resolved: 'claude-haiku-4-5-20251001', efforts: [], adaptive: false, recommended: false },
     ],
   });
+  const sentBefore = await page.evaluate(() => (window.__sent || []).length);
   await page.click('#btnCfg');
   await page.waitForTimeout(140);
   t(await page.isVisible('#cfg'), 'the settings panel does not open');
+  // Opening the settings is when the list gets checked against the CLI installed now:
+  // a list said by an older CLI is how the card kept saying "Opus 5" on a 5.5 CLI.
+  t(
+    (await page.evaluate((n) => (window.__sent || []).slice(n), sentBefore)).some((m) => m?.cmd === 'models'),
+    'opening the settings does not ask for the list of models'
+  );
   // One card per real model. The recommended one ('default') is not shown: it was
   // the "automatic" choice, and now you pick the model yourself.
   const modelCards = await page.locator('#cfgModelList .model-card').count();
@@ -621,9 +629,13 @@ for (const surface of ['view', 'panel']) {
   // The Opus card must show the description in the card itself
   const opusDesc = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-desc').textContent();
   t(opusDesc === 'The smartest.', 'the chosen model does not describe itself: ' + opusDesc);
-  // "Opus" on its own does not say which one: the number comes from the resolved model.
+  // "Opus" on its own does not say which one: the number comes from the resolved model,
+  // minor version included — claude-opus-5-5 is 5.5, not 5.
   const opusName = await page.locator('#cfgModelList .model-card:nth-child(1) .mc-name').textContent();
-  t(opusName === 'Opus 5', 'the model name does not carry its version: ' + opusName);
+  t(opusName === 'Opus 5.5', 'the model name does not carry its version: ' + opusName);
+  const sonnetName = await page.locator('#cfgModelList .model-card:nth-child(2) .mc-name').textContent();
+  t(sonnetName === 'Sonnet 5', 'the version is not read from the description: ' + sonnetName);
+  // The date at the end of the id is not part of the version.
   const haikuName = await page.locator('#cfgModelList .model-card:nth-child(3) .mc-name').textContent();
   t(haikuName === 'Haiku 4.5', 'the Haiku version does not arrive: ' + haikuName);
   // Each family gets its own effect: Opus, Sonnet and Haiku have different classes.
@@ -1033,8 +1045,8 @@ for (const surface of ['view', 'panel']) {
     durationMs: 4200,
     tokens: 18234,
     ctx: { input: 412, cacheRead: 16800, cacheCreate: 620, output: 402 },
-    models: [{ model: 'claude-opus-5[1m]', input: 412, output: 402, cacheRead: 16800, cacheCreate: 620, costUsd: 0.014, contextWindow: 1000000 }],
-    model: 'claude-opus-5[1m]',
+    models: [{ model: 'claude-opus-5-5[1m]', input: 412, output: 402, cacheRead: 16800, cacheCreate: 620, costUsd: 0.014, contextWindow: 1000000 }],
+    model: 'claude-opus-5-5[1m]',
     effort: 'high',
   });
   await post({ k: 'busy', value: false });
@@ -1050,7 +1062,7 @@ for (const surface of ['view', 'panel']) {
     return { text: chip.textContent, fam: [...chip.classList].find((c) => c.startsWith('fam-')) };
   });
   t(!!recap, 'the end of turn does not say which model answered');
-  t(/Opus 5/.test(recap?.text || ''), 'the model chip does not name the model: ' + recap?.text);
+  t(/Opus 5\.5/.test(recap?.text || ''), 'the model chip does not name the model: ' + recap?.text);
   t(/Thorough/.test(recap?.text || ''), 'the model chip does not name the effort: ' + recap?.text);
   t(recap?.fam === 'fam-opus', 'the model chip is not in its family colour: ' + recap?.fam);
 

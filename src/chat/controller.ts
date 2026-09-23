@@ -4,7 +4,8 @@
 import * as vscode from 'vscode';
 import * as nodePath from 'node:path';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
-import { claudeCliVersion, findClaudeCli } from '../engine/cli';
+import { claudeCliVersion, findClaudeCli, onCliReset } from '../engine/cli';
+import { askModels } from '../engine/models';
 import type {
   AskKind,
   AskQuestion,
@@ -58,6 +59,12 @@ const PREFS_KEY = 'claudeStudio.prefs';
  * che ha detto, cosi' il menu ha gia' qualcosa da mostrare prima del primo messaggio.
  */
 const MODELS_KEY = 'claudeStudio.models';
+/**
+ * Quale versione della CLI l'ha detto. L'elenco messo da parte vale finche' sul disco
+ * c'e' quella: dopo un aggiornamento parla dei modelli di ieri (vedi `freshModels`).
+ * Chiave a parte e non dentro l'elenco: le versioni precedenti leggono ancora un array.
+ */
+const MODELS_CLI_KEY = 'claudeStudio.models.cli';
 // v2: i comandi salvati dalle versioni precedenti non hanno il campo `group`, e senza
 // quello finirebbero tutti sotto "Comandi di Claude" — skill comprese — fino al primo
 // messaggio della sessione. Cambiare chiave li ignora invece di mostrarli mal divisi.
@@ -221,6 +228,9 @@ export class ChatController {
   private pending = new Map<string, Pending>();
   private prefs: Prefs;
   private models: ModelChoice[];
+  /** La versione della CLI che ha detto `models`; '' se non si sa. */
+  private modelsFrom: string;
+  private readonly offCli: () => void;
   private commands: { name: string; description: string }[];
   /**
    * Il bollino sull'icona e' uno solo per finestra: lo governa il principale.
@@ -250,7 +260,12 @@ export class ChatController {
     this.models = (ctx.globalState.get<ModelChoice[]>(MODELS_KEY) ?? []).filter(
       (m) => typeof m?.resolved === 'string'
     );
+    this.modelsFrom = ctx.globalState.get<string>(MODELS_CLI_KEY) ?? '';
     this.commands = ctx.globalState.get<{ name: string; description: string }[]>(COMMANDS_KEY) ?? [];
+    this.freshModels(false);
+    // L'aggiornamento automatico gira mezzo minuto dopo l'avvio, cioe' a schede gia'
+    // aperte: quando cambia la CLI, ognuna ricontrolla il suo elenco.
+    this.offCli = onCliReset(() => this.freshModels(true));
   }
 
   attach(s: Surface) {
@@ -973,6 +988,7 @@ export class ChatController {
   }
 
   dispose() {
+    this.offCli();
     this.closeAllPending('Extension closed.');
     this.endEngine();
     owned.end(this.key);
@@ -1181,7 +1197,9 @@ export class ChatController {
     // vuoto la prossima volta che apri la chat prima di scrivere.
     if (e.k === 'models') {
       this.models = e.items;
+      this.modelsFrom = e.cli ?? '';
       void this.ctx.globalState.update(MODELS_KEY, e.items);
+      void this.ctx.globalState.update(MODELS_CLI_KEY, this.modelsFrom);
       this.dropStaleModel(e.items);
     }
     if (e.k === 'commands') {
@@ -1367,6 +1385,48 @@ export class ChatController {
     return model === p.model && effort === p.effort && thinking === p.thinking
       ? p
       : { ...p, model, effort, thinking };
+  }
+
+  /** Le impostazioni si sono aperte: e' li' che l'elenco dei modelli si guarda. */
+  wantModels() {
+    this.freshModels(true);
+  }
+
+  /**
+   * L'elenco dei modelli deve essere quello della CLI che c'e' adesso sul disco.
+   *
+   * Arrivava solo col primo messaggio, e fino a li' le carte mostravano quello messo
+   * da parte dalla CLI di prima: il 23/09 la CLI si e' aggiornata da sola a quella in
+   * cui «opus» e' Opus 5.5, e il pannello ha continuato a dire «Opus 5» finche' non si
+   * e' scritto qualcosa. Adesso un elenco di un'altra versione si toglie — meglio «in
+   * attesa» che un modello sbagliato — e con `ask` quello vero si chiede subito, senza
+   * nessun messaggio (vedi engine/models.ts). `ask` solo quando l'elenco serve davvero,
+   * perche' chiedere vuol dire accendere la CLI per un paio di secondi.
+   */
+  private freshModels(ask: boolean) {
+    // Un motore acceso resta la CLI con cui e' partito, anche se sul disco ce n'e' una
+    // nuova: per questa chat l'elenco giusto e' il suo, e l'ha gia' detto lui.
+    if (this.session?.cliVersion) return;
+    const cli = findClaudeCli(cliSetting());
+    if (!cli) return;
+    const now = claudeCliVersion(cli);
+    if (this.models.length && this.modelsFrom === now) return;
+    if (this.models.length) {
+      this.models = [];
+      this.broadcast({ k: 'models', items: [] });
+    }
+    if (!ask) return;
+    askModels(cli, currentCwd()).then(
+      (items) => {
+        // Nel frattempo la chat puo' essersi chiusa, il motore acceso o la CLI cambiata.
+        if (!items.length || !chats.has(this.key) || this.session?.cliVersion) return;
+        if (claudeCliVersion(cli) !== now) return;
+        this.emit({ k: 'models', items, cli: now });
+      },
+      () => {
+        /* la CLI non ha risposto: l'elenco arriva col primo messaggio, come prima */
+      }
+    );
   }
 
   /**

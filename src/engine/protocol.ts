@@ -245,7 +245,12 @@ export type Wire =
   // laterale, che aprono la scheda gia' sulla faccia giusta.
   | { k: 'view'; value: 'chat' | 'office' }
   | { k: 'prefs'; value: Prefs }
-  | { k: 'models'; items: ModelChoice[] }
+  | {
+      k: 'models';
+      items: ModelChoice[];
+      /** La versione della CLI che l'ha detto: l'elenco vale finche' sul disco c'e' quella. */
+      cli?: string;
+    }
   // The "play now" is decided by the extension, not the page: it's the only one that
   // knows whether the window is in front, and it has to be told to a single face —
   // two open faces would play twice.
@@ -490,6 +495,9 @@ export type Cmd =
   | { cmd: 'answer'; id: string; choice: 'allow' | 'always' | 'deny'; answers?: Record<string, string> }
   | { cmd: 'setMode'; value: Mode }
   | { cmd: 'setPrefs'; value: Partial<Prefs> }
+  // Le impostazioni si sono aperte: l'elenco dei modelli deve essere quello della CLI
+  // di adesso, e se non lo e' lo si chiede (vedi ChatController.freshModels).
+  | { cmd: 'models' }
   | { cmd: 'history' }
   // `fork` = resume but on a new branch, without touching the original conversation
   | { cmd: 'open'; id: string; fork?: boolean }

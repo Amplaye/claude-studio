@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code, in a panel you can actually watch. Live progress, diffs you open when you want, one-click permissions, any file attached — and THE OFFICE: a desk for every open conversation.",
-  "version": "0.31.3",
+  "version": "0.31.4",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -301,7 +301,8 @@
     "tasks-live": "node build.mjs && node scripts/tasks-check.cjs --live",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
-    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/autofix-check.cjs && node scripts/checkpoint-check.cjs && node scripts/update-check.cjs",
+    "models-check": "node build.mjs && node scripts/models-check.cjs",
+    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/models-check.cjs && node scripts/autofix-check.cjs && node scripts/checkpoint-check.cjs && node scripts/update-check.cjs",
     "autofix-check": "node build.mjs && node scripts/autofix-check.cjs",
     "checkpoint-check": "node scripts/checkpoint-check.cjs"
   },
@@ -317,7 +318,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.270",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.280",
     "ionicons": "^8.1.0",
     "zod": "^4.4.3"
   }

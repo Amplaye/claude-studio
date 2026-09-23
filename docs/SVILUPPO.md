@@ -195,11 +195,20 @@ in `C:\Users\Steward\.claude\plans\l-auto-mode-dimenticatelo-indexed-moonbeam.md
   `max`; `high` e sotto girano anche a pensiero spento. **Non sta in `ModelInfo`**:
   l'SDK espone `supportedEffortLevels` e `supportsAdaptiveThinking`, ma niente che
   leghi i due. Nel catalogo interno della CLI esiste `rejects_disabled_thinking`,
-  che pero' e' una cosa del *modello* (ce l'ha Fable 5), non del livello.
+  che pero' e' una cosa del *modello* (ce l'hanno Fable 5 e Opus 5.5), non del livello.
 - **Un errore 400 dell'API torna come turno riuscito.** La CLI lo trasforma in una
   risposta di un modello `<synthetic>` da zero dollari, e il `result` arriva con
   subtype `success`: la riga di fine turno dice "Fatto" per un turno che non ha
   fatto niente. Se ne accorge solo chi guarda il modello nel chip.
+- **L'elenco dei modelli invecchia con la CLI, non con l'estensione.** Messo da
+  parte in `globalState`, restava quello della CLI che l'aveva detto: dopo un
+  aggiornamento le carte parlavano dei modelli di ieri fino al primo messaggio (il
+  23/09: «Opus 5» su una CLI che lavorava gia' col 5.5). Ora porta con se' la
+  versione (`claudeStudio.models.cli`) e si richiede con una stretta di mano a vuoto
+  (`engine/models.ts`: `supportedModels()` aspetta solo l'initialize — niente turno,
+  niente transcript, e `strictMcpConfig` per non accendere i server MCP). Un motore
+  gia' acceso invece resta la CLI con cui e' partito: per quella chat l'elenco giusto
+  e' il suo. `models-check` lo prova sulla CLI vera.
 - **Una regola che aspetta l'elenco dei modelli arriva tardi.** Il legame
   impegno→pensiero dipende dal solo livello, ma stava dentro il ramo che si sblocca
   quando la CLI dice quali modelli esistono: il primo turno partiva col pensiero

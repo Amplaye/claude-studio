@@ -180,6 +180,9 @@ export function bindWebview(
       case 'setPrefs':
         chat.setPrefs(m.value);
         return;
+      case 'models':
+        chat.wantModels();
+        return;
       case 'history':
         void chat.sendHistory(surface);
         return;

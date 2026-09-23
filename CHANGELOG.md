@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.31.4
+
+- **Le carte dei modelli dicono quello che offre la CLI di adesso.** Il 23/09 la
+  CLI si e' aggiornata da sola alla versione in cui «opus» e' Opus 5.5, e le
+  impostazioni hanno continuato a dire «Opus 5» fino al primo messaggio: l'elenco
+  mostrato prima di scrivere era quello messo da parte dalla CLI precedente. Il
+  motore lavorava gia' col 5.5, il pannello diceva un'altra cosa. Adesso l'elenco
+  si ricorda da quale versione della CLI arriva: se sul disco ce n'e' un'altra non
+  si mostra, e aprendo le impostazioni — o appena l'aggiornamento automatico cambia
+  la CLI — si chiede quello vero. Basta la stretta di mano iniziale della CLI:
+  nessun messaggio, nessuna conversazione, nessun costo, un paio di secondi una
+  volta per versione.
+
+- **Il numero del modello lo dice la CLI, anche quello dopo il punto.** Un «Opus»
+  senza numero lo completava una riga scritta a mano qui dentro, ferma a «5».
+  Tolta: il numero si legge dal modello risolto (`claude-opus-5-5` → 5.5) o, se
+  li' non c'e', dalla descrizione della CLI. E la data in fondo a un id
+  (`-20250514`) non diventa piu' un pezzo di versione.
+
+- Dipendenza dell'SDK del CLI aggiornata alla 0.3.280.
+
 ## 0.31.3
 
 - **L'aggiornamento automatico non si blocca piu' da solo.** Quando usciva un

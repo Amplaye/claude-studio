@@ -16,6 +16,8 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk';
 import type { SentFile, Thinking, TurnCtx, TurnModelUsage, Wire } from './protocol';
 import { LOCAL_COMMANDS } from '../shared/localCommands';
+import { versionOf } from './cli';
+import { toChoices } from './models';
 
 /**
  * Tutto quello che serve per chiedere il permesso. `id` e' il `tool_use_id`:
@@ -243,6 +245,12 @@ export class Session {
   sessionId?: string;
   model = '';
   busy = false;
+  /**
+   * La versione della CLI che questo processo sta facendo girare, presa quando si
+   * accende; '' finche' e' spento. Non quella sul disco adesso: se la CLI si aggiorna
+   * a sessione accesa, questo processo resta il vecchio, e i suoi modelli pure.
+   */
+  cliVersion = '';
 
   constructor(private o: SessionOptions) {}
 
@@ -552,6 +560,7 @@ export class Session {
     };
 
     try {
+      this.cliVersion = this.o.cliPath ? versionOf(this.o.cliPath) : '';
       this.q = query({ prompt: this.input(), options });
       for await (const m of this.q) this.onMessage(m);
     } catch (e) {
@@ -611,20 +620,7 @@ export class Session {
     try {
       const list = await this.q?.supportedModels();
       if (!list) return;
-      this.o.emit({
-        k: 'models',
-        items: list.map((m) => ({
-          value: String(m.value ?? ''),
-          label: String(m.displayName || m.value || ''),
-          description: String(m.description ?? '').slice(0, 160),
-          resolved: String((m as { resolvedModel?: string }).resolvedModel ?? ''),
-          efforts: m.supportsEffort ? [...(m.supportedEffortLevels ?? ['low', 'medium', 'high'])] : [],
-          adaptive: m.supportsAdaptiveThinking !== false,
-          // "default" e' l'alias che segue quello che la CLI consiglia oggi: chi lo
-          // sceglie si ritrova il modello nuovo il giorno che esce, senza fare niente.
-          recommended: String(m.value ?? '') === 'default',
-        })).filter((m) => m.value),
-      });
+      this.o.emit({ k: 'models', items: toChoices(list), cli: this.cliVersion });
     } catch {
       /* una CLI piu' vecchia puo' non saperlo dire: resta la scelta predefinita */
     }

@@ -168,11 +168,21 @@ export function findClaudeCli(override?: string): string | undefined {
 
 /**
  * After an update the path stays the same, but the version doesn't: and if before
- * there was nothing, now there might be something. We throw away what we knew.
+ * there was nothing, now there might be something. We throw away what we knew — and
+ * so does whoever keeps something the old CLI said (the chat's list of models).
  */
 export function resetCliCache() {
   found = undefined;
   versions.clear();
+  for (const fn of resetListeners) fn();
+}
+
+const resetListeners = new Set<() => void>();
+
+/** Called after every `resetCliCache()`. Returns the function that unsubscribes. */
+export function onCliReset(fn: () => void): () => void {
+  resetListeners.add(fn);
+  return () => resetListeners.delete(fn);
 }
 
 const versions = new Map<string, string>();
