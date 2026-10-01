@@ -519,7 +519,4 @@ export type Cmd =
   | { cmd: 'audio'; ok: boolean }
   // A webview's clipboard can be refused; VS Code's never is. The page tries its
   // own first and falls back to here.
-  | { cmd: 'copy'; text: string }
-  // Links open in the browser: a webview that navigates away from the chat has
-  // no way back to it.
-  | { cmd: 'openLink'; url: string };
+  | { cmd: 'copy'; text: string };

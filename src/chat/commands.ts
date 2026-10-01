@@ -10,6 +10,7 @@
 // La corrispondenza e' esatta, come si legge nel menu: "/resume" pulisce,
 // "/resume qualcosa" no. Chi vuole il comando lo scrive com'e' scritto.
 import * as vscode from 'vscode';
+import { openWeb } from '../shared/browser';
 import { LOCAL_COMMANDS } from '../shared/localCommands';
 import * as settings from './settings';
 
@@ -29,9 +30,13 @@ export interface CommandHost {
   lang: string;
 }
 
-/** Un indirizzo esterno: il browser lo apre, l'estensione non lo imita. */
+/**
+ * Un indirizzo esterno: il browser lo apre, l'estensione non lo imita. Senza il
+ * popup «Aprire il sito esterno?»: la pagina l'hai appena chiesta tu (vedi
+ * shared/browser.ts).
+ */
 function open(url: string) {
-  void vscode.env.openExternal(vscode.Uri.parse(url));
+  openWeb(url);
 }
 
 /**

@@ -201,11 +201,6 @@ export function bindWebview(
       case 'copy':
         void vscode.env.clipboard.writeText(m.text);
         return;
-      case 'openLink':
-        // http(s) only: the page hands over a string, and a string that turns into
-        // a command:// URI would be the page running commands in the editor.
-        if (/^https?:\/\//i.test(m.url)) void vscode.env.openExternal(vscode.Uri.parse(m.url));
-        return;
       // ---- what the context column sends ----
       case 'refresh':
         monitor?.tick();

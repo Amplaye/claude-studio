@@ -1178,11 +1178,29 @@ for (const surface of ['view', 'panel']) {
   t(links.inCode === 1, 'an address inside a code block is not clickable: ' + links.inCode);
   t(links.copyBtns === 1, 'the code block has no copy button: ' + links.copyBtns);
 
+  // VS Code opens the link on its own (its frame catches the click, and in a trusted
+  // workspace no prompt shows up). The page must not ALSO hand it to the extension:
+  // that road went through openExternal, which brought up the prompt and, on "Open",
+  // opened the page a second time. And it must not navigate away from the chat.
+  const sentBeforeLink = await page.evaluate(() => (window.__sent || []).length);
+  const urlBeforeLink = page.url();
   await page.locator('.msg.assistant').last().locator('a.mdlink').first().click();
-  const sl = await lastSent();
+  await page.waitForTimeout(120);
+  const afterLink = await page.evaluate((n) => (window.__sent || []).slice(n), sentBeforeLink);
   t(
-    sl?.cmd === 'openLink' && /business\.facebook\.com/.test(sl.url || ''),
-    'clicking a link does not ask the extension to open it: ' + JSON.stringify(sl)
+    !afterLink.some((s) => s?.cmd === 'openLink'),
+    'clicking a link still hands it to the extension, which opens it a second time: ' + JSON.stringify(afterLink)
+  );
+  t(page.url() === urlBeforeLink, 'clicking a link took the page away from the chat: ' + page.url());
+  const firstHref = await page
+    .locator('.msg.assistant')
+    .last()
+    .locator('a.mdlink')
+    .first()
+    .evaluate((a) => a.href);
+  t(
+    firstHref === 'https://business.facebook.com/settings/apps?business_id=905021967715680',
+    'the link VS Code opens is not the whole address: ' + firstHref
   );
 
   const copyBtn = page.locator('.msg.assistant').last().locator('.copybtn').first();

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.31.5
+
+- **Un link nella chat si apre una volta sola, e senza popup.** Cliccandolo si
+  apriva il browser *e* compariva «Aprire il sito esterno?» di VS Code; dicendo
+  «Apri», la pagina si apriva una seconda volta. Il clic lo raccoglievano in due:
+  VS Code stesso — che lo apre per conto suo e, in un progetto fidato, senza
+  chiedere niente — e la chat, che lo passava all'estensione per una strada che il
+  popup lo mostra sempre. Adesso la chat lascia fare a VS Code e si limita a non
+  andarsene dalla pagina.
+
+- **Lo stesso per i comandi che aprono una pagina.** `/help`, `/upgrade`,
+  `/logout`, `/privacy-settings`, `/release-notes`, `/feedback` e `/bug` aprono il
+  browser direttamente, col comando del sistema: la pagina l'hai appena chiesta tu,
+  non serve confermarla. Su una macchina remota (SSH, WSL, container), dove il
+  browser sta dall'altra parte del collegamento, resta la strada di VS Code.
+
 ## 0.31.4
 
 - **Le carte dei modelli dicono quello che offre la CLI di adesso.** Il 23/09 la

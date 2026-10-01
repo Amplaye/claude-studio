@@ -42,6 +42,7 @@ import { sound } from './sound';
 import { tips } from './tips';
 import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
 import { announceLang, t } from '../shared/i18n';
+import { openWeb } from '../shared/browser';
 import { tasks } from '../tasks/store';
 
 export interface Surface {
@@ -825,7 +826,7 @@ export class ChatController {
 
   /** "/help": l'elenco di cosa si puo' scrivere. */
   private async showHelp() {
-    void vscode.env.openExternal(vscode.Uri.parse('https://code.claude.com/docs/en/commands'));
+    openWeb('https://code.claude.com/docs/en/commands');
   }
 
   /** "/status" e "/cost": com'e' messa questa sessione, in breve. */

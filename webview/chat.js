@@ -795,15 +795,18 @@
     return out.length ? out : [document.createTextNode('')];
   }
 
-  // A link opens in the browser, and it's the extension that opens it. Left to
-  // itself a webview either swallows the navigation or goes there wholesale —
-  // and a panel that has navigated away from the chat has no way back.
+  // A link opens in the browser, and it's VS Code that opens it. The frame it wraps
+  // every webview in listens for clicks on an <a> and — without looking at
+  // defaultPrevented — sends the address to the workbench, which opens it with
+  // `fromWorkspace`: in a trusted workspace (the only kind this extension runs in)
+  // that skips the "Open external website?" prompt. This page used to also send the
+  // address to the extension, whose `openExternal` has no `fromWorkspace`: out came
+  // the prompt, and clicking "Open" opened the page a second time. So here the page
+  // only keeps itself from navigating — which matters where VS Code isn't around,
+  // like the browser preview: a panel that has left the chat has no way back.
   document.addEventListener('click', (e) => {
     const a = e.target && e.target.closest && e.target.closest('a.mdlink');
-    if (!a) return;
-    e.preventDefault();
-    const url = a.getAttribute('href');
-    if (url) vscode.postMessage({ cmd: 'openLink', url });
+    if (a) e.preventDefault();
   });
 
   // ---------- tool ----------
