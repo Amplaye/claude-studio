@@ -75,6 +75,72 @@ export function plansDir(cwd: string): string {
   return path.join(claudeDir(), 'plans');
 }
 
+/** `~/x` vale la home su ogni macchina; un percorso relativo, rispetto a `from`. */
+function expandHome(p: string, from: string): string {
+  if (p === '~') return os.homedir();
+  if (/^~[\\/]/.test(p)) return path.join(os.homedir(), p.slice(2));
+  return path.resolve(from, p);
+}
+
+const isDir = (p: string) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Dove sta la memoria di questo progetto.
+ *
+ * `autoMemoryDirectory` dei settings, se c'e' — locale o utente: quella del progetto la
+ * CLI la ignora apposta, perche' sta in git e chiunque potrebbe puntarla altrove — con
+ * `~` per la home. Altrimenti `projects/<progetto>/memory`, e la cartella del progetto
+ * si cerca senza badare alle maiuscole: sul disco ci sono `c--Users-Steward-CRM` e
+ * `C--Users-Steward-claude-studio`, a seconda di chi ha aperto la cartella per primo,
+ * e su un disco che le maiuscole le distingue il nome esatto non basta.
+ */
+export function memoryDirFor(cwd: string): string {
+  for (const file of [path.join(cwd, '.claude', 'settings.local.json'), path.join(claudeDir(), 'settings.json')]) {
+    const v = readSettings(file).autoMemoryDirectory;
+    if (typeof v === 'string' && v.trim()) return expandHome(v.trim(), cwd);
+  }
+  const want = projectsDirFor(cwd);
+  // Col nome com'e' scritto sul disco, anche dove le maiuscole non contano: e' quello
+  // che si mostra, e lo stesso file non deve sembrare due.
+  try {
+    const parent = path.dirname(want);
+    const names = fs.readdirSync(parent);
+    const hit =
+      names.find((d) => d === path.basename(want) && isDir(path.join(parent, d, 'memory'))) ??
+      names.find((d) => d.toLowerCase() === path.basename(want).toLowerCase() && isDir(path.join(parent, d, 'memory')));
+    if (hit) return path.join(parent, hit, 'memory');
+  } catch {
+    /* nessuna cartella dei progetti: la memoria non c'e' ancora */
+  }
+  return path.join(want, 'memory');
+}
+
+/** Tutte le memorie di questa macchina: una per progetto, piu' quella dei settings utente. */
+export function allMemoryDirs(): string[] {
+  const out: string[] = [];
+  const base = path.join(claudeDir(), 'projects');
+  try {
+    for (const d of fs.readdirSync(base)) {
+      const m = path.join(base, d, 'memory');
+      if (isDir(m)) out.push(m);
+    }
+  } catch {
+    /* nessun progetto ancora */
+  }
+  const v = readSettings(path.join(claudeDir(), 'settings.json')).autoMemoryDirectory;
+  if (typeof v === 'string' && v.trim()) {
+    const d = expandHome(v.trim(), os.homedir());
+    if (isDir(d) && !out.some((x) => x.toLowerCase() === d.toLowerCase())) out.push(d);
+  }
+  return out;
+}
+
 /** A conversation's transcript: it's a jsonl, one line per message. */
 export function transcriptPath(cwd: string, sessionId: string): string {
   return path.join(projectsDirFor(cwd), sessionId + '.jsonl');

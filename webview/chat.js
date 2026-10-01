@@ -154,7 +154,16 @@
     ToolSearch: 'search',
     Workflow: 'git-branch',
     'mcp__editor__plan': 'list',
+    'mcp__memoria__memory_search': 'library',
+    'mcp__memoria__memory_read': 'library',
   };
+
+  /**
+   * La memoria del progetto (vedi src/memory). Una card stretta — «Memoria: «query» →
+   * 3 note» — e dentro solo nomi e date, cliccabili. Mai i corpi: fra le note ci sono
+   * credenziali, e quello che si vede in chat si condivide con una schermata.
+   */
+  const MEMORY_TOOL = /^mcp__memoria__memory_(search|read)$/;
 
   /** Il piano che Claude si scrive: e' il nostro (vedi src/engine/ide.ts). */
   const PLAN_TOOL = 'mcp__editor__plan';
@@ -214,7 +223,7 @@
   /** Anche il ponte con l'editor: leggere gli errori o sapere quali file sono aperti
       non cambia niente sul disco. */
   const slimTool = (name) =>
-    !!SLIM[name] || /^mcp__editor__(open_files|editor_errors|plan)$/.test(name);
+    !!SLIM[name] || /^mcp__editor__(open_files|editor_errors|plan)$/.test(name) || MEMORY_TOOL.test(name);
 
   let cwd = '';
   /** Absolute paths fill the line without saying anything: keep the useful part. */
@@ -894,10 +903,16 @@
     const sum = el('summary');
     const head = el('div', 'head');
     const ic = icon(TOOL_ICONS[name] || 'flash', 'tool-ico');
+    const memory = MEMORY_TOOL.test(name);
     // If the tool touches a file, the path is a link: one click opens it in the
     // editor, where you actually need to look at it.
     const file = i.file_path || i.path;
-    const arg = el(typeof file === 'string' ? 'button' : 'span', 'arg', toolArg(inp, name));
+    const arg = el(
+      typeof file === 'string' ? 'button' : 'span',
+      'arg',
+      memory ? (/_read$/.test(name) ? String(i.name || '') : '«' + String(i.query || '') + '»') : toolArg(inp, name)
+    );
+    node._arg = arg;
     if (typeof file === 'string') {
       arg.type = 'button';
       arg.classList.add('link');
@@ -908,7 +923,7 @@
         vscode.postMessage({ cmd: 'openFile', path: file });
       });
     }
-    head.append(ic, el('span', 'name', toolName(name)), arg, icon('chevron-down', 'chev'));
+    head.append(ic, el('span', 'name', memory ? t('mem.title') : toolName(name)), arg, icon('chevron-down', 'chev'));
     sum.append(head, el('div', 'tool-bar'));
 
     // Nothing opens by itself. A diff that unfolds on its own pushes the message
@@ -959,6 +974,14 @@
       setTimeout(() => spark.remove(), 800);
     }
 
+    // The memory's answer carries lines out of the notes, and the notes carry
+    // credentials: what shows here is which notes, and when they were written.
+    if (ok && MEMORY_TOOL.test(node.dataset.tool)) {
+      memoryResult(node, text);
+      toBottom();
+      return;
+    }
+
     // "File updated successfully" under a diff you can already see is noise:
     // for these tools the result only shows up when something goes wrong.
     const res = ok && QUIET[node.dataset.tool] ? '' : String(text || '').trim();
@@ -980,6 +1003,89 @@
     } else if (!node._full && !node.open) {
       node.classList.add('bare'); // nothing to open: drop the arrow
     }
+    toBottom();
+  }
+
+  // ---------- the memory ----------
+
+  /** dd/mm/yyyy: how dates read here, and a month never passes for a day. */
+  function dayOf(ms) {
+    const d = new Date(ms);
+    if (!isFinite(d.getTime())) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+  }
+
+  /**
+   * Which notes the memory answered with: name, date and file, and nothing else. The
+   * answer is written for the model (src/memory/memory.ts): a numbered line per note
+   * ending in "(type · dd/mm/yyyy · N⚠️)", then "file: …" — or, for a single note read
+   * whole, "name (slug · … · dd/mm/yyyy)" and "file: …" on the line after.
+   */
+  function memoryNotes(tool, text) {
+    const lines = String(text || '').split('\n');
+    const out = [];
+    const dateIn = (s) => (s.match(/(\d{2}\/\d{2}\/\d{4})[^()]*\)\s*$/) || [])[1] || '';
+    const fileAfter = (k) => {
+      const f = (lines[k + 1] || '').match(/^\s*file: (.+)$/);
+      return f ? f[1].trim() : '';
+    };
+    if (/_read$/.test(tool)) {
+      const m = (lines[0] || '').match(/^.* \(([^\s()]+) · [^()]*\)\s*$/);
+      if (m) out.push({ slug: m[1], date: dateIn(lines[0]), file: fileAfter(0) });
+      return out;
+    }
+    lines.forEach((l, k) => {
+      const m = l.match(/^\d+\. (\S+)(?: \[[^\]]*\])? — /);
+      if (m) out.push({ slug: m[1], date: dateIn(l), file: fileAfter(k) });
+    });
+    return out;
+  }
+
+  /** A button per note: its name, its date, and one click to open it in the editor. */
+  function noteButton(n, cls) {
+    const b = el('button', cls);
+    b.type = 'button';
+    b.append(el('span', 'mem-name', n.slug));
+    if (n.date) b.append(el('span', 'mem-date', n.date));
+    if (n.file) {
+      b.title = n.file;
+      b.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        vscode.postMessage({ cmd: 'openFile', path: n.file });
+      });
+    }
+    return b;
+  }
+
+  function memoryResult(node, text) {
+    const notes = memoryNotes(node.dataset.tool, text);
+    if (!/_read$/.test(node.dataset.tool) && node._arg) {
+      const n = notes.length;
+      node._arg.textContent += ' → ' + (n === 0 ? t('mem.none') : n === 1 ? t('mem.one') : t('mem.many', { n }));
+    }
+    if (!notes.length) {
+      if (!node.open) node.classList.add('bare');
+      return;
+    }
+    const list = el('div', 'mem-notes');
+    for (const n of notes) list.append(noteButton(n, 'mem-note'));
+    node._body.append(list);
+    node._full = true;
+  }
+
+  /** "Recalled: a, b" — what the memory put next to your message on its own. */
+  function recalledRow(m) {
+    const last = [...log.querySelectorAll('.msg.user')].at(-1);
+    const notes = (m.notes || []).filter((n) => n && n.slug);
+    if (!last || !notes.length) return;
+    const old = last.querySelector('.recalled');
+    if (old) old.remove();
+    const row = el('div', 'recalled');
+    row.append(icon('library'), el('span', 'rc-label', t('mem.recalled')));
+    for (const n of notes) row.append(noteButton({ slug: n.slug, date: dayOf(n.date), file: n.file }, 'rc-note'));
+    last.append(row);
     toBottom();
   }
 
@@ -1870,6 +1976,9 @@
       case 'plan_ready':
         hideWaiting();
         planReadyCard(m);
+        break;
+      case 'recalled':
+        recalledRow(m);
         break;
       case 'session':
         // The model icon in the header was removed:
@@ -3506,6 +3615,7 @@
     paintVol();
     $('cfgFollow').checked = !!prefs.follow;
     $('cfgAutofix').checked = !!prefs.autofix;
+    $('cfgRecall').checked = prefs.memoryRecall !== false;
     $('cfgAway').checked = !!prefs.onlyWhenAway;
     $('cfgAsk').checked = !!prefs.soundOnAsk;
     $('cfgToast').checked = !!prefs.toast;
@@ -3587,6 +3697,7 @@
   });
   $('cfgFollow').addEventListener('change', (e) => push({ follow: e.target.checked }));
   $('cfgAutofix').addEventListener('change', (e) => push({ autofix: e.target.checked }));
+  $('cfgRecall').addEventListener('change', (e) => push({ memoryRecall: e.target.checked }));
   $('cfgAway').addEventListener('change', (e) => push({ onlyWhenAway: e.target.checked }));
   $('cfgAsk').addEventListener('change', (e) => push({ soundOnAsk: e.target.checked }));
   $('cfgToast').addEventListener('change', (e) => push({ toast: e.target.checked }));

@@ -522,6 +522,70 @@ for (const surface of ['view', 'panel']) {
   }));
   t(pr2.cards === 2 && pr2.exitCards === 0, 'from the history the card does not take the place of the call: ' + JSON.stringify(pr2));
 
+  // ---- the memory: which notes and when, never what is inside them ----
+  // The answer is written for the model and carries lines out of the notes — and
+  // notes carry credentials. On screen: a slim card, names and dates you can click.
+  const memFile = 'C:\\Users\\x\\.claude\\projects\\c--x-CRM\\memory\\fuoricitta-stampanti.md';
+  const memAnswer = [
+    'Notes written in the past: each one holds as of its date — check its ⚠️ before relying on it.',
+    '',
+    '1. fuoricitta-stampanti — La stampante (192.168.2.12) su una rete separata (project · 22/09/2026 · 2⚠️)',
+    '   file: ' + memFile,
+    '   > SEGRETO-DA-NON-MOSTRARE password: hunter2hunter2',
+    '   see also: comanda-accodata',
+    '',
+    '2. comanda-accodata [altro] — accodata dal server (project · 21/09/2026)',
+    '   file: C:\\m\\comanda-accodata.md',
+    '',
+    'Read a whole note with memory_read.',
+  ].join('\n');
+  await post({ k: 'user', text: 'cosa sappiamo delle stampanti?' });
+  await post({ k: 'recalled', notes: [{ slug: 'fuoricitta-stampanti', name: 'Stampanti', date: Date.UTC(2026, 8, 22, 12), file: memFile }] });
+  await post({ k: 'tool_start', id: 'mem_1', name: 'mcp__memoria__memory_search', input: { query: 'stampanti' }, parent: null });
+  await post({ k: 'tool_end', id: 'mem_1', ok: true, text: memAnswer });
+  await post({ k: 'tool_start', id: 'mem_2', name: 'mcp__memoria__memory_read', input: { name: 'fuoricitta-stampanti' }, parent: null });
+  await post({
+    k: 'tool_end',
+    id: 'mem_2',
+    ok: true,
+    text: 'Stampanti (fuoricitta-stampanti · project · 22/09/2026 · 2⚠️)\nfile: ' + memFile + '\nWritten on 22/09/2026: it holds as of that date.\ncited by: no other note\n\nSEGRETO-DA-NON-MOSTRARE',
+  });
+  await page.waitForTimeout(150);
+  const mem = await page.evaluate(() => {
+    const card = document.querySelector('.tool[data-tool="mcp__memoria__memory_search"]');
+    const read = document.querySelector('.tool[data-tool="mcp__memoria__memory_read"]');
+    const user = [...document.querySelectorAll('.msg.user')].at(-1);
+    return {
+      slim: !!card && card.classList.contains('slim'),
+      name: card?.querySelector('.name')?.textContent,
+      arg: card?.querySelector('.arg')?.textContent,
+      notes: [...(card?.querySelectorAll('.mem-note .mem-name') || [])].map((x) => x.textContent),
+      dates: [...(card?.querySelectorAll('.mem-note .mem-date') || [])].map((x) => x.textContent),
+      outs: (card?.querySelectorAll('.out').length || 0) + (read?.querySelectorAll('.out').length || 0),
+      readNotes: [...(read?.querySelectorAll('.mem-note .mem-name') || [])].map((x) => x.textContent),
+      leaked: document.body.innerText.includes('SEGRETO-DA-NON-MOSTRARE') || document.body.innerHTML.includes('hunter2'),
+      recalled: [...(user?.querySelectorAll('.recalled .rc-note .mem-name') || [])].map((x) => x.textContent),
+      recalledDate: user?.querySelector('.recalled .mem-date')?.textContent,
+    };
+  });
+  t(mem.slim && mem.name === 'Memory', 'the memory card is not a slim "Memory" line: ' + JSON.stringify(mem));
+  t(mem.arg === '«stampanti» → 2 notes', 'the memory card does not say what it looked for and how many it found: ' + JSON.stringify(mem.arg));
+  t(mem.notes.join(',') === 'fuoricitta-stampanti,comanda-accodata' && mem.dates.join(',') === '22/09/2026,21/09/2026', 'the notes found are not listed by name and date: ' + JSON.stringify(mem));
+  t(mem.outs === 0 && !mem.leaked, 'the inside of the notes is on screen: ' + JSON.stringify(mem));
+  t(mem.readNotes.join(',') === 'fuoricitta-stampanti', 'the note read is not named: ' + JSON.stringify(mem.readNotes));
+  t(mem.recalled.join(',') === 'fuoricitta-stampanti' && mem.recalledDate === '22/09/2026', '"Recalled" does not show under the message: ' + JSON.stringify(mem));
+  await page.evaluate(() => document.querySelector('.tool[data-tool="mcp__memoria__memory_search"]').setAttribute('open', ''));
+  await page.locator('.tool[data-tool="mcp__memoria__memory_search"] .mem-note').first().click();
+  const sMem = await lastSent();
+  t(sMem?.cmd === 'openFile' && sMem.path === memFile, 'a note does not open in the editor: ' + JSON.stringify(sMem));
+  await page.locator('.msg.user .recalled .rc-note').last().click();
+  const sRec = await lastSent();
+  t(sRec?.cmd === 'openFile' && sRec.path === memFile, 'a recalled note does not open in the editor: ' + JSON.stringify(sRec));
+  // Out of the way: the turn checked further down counts its own tools.
+  await page.evaluate(() => {
+    for (const n of document.querySelectorAll('.tool[data-tool^="mcp__memoria__"]')) n.remove();
+  });
+
   // ---- the permission mode ----
   // It's no longer a dropdown but three buttons with the slider underneath.
   await post({ k: 'mode', value: 'plan' });

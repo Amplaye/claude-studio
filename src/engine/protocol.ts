@@ -120,6 +120,13 @@ export interface Prefs {
    * decima, e nel frattempo spende.
    */
   autofix: boolean;
+  /**
+   * Il ricordo automatico: a ogni messaggio tuo si cerca nella memoria del progetto, e
+   * le note che fanno davvero centro — al massimo tre, solo nome, descrizione e data —
+   * arrivano a Claude insieme al messaggio (vedi memory/memory.ts, `recall`). Senza,
+   * a una nota ci si arriva solo se l'indice la nomina.
+   */
+  memoryRecall: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -134,6 +141,7 @@ export const DEFAULT_PREFS: Prefs = {
   lang: 'en',
   follow: true,
   autofix: true,
+  memoryRecall: true,
 };
 
 /**
@@ -251,6 +259,12 @@ export type Wire =
    * cambiata per conto suo (Claude che entra in plan mode da solo).
    */
   | { k: 'cli_mode'; value: string }
+  /**
+   * Le note che il ricordo automatico ha messo accanto al tuo messaggio. A schermo solo
+   * nomi e date, mai i corpi: fra le note ci sono credenziali, e una schermata si
+   * condivide piu' facilmente di un file.
+   */
+  | { k: 'recalled'; notes: RecalledNote[] }
   | { k: 'mode'; value: Mode }
   // Quale delle due facce della scheda si guarda: la chat, o la pianta
   // dell'ufficio. Il bottone nella testata la gira da solo senza passare di qui;
@@ -403,6 +417,15 @@ export type Wire =
    * schede normali non ricevono mai questo filo, e la striscia non compare.
    */
   | { k: 'tabs'; items: TabItem[] };
+
+/** Una nota ricordata da sola: quanto basta per riconoscerla e aprirla. */
+export interface RecalledNote {
+  slug: string;
+  name: string;
+  /** millisecondi */
+  date: number;
+  file: string;
+}
 
 /** Una conversazione nella striscia: come si chiama e cosa le sta succedendo. */
 export interface TabItem {

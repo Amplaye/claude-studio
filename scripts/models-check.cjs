@@ -110,6 +110,16 @@ const written = (since) => {
       'the list kept aside is not tied to the CLI that said it: ' +
         ctx.globalState.get('claudeStudio.models.cli') + ' instead of ' + hello.cliVersion
     );
+    // Nobody chose a model here: the one picked must be the one the CLI recommends.
+    // "claude-opus-5-5" starts with "claude-opus-5", and for a while that was enough to
+    // hand Opus 5 to everyone who had not picked one yet.
+    const rec = fresh.items.find((i) => i.recommended);
+    const prefs = await waitFor((m) => m.k === 'prefs' && m.value.model, mark, 5000);
+    const chosen = fresh.items.find((i) => i.value === prefs?.value.model);
+    t(
+      !!rec && !!chosen && chosen.resolved === rec.resolved,
+      `with no model chosen, the default is not the recommended one: ${prefs?.value.model} (${chosen?.resolved}) instead of ${rec?.resolved}`
+    );
   }
 
   // A tab opened now finds the right list already there, without asking again.

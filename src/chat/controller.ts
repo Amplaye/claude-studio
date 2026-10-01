@@ -27,6 +27,8 @@ import { plansDir } from '../context/paths';
 import { Checkpoints } from './checkpoints';
 import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
+import { memoryServer } from '../memory/server';
+import { recall, recallContext } from '../memory/memory';
 import { setChatBadge } from './badge';
 import { owned } from '../context/owned';
 import {
@@ -93,10 +95,15 @@ function pickDefaultModel(items: ModelChoice[]): string {
   const real = items.filter((m) => m.value && m.value !== 'default');
   const rec = items.find((m) => m.recommended);
   if (rec?.resolved) {
-    // "claude-sonnet-4-5[1m]" → si cerca il modello vero che gli somiglia
-    const hit = real.find(
-      (m) => m.value === rec.resolved || rec.resolved.startsWith(m.value)
-    );
+    // Prima quello che *e'* il consigliato — per nome, o perche' la CLI lo risolve
+    // nello stesso modello — e solo dopo quello che gli somiglia ("claude-sonnet-4-5[1m]"
+    // → il modello vero col nome piu' corto). Nell'ordine inverso «claude-opus-5-5»
+    // comincia con «claude-opus-5»: si sceglieva Opus 5 al posto del 5.5 consigliato,
+    // a chiunque non avesse ancora scelto un modello.
+    const hit =
+      real.find((m) => m.value === rec.resolved) ??
+      real.find((m) => m.resolved === rec.resolved) ??
+      real.find((m) => rec.resolved.startsWith(m.value));
     if (hit) return hit.value;
   }
   return real[0]?.value ?? '';
@@ -144,6 +151,13 @@ const PLAN_TOOL = 'mcp__editor__plan';
 function absolute(p: string): string {
   return /^([a-zA-Z]:[\\/]|\/)/.test(p) ? p : nodePath.join(workspaceRoot(), p);
 }
+
+/**
+ * Gli strumenti di Studio: il ponte con l'editor e la memoria. Non chiedono mai, in
+ * nessuna modalita': leggono, o mostrano qualcosa a te — una scheda per chiederti se
+ * Claude puo' guardare i file aperti sarebbe solo rumore.
+ */
+const OUR_TOOLS = /^mcp__(editor|memoria)__/;
 
 /** Le modalita' che la testata sa mostrare. `dontAsk` e `auto` la CLI le conosce, noi no. */
 const MODES = new Set<string>(['default', 'acceptEdits', 'plan', 'bypassPermissions']);
@@ -1202,6 +1216,12 @@ export class ChatController {
    */
   private ask = (req: AskRequest): Promise<PermissionResult> => {
     const kind = askKind(req.tool);
+    // I nostri strumenti passano sempre. Ci si fida di chi li serve, non del nome: un
+    // server del progetto che si chiamasse "editor" non e' il nostro (`source` 'sdk' e'
+    // solo quello ospitato qui; le CLI che non lo dicono ancora vanno a nome).
+    if (OUR_TOOLS.test(req.tool) && (!req.mcpServer || req.mcpServer.source === 'sdk')) {
+      return Promise.resolve(allow(req.input, {}, 'user_temporary'));
+    }
     // In plan mode non si chiede niente a nessuno: leggere si', cambiare no, e il
     // piano finito si salva invece di passare da un «approvi?». Vale anche per le
     // richieste dei sub-agent, che arrivano da questa stessa porta. Le domande
@@ -1370,8 +1390,20 @@ export class ChatController {
       model: this.prefs.model,
       effort: this.prefs.effort,
       thinking: this.prefs.thinking,
-      ide: { editor: ideServer() },
+      // La memoria sta nello stesso posto del ponte con l'editor: cosi' la usano anche i
+      // sub-agent, che dei server del motore ereditano tutto.
+      ide: { editor: ideServer(), memoria: memoryServer({ cwd: currentCwd() }) },
       beforeTool: (tool, input) => this.checkpoints.before(tool, input),
+      // Letta a ogni messaggio: spegnerla dalle impostazioni vale da subito.
+      recall: (prompt) => {
+        if (!this.prefs.memoryRecall) return null;
+        const notes = recall(currentCwd(), prompt);
+        if (!notes.length) return null;
+        return {
+          context: recallContext(notes),
+          notes: notes.map((n) => ({ slug: n.slug, name: n.name, date: n.date, file: n.file })),
+        };
+      },
       ...(this.resume ? { resume: this.resume.id, fork: this.resume.fork } : {}),
     });
     // La ripresa vale per l'accensione, non per sempre: se poi si azzera la

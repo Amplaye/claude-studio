@@ -58,6 +58,7 @@
     'cfg.auto': 'While it works',
     'cfg.follow': 'The editor follows it: files open and the changed lines light up',
     'cfg.autofix': 'Fix on its own the errors it introduces (at most twice)',
+    'cfg.recall': 'Bring up on its own the memory notes that fit what you write',
     'cfg.done': "When it's done",
     'cfg.language': 'Language',
     'cfg.language.hint': 'Changes the whole interface straight away',
@@ -241,6 +242,13 @@
     'plan.run': 'Run the plan {path}',
     'plan.hint': 'Paste it into a new conversation to run it.',
 
+    // ---- the project's memory: only names and dates on screen, never the notes ----
+    'mem.title': 'Memory',
+    'mem.one': '1 note',
+    'mem.many': '{n} notes',
+    'mem.none': 'nothing',
+    'mem.recalled': 'Recalled:',
+
     // ---- errors ----
     'err.cli.title': "Can't find the Claude Code CLI on this computer.",
     'err.cli.hint':
@@ -347,6 +355,7 @@
     'cfg.auto': 'Mentre lavora',
     'cfg.follow': "L'editor lo segue: i file si aprono e le righe cambiate si accendono",
     'cfg.autofix': 'Sistema da solo gli errori che introduce (al massimo due volte)',
+    'cfg.recall': "Tira fuori da solo le note della memoria che c'entrano con quello che scrivi",
     'cfg.done': 'Quando ha finito',
     'cfg.language': 'Lingua',
     'cfg.language.hint': "Cambia subito tutta l'interfaccia",
@@ -510,6 +519,12 @@
     'plan.copied': 'Copiata',
     'plan.run': 'Esegui il piano {path}',
     'plan.hint': 'Incollala in una conversazione nuova per eseguirlo.',
+
+    'mem.title': 'Memoria',
+    'mem.one': '1 nota',
+    'mem.many': '{n} note',
+    'mem.none': 'niente',
+    'mem.recalled': 'Ricordate:',
 
     'err.cli.title': 'Non trovo la CLI di Claude Code su questo computer.',
     'err.cli.hint':

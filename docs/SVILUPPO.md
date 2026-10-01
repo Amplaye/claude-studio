@@ -326,6 +326,16 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
   nella barra di contesto **senza euristica** (`focusHow: studio`).
 - `smoke` e `trace-order` sono le prove secche del motore, utili quando si sospetta
   che sia cambiato qualcosa nel protocollo.
+- `browser-check`, `plan-check` e `memory-check` sono puri, sui moduli come sono: il
+  comando che apre una pagina su ogni sistema (e cosa non deve arrivarci mai), cosa
+  passa da solo in plan mode e cosa no (190 casi), e la memoria — ogni forma di nota,
+  accenti e plurali, date, `._*` e `MEMORY.md` mai fra i risultati, segreti nascosti.
+
+Due prove dal vivo stanno fuori da `verify` perche' spendono qualche turno:
+`npm run plan-live` (plan mode senza schede, «Piano pronto», la scheda che torna dalla
+cronologia) e `npm run memory-live` (la memoria cercata da sola, senza permessi e senza
+ToolSearch prima, il ricordo automatico, il plan mode che la lascia passare). Si
+lanciano quando cambia il percorso dei permessi, il plan mode o la memoria.
 
 `router-check` e' l'unico che **spende**: sono turni veri su modelli veri, e il giro
 intero costa qualche dollaro e una decina di minuti. Serve a rispondere a una

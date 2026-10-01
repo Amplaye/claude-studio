@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code, in a panel you can actually watch. Live progress, diffs you open when you want, one-click permissions, any file attached — and THE OFFICE: a desk for every open conversation.",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -302,10 +302,11 @@
     "data-check": "node build.mjs && node scripts/data-check.cjs",
     "host-check": "node build.mjs && node scripts/host-check.cjs",
     "models-check": "node build.mjs && node scripts/models-check.cjs",
-    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/models-check.cjs && node scripts/autofix-check.cjs && node scripts/checkpoint-check.cjs && node scripts/update-check.cjs && node scripts/browser-check.cjs && node scripts/plan-check.cjs",
+    "verify": "npm run typecheck && npm run ui-check && node scripts/data-check.cjs && node scripts/host-check.cjs && node scripts/models-check.cjs && node scripts/autofix-check.cjs && node scripts/checkpoint-check.cjs && node scripts/update-check.cjs && node scripts/browser-check.cjs && node scripts/plan-check.cjs && node scripts/memory-check.cjs",
     "autofix-check": "node build.mjs && node scripts/autofix-check.cjs",
     "checkpoint-check": "node scripts/checkpoint-check.cjs",
-    "plan-live": "node build.mjs && node scripts/plan-live.cjs"
+    "plan-live": "node build.mjs && node scripts/plan-live.cjs",
+    "memory-live": "node build.mjs && node scripts/memory-live.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
@@ -319,7 +320,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.280",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.286",
     "ionicons": "^8.1.0",
     "zod": "^4.4.3"
   }

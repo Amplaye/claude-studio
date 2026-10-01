@@ -6,6 +6,8 @@
 // e si chiude solo con dispose(), altrimenti il processo non morirebbe mai.
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type {
+  HookInput,
+  HookJSONOutput,
   Options,
   PermissionMode,
   PermissionResult,
@@ -14,7 +16,7 @@ import type {
   SDKMessage,
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
-import type { SentFile, Thinking, TurnCtx, TurnModelUsage, Wire } from './protocol';
+import type { RecalledNote, SentFile, Thinking, TurnCtx, TurnModelUsage, Wire } from './protocol';
 import { LOCAL_COMMANDS } from '../shared/localCommands';
 import { versionOf } from './cli';
 import { toChoices } from './models';
@@ -36,6 +38,11 @@ export interface AskRequest {
   suggestions?: PermissionUpdate[];
   /** Scatta se il turno viene interrotto: la scheda va tolta di mezzo. */
   signal: AbortSignal;
+  /**
+   * Per gli strumenti MCP: chi li serve. `source: 'sdk'` sono i server ospitati qui
+   * dentro — i nostri — e l'SDK raccomanda di fidarsi di questo, non del nome.
+   */
+  mcpServer?: { name: string; source: string };
 }
 
 export type PermissionAsker = (r: AskRequest) => Promise<PermissionResult>;
@@ -64,6 +71,11 @@ export interface SessionOptions {
    * piu' da nessuna parte. Chi non tiene checkpoint non lo passa.
    */
   beforeTool?: (tool: string, input: Record<string, unknown>) => Promise<void>;
+  /**
+   * Il ricordo automatico: le note da mettere accanto a un tuo messaggio, o niente.
+   * Chi non tiene una memoria non lo passa.
+   */
+  recall?: (prompt: string) => { context: string; notes: RecalledNote[] } | null;
 }
 
 /**
@@ -266,6 +278,15 @@ export class Session {
 
   /** Il timer che apre la finestra del prossimo in fila. Uno solo: si rifa' a ogni modifica. */
   private varco?: ReturnType<typeof setTimeout>;
+
+  /**
+   * I messaggi tuoi partiti verso la CLI e non ancora visti dall'hook del ricordo.
+   *
+   * La CLI dice chi ha scritto un prompt nel campo `source` — ma dall'Agent SDK quel
+   * campo non arriva (provato: 2.1.286), e quando arriva per noi direbbe `sdk` sia per
+   * te sia per l'autofix. Chi l'ha scritto lo sappiamo noi: e' tuo se e' passato di qui.
+   */
+  private yours: { text: string; echo: string }[] = [];
 
   sessionId?: string;
   model = '';
@@ -472,6 +493,10 @@ export class Session {
       }
       // Le immagini incollate viaggiano come blocchi, prima del testo: e' l'ordine
       // in cui si guardano.
+      if (!out.silent && this.o.recall) {
+        this.yours.push({ text: out.text.trim(), echo: out.echo ?? out.text });
+        if (this.yours.length > 8) this.yours.shift();
+      }
       const content: any = out.images?.length
         ? [
             ...out.images.map((i) => ({
@@ -573,6 +598,10 @@ export class Session {
         this.o.thinking === 'off' ? { type: 'disabled' as const } : { type: 'adaptive' as const },
       ...(this.o.resume ? { resume: this.o.resume, forkSession: !!this.o.fork } : {}),
       ...(this.o.ide ? { mcpServers: this.o.ide } : {}),
+      // Il ricordo automatico. La CLI non lo fa da se' — provato: dall'Agent SDK non
+      // arriva nessun `system/memory_recall` — quindi le note giuste le aggiunge un
+      // hook, al momento in cui il tuo messaggio entra (vedi `onPrompt`).
+      ...(this.o.recall ? { hooks: { UserPromptSubmit: [{ hooks: [this.onPrompt] }] } } : {}),
       // Chiamiamo la CLI installata sul PC: senza questo l'SDK cerca il proprio
       // binario nativo, che apposta non impacchettiamo.
       ...(this.o.cliPath ? { pathToClaudeCodeExecutable: this.o.cliPath } : {}),
@@ -651,6 +680,35 @@ export class Session {
     }
   }
 
+  /**
+   * Un messaggio sta entrando: se e' tuo, e dice qualcosa, la memoria aggiunge le
+   * note che fanno centro — nome, descrizione e data, mai il corpo: se servono,
+   * Claude le legge con memory_read.
+   *
+   * Salta i messaggi che non sono tuoi (l'autofix, le notifiche della CLI), gli slash
+   * command e quelli troppo corti per dire di cosa parlano: «ok», «vai», «grazie».
+   */
+  private onPrompt = async (input: HookInput): Promise<HookJSONOutput> => {
+    const i = input as { hook_event_name?: string; prompt?: unknown; source?: string };
+    if (i.hook_event_name !== 'UserPromptSubmit' || typeof i.prompt !== 'string') return {};
+    if (i.source && i.source !== 'user' && i.source !== 'sdk') return {};
+    const said = i.prompt.trim();
+    const at = this.yours.findIndex((y) => y.text === said);
+    if (at < 0) return {};
+    const { echo } = this.yours.splice(at, 1)[0];
+    const words = echo.trim();
+    if (!this.o.recall || words.startsWith('/') || words.length < 15 || words.split(/\s+/).length < 3) return {};
+    let got: ReturnType<NonNullable<SessionOptions['recall']>> = null;
+    try {
+      got = this.o.recall(words);
+    } catch {
+      got = null; // una memoria illeggibile non deve fermare il messaggio
+    }
+    if (!got || !got.notes.length) return {};
+    this.o.emit({ k: 'recalled', notes: got.notes });
+    return { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: got.context } };
+  };
+
   private canUseTool = async (
     toolName: string,
     input: Record<string, unknown>,
@@ -661,6 +719,7 @@ export class Session {
       title?: string;
       displayName?: string;
       description?: string;
+      mcpServer?: { name: string; source: string };
     }
   ): Promise<PermissionResult> => {
     // Com'era prima si prende adesso: qui il file e' ancora quello di partenza.
@@ -676,6 +735,7 @@ export class Session {
       description: opts.description,
       suggestions: opts.suggestions,
       signal: opts.signal,
+      mcpServer: opts.mcpServer,
     });
   };
 

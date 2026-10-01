@@ -20,6 +20,9 @@ docs/**
 # I pezzi da cui si costruisce media/tips.json. Stanno in git perche' la libreria
 # vada ricostruita anche dall'altra macchina, ma nel pacchetto ci va solo il JSON.
 .tips-work/**
+# I registri del banco di prova (router-check) e le sonde di chi sviluppa: stanno
+# fuori da git, e finivano lo stesso dentro il pacchetto.
+.bench/**
 # Artefatti di publishing. La prima riga e' critica: contiene il token Open VSX
 # e senza questa regola verrebbe distribuito dentro il .vsix.
 .publish-tokens.json

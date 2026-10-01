@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.33.0
+
+- **Claude cerca nella memoria per argomento.** Le note della memoria del progetto
+  si potevano raggiungere solo se l'indice (`MEMORY.md`) le nominava, e l'indice
+  cresce e si legge tutto a ogni sessione. Adesso Claude — e i suoi aiutanti — ha
+  due strumenti suoi: cerca per argomento («stampanti fuoricitta» trova la nota
+  scritta «Fuoricittà» e «stampante») e legge una nota intera. Ogni nota arriva con
+  la sua data e le sue ⚠️, cosi' una cosa vecchia non passa per nuova. Niente da
+  scaricare, niente rete: le note restano dove sono, Studio le legge e basta.
+
+- **Le note giuste arrivano da sole.** A ogni tuo messaggio Studio guarda nella
+  memoria e, se ci sono note che fanno davvero centro — al massimo tre — le mette
+  accanto al messaggio: solo nome, descrizione e data, il resto Claude lo legge se
+  serve. Sotto il messaggio compare «Ricordate: …». Si spegne dalle impostazioni.
+
+- **In chat solo nomi e date, mai il contenuto delle note.** Fra le note ci sono
+  credenziali: la card della memoria dice cosa ha cercato e quali note ha trovato,
+  cliccabili per aprirle nell'editor, e i segreti — chiavi, token, password — non
+  escono nemmeno verso Claude.
+
+- **Gli strumenti di Studio non chiedono mai il permesso**, in nessuna modalita': il
+  ponte con l'editor e la memoria leggono o mostrano qualcosa a te.
+
+- **Senza un modello scelto, Studio prende davvero quello consigliato.** Prendeva
+  Opus 5 al posto di Opus 5.5, perche' «claude-opus-5-5» comincia con
+  «claude-opus-5». Chi aveva gia' scelto un modello non e' toccato.
+
+- Il pacchetto non si porta piu' dietro i registri del banco di prova (`.bench/`):
+  stavano fuori da git ma dentro l'estensione installata.
+
+- Dipendenza dell'SDK del CLI aggiornata alla 0.3.286.
+
 ## 0.32.0
 
 - **In plan mode non ti viene chiesto niente.** Prima ogni lettura che la CLI non
