@@ -882,6 +882,10 @@
   }
 
   function toolStart(id, name, inp, parent) {
+    // Its card is already on screen as "Plan ready" (the plan can be announced before
+    // the call that closes it gets drawn): a second, failed-looking card would only
+    // contradict it.
+    if (plansShown.has(id)) return;
     const node = document.createElement('details');
     node.className = 'msg tool running' + (slimTool(name) ? ' slim' : '');
     node.dataset.tool = name;
@@ -1185,6 +1189,55 @@
       }
     }
     toBottom();
+  }
+
+  // ---------- the plan, saved ----------
+  //
+  // In plan mode nobody approves the plan: it is already saved, and it gets run later
+  // in a new conversation. So no Yes/No here — the card says the plan's name (that is
+  // what you will look for afterwards), where it lives, and hands over the sentence
+  // that starts it. It takes the place of the ExitPlanMode card, which the engine
+  // closes with a refusal on purpose and would otherwise read as a failure.
+  const plansShown = new Set();
+
+  function planReadyCard(m) {
+    if (!m.id || plansShown.has(m.id)) return;
+    plansShown.add(m.id);
+    const node = el('div', 'msg perm plan-ready card-hover');
+    const head = el('div', 'head');
+    head.append(icon('list', 'perm-ico'), el('span', 'title', t('plan.ready')));
+    node.append(head, el('div', 'pr-name', m.name || ''), el('div', 'pr-path', m.path || ''));
+    if (m.plan) {
+      const body = el('div', 'plan');
+      body.replaceChildren(...markdown(m.plan));
+      node.append(body);
+    }
+    const acts = el('div', 'acts');
+    const open = button('ok', 'open', t('plan.open'));
+    open.addEventListener('click', () => vscode.postMessage({ cmd: 'openFile', path: m.path }));
+    const copy = button('always', 'copy', t('plan.copy'));
+    let back = 0;
+    copy.addEventListener('click', () => {
+      // Straight to the extension's clipboard: this is the one sentence that has to
+      // arrive whole, in a new conversation, and the page's own clipboard can refuse.
+      vscode.postMessage({ cmd: 'copy', text: t('plan.run', { path: m.path }) });
+      copy.replaceChildren(drawnCheck(), el('span', null, t('plan.copied')));
+      clearTimeout(back);
+      back = setTimeout(() => copy.replaceChildren(icon('copy'), el('span', null, t('plan.copy'))), 1500);
+    });
+    acts.append(open, copy, el('span', 'pr-hint', t('plan.hint')));
+    node.append(acts);
+    node.setAttribute('role', 'status');
+    node.setAttribute('aria-label', t('plan.ready') + ': ' + (m.name || ''));
+
+    const call = tools.get(m.id);
+    if (call) {
+      tools.delete(m.id);
+      call.replaceWith(node);
+      seen.observe(node);
+      toBottom();
+    } else add(node);
+    say(t('plan.ready') + ': ' + (m.name || ''));
   }
 
   // ---------- errors ----------
@@ -1721,6 +1774,7 @@
         blocks.clear();
         tools.clear();
         asks.clear();
+        plansShown.clear();
         waiting = null;
         stepsN = 0;
         filesTouched.clear();
@@ -1812,6 +1866,10 @@
       case 'ask_done':
         askDone(m);
         if (busy) showWaiting();
+        break;
+      case 'plan_ready':
+        hideWaiting();
+        planReadyCard(m);
         break;
       case 'session':
         // The model icon in the header was removed:

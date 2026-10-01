@@ -227,6 +227,19 @@
     'label.Approved, automatic edits': 'Approved, automatic edits',
     'label.Keep planning': 'Keep planning',
     'label.Answered': 'Answered',
+    'label.Allowed (plan mode)': 'Allowed (plan mode)',
+    'label.Refused (plan mode)': 'Refused (plan mode)',
+    'label.Plan ready': 'Plan ready',
+
+    // ---- the plan, once plan mode has written it ----
+    // Nobody approves it here: it gets run later, in a new conversation, and the card
+    // hands over the sentence that starts it.
+    'plan.ready': 'Plan ready',
+    'plan.open': 'Open',
+    'plan.copy': 'Copy',
+    'plan.copied': 'Copied',
+    'plan.run': 'Run the plan {path}',
+    'plan.hint': 'Paste it into a new conversation to run it.',
 
     // ---- errors ----
     'err.cli.title': "Can't find the Claude Code CLI on this computer.",
@@ -487,6 +500,16 @@
     'label.Approved, automatic edits': 'Approvato, modifiche automatiche',
     'label.Keep planning': 'Continua a pianificare',
     'label.Answered': 'Risposto',
+    'label.Allowed (plan mode)': 'Consentito (plan mode)',
+    'label.Refused (plan mode)': 'Rifiutato (plan mode)',
+    'label.Plan ready': 'Piano pronto',
+
+    'plan.ready': 'Piano pronto',
+    'plan.open': 'Apri',
+    'plan.copy': 'Copia',
+    'plan.copied': 'Copiata',
+    'plan.run': 'Esegui il piano {path}',
+    'plan.hint': 'Incollala in una conversazione nuova per eseguirlo.',
 
     'err.cli.title': 'Non trovo la CLI di Claude Code su questo computer.',
     'err.cli.hint':

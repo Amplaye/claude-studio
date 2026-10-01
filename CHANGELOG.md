@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.32.0
+
+- **In plan mode non ti viene chiesto niente.** Prima ogni lettura che la CLI non
+  sapeva da se' innocua diventava una scheda — «Claude vuole usare Bash» — mentre tu
+  volevi solo un piano. Adesso le risposte le da' Studio: leggere file, cercare,
+  lanciare un `ls`, un `git log` o un `grep` passa; tutto quello che cambierebbe
+  qualcosa — scrivere fuori dal file del piano, `rm`, `git push`, `npm install`, un
+  `> file` — viene rifiutato da solo, e Claude lo scrive nel piano invece di farlo.
+  Le domande a scelta (quelle che solo tu sai) restano.
+
+- **Alla fine niente «approvi il piano?»: compare «Piano pronto».** Col nome del
+  piano in grande, il percorso sotto, il testo, «Apri» e «Copia» — che copia
+  «Esegui il piano <percorso>», la frase da incollare in una conversazione nuova.
+  Riaprendo la conversazione dalla cronologia la scheda torna com'era.
+
+- **Il bottone della modalita' segue quella vera.** La modalita' la dice la CLI a ogni
+  turno: se Claude entra in plan mode da solo, la testata lo mostra e le regole qui
+  sopra valgono anche li'. Entrando in plan mode, le richieste gia' aperte si
+  risolvono con le stesse regole invece di restare ad aspettarti.
+
 ## 0.31.5
 
 - **Un link nella chat si apre una volta sola, e senza popup.** Cliccandolo si

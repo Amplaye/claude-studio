@@ -2,6 +2,7 @@
 // aperta insieme nel pannello laterale e come scheda a tutto schermo: chi si attacca
 // dopo si riprende la storia e vede esattamente quello che vede l'altra faccia.
 import * as vscode from 'vscode';
+import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import type { PermissionResult, PermissionUpdate } from '@anthropic-ai/claude-agent-sdk';
 import { claudeCliVersion, findClaudeCli, onCliReset } from '../engine/cli';
@@ -20,6 +21,9 @@ import type {
 import { needsThinking } from '../engine/protocol';
 import { pickFiles, previewFile, stashFile } from './attach';
 import { type CommandHost, runLocalCommand } from './commands';
+import { inPlans, planDecision } from './planGuard';
+import { planName, planSavedMessage } from './planReady';
+import { plansDir } from '../context/paths';
 import { Checkpoints } from './checkpoints';
 import { DEFAULT_PREFS } from '../engine/protocol';
 import { ideServer } from '../engine/ide';
@@ -141,6 +145,15 @@ function absolute(p: string): string {
   return /^([a-zA-Z]:[\\/]|\/)/.test(p) ? p : nodePath.join(workspaceRoot(), p);
 }
 
+/** Le modalita' che la testata sa mostrare. `dontAsk` e `auto` la CLI le conosce, noi no. */
+const MODES = new Set<string>(['default', 'acceptEdits', 'plan', 'bypassPermissions']);
+
+/** Il contesto con cui il plan mode giudica: la cartella dei piani di questo progetto. */
+function planCtx() {
+  const cwd = workspaceRoot();
+  return { plansDir: plansDir(cwd), platform: process.platform, cwd };
+}
+
 /**
  * Quante volte l'autofix puo' riprovare su uno stesso messaggio.
  *
@@ -199,6 +212,19 @@ export class ChatController {
   /** Quante volte l'autofix e' gia' ripartito su questo messaggio. */
   private fixRound = 0;
   private mode: Mode = 'bypassPermissions';
+  /**
+   * L'ultima modalita' detta dalla CLI. Conta solo quando cambia: lo stesso valore
+   * ripetuto a ogni turno non dice niente, e puo' arrivare in ritardo su un cambio
+   * appena chiesto dalla testata — preso per buono, riporterebbe indietro il bottone.
+   */
+  private cliSaid = '';
+  /**
+   * Il file del piano scritto in plan mode, appena lo si vede passare: e' quello che
+   * la scheda «Piano pronto» mostrera' (vedi `planFile`). Si azzera a ogni messaggio.
+   */
+  private planWritten = '';
+  /** Quando e' partito l'ultimo messaggio tuo: il ripiego per trovare il piano. */
+  private turnSince = 0;
   /** Conversazione da riprendere alla prossima accensione del motore. */
   private resume?: { id: string; fork: boolean };
   /**
@@ -510,6 +536,8 @@ export class ChatController {
     this.writing.clear();
     this.fixRound = 0;
     this.errorsBefore = errorSnapshot();
+    this.planWritten = '';
+    this.turnSince = Date.now();
     // I file viaggiano a parte dall'eco: nel messaggio vero sono gia' dentro `full`
     // come percorsi, qui servono solo perche' la chat possa disegnarli attaccati al
     // messaggio, esattamente come fa con le immagini.
@@ -977,6 +1005,156 @@ export class ChatController {
     // Passando a yolo si approvano automaticamente i permessi in attesa:
     // l'utente ha appena detto "fa' tutto da solo".
     if (value === 'bypassPermissions') this.allowAllPending();
+    // Entrando in plan mode le schede gia' aperte passano dalla stessa regola delle
+    // richieste nuove: nessuna resta li' ad aspettare una risposta che il plan mode
+    // da' da solo.
+    if (value === 'plan') this.planPending();
+  }
+
+  /**
+   * La CLI dice in che modalita' e' (vedi engine/session.ts). Se l'ha cambiata lei —
+   * Claude che entra in plan mode da solo — il bottone la segue, e con lui le regole:
+   * senza, il plan mode della CLI tornerebbe a riempire la chat di schede.
+   *
+   * Non si richiama `setPermissionMode`: la CLI e' gia' li', sarebbe un'eco.
+   */
+  private cliMode(value: string) {
+    if (value === this.cliSaid) return;
+    this.cliSaid = value;
+    if (!MODES.has(value) || value === this.mode) return;
+    this.mode = value as Mode;
+    this.broadcast({ k: 'mode', value: this.mode });
+    if (this.mode === 'plan') this.planPending();
+  }
+
+  /** Le schede aperte prima di entrare in plan mode, risolte come le risolverebbe lui. */
+  private planPending() {
+    for (const [id, p] of [...this.pending]) {
+      if (p.kind === 'question') continue; // le domande restano tue
+      if (p.kind === 'plan') {
+        this.emit({ k: 'ask_done', id, ok: true, label: 'Plan ready' });
+        p.settle(this.planDone(p.req));
+        continue;
+      }
+      const r = this.planGate(p.req);
+      const ok = r.behavior === 'allow';
+      this.emit({ k: 'ask_done', id, ok, label: ok ? 'Allowed (plan mode)' : 'Refused (plan mode)' });
+      p.settle(r);
+    }
+  }
+
+  /**
+   * Una richiesta di permesso in plan mode: la risposta la da' il guard, e nessuno
+   * viene interpellato (vedi chat/planGuard.ts). Un rifiuto dice al modello cosa non
+   * e' passato e dove metterlo: nel piano.
+   */
+  private planGate(req: AskRequest): PermissionResult {
+    const ctx = planCtx();
+    const d = planDecision(req.tool, req.input, ctx);
+    if (!d.ok) {
+      return {
+        behavior: 'deny',
+        message:
+          'Plan mode in Claude Studio: nothing is changed and nobody is asked. ' +
+          `${d.why}. If this step is needed, write it in the plan.`,
+        decisionClassification: 'user_reject',
+      };
+    }
+    // Se ha appena lasciato scrivere il piano, quello e' il file da mostrare alla fine.
+    const file = req.input?.file_path;
+    if (WRITERS.has(req.tool) && typeof file === 'string' && inPlans(file, ctx)) this.planWritten = absolute(file);
+    return allow(req.input, {}, 'user_temporary');
+  }
+
+  /**
+   * ExitPlanMode in plan mode: nessuna scheda «approvi il piano?». Il piano e' gia'
+   * salvato; si dice dove, lo si mostra col suo nome, e il turno si ferma — lo esegui
+   * tu, in una conversazione nuova, quando vuoi.
+   */
+  private planDone(req: AskRequest): PermissionResult {
+    const file = this.planFile(req.input);
+    if (!file) {
+      // Niente file e niente testo: non c'e' un piano da mostrare. Il modello lo scrive
+      // e riprova — e' l'unico caso in cui il turno non si ferma qui.
+      return {
+        behavior: 'deny',
+        message: `Plan mode in Claude Studio: there is no plan file yet. Write the whole plan in ${planCtx().plansDir}, then call ExitPlanMode again.`,
+        decisionClassification: 'user_reject',
+      };
+    }
+    let plan = planText(req.input);
+    if (!plan) {
+      try {
+        plan = fs.readFileSync(file, 'utf8');
+      } catch {
+        plan = '';
+      }
+    }
+    this.emit({ k: 'plan_ready', id: req.id, name: planName(file), path: file, plan });
+    // Un rifiuto e basta, senza `interrupt`. Provato con la CLI vera: con `interrupt`
+    // la CLI butta via questo messaggio e scrive il suo «The user doesn't want to
+    // proceed…», aggiunge un «[Request interrupted by user]» che riaprendo la
+    // conversazione diventa un messaggio tuo, e chiude il turno come fallito — e senza
+    // il percorso nel transcript la scheda dalla cronologia non torna piu'. A fermarsi
+    // ci pensa il modello: glielo dicono questo messaggio e il prompt della sessione.
+    return {
+      behavior: 'deny',
+      message: planSavedMessage(file),
+      decisionClassification: 'user_reject',
+    };
+  }
+
+  /**
+   * Quale file e' il piano. In quest'ordine:
+   *  1. quello che dice la CLI: nella richiesta per ExitPlanMode mette `planFilePath`;
+   *  2. quello che il guard ha lasciato scrivere, o che e' passato con un Write/Edit
+   *     dentro la cartella dei piani (la CLI il suo file lo scrive senza chiedere);
+   *  3. il `.md` piu' recente della cartella, toccato da quando hai scritto;
+   *  4. se c'e' solo il testo, lo si salva li' dentro: un piano senza file non si
+   *     potrebbe eseguire in una conversazione nuova.
+   */
+  private planFile(input: Record<string, unknown>): string {
+    const exists = (f: unknown): f is string => typeof f === 'string' && !!f && fs.existsSync(f);
+    if (exists(input?.planFilePath)) return input.planFilePath;
+    if (exists(this.planWritten)) return this.planWritten;
+    const dir = planCtx().plansDir;
+    try {
+      let best = '';
+      let at = 0;
+      for (const f of fs.readdirSync(dir)) {
+        if (!/\.md$/i.test(f)) continue;
+        const full = nodePath.join(dir, f);
+        const t = fs.statSync(full).mtimeMs;
+        if (t >= this.turnSince - 2000 && t > at) {
+          best = full;
+          at = t;
+        }
+      }
+      if (best) return best;
+    } catch {
+      /* la cartella non c'e' ancora: si passa al ripiego */
+    }
+    const text = planText(input);
+    if (!text.trim()) return '';
+    try {
+      const title = (text.match(/^#+\s*(.+)$/m)?.[1] ?? text.split('\n')[0]).trim();
+      const slug =
+        title
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 60)
+          .replace(/-+$/, '') || 'piano';
+      fs.mkdirSync(dir, { recursive: true });
+      let file = nodePath.join(dir, `${slug}.md`);
+      for (let n = 2; fs.existsSync(file); n++) file = nodePath.join(dir, `${slug}-${n}.md`);
+      fs.writeFileSync(file, text, 'utf8');
+      return file;
+    } catch {
+      return '';
+    }
   }
 
   /** Approva tutti i permessi in attesa (usato dal passaggio a yolo). */
@@ -1024,6 +1202,13 @@ export class ChatController {
    */
   private ask = (req: AskRequest): Promise<PermissionResult> => {
     const kind = askKind(req.tool);
+    // In plan mode non si chiede niente a nessuno: leggere si', cambiare no, e il
+    // piano finito si salva invece di passare da un «approvi?». Vale anche per le
+    // richieste dei sub-agent, che arrivano da questa stessa porta. Le domande
+    // (AskUserQuestion) restano: non sono permessi, sono cose che solo tu sai.
+    if (this.mode === 'plan' && kind !== 'question') {
+      return Promise.resolve(kind === 'plan' ? this.planDone(req) : this.planGate(req));
+    }
     return new Promise<PermissionResult>((resolve) => {
       let done = false;
       const settle = (r: PermissionResult) => {
@@ -1174,6 +1359,8 @@ export class ChatController {
       });
     }
 
+    // Un motore nuovo dira' la sua modalita' da capo: quella del motore di prima non vale.
+    this.cliSaid = '';
     this.session = new Session({
       cwd: currentCwd(),
       cliPath: cli,
@@ -1194,6 +1381,11 @@ export class ChatController {
   }
 
   private emit(e: Wire) {
+    // La modalita' detta dalla CLI resta qui: alla pagina arriva, se cambia, come `mode`.
+    if (e.k === 'cli_mode') {
+      this.cliMode(e.value);
+      return;
+    }
     // L'elenco dei modelli lo dice la CLI: si tiene da parte, cosi' il menu non e'
     // vuoto la prossima volta che apri la chat prima di scrivere.
     if (e.k === 'models') {
@@ -1316,6 +1508,9 @@ export class ChatController {
           file,
           wrote: typeof i.new_string === 'string' ? i.new_string : undefined,
         });
+        // Il file del piano, in plan mode, la CLI lo scrive senza chiedere: lo si
+        // riconosce qui, mentre passa (vedi `planFile`).
+        if (this.mode === 'plan' && inPlans(file, planCtx())) this.planWritten = absolute(file);
       }
     }
     if (e.k === 'tool_end') {

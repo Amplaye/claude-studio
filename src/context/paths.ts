@@ -38,6 +38,43 @@ export function projectsDirFor(cwd: string): string {
   return path.join(claudeDir(), 'projects', cwd.replace(/[^a-zA-Z0-9]/g, '-'));
 }
 
+/**
+ * Un file di impostazioni della CLI, letto senza storie: se manca o non e' JSON
+ * valido vale come vuoto — e' quello che fa anche lei.
+ */
+function readSettings(file: string): Record<string, unknown> {
+  try {
+    const v = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Dove la CLI scrive i piani del plan mode.
+ *
+ * `plansDirectory` dei settings, col primo che lo dice fra locale, progetto e utente
+ * — l'ordine in cui la CLI li fa valere. E' relativo alla radice del progetto, e la
+ * CLI lo prende solo se ci resta dentro: fuori, se ne lamenta e torna a quella di
+ * serie. Qui lo stesso, o il piano lo cercheremmo dove lei non l'ha scritto.
+ */
+export function plansDir(cwd: string): string {
+  for (const file of [
+    path.join(cwd, '.claude', 'settings.local.json'),
+    path.join(cwd, '.claude', 'settings.json'),
+    path.join(claudeDir(), 'settings.json'),
+  ]) {
+    const v = readSettings(file).plansDirectory;
+    if (typeof v !== 'string' || !v.trim()) continue;
+    const dir = path.resolve(cwd, v);
+    const rel = path.relative(path.resolve(cwd), dir);
+    if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return dir;
+    break;
+  }
+  return path.join(claudeDir(), 'plans');
+}
+
 /** A conversation's transcript: it's a jsonl, one line per message. */
 export function transcriptPath(cwd: string, sessionId: string): string {
   return path.join(projectsDirFor(cwd), sessionId + '.jsonl');

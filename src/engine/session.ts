@@ -142,6 +142,31 @@ const CLOSING = [
 ].join('\n');
 
 /**
+ * Il plan mode, come lo gestisce Studio (vedi chat/planGuard.ts).
+ *
+ * Nessuna richiesta di permesso: le risolve l'estensione, leggere si' e cambiare no. Il
+ * modello deve saperlo, o un rifiuto arrivato da solo lo spinge a cercare un'altra
+ * strada per fare la stessa cosa; e deve sapere che a ExitPlanMode nessuno approva
+ * niente — il piano si esegue dopo, in una conversazione nuova.
+ *
+ * Fissa dall'inizio della sessione, come le altre due: sta nel prompt di sistema, e
+ * cambiarla a meta' — per esempio solo quando si entra in plan mode — butterebbe via
+ * la cache del prompt a ogni cambio di modalita'.
+ */
+const PLAN_MODE = [
+  '## Plan mode in Claude Studio',
+  '',
+  'In plan mode nobody is asked about permissions: Claude Studio settles them. Reading —',
+  'files, searches, read-only commands — goes through; anything that would change',
+  'something is refused on the spot, with the reason. A refusal is not an obstacle to get',
+  'around another way: if the step is needed, it belongs in the plan.',
+  '',
+  'Write the whole plan in the plan file, then close with ExitPlanMode. Nobody approves it',
+  'there: the user runs the plan later, in a new conversation. Do not start carrying it',
+  'out, and do not ask whether to.',
+].join('\n');
+
+/**
  * Un messaggio in attesa di partire. `echo` e' quello che si vede in chat — il
  * messaggio vero puo' portarsi dietro anche il codice selezionato, che nella chat
  * sarebbe un muro — e `files` sono le pastiglie degli allegati, che si disegnano
@@ -535,7 +560,7 @@ export class Session {
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
-        append: `${PLANNING}\n\n${CLOSING}`,
+        append: `${PLANNING}\n\n${CLOSING}\n\n${PLAN_MODE}`,
       },
       // Vuoto vuol dire "non dire niente": la CLI usa quello che useresti da
       // terminale. Si passa solo cio' che hai scelto apposta.
@@ -665,6 +690,16 @@ export class Session {
           this.o.emit({ k: 'session', id: m.session_id, model: m.model, cwd: this.o.cwd });
           void this.publishCommands();
           void this.publishModels();
+        }
+        // La modalita' vera la dice la CLI: all'inizio di ogni turno, e ogni volta che
+        // cambia — anche quando a cambiarla e' Claude, entrando in plan mode da solo.
+        // Il bottone della testata la deve seguire, e con lui le regole del plan mode
+        // (vedi chat/controller.ts, `cliMode`).
+        {
+          const pm = (m as { permissionMode?: unknown }).permissionMode;
+          if ((m.subtype === 'init' || (m as any).subtype === 'status') && typeof pm === 'string' && pm) {
+            this.o.emit({ k: 'cli_mode', value: pm });
+          }
         }
         // La lista degli slash command puo' cambiare a meta' sessione (skill trovate
         // per strada): quando cambia si rilegge, non si tiene quella vecchia.

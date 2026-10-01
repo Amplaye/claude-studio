@@ -479,6 +479,49 @@ for (const surface of ['view', 'panel']) {
   );
   await post({ k: 'ask_done', id: 'ask_3', ok: true, label: 'tsc' });
 
+  // ---- plan mode: the plan is saved and named, nobody votes on it ----
+  // Live, the "Plan ready" event comes between the call and its (refused) result;
+  // from the history it comes after both. Either way the ExitPlanMode card must not
+  // stay on screen looking failed, and the card has to hand over the right sentence.
+  const planPath = 'C:\\Users\\x\\.claude\\plans\\crea-un-piano-twinkling-owl.md';
+  await post({ k: 'tool_start', id: 'xp_1', name: 'ExitPlanMode', input: { plan: '# P' }, parent: null });
+  await post({ k: 'plan_ready', id: 'xp_1', name: 'crea-un-piano-twinkling-owl', path: planPath, plan: '# Piano\n\n- uno\n- due\n' });
+  await post({ k: 'tool_end', id: 'xp_1', ok: false, text: 'Plan saved at ' + planPath + '. The user will run it in a new conversation: do not start it, do not ask to.' });
+  await page.waitForTimeout(150);
+  const pr = await page.evaluate(() => {
+    const card = [...document.querySelectorAll('.plan-ready')].at(-1);
+    return {
+      cards: document.querySelectorAll('.plan-ready').length,
+      name: card?.querySelector('.pr-name')?.textContent,
+      path: card?.querySelector('.pr-path')?.textContent,
+      items: card?.querySelectorAll('.plan li').length,
+      buttons: card?.querySelectorAll('.btn').length,
+      exitCards: document.querySelectorAll('.tool[data-tool="ExitPlanMode"]').length,
+    };
+  });
+  t(pr.cards === 1, 'the "Plan ready" card does not appear: ' + JSON.stringify(pr));
+  t(pr.name === 'crea-un-piano-twinkling-owl' && pr.path === planPath, 'the card does not show name and path: ' + JSON.stringify(pr));
+  t(pr.items === 2, 'the plan body is not drawn: ' + JSON.stringify(pr));
+  t(pr.buttons === 2, 'the card should have Open and Copy, and no Yes/No: ' + JSON.stringify(pr));
+  t(pr.exitCards === 0, 'the refused ExitPlanMode card is still on screen next to the plan');
+  await page.locator('.plan-ready .btn.always').last().click();
+  const sc = await lastSent();
+  t(sc?.cmd === 'copy' && sc.text === 'Run the plan ' + planPath, 'Copy does not hand over the sentence that runs the plan: ' + JSON.stringify(sc));
+  await page.locator('.plan-ready .btn.ok').last().click();
+  const sOpen = await lastSent();
+  t(sOpen?.cmd === 'openFile' && sOpen.path === planPath, 'Open does not open the plan: ' + JSON.stringify(sOpen));
+  // the order the history uses: the call, its result, then the card
+  await post({ k: 'tool_start', id: 'xp_2', name: 'ExitPlanMode', input: {}, parent: null });
+  await post({ k: 'tool_end', id: 'xp_2', ok: false, text: 'Plan saved at x' });
+  await post({ k: 'plan_ready', id: 'xp_2', name: 'altro', path: 'C:\\p\\altro.md', plan: '' });
+  await post({ k: 'plan_ready', id: 'xp_2', name: 'altro', path: 'C:\\p\\altro.md', plan: '' }); // a second face
+  await page.waitForTimeout(120);
+  const pr2 = await page.evaluate(() => ({
+    cards: document.querySelectorAll('.plan-ready').length,
+    exitCards: document.querySelectorAll('.tool[data-tool="ExitPlanMode"]').length,
+  }));
+  t(pr2.cards === 2 && pr2.exitCards === 0, 'from the history the card does not take the place of the call: ' + JSON.stringify(pr2));
+
   // ---- the permission mode ----
   // It's no longer a dropdown but three buttons with the slider underneath.
   await post({ k: 'mode', value: 'plan' });

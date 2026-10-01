@@ -238,6 +238,19 @@ export type Wire =
       questions?: AskQuestion[];
     }
   | { k: 'ask_done'; id: string; ok: boolean; label: string }
+  /**
+   * Il piano chiuso in plan mode. Nessuno lo approva: si e' salvato, e lo si esegue
+   * dopo in una conversazione nuova. `id` e' quello della chiamata a ExitPlanMode — la
+   * scheda prende il posto della sua card — e `name` il nome del file senza `.md`,
+   * che e' quello che si cerca dopo.
+   */
+  | { k: 'plan_ready'; id: string; name: string; path: string; plan: string }
+  /**
+   * La modalita' in cui la CLI dice di essere, a ogni turno e a ogni cambio. Non arriva
+   * alla pagina: la raccoglie il controller, che sposta il bottone se la CLI l'ha
+   * cambiata per conto suo (Claude che entra in plan mode da solo).
+   */
+  | { k: 'cli_mode'; value: string }
   | { k: 'mode'; value: Mode }
   // Quale delle due facce della scheda si guarda: la chat, o la pianta
   // dell'ufficio. Il bottone nella testata la gira da solo senza passare di qui;
