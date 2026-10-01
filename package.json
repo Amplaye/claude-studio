@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code, in a panel you can actually watch. Live progress, diffs you open when you want, one-click permissions, any file attached — and THE OFFICE: a desk for every open conversation.",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -306,7 +306,8 @@
     "autofix-check": "node build.mjs && node scripts/autofix-check.cjs",
     "checkpoint-check": "node scripts/checkpoint-check.cjs",
     "plan-live": "node build.mjs && node scripts/plan-live.cjs",
-    "memory-live": "node build.mjs && node scripts/memory-live.cjs"
+    "memory-live": "node build.mjs && node scripts/memory-live.cjs",
+    "agents-live": "node build.mjs && node scripts/agents-live.cjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

@@ -325,6 +325,84 @@
   }
 }
 
+/* Gli aiutanti: chi lavora per questa conversazione, ognuno rientrato sotto chi l'ha
+   lanciato. Piu' leggeri dei passi — non sono la lista di cosa c'e' da fare, sono la
+   gente che ci sta lavorando — e con lo stesso alfabeto di colori: verde fatto, rosso
+   andato storto, il battito su chi lavora adesso. */
+.tk-agents {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+}
+.tk-agents[hidden] {
+  display: none;
+}
+.tk-agents-head {
+  padding: 0 6px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+.tk-agents-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.tk-agent {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 6px 2px calc(6px + var(--lv, 0) * 14px);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+/* Il raccordo: un angolino che dice "sotto quello di sopra". */
+.tk-agent.sub::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 6px;
+  height: 7px;
+  margin-right: -3px;
+  border-left: 1px solid color-mix(in srgb, var(--fg) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 40%, transparent);
+  transform: translateY(-3px);
+}
+.tk-agent-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tk-agent-type {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.65;
+}
+.tk-agent-type[hidden] {
+  display: none;
+}
+.tk-agent.in_progress {
+  font-weight: 600;
+}
+.tk-agent.in_progress .ico {
+  color: var(--claude-2);
+  animation: tk-beat 1.4s ease-in-out infinite;
+}
+.tk-agent.completed .ico {
+  color: var(--ok, #5dbf8a);
+}
+.tk-agent.failed .ico {
+  color: var(--bad);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tk-agent.in_progress .ico {
+    animation: none;
+  }
+}
+
 /* Most sessions this is the only line the section ever shows. It is a sentence, and
    it has to be readable as one. */
 .tk-empty {

@@ -34,7 +34,13 @@
     failed: 'alert-circle',
   };
 
-  window.TaskPanel = function mount(root) {
+  /**
+   * `opts.agents === false` lascia fuori gli aiutanti: il foglio della bacheca li
+   * disegna in una sezione sua, ad albero, e due volte la stessa gente sarebbe una
+   * lista da confrontare invece che da leggere.
+   */
+  window.TaskPanel = function mount(root, opts) {
+    const conAiutanti = !(opts && opts.agents === false);
     root.classList.add('taskroot');
 
     const head = el('div', 'tk-head');
@@ -53,9 +59,65 @@
     const list = el('div', 'tk-list');
     /** I passi gia' fatti, quando un piano non c'e'. Vedi `trail` in tasks/protocol.ts. */
     const trailBox = el('div', 'tk-trail');
+    /* Chi lavora per questa conversazione: i sub-agent, ognuno sotto chi l'ha
+       lanciato. Erano righe dell'elenco dei passi, e la prima che arrivava si portava
+       via il piano — adesso stanno qui sotto, per conto loro. */
+    const crew = el('div', 'tk-agents');
+    const crewHead = el('div', 'tk-agents-head');
+    const crewList = el('div', 'tk-agents-list');
+    crew.append(crewHead, crewList);
+    crew.hidden = true;
     const empty = el('p', 'tk-empty');
 
-    root.append(head, barWrap, list, trailBox, empty);
+    root.append(head, barWrap, list, trailBox, crew, empty);
+
+    /** Le righe degli aiutanti, per id: si ridipingono invece di rifarle, o l'icona che batte riparte a ogni notizia. */
+    const crewRows = new Map();
+
+    function paintCrew(d) {
+      const all = conAiutanti && d && Array.isArray(d.agents) ? d.agents : [];
+      crew.hidden = !all.length;
+      const vivi = all.filter((a) => a.status === 'in_progress').length;
+      crewHead.textContent = vivi ? t('tasks.crewBusy', { n: vivi }) : t('tasks.crew');
+      const seen = new Set();
+      let prima = null;
+      for (const a of all) {
+        seen.add(a.id);
+        let r = crewRows.get(a.id);
+        if (!r) {
+          const row = el('div', 'tk-agent');
+          const ic = el('span', 'tk-ic');
+          const txt = el('span', 'tk-agent-txt');
+          const kind = el('span', 'tk-agent-type');
+          row.append(ic, txt, kind);
+          r = { row, ic, txt, kind, status: null };
+          crewRows.set(a.id, r);
+        }
+        const dopo = prima ? prima.row.nextSibling : crewList.firstChild;
+        if (dopo !== r.row) crewList.insertBefore(r.row, dopo);
+        prima = r;
+        const status = a.status || 'pending';
+        const lv = Math.max(0, (a.depth || 1) - 1);
+        r.row.style.setProperty('--lv', String(lv));
+        r.row.classList.toggle('sub', lv > 0);
+        if (r.status !== status) {
+          r.status = status;
+          r.row.classList.remove('pending', 'in_progress', 'completed', 'failed');
+          r.row.classList.add(status);
+          r.ic.replaceChildren(icon(ICON[status] || 'time'));
+        }
+        r.txt.textContent = a.title || a.type || '';
+        r.kind.textContent = a.type || '';
+        r.kind.hidden = !a.type;
+        r.row.title = [a.title, a.doing || a.summary || ''].filter(Boolean).join(' — ');
+      }
+      for (const [id, r] of crewRows) {
+        if (seen.has(id)) continue;
+        r.row.remove();
+        crewRows.delete(id);
+      }
+      return all.length;
+    }
 
     /** The rows currently on screen, so a repaint can reuse them. */
     let rows = [];
@@ -90,7 +152,10 @@
       // La riga sola resta per il momento in cui non c'e' ancora nemmeno un passo.
       empty.textContent = doing || (d && d.busy ? t('tasks.thinking') : t('tasks.none'));
       empty.classList.toggle('live', !!doing);
-      empty.hidden = total > 0 || trail.length > 0;
+      // Con degli aiutanti a schermo "niente in lista" sarebbe falso: la lista dei
+      // passi e' vuota, ma qualcuno sta lavorando — e lo dice la loro testata.
+      const squadra = paintCrew(d);
+      empty.hidden = total > 0 || trail.length > 0 || (squadra > 0 && !doing);
       head.hidden = barWrap.hidden = total === 0;
 
       if (total) {

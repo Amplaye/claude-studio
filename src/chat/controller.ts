@@ -1516,13 +1516,29 @@ export class ChatController {
     // quale stanno parlando. Nella risposta di una TaskList c'e' invece l'elenco
     // intero, ed e' quello che rimette in riga tutto il resto.
     if (e.k === 'tool_end') tasks.answered(this.key, e.id, e.text);
+    // Chi lavora per chi. Ogni chiamata Agent, da qualunque filo — anche da dentro un
+    // sub-agent, ed e' proprio quella che conta: dice che il prossimo aiutante lavora
+    // per lui e non per la conversazione. La `task_started` che segue porta l'id di
+    // questa chiamata, e lo store li mette insieme (vedi `tree` in tasks/store.ts).
+    if (e.k === 'tool_start' && (e.name === 'Agent' || e.name === 'Task')) {
+      tasks.spawned(this.key, e.id, e.parent ?? null, e.input);
+    }
     // La sorgente viva. I tre strumenti qui sopra la CLI non ce li ha piu' — restano
-    // per chi gira una versione vecchia — e le task di adesso arrivano da qui.
+    // per chi gira una versione vecchia — e le task di adesso arrivano da qui: sono
+    // gli aiutanti, e vanno nel loro elenco, non in quello dei passi.
     if (e.k === 'task') {
       tasks.fromCli(this.key, e.id, {
         description: e.description,
         doing: e.doing,
         status: e.status,
+        toolUseId: e.toolUseId,
+        depth: e.depth,
+        type: e.type,
+        brief: e.brief,
+        lastTool: e.lastTool,
+        ms: e.ms,
+        summary: e.summary,
+        ambient: e.ambient,
       });
     }
     // ---- l'editor che segue Claude, e gli errori che tornano indietro da soli ----

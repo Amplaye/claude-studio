@@ -736,6 +736,85 @@ body.inoffice.linguette .top #btnNew {
 .of-sheet-tasks .taskroot {
   padding-top: 6px;
 }
+/* ---- chi lavora per chi ----
+   Una riga per aiutante, rientrata sotto chi l'ha lanciato, col pallino del suo
+   stato: lo stesso alfabeto dei foglietti sul muro — verde fatto, rosso storto — piu'
+   il battito di chi lavora adesso. */
+.of-tree-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 12px 12px;
+}
+.of-tree-capo {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.8;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.of-tree-capo:first-child {
+  margin-top: 0;
+}
+.of-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 0 2px calc(var(--lv, 1) * 14px);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.of-tree-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+}
+.of-tree-row.in_progress .of-tree-dot {
+  background: var(--claude-2);
+  animation: of-tree-beat 1.4s ease-in-out infinite;
+}
+.of-tree-row.completed .of-tree-dot {
+  background: var(--ok);
+}
+.of-tree-row.failed .of-tree-dot {
+  background: var(--bad);
+}
+@keyframes of-tree-beat {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .of-tree-row.in_progress .of-tree-dot {
+    animation: none;
+  }
+}
+.of-tree-txt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.of-tree-row.in_progress .of-tree-txt {
+  font-weight: 600;
+}
+.of-tree-type,
+.of-tree-time {
+  flex: 0 0 auto;
+  font-size: 10px;
+  opacity: 0.65;
+}
+.of-tree-type {
+  font-family: var(--mono);
+}
+.of-tree-time {
+  font-variant-numeric: tabular-nums;
+}
 .of-sheet-empty {
   margin: 0;
   padding: 16px 14px 18px;
@@ -947,10 +1026,35 @@ body.inoffice.linguette .top #btnNew {
   outline-offset: 2px;
 }
 /* Gli impiegati rientrati di un filo sotto il loro capo: e' l'unica cosa che fa
-   leggere la fila come "questi lavorano per quello" invece che come un elenco. */
+   leggere la fila come "questi lavorano per quello" invece che come un elenco.
+
+   Un rientro per livello, e un raccordo che lo dice: la fila e' orizzontale, quindi
+   il "sotto" e' un passo in piu' di distanza da chi sta a sinistra, attraversato da
+   una lineetta. Chi lavora per la conversazione le sta quasi attaccato, chi lavora
+   per un aiutante sta un passo piu' in la' — e con un gancetto in piu', perche' due
+   distanze diverse da sole a colpo d'occhio non si distinguono. */
 .of-chi.of-sub {
-  margin-left: -2px;
+  position: relative;
+  margin-left: calc(var(--lv, 1) * 6px - 8px);
   opacity: 0.86;
+}
+.of-chi.of-sub::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(-1 * (var(--lv, 1) * 6px - 1px));
+  width: calc(var(--lv, 1) * 6px - 2px);
+  border-top: 1px solid color-mix(in srgb, var(--fg) 45%, transparent);
+  pointer-events: none;
+}
+.of-chi.of-sub.deep::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 4px);
+  left: calc(-1 * (var(--lv, 1) * 6px - 1px));
+  height: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--fg) 45%, transparent);
+  pointer-events: none;
 }
 .of-chi.of-sub .of-chi-nome {
   font-weight: 600;
@@ -1019,6 +1123,26 @@ body.inoffice.linguette .top #btnNew {
   margin-top: 2px;
   font-size: 11.5px;
   line-height: 1.35;
+}
+/* Il compito ricevuto: l'inizio del prompt, piu' quieto di quello che sta facendo —
+   e' il perche', non l'adesso. */
+.of-scheda-compito {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+/* Da quanto lavora, o quanti ne ha al lavoro: la riga dei numeri. */
+.of-scheda-extra {
+  font-size: 10.5px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.of-scheda-compito[hidden],
+.of-scheda-cosa[hidden],
+.of-scheda-extra[hidden] {
+  display: none;
 }
 .of-scheda-pct {
   margin-top: 6px;

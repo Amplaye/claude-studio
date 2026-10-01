@@ -387,7 +387,25 @@ export type Wire =
       description?: string;
       /** Cosa sta facendo proprio adesso: "Running find …". */
       doing?: string;
-      status?: 'pending' | 'running' | 'completed' | 'failed' | 'killed' | 'paused';
+      status?: 'pending' | 'running' | 'completed' | 'failed' | 'killed' | 'paused' | 'stopped';
+      /**
+       * La chiamata Agent che l'ha lanciata. E' l'aggancio con l'albero: la chiamata ha
+       * un `parent` — il filo da cui e' partita — e da li' si sa per chi lavora.
+       */
+      toolUseId?: string;
+      /** 1 se l'ha lanciata la conversazione, N+1 se un aiutante di livello N. */
+      depth?: number;
+      /** "Explore"; per le task che non sono sub-agent, il loro genere ("Bash"). */
+      type?: string;
+      /** Il compito ricevuto, tagliato a 600 caratteri. */
+      brief?: string;
+      lastTool?: string;
+      /** Quanto ha lavorato finora, o in tutto. */
+      ms?: number;
+      /** Il riassunto: a meta' lavoro (se la CLI lo fa) e alla fine. */
+      summary?: string;
+      /** Non e' lavoro: una faccenda di casa della CLI. */
+      ambient?: boolean;
     }
   /**
    * Gli errori che l'editor gia' conosceva, rimandati indietro da soli.

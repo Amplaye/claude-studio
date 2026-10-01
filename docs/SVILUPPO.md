@@ -331,11 +331,20 @@ npm run verify      # tipi + webview (Playwright) + bundle vero sulla CLI vera
   passa da solo in plan mode e cosa no (190 casi), e la memoria — ogni forma di nota,
   accenti e plurali, date, `._*` e `MEMORY.md` mai fra i risultati, segreti nascosti.
 
-Due prove dal vivo stanno fuori da `verify` perche' spendono qualche turno:
+Tre prove dal vivo stanno fuori da `verify` perche' spendono qualche turno:
 `npm run plan-live` (plan mode senza schede, «Piano pronto», la scheda che torna dalla
-cronologia) e `npm run memory-live` (la memoria cercata da sola, senza permessi e senza
-ToolSearch prima, il ricordo automatico, il plan mode che la lascia passare). Si
-lanciano quando cambia il percorso dei permessi, il plan mode o la memoria.
+cronologia), `npm run memory-live` (la memoria cercata da sola, senza permessi e senza
+ToolSearch prima, il ricordo automatico, il plan mode che la lascia passare) e
+`npm run agents-live` (i sub-agent che arrivano come aiutanti, mai fra i passi del
+piano, ognuno con la chiamata che l'ha lanciato e il suo livello; e se la CLI lo fa,
+l'aiutante di un aiutante appeso sotto di lui). Si lanciano quando cambia il percorso
+dei permessi, il plan mode, la memoria o il filo delle task.
+
+`tasks-check` prova anche l'albero sullo store da solo, compilato a parte col suo
+`owned`: le task della CLI sono messaggi di sistema che in un transcript non finiscono,
+quindi non c'e' una conversazione da riaprire — si danno allo store le notizie
+nell'ordine del motore (prima la chiamata Agent col suo filo, poi la `task_started` con
+l'id di quella chiamata) e si guarda che il piano resti intero e il genitore sia giusto.
 
 `router-check` e' l'unico che **spende**: sono turni veri su modelli veri, e il giro
 intero costa qualche dollaro e una decina di minuti. Serve a rispondere a una

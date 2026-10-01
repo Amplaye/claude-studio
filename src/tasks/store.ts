@@ -29,9 +29,14 @@
 // under your eyes while you were reading it. Each list goes over under the id of the
 // conversation that wrote it, and the panel puts it inside that conversation's card —
 // where there is nothing left to work out about whose steps these are.
+//
+// E gli aiutanti stanno da parte. Erano righe di questa stessa lista, e la prima task
+// della CLI svuotava il piano che Claude si era scritto — mentre il piano riscritto si
+// portava via gli aiutanti. Adesso i passi sono `items` e chi ci lavora e' `agents`,
+// con l'albero di chi lavora per chi.
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
-import type { TaskBoard, TaskData, TaskItem } from './protocol';
+import type { AgentItem, TaskBoard, TaskData, TaskItem } from './protocol';
 
 const EMPTY: TaskData = { items: [], done: 0, total: 0, active: -1, busy: false, doing: '' };
 
@@ -56,24 +61,59 @@ interface Step extends TaskItem {
  */
 const FIRST_GUESS_MS = 30000;
 
+/** Un aiutante com'e' tenuto qui: quello che va a schermo piu' gli orologi. */
+interface Agent {
+  id: string;
+  toolUseId?: string;
+  /** Il livello detto dalla CLI: fa da controprova all'albero, non lo sostituisce. */
+  spawnDepth?: number;
+  title: string;
+  type?: string;
+  brief?: string;
+  status: TaskItem['status'];
+  doing?: string;
+  lastTool?: string;
+  summary?: string;
+  ambient?: boolean;
+  startedAt?: number;
+  /** La durata detta dalla CLI, quando la dice. */
+  ms?: number;
+  endedAt?: number;
+}
+
+/** Una chiamata Agent vista passare: da quale filo e' partita e cosa portava. */
+interface Spawn {
+  /** La chiamata Agent dell'aiutante da cui e' partita; null = la conversazione. */
+  parent: string | null;
+  title?: string;
+  type?: string;
+  brief?: string;
+  name?: string;
+}
+
+/** Quante chiamate Agent si ricordano al massimo: una conversazione lunga non cresce senza fine. */
+const MAX_SPAWNS = 300;
+
+const finished = (s: TaskItem['status']) => s === 'completed' || s === 'failed';
+
 interface List {
-  /**
-   * Chi l'ha scritta. TodoWrite riscrive tutto a ogni giro ed e' roba del singolo
-   * messaggio; le Task* si accumulano e restano per tutta la conversazione.
-   */
   /**
    * Chi l'ha scritta.
    *
-   *   'todo'  TodoWrite: riscrive tutto a ogni giro, ed e' roba del singolo messaggio
+   *   'todo'  TodoWrite o il nostro `plan`: riscrive tutto a ogni giro, ed e' roba del
+   *           singolo messaggio
    *   'task'  TaskCreate/TaskUpdate: si accumulano e restano per tutta la conversazione
-   *   'cli'   i messaggi di sistema della CLI di oggi — l'unica sorgente ancora viva
    *
-   * Le prime due esistono ancora qui dentro solo per le CLI vecchie: nella CLI di
-   * adesso quei tre strumenti non ci sono piu' affatto (provato: il modello risponde
-   * che non li ha), ed e' il motivo per cui questo pannello e' rimasto vuoto.
+   * Le task della CLI di oggi qui non c'entrano: sono gli aiutanti, e stanno in
+   * `agents`. Erano una terza sorgente di questa stessa lista, e prendersela voleva
+   * dire buttare via il piano.
    */
-  source: 'todo' | 'task' | 'cli';
+  source: 'todo' | 'task';
   steps: Step[];
+  /** Chi lavora per questa conversazione, nell'ordine in cui e' arrivato. */
+  agents: Agent[];
+  /** Le chiamate Agent, sotto il loro id: e' da qui che un aiutante sa chi l'ha lanciato. */
+  spawns: Map<string, Spawn>;
   /** Le TaskCreate in volo, sotto l'id della chiamata: aspettano il loro numero. */
   waiting: Map<string, Step>;
   /** Le TaskList in volo: la loro risposta e' l'elenco vero, e rimette tutto in riga. */
@@ -97,6 +137,8 @@ interface List {
 const blank = (): List => ({
   source: 'todo',
   steps: [],
+  agents: [],
+  spawns: new Map(),
   waiting: new Map(),
   asked: new Set(),
   doing: '',
@@ -132,6 +174,7 @@ function cliStatus(s?: string): TaskItem['status'] | undefined {
       return 'completed';
     case 'failed':
     case 'killed':
+    case 'stopped':
       return 'failed';
     case 'pending':
     case 'paused':
@@ -360,40 +403,83 @@ export class TaskStore {
   // ---- la CLI di oggi: le task arrivano come messaggi di sistema ------------
 
   /**
-   * Una notizia su una task, da `task_started` / `task_progress` / `task_updated`.
+   * Una chiamata Agent (o Task, nelle CLI di prima) vista passare, da qualunque filo.
    *
-   * Ognuno dei tre dice un pezzo — il nome, cosa sta facendo adesso, com'e' finita —
-   * quindi qui si fondono invece di sostituirsi: una `task_progress` che arriva senza
-   * stato non deve spegnere lo stato che c'era.
+   * E' l'unico posto dove si sa da dove e' partito un aiutante: la chiamata porta il
+   * `parent` — il filo del sub-agent che l'ha fatta, o niente se l'ha fatta la
+   * conversazione — e la `task_started` che segue porta l'id di questa chiamata. Messi
+   * insieme dicono chi lavora per chi. E' anche l'unico posto dove sta il `name` con
+   * cui all'aiutante si scrive.
+   */
+  spawned(key: string, callId: string, parent: string | null, input: unknown) {
+    if (!callId) return;
+    const o = (input ?? {}) as { description?: unknown; prompt?: unknown; subagent_type?: unknown; name?: unknown };
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+    const l = this.of(key);
+    l.spawns.set(callId, {
+      parent: parent || null,
+      title: str(o.description),
+      type: str(o.subagent_type),
+      brief: typeof o.prompt === 'string' && o.prompt.trim() ? o.prompt.trim().slice(0, 600) : undefined,
+      name: str(o.name),
+    });
+    while (l.spawns.size > MAX_SPAWNS) l.spawns.delete(l.spawns.keys().next().value as string);
+    // Di solito la chiamata arriva prima dell'aiutante che lancia; se no lo si
+    // riaggancia adesso, invece di lasciarlo orfano fino alla prossima notizia.
+    if (l.agents.some((a) => a.toolUseId === callId)) this.settle(key, l);
+  }
+
+  /**
+   * Una notizia su un aiutante, da `task_started` / `task_progress` / `task_updated` /
+   * `task_notification`.
+   *
+   * Ognuno dice un pezzo — il nome e chi l'ha lanciato, cosa sta facendo adesso,
+   * com'e' finita — quindi qui si fondono invece di sostituirsi: una `task_progress`
+   * che arriva senza stato non deve spegnere lo stato che c'era.
+   *
+   * Il piano non si tocca. Qui la prima task della CLI svuotava la lista dei passi —
+   * "due contabilita' diverse" — ed era vero: per questo adesso stanno in due posti.
    */
   fromCli(
     key: string,
     id: string,
-    d: { description?: string; doing?: string; status?: string }
+    d: {
+      description?: string;
+      doing?: string;
+      status?: string;
+      toolUseId?: string;
+      depth?: number;
+      type?: string;
+      brief?: string;
+      lastTool?: string;
+      ms?: number;
+      summary?: string;
+      ambient?: boolean;
+    }
   ) {
     if (!id) return;
     const l = this.of(key);
-    // La prima task della CLI butta via una lista dei vecchi strumenti rimasta li':
-    // sono due contabilita' diverse e mescolarle darebbe passi doppi.
-    if (l.source !== 'cli') {
-      l.source = 'cli';
-      l.steps = [];
-      l.waiting.clear();
-      l.asked.clear();
-    }
-    let s = l.steps.find((x) => x.id === id);
-    if (!s) {
+    let a = l.agents.find((x) => x.id === id);
+    if (!a) {
       // Senza un nome non c'e' niente da disegnare: una `task_progress` che arriva
       // prima della sua `task_started` aspetta, invece di aprire una riga vuota.
       if (!d.description) return;
-      s = { id, content: d.description, status: 'pending' };
-      l.steps.push(s);
+      a = { id, title: d.description, status: 'pending' };
+      l.agents.push(a);
     }
-    if (d.description) s.content = d.description;
-    // "Running find …" e' la riga che si legge mentre e' quella in corso.
-    if (d.doing) s.activeForm = d.doing;
+    if (d.description) a.title = d.description;
+    if (d.toolUseId) a.toolUseId = d.toolUseId;
+    if (typeof d.depth === 'number') a.spawnDepth = d.depth;
+    if (d.type) a.type = d.type;
+    if (d.brief) a.brief = d.brief;
+    // "Running find …" e' la riga che si legge mentre lavora.
+    if (d.doing) a.doing = d.doing;
+    if (d.lastTool) a.lastTool = d.lastTool;
+    if (typeof d.ms === 'number') a.ms = d.ms;
+    if (d.summary) a.summary = d.summary.slice(0, 600);
+    if (d.ambient) a.ambient = true;
     const st = cliStatus(d.status);
-    if (st) s.status = st;
+    if (st) a.status = st;
     this.settle(key, l);
   }
 
@@ -413,14 +499,23 @@ export class TaskStore {
     // La scia e' dei passi di *questo* turno: al messaggio dopo riparte, sempre,
     // qualunque sia la sorgente della lista.
     l.trail = [];
-    // Le liste dei due sistemi a task (quello vecchio e quello della CLI di oggi) se
-    // le tiene il motore per tutta la sessione, e quello che hai chiesto due messaggi
-    // fa e non e' ancora finito deve continuare a vedersi. Solo TodoWrite se ne va.
-    if (l.source !== 'todo') {
-      this.settle(key, l);
-      return;
+    // Gli aiutanti finiti erano del turno di prima, e se ne vanno con lui; quelli
+    // ancora al lavoro restano — lanciati in sottofondo, possono lavorare ben oltre
+    // la fine del turno che li ha chiamati, e sparire dall'ufficio mentre lavorano
+    // sarebbe una bugia.
+    l.agents = l.agents.filter((a) => !finished(a.status));
+    const vivi = new Set(l.agents.map((a) => a.toolUseId).filter(Boolean));
+    for (const k of [...l.spawns.keys()]) if (!vivi.has(k)) l.spawns.delete(k);
+    // Il vecchio sistema a task lo tiene il motore per tutta la sessione, e quello che
+    // hai chiesto due messaggi fa e non e' ancora finito deve continuare a vedersi.
+    // Solo un elenco scritto tutto intero (TodoWrite, il nostro `plan`) se ne va.
+    if (l.source === 'todo') {
+      l.steps = [];
+      l.waiting.clear();
+      l.asked.clear();
+      l.next = 0;
     }
-    this.clear(key);
+    this.settle(key, l);
   }
 
   /** La conversazione riparte da zero: non resta niente di quella di prima. */
@@ -482,16 +577,14 @@ export class TaskStore {
     // Quello a cui il pannello sta guardando: il primo in corso.
     //
     // Tutta la grammatica del pannello dice "uno": una riga accesa, un `active`, una
-    // stima. Ma "uno" e' una regola di come si disegna, non di cosa succede — la CLI
-    // lancia i sub-agent a mazzi di tre o quattro, e per un pezzo qui dentro gli altri
-    // venivano riscritti a "da fare" per non accendere quattro righe insieme. Adesso
-    // che l'ufficio disegna una persona per sub-agent quella bugia costava cara: tre
-    // impiegati su quattro stavano fermi a guardare. Sul filo passa la verita', e a
-    // tenere accesa una riga sola ci pensa il pannello, che e' l'unico che lo vuole.
+    // stima. Ma "uno" e' una regola di come si disegna, non di cosa succede — un piano
+    // riscritto puo' arrivare con due passi accesi, e per un pezzo qui dentro gli altri
+    // venivano riscritti a "da fare". Sul filo passa la verita', e a tenere accesa una
+    // riga sola ci pensa il pannello, che e' l'unico che lo vuole.
     const active = l.steps.findIndex((s) => s.status === 'in_progress');
 
     // L'orologio di ogni passo, tenuto qui e non altrove perche' e' l'unico punto da
-    // cui passa ogni cambiamento di stato, da qualunque delle tre sorgenti arrivi.
+    // cui passa ogni cambiamento di stato, da qualunque sorgente arrivi.
     // Non serve sapere com'era prima: "sta correndo e non ha ancora un inizio" e "non
     // corre piu' e non ha ancora una durata" sono le due sole domande.
     const now = Date.now();
@@ -502,6 +595,16 @@ export class TaskStore {
         s.ms = Math.max(1, now - s.startedAt);
       }
     });
+
+    // E quello di ogni aiutante, con la stessa regola.
+    l.agents.forEach((a) => {
+      if (a.status === 'in_progress') {
+        if (!a.startedAt) a.startedAt = now;
+      } else if (finished(a.status) && !a.endedAt) {
+        a.endedAt = now;
+      }
+    });
+    const agents = this.tree(l);
 
     const items: TaskItem[] = l.steps.map((s) => ({
       id: s.id || undefined,
@@ -525,9 +628,81 @@ export class TaskStore {
       ...(active >= 0 && l.steps[active].startedAt
         ? { activeSince: l.steps[active].startedAt, expectedMs: expected(l.steps) }
         : {}),
+      ...(agents.length ? { agents } : {}),
     };
     this.lists.set(key, l);
     this.emit();
+  }
+
+  /**
+   * Gli aiutanti in ordine d'albero: ognuno subito dopo chi l'ha lanciato, i fratelli
+   * nell'ordine in cui sono partiti.
+   *
+   * Il genitore si trova cosi': la `task_started` porta l'id della chiamata Agent che
+   * l'ha fatto nascere; quella chiamata e' partita da un filo, e il filo di un
+   * sub-agent ha per nome l'id della chiamata che ha lanciato *lui*. Se quell'id e' di
+   * un aiutante che conosciamo, e' lui il capo; altrimenti e' la conversazione. Il
+   * livello detto dalla CLI fa da controprova: chi lei dice lanciato dalla
+   * conversazione, lo e' comunque.
+   */
+  private tree(l: List): AgentItem[] {
+    const byCall = new Map<string, Agent>();
+    for (const a of l.agents) if (a.toolUseId) byCall.set(a.toolUseId, a);
+    const parentOf = (a: Agent): Agent | null => {
+      if (a.spawnDepth === 1 || !a.toolUseId) return null;
+      const from = l.spawns.get(a.toolUseId)?.parent;
+      const p = from ? byCall.get(from) : undefined;
+      return p && p !== a ? p : null;
+    };
+    const kids = new Map<string | null, Agent[]>();
+    for (const a of l.agents) {
+      const p = parentOf(a)?.id ?? null;
+      const list = kids.get(p) ?? [];
+      list.push(a);
+      kids.set(p, list);
+    }
+    const out: AgentItem[] = [];
+    const seen = new Set<string>();
+    const view = (a: Agent, parentId: string | null, depth: number): AgentItem => {
+      const call = a.toolUseId ? l.spawns.get(a.toolUseId) : undefined;
+      const ms = finished(a.status)
+        ? a.ms ?? (a.startedAt && a.endedAt ? Math.max(1, a.endedAt - a.startedAt) : undefined)
+        : undefined;
+      return {
+        id: a.id,
+        ...(a.toolUseId ? { toolUseId: a.toolUseId } : {}),
+        parentId,
+        depth,
+        title: a.title || call?.title || '',
+        ...(a.type || call?.type ? { type: a.type || call?.type } : {}),
+        ...(call?.name ? { name: call.name } : {}),
+        ...(a.brief || call?.brief ? { brief: a.brief || call?.brief } : {}),
+        status: a.status,
+        ...(a.doing && !finished(a.status) ? { doing: a.doing } : {}),
+        ...(a.lastTool ? { lastTool: a.lastTool } : {}),
+        ...(a.startedAt ? { since: a.startedAt } : {}),
+        ...(ms ? { ms } : {}),
+        ...(a.summary ? { summary: a.summary } : {}),
+        ...(a.ambient ? { ambient: true } : {}),
+      };
+    };
+    const walk = (parentId: string | null, depth: number) => {
+      for (const a of kids.get(parentId) ?? []) {
+        if (seen.has(a.id)) continue;
+        seen.add(a.id);
+        out.push(view(a, parentId, depth));
+        walk(a.id, depth + 1);
+      }
+    };
+    walk(null, 1);
+    // Un giro chiuso (A lanciato da B lanciato da A) non esiste, ma se un giorno
+    // arrivasse non deve far sparire nessuno: chi e' rimasto fuori va in cima.
+    for (const a of l.agents) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
+      out.push(view(a, null, 1));
+    }
+    return out;
   }
 
   /**
@@ -546,7 +721,9 @@ export class TaskStore {
       const l = this.lists.get(s.key);
       // Anche una conversazione ferma con una scia alle spalle: quello che il turno
       // appena finito ha fatto resta leggibile finche' non ne comincia un altro.
-      if (l && (l.data.total > 0 || l.busy || l.trail.length > 0)) out[s.id] = l.data;
+      // E una con degli aiutanti, anche a turno finito: quelli in sottofondo lavorano
+      // ancora, e quelli appena finiti sono la notizia.
+      if (l && (l.data.total > 0 || l.busy || l.trail.length > 0 || l.agents.length > 0)) out[s.id] = l.data;
     }
     return out;
   }

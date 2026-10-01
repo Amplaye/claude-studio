@@ -74,6 +74,57 @@ export interface TaskData {
    * era una riga sola.
    */
   trail?: string[];
+  /**
+   * Chi lavora per questa conversazione: i sub-agent, e quelli che hanno lanciato loro.
+   *
+   * Stavano dentro `items`, nella stessa lista dei passi del piano, e le due
+   * contabilita' si cancellavano a vicenda: la prima task della CLI svuotava il piano,
+   * e il piano riscritto si portava via gli aiutanti. Sono due domande diverse — "cosa
+   * c'e' da fare" e "chi ci sta lavorando" — e adesso viaggiano separate. Gli aiutanti
+   * finiti restano fino al prossimo messaggio tuo; quelli ancora al lavoro restano
+   * finche' lavorano, anche oltre la fine del turno.
+   */
+  agents?: AgentItem[];
+}
+
+/**
+ * Un aiutante: una task della CLI, quasi sempre un sub-agent.
+ *
+ * `parentId` dice per chi lavora: l'id di un altro aiutante, o null se l'ha lanciato
+ * la conversazione stessa. E' quello che fa dell'elenco un albero — chi lavora per
+ * chi — invece di una fila di gente tutta uguale.
+ */
+export interface AgentItem {
+  /** Il task_id della CLI. */
+  id: string;
+  /** La chiamata Agent che l'ha lanciato: e' da qui che i suoi figli lo ritrovano. */
+  toolUseId?: string;
+  parentId: string | null;
+  /** 1 = lanciato dalla conversazione, 2 = da un suo aiutante, e cosi' via. */
+  depth: number;
+  /** Come si chiama il lavoro: "Count .ts files in src". */
+  title: string;
+  /** Il tipo: "Explore", "general-purpose"; per le task che non sono agenti, "Bash". */
+  type?: string;
+  /** Il nome dato all'Agent, quello con cui gli si scrive con SendMessage. */
+  name?: string;
+  /** Il compito ricevuto: l'inizio del prompt. */
+  brief?: string;
+  status: TaskItem['status'];
+  /** Cosa sta facendo adesso: "Running find …". */
+  doing?: string;
+  /** L'ultimo strumento che ha usato. */
+  lastTool?: string;
+  /** Da quando lavora (epoch ms) e, a lavoro finito, quanto c'e' voluto. */
+  since?: number;
+  ms?: number;
+  /** Come e' andata, detto da lui alla fine. */
+  summary?: string;
+  /**
+   * Una faccenda di casa — un osservatore, una task che la CLI tiene per se': nel
+   * pannello delle task si vede, ma non e' qualcuno al lavoro, e nell'ufficio non entra.
+   */
+  ambient?: boolean;
 }
 
 /**

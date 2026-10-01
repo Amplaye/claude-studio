@@ -169,6 +169,8 @@
     'tasks.about': '~{n}%',
     'tasks.aboutHint':
       'An estimate, not a measurement: how long this step has been running against how long the steps already finished here took. It stops at 95% and waits.',
+    'tasks.crew': 'Helpers',
+    'tasks.crewBusy': 'Helpers · {n} at work',
 
     // ---- the conversation ----
     'msg.reasoning': 'Reasoning',
@@ -316,13 +318,20 @@
     'office.boardEmpty': 'Nothing on the board: no conversation has a plan open.',
     'office.boardClose': 'Close',
     'office.asking': 'waiting for an answer',
-    'office.sub': 'sub-agent of {name}',
     'office.ctxUsed': 'context used',
     'office.askTitle': '{name} is asking you',
     'office.askAllow': 'Allow',
     'office.askDeny': 'Deny',
     'office.askOpen': 'Open the conversation',
     'office.askEmpty': 'Nothing waiting for an answer any more.',
+    'office.worksFor': 'works for {name}',
+    'office.brief': 'Asked to: {text}',
+    'office.now': 'Now: {text}',
+    'office.since': 'at work for {time}',
+    'office.took': 'took {time}',
+    'office.helpers1': '1 helper at work',
+    'office.helpersN': '{n} helpers at work',
+    'office.tree': 'Who works for whom',
   };
 
   const IT = {
@@ -457,6 +466,8 @@
     'tasks.about': '~{n}%',
     'tasks.aboutHint':
       'E’ una stima, non una misura: da quanto va questo passo rispetto a quanto ci hanno messo quelli gia’ finiti qui. Si ferma al 95% e aspetta.',
+    'tasks.crew': 'Aiutanti',
+    'tasks.crewBusy': 'Aiutanti · {n} al lavoro',
 
     'msg.reasoning': 'Ragionamento',
     'msg.thinking': 'Claude sta pensando…',
@@ -589,13 +600,20 @@
     'office.boardEmpty': 'Sulla bacheca non c’e’ niente: nessuna conversazione ha un piano aperto.',
     'office.boardClose': 'Chiudi',
     'office.asking': 'aspetta una risposta',
-    'office.sub': 'sub-agent di {name}',
     'office.ctxUsed': 'contesto usato',
     'office.askTitle': '{name} ti sta chiedendo',
     'office.askAllow': 'Consenti',
     'office.askDeny': 'Nega',
     'office.askOpen': 'Apri la conversazione',
     'office.askEmpty': 'Non c’e’ piu’ niente in attesa di risposta.',
+    'office.worksFor': 'lavora per {name}',
+    'office.brief': 'Compito: {text}',
+    'office.now': 'Adesso: {text}',
+    'office.since': 'al lavoro da {time}',
+    'office.took': 'ci ha messo {time}',
+    'office.helpers1': '1 aiutante al lavoro',
+    'office.helpersN': '{n} aiutanti al lavoro',
+    'office.tree': 'Chi lavora per chi',
   };
 
   const DICT = { en: EN, it: IT };

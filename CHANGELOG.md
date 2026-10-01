@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.34.0
+
+- **Nell'ufficio si vede chi lavora per chi.** Nella fila in cima ogni conversazione
+  ha subito dopo i suoi aiutanti, e un aiutante lanciato da un altro aiutante sta un
+  passo piu' in la', attaccato con un raccordo. Ci sono tutti: anche quelli di una
+  conversazione rimasta senza scrivania, e anche quando sono piu' di quattro — prima
+  sparivano dalla fila, che leggeva solo chi era seduto nella stanza.
+
+- **Cliccando un aiutante si legge il suo lavoro.** Che tipo e' («Explore»), per chi
+  lavora, il compito che ha ricevuto, cosa sta facendo adesso e da quanto, con
+  l'orologio che gira. Cliccando una conversazione, oltre al passo del piano, c'e'
+  cosa sta facendo il suo filo e quanti aiutanti ha al lavoro.
+
+- **Il piano non sparisce piu' quando parte un sub-agent.** Passi del piano e
+  aiutanti stavano nella stessa lista e si cancellavano a vicenda: il primo sub-agent
+  svuotava il piano, e un passo del piano in corso diventava una persona finta che
+  entrava dalla porta. Adesso sono due elenchi: i passi restano passi, e nella stanza
+  entra solo chi lavora davvero. Chi lavora per un aiutante si siede vicino a lui.
+
+- **La bacheca racconta anche gli aiutanti.** Sul muro, accanto ai passi del piano,
+  il foglietto di ogni aiutante finito: verde se e' andata bene, rosso se no. E
+  aprendola c'e' una sezione nuova, «Chi lavora per chi», con l'albero di ogni
+  conversazione: tipo, stato e quanto ci ha messo ciascuno.
+
+- **Gli aiutanti anche nella colonna del contesto**, sotto i passi della loro
+  conversazione e rientrati come nell'albero. Quelli lanciati in sottofondo restano
+  finche' lavorano, anche a turno finito; quelli finiti se ne vanno al messaggio dopo.
+
 ## 0.33.0
 
 - **Claude cerca nella memoria per argomento.** Le note della memoria del progetto

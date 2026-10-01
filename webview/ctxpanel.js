@@ -317,8 +317,10 @@ window.CtxPanel = (() => {
         const total = (d && d.total) || 0;
         // Sempre visibile mentre lavora, anche senza task: li' dentro c'e' la riga
         // che dice cosa sta facendo, ed e' la sola cosa che si guarda una card per
-        // sapere (vedi taskspanel.js).
-        c._p.steps.hidden = !(total > 0 || (d && d.busy));
+        // sapere (vedi taskspanel.js). E finche' ha degli aiutanti: quelli in
+        // sottofondo lavorano anche a turno finito.
+        const crew = (d && Array.isArray(d.agents) && d.agents.length) || 0;
+        c._p.steps.hidden = !(total > 0 || crew > 0 || (d && d.busy));
         c._p.stepsPanel?.render(d);
       }
     }

@@ -384,46 +384,51 @@ async function live(tab, side) {
       'Poi riporta i due numeri. Non modificare nessun file.'
   );
 
+  // I sub-agent sono aiutanti, e viaggiano in `agents`: fra i passi non ci vanno piu'.
+  const crew = (x) => (x?.agents ?? []).map((a) => `${a.status[0]}:${a.title}`).join(' | ') || '(nobody)';
   const frames = seen().filter(Boolean);
   const d = frames[frames.length - 1] ?? null;
-  console.log('  turn 1: ' + frames.length + ' list(s) handed over; the last one: ' + line(d));
+  console.log('  turn 1: ' + frames.length + ' list(s) handed over; the helpers: ' + crew(d));
   t(ok1, 'the turn never finished: no CLI, no login, or no network');
   t(frames.length > 0, 'the panel was handed no list at all while Claude was writing one');
-  t((d?.total ?? 0) >= 2, 'the tasks the CLI opened did not reach the panel: ' + line(d));
+  t((d?.agents ?? []).length >= 2, 'the sub-agents the CLI opened did not reach the panel: ' + crew(d));
   t(
-    (d?.items ?? []).some((i) => i.status === 'completed'),
-    'a step Claude ticked off is still drawn as pending: ' + line(d)
+    (d?.agents ?? []).every((a) => a.toolUseId && a.depth >= 1),
+    'a helper arrived without the call that launched it or its level: ' + JSON.stringify(d?.agents)
+  );
+  t(
+    (d?.agents ?? []).some((a) => a.status === 'completed'),
+    'a helper that finished is still drawn as working: ' + crew(d)
   );
   // The list must be built as it goes, not handed over in one piece at the end: that
   // delay is the whole reason this panel exists.
   t(
-    frames.filter((f) => f.total > 0).length > 1,
-    'the list only appeared once, at the end — it is not being built as Claude writes it'
+    frames.filter((f) => (f.agents ?? []).length > 0).length > 1,
+    'the helpers only appeared once, at the end — they are not followed as they work'
   );
 
   const s = only(side);
-  console.log('  the sidebar was handed: ' + line(s));
-  t(line(s) === line(d), 'the sidebar panel does not show what the tab shows: ' + line(s));
+  console.log('  the sidebar was handed: ' + crew(s));
+  t(crew(s) === crew(d), 'the sidebar panel does not show what the tab shows: ' + crew(s));
 
-  // ---- the second message: this is where a list used to disappear ----------
+  // ---- the second message: the helpers of the turn before make room ----------
   //
-  // A TodoWrite list belongs to the prompt that produced it and goes when the next
-  // one arrives; a Task* list belongs to the conversation and must not. Get that
-  // wrong and the panel empties itself the moment you say "go on".
+  // The ones that finished belonged to the turn before and go with it; the new one
+  // has to arrive, and be ticked off when it is done.
   const before = seen().length;
   const ok2 = await turn('Lancia un altro sub-agent Explore che dica quante righe ha LICENSE.');
   const after = seen().slice(before).filter(Boolean);
   const d2 = after[after.length - 1] ?? only(tab);
-  console.log('  turn 2: ' + line(d2));
+  console.log('  turn 2: ' + crew(d2));
   t(ok2, 'the second turn never finished');
-  t((d2?.total ?? 0) > (d?.total ?? 0), 'the new task did not join the list: ' + line(d2));
+  t((d2?.agents ?? []).length >= 1, 'the new helper did not reach the panel: ' + crew(d2));
   t(
-    (d2?.items ?? []).filter((i) => i.status === 'completed').length >= 2,
-    'the tasks that finished are not ticked off: ' + line(d2)
+    (d2?.agents ?? []).every((a) => a.status === 'completed'),
+    'the helper that finished is not ticked off: ' + crew(d2)
   );
   t(
-    line(only(side)) === line(d2),
-    'after a second message the sidebar and the tab disagree: ' + line(only(side))
+    crew(only(side)) === crew(d2),
+    'after a second message the sidebar and the tab disagree: ' + crew(only(side))
   );
 
   // ---- un turno normale, senza sub-agent: la card deve dire cosa sta facendo ----
@@ -512,6 +517,132 @@ async function live(tab, side) {
     );
   }
   clearInterval(watch);
+}
+
+/**
+ * Gli aiutanti, sullo store vero e da solo.
+ *
+ * Le task della CLI di oggi sono messaggi di sistema che in un transcript non
+ * finiscono, quindi qui non c'e' una conversazione da riaprire: lo store si compila a
+ * parte, insieme al suo `owned`, e gli si danno le notizie nell'ordine in cui le da'
+ * il motore. Tre cose da guardare, e sono le tre che si rompevano:
+ *   - il piano non sparisce piu' quando arriva una task (la prima svuotava i passi);
+ *   - gli aiutanti stanno in `agents`, mai fra i passi;
+ *   - il genitore si aggancia dal `tool_use_id`: la chiamata Agent ha il filo da cui
+ *     e' partita, e la `task_started` porta l'id di quella chiamata.
+ */
+function agents() {
+  const esbuild = require('esbuild');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-agents-'));
+  const out = path.join(tmp, 'store.cjs');
+  esbuild.buildSync({
+    stdin: {
+      contents: "export { tasks } from './src/tasks/store'; export { owned } from './src/context/owned';",
+      resolveDir: root,
+      loader: 'ts',
+    },
+    bundle: true,
+    outfile: out,
+    platform: 'node',
+    format: 'cjs',
+    external: ['vscode'],
+    logLevel: 'warning',
+  });
+  const { tasks: store, owned: own } = require(out);
+  const K = 'k-agents';
+  const SID = 'sid-agents';
+  own.adopt(K, SID, work);
+  let last = {};
+  const sub = store.subscribe((d) => (last = d));
+  const now = () => last[SID] || {};
+  const crew = () =>
+    (now().agents || []).map((a) => `${a.id}<${a.parentId || '-'}>${a.depth}:${a.status[0]}`).join(' ') || '(nobody)';
+
+  // Il piano, scritto col nostro strumento.
+  const piano = [
+    { content: 'Leggere il modulo', status: 'completed' },
+    { content: 'Contare i file', activeForm: 'Contando i file', status: 'in_progress' },
+    { content: 'Scrivere il riassunto', status: 'pending' },
+  ];
+  store.set(K, piano);
+  const PIANO = 'c:Leggere il modulo | i:Contare i file | p:Scrivere il riassunto';
+
+  // La conversazione lancia un aiutante; l'aiutante ne lancia un altro; la
+  // conversazione ne lancia un secondo. Nell'ordine del motore: prima la chiamata
+  // Agent (col filo da cui parte), poi la task_started con l'id di quella chiamata.
+  store.spawned(K, 'tu-1', null, {
+    description: 'Contare i file',
+    prompt: 'Conta i file .ts sotto src e dimmi quanti sono',
+    subagent_type: 'Explore',
+    name: 'contatore',
+  });
+  store.fromCli(K, 'task-1', { description: 'Contare i file', status: 'running', toolUseId: 'tu-1', depth: 1, type: 'Explore' });
+  t(line(now()) === PIANO, 'la prima task della CLI ha svuotato il piano: ' + line(now()));
+  t(!(now().items || []).some((i) => /task-/.test(i.id || '')), 'un aiutante e’ finito fra i passi: ' + line(now()));
+
+  store.spawned(K, 'tu-2', 'tu-1', { description: 'Guardare i test', subagent_type: 'Explore' });
+  store.fromCli(K, 'task-2', { description: 'Guardare i test', status: 'running', toolUseId: 'tu-2', depth: 2 });
+  store.spawned(K, 'tu-3', null, { description: 'Leggere il README' });
+  store.fromCli(K, 'task-3', { description: 'Leggere il README', status: 'running', toolUseId: 'tu-3', depth: 1 });
+  t(
+    crew() === 'task-1<->1:i task-2<task-1>2:i task-3<->1:i',
+    'l’albero di chi lavora per chi e’ sbagliato: ' + crew()
+  );
+  const primo = (now().agents || [])[0] || {};
+  t(
+    primo.toolUseId === 'tu-1' && primo.name === 'contatore' && primo.type === 'Explore' && /Conta i file/.test(primo.brief || ''),
+    'l’aiutante ha perso chi e’ (chiamata, nome, tipo, compito): ' + JSON.stringify(primo)
+  );
+  t(typeof primo.since === 'number' && primo.since > 0, 'l’aiutante non dice da quando lavora: ' + primo.since);
+  t(line(now()) === PIANO, 'con tre aiutanti al lavoro il piano non e’ piu’ quello: ' + line(now()));
+
+  // Una notizia arrivata prima della chiamata che l'ha fatta nascere: per un attimo
+  // e' della conversazione, poi la chiamata la riaggancia a chi l'ha lanciata.
+  store.fromCli(K, 'task-4', { description: 'Contare le righe', status: 'running', toolUseId: 'tu-4' });
+  store.spawned(K, 'tu-4', 'tu-1', { description: 'Contare le righe' });
+  const quarto = (now().agents || []).find((a) => a.id === 'task-4') || {};
+  t(quarto.parentId === 'task-1' && quarto.depth === 2, 'una task arrivata prima della sua chiamata resta orfana: ' + crew());
+
+  // La controprova: chi la CLI dice lanciato dalla conversazione, lo e'.
+  store.spawned(K, 'tu-5', 'tu-1', { description: 'Uno che dice di essere del capo' });
+  store.fromCli(K, 'task-5', { description: 'Uno che dice di essere del capo', status: 'running', toolUseId: 'tu-5', depth: 1 });
+  const quinto = (now().agents || []).find((a) => a.id === 'task-5') || {};
+  t(quinto.parentId === null && quinto.depth === 1, 'il livello detto dalla CLI non fa da controprova: ' + crew());
+
+  // Cosa sta facendo, e come finisce.
+  store.fromCli(K, 'task-2', { doing: 'Running grep', lastTool: 'Grep', ms: 1200 });
+  store.fromCli(K, 'task-2', { status: 'completed', summary: 'Trovati tre test', ms: 4200 });
+  store.fromCli(K, 'task-3', { status: 'stopped' });
+  const fine = Object.fromEntries((now().agents || []).map((a) => [a.id, a]));
+  t(
+    fine['task-2'] && fine['task-2'].status === 'completed' && fine['task-2'].ms === 4200 && fine['task-2'].summary === 'Trovati tre test',
+    'la fine di un aiutante non arriva com’e’: ' + JSON.stringify(fine['task-2'])
+  );
+  t(fine['task-2'] && !fine['task-2'].doing, 'un aiutante finito dice ancora cosa sta facendo: ' + JSON.stringify(fine['task-2']));
+  t(fine['task-3'] && fine['task-3'].status === 'failed', 'un aiutante fermato non e’ andato storto: ' + JSON.stringify(fine['task-3']));
+
+  // Il piano riscritto non si porta via gli aiutanti.
+  store.set(K, piano.map((p) => ({ ...p, status: 'completed' })));
+  t((now().agents || []).length === 5, 'il piano riscritto si e’ portato via gli aiutanti: ' + crew());
+
+  // Una task_progress senza la sua task_started non apre una riga vuota.
+  store.fromCli(K, 'task-9', { doing: 'Running ls' });
+  t(!(now().agents || []).some((a) => a.id === 'task-9'), 'una notizia senza nome ha aperto un aiutante vuoto: ' + crew());
+
+  // Un messaggio nuovo: il piano (scritto tutto intero) se ne va, gli aiutanti finiti
+  // pure; quelli ancora al lavoro restano — in sottofondo lavorano oltre il turno.
+  store.newTurn(K);
+  t(!(now().items || []).length, 'il piano del messaggio prima e’ rimasto: ' + line(now()));
+  t(
+    crew() === 'task-1<->1:i task-4<task-1>2:i task-5<->1:i',
+    'al messaggio dopo gli aiutanti non sono quelli ancora al lavoro: ' + crew()
+  );
+  t(!!last[SID], 'una conversazione con aiutanti al lavoro sparisce dalla bacheca a turno finito');
+
+  // Conversazione azzerata: non resta nessuno.
+  store.clear(K);
+  t(!(now().agents || []).length, 'dopo l’azzeramento restano degli aiutanti: ' + crew());
+  sub.dispose();
 }
 
 (async () => {
@@ -673,6 +804,8 @@ async function live(tab, side) {
     line(theirs) === 'c:Read the file | i:Write the patch',
     'the second conversation lost its own steps: ' + line(theirs)
   );
+
+  agents();
 
   for (const dsp of ctx.subscriptions) dsp.dispose?.();
 

@@ -155,6 +155,23 @@ window.OFFICE = (() => {
     return viva ? viva.activeForm || viva.content || '' : '';
   }
 
+  /**
+   * Chi lavora per una conversazione, in ordine d'albero: ognuno subito dopo chi l'ha
+   * lanciato. Le faccende di casa della CLI no — un osservatore non e' qualcuno al
+   * lavoro, e una persona seduta per sempre a guardarlo non direbbe niente.
+   */
+  const aiutanti = (id) => ((board[id] && board[id].agents) || []).filter((a) => !a.ambient);
+  const alLavoro = (id) => aiutanti(id).filter((a) => a.status === 'in_progress');
+
+  /** "12s", "4m 05s", "1h 02m": quanto, detto come si legge un orologio. */
+  function durata(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + 's';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ' + String(s % 60).padStart(2, '0') + 's';
+    return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm';
+  }
+
   const comeSta = (s) =>
     s.busy ? t('ctx.busy') : s.done ? t('ctx.done') : s.recent ? t('ctx.recent') : t('ctx.idle');
 
@@ -165,6 +182,7 @@ window.OFFICE = (() => {
       const chi = people.get(s.id);
       if (!chi) continue;
       const aspetta = !!(s.asks && s.asks.length);
+      const vivi = alLavoro(s.id);
       out.push({
         key: 'c:' + s.id,
         id: s.id,
@@ -175,28 +193,47 @@ window.OFFICE = (() => {
         // Chi aspetta una risposta non "sta lavorando a" niente: sta aspettando
         // te, ed e' la cosa piu' urgente che questa fila possa dire.
         cosa: aspetta ? s.asks[0].title : cheFa(s.id) || comeSta(s),
+        // Il passo in corso del suo filo: "Read package.json". C'era da sempre sul
+        // filo delle task, e non lo leggeva nessuno.
+        adesso: s.busy ? (board[s.id] && board[s.id].doing) || '' : '',
+        squadra: vivi.length,
         pct: s.pct,
         capo: null,
+        livello: 0,
         focused: !!s.focused,
         busy: !!s.busy,
         asking: aspetta,
       });
-      // I suoi, attaccati a lui. Un sub-agent non ha un nome: ha una cosa da
-      // fare, ed e' quella a dire chi e'.
-      for (const [chiave, sub] of staff) {
-        // Chi sta uscendo non e' piu' in ufficio: e' ancora disegnato perche' sta
-        // attraversando la stanza, ma nella fila di chi c'e' non ci va.
-        if (sub.capoId !== s.id || sub.esce) continue;
+      // I suoi, in ordine d'albero, e tutti: anche chi nella stanza un posto non ce
+      // l'ha — perche' il capo e' in piedi, o perche' sono piu' di quanti ne stanno
+      // attorno a una scrivania. La fila e' l'elenco di chi lavora; la stanza e' solo
+      // dove ci si siede. Prima la fila leggeva la stanza, e chi non ci stava non
+      // esisteva.
+      //
+      // Il livello e' quello che si vede: un aiutante il cui capo ha gia' finito
+      // non resta rientrato sotto il vuoto, sale al posto di chi se n'e' andato.
+      const tutti = new Map(aiutanti(s.id).map((a) => [a.id, a]));
+      const livelli = new Map();
+      for (const a of vivi) {
+        const padre = a.parentId ? tutti.get(a.parentId) : null;
+        const lv = padre && livelli.has(padre.id) ? livelli.get(padre.id) + 1 : 1;
+        livelli.set(a.id, lv);
         out.push({
-          key: 's:' + chiave,
+          key: 's:' + s.id + '/' + a.id,
           id: s.id,
-          nome: sub.cosa || sub.nome || '',
-          seme: sub.seme,
+          agente: a,
+          // Un sub-agent non ha un nome: ha una cosa da fare, ed e' quella a dire chi e'.
+          nome: a.title || a.type || '',
+          // Lo stesso seme della persona nella stanza (vedi `buildStaff`): la faccina
+          // in cima e' la sua, non quella di un sosia.
+          seme: chi.seme + '/' + a.id,
           posa: 'digita',
           stato: t('ctx.busy'),
-          cosa: sub.cosa || sub.nome || '',
+          cosa: a.doing || a.title || '',
           pct: null,
           capo: s.name,
+          genitore: padre ? padre.title || padre.type || '' : s.name,
+          livello: lv,
           focused: false,
           busy: true,
           asking: false,
@@ -245,11 +282,16 @@ window.OFFICE = (() => {
       window.ROOM.vesti(p.corpo, a.seme, a.posa);
       p.nome.textContent = a.nome;
       p.el.classList.toggle('of-sub', !!a.capo);
+      // Il rientro e' per livello: chi lavora per un aiutante sta un passo piu' in
+      // la' di chi lavora per la conversazione.
+      p.el.dataset.livello = String(a.livello);
+      p.el.style.setProperty('--lv', String(a.livello));
+      p.el.classList.toggle('deep', a.livello > 1);
       p.el.classList.toggle('focused', a.focused);
       p.el.classList.toggle('busy', a.busy);
       p.el.classList.toggle('asking', !!a.asking);
       p.el.classList.toggle('aperta', guardato === a.key);
-      p.el.title = a.capo ? t('office.sub', { name: a.capo }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa;
+      p.el.title = a.capo ? t('office.worksFor', { name: a.genitore }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa;
       p.el.setAttribute('aria-label', p.el.title);
       p.el.setAttribute('aria-expanded', guardato === a.key ? 'true' : 'false');
     }
@@ -281,23 +323,59 @@ window.OFFICE = (() => {
     paintGente();
   }
 
+  /** L'orologio della scheda aperta: gira solo finche' c'e' un orologio da far girare. */
+  let lancetta = 0;
+
+  /** Una riga della scheda: scritta se c'e' qualcosa da dire, nascosta se no. */
+  function riga(n, testo) {
+    n.textContent = testo || '';
+    n.hidden = !testo;
+  }
+
   function paintScheda() {
     if (!scheda) return;
     const a = guardato && abitanti().find((x) => x.key === guardato);
     if (!a) {
       guardato = null;
       scheda.el.hidden = true;
+      clearInterval(lancetta);
+      lancetta = 0;
       return;
     }
     scheda.el.hidden = false;
     scheda.nome.textContent = a.nome;
-    scheda.ruolo.textContent = a.capo ? t('office.sub', { name: a.capo }) : a.stato;
-    scheda.cosa.textContent = a.cosa;
+    const ag = a.agente;
+    if (ag) {
+      // Un aiutante: che tipo e', per chi lavora, cosa gli e' stato chiesto, cosa sta
+      // facendo adesso e da quanto. Le cinque cose che dalla stanza non si vedono.
+      scheda.ruolo.textContent = (ag.type ? ag.type + ' · ' : '') + t('office.worksFor', { name: a.genitore });
+      const brief = (ag.brief || '').replace(/\s+/g, ' ').trim();
+      riga(scheda.compito, brief ? t('office.brief', { text: brief.length > 160 ? brief.slice(0, 159) + '…' : brief }) : '');
+      riga(scheda.cosa, ag.doing ? t('office.now', { text: ag.doing }) : '');
+      riga(scheda.extra, ag.since ? t('office.since', { time: durata(Date.now() - ag.since) }) : '');
+    } else {
+      // Una conversazione: come sta, a che passo del piano e', cosa sta facendo il
+      // suo filo adesso, e quanti aiutanti ha al lavoro.
+      scheda.ruolo.textContent = a.stato;
+      riga(scheda.compito, '');
+      riga(scheda.cosa, a.cosa);
+      const adesso = a.adesso && a.adesso !== a.cosa ? t('office.now', { text: a.adesso }) : '';
+      const squadra = a.squadra ? (a.squadra === 1 ? t('office.helpers1') : t('office.helpersN', { n: a.squadra })) : '';
+      riga(scheda.extra, [adesso, squadra].filter(Boolean).join(' · '));
+    }
     scheda.pct.hidden = a.pct == null;
     if (a.pct != null) {
       scheda.pctVal.textContent = Math.round(a.pct) + '%';
       scheda.pctFill.style.width = Math.max(0, Math.min(100, a.pct)) + '%';
       scheda.pctFill.style.background = barColor(a.pct);
+    }
+    // L'orologio vivo: "da quanto lavora" fermo al momento in cui hai aperto la
+    // scheda dice un'ora che non e' piu' quella.
+    const gira = !!(ag && ag.since);
+    if (gira && !lancetta) lancetta = setInterval(paintScheda, 1000);
+    if (!gira && lancetta) {
+      clearInterval(lancetta);
+      lancetta = 0;
     }
   }
 
@@ -335,7 +413,9 @@ window.OFFICE = (() => {
     box.hidden = true;
     const sNome = el('div', 'of-scheda-nome');
     const sRuolo = el('div', 'of-scheda-ruolo');
+    const sCompito = el('div', 'of-scheda-compito');
     const sCosa = el('div', 'of-scheda-cosa');
+    const sExtra = el('div', 'of-scheda-extra');
     const sPct = el('div', 'of-scheda-pct');
     const sPctLab = el('span', null, t('office.ctxUsed'));
     const sPctVal = el('span', 'of-scheda-val');
@@ -345,12 +425,14 @@ window.OFFICE = (() => {
     const sPctFill = el('div', 'of-cell-fill');
     sPctBar.append(sPctFill);
     sPct.append(sPctTop, sPctBar);
-    box.append(sNome, sRuolo, sCosa, sPct);
+    box.append(sNome, sRuolo, sCompito, sCosa, sExtra, sPct);
     scheda = {
       el: box,
       nome: sNome,
       ruolo: sRuolo,
+      compito: sCompito,
       cosa: sCosa,
+      extra: sExtra,
       pct: sPct,
       pctLab: sPctLab,
       pctVal: sPctVal,
@@ -676,7 +758,9 @@ window.OFFICE = (() => {
     bubble.append(dots);
     b.append(el('span', 'of-ring'), who, bubble);
     crowd.append(b);
-    const nome = it.id || it.content;
+    // Il seme e' il capo piu' l'id della task: la stessa faccia che ha nella fila in
+    // cima (vedi `abitanti`), e la stessa per tutto il tempo che lavora.
+    const nome = it.id;
     const chi = { chiave, capoId: capo.id, nome, el: b, fig: who, seme: capo.seme + '/' + nome };
     // Dietro un impiegato non c'e' nessuna conversazione dove andare: cliccarlo
     // dice cosa sta facendo, che e' l'unica cosa che ha da dire. Dalla fila in
@@ -716,8 +800,14 @@ window.OFFICE = (() => {
       if (!voluti.has(chiave) || seats[i]) banchi.delete(chiave);
     }
     const presi = new Set(banchi.values());
-    for (const [chiave, { capo }] of voluti) {
+    // In ordine d'albero, quindi chi ha lanciato qualcuno si e' gia' seduto quando
+    // tocca a chi ha lanciato.
+    for (const [chiave, { capo, it }] of voluti) {
       if (banchi.has(chiave) || !capo.casa) continue;
+      // L'ancora e' chi l'ha lanciato: un aiutante di un aiutante si siede vicino a
+      // lui, non al capo — e' il gruppetto che fa leggere da lontano chi lavora per chi.
+      const padre = it.parentId ? capo.id + '/' + it.parentId : null;
+      const ancora = padre != null && banchi.has(padre) ? postoBanco(banchi.get(padre)) : capo.casa;
       let scelto = -1;
       let quanto = Infinity;
       for (let i = 0; i < posti(); i++) {
@@ -726,7 +816,7 @@ window.OFFICE = (() => {
         // Le scrivanie vengono prima degli sgabelli a qualunque distanza: un
         // posto col computer e' un posto migliore di uno col portatile, e la
         // sala riunioni si riempie solo quando il salone e' pieno davvero.
-        const d = Math.hypot(p.x - capo.casa.x, p.y - capo.casa.y) + (sgabello(i) ? 1e4 : 0);
+        const d = Math.hypot(p.x - ancora.x, p.y - ancora.y) + (sgabello(i) ? 1e4 : 0);
         if (d < quanto) {
           quanto = d;
           scelto = i;
@@ -786,17 +876,21 @@ window.OFFICE = (() => {
   /**
    * Chi c'e' adesso, capo per capo.
    *
-   * Solo i sub-agent davvero in corso: uno "da fare" non e' ancora entrato in
+   * Solo gli aiutanti davvero al lavoro: uno "da fare" non e' ancora entrato in
    * ufficio, e uno finito se n'e' andato. E solo i capi seduti — chi e' in piedi
    * in fila non ha un posto attorno a cui mettere nessuno.
+   *
+   * Si leggono dagli aiutanti e non dai passi del piano. Prima era la stessa lista,
+   * e un passo in corso diventava una persona finta che entrava dalla porta a fare
+   * un lavoro che stava facendo la conversazione stessa.
    */
   function volutiStaff() {
     const out = new Map();
     for (const [id, capo] of people) {
       if (!capo.casa) continue;
-      const items = (board[id] && board[id].items) || [];
-      const vivi = items.filter((it) => it.status === 'in_progress').slice(0, MAX_STAFF);
-      vivi.forEach((it, i) => out.set(id + '/' + (it.id || it.content), { capo, it, i }));
+      alLavoro(id)
+        .slice(0, MAX_STAFF)
+        .forEach((it, i) => out.set(id + '/' + it.id, { capo, it, i }));
     }
     return out;
   }
@@ -936,10 +1030,16 @@ window.OFFICE = (() => {
     for (const id of Object.keys(board)) {
       if (!people.has(id)) continue;
       for (const it of board[id].items || []) {
-        if (staff.has(id + '/' + (it.id || it.content))) continue;
         if (it.status === 'pending') fare++;
         else if (it.status === 'failed') storte++;
         else if (it.status === 'completed') fatte++;
+      }
+      // E il lavoro degli aiutanti finiti: il foglio che hanno riappeso, verde o
+      // rosso. Chi lo sta ancora riportando ce l'ha in mano, e un foglio e' uno solo.
+      for (const a of aiutanti(id)) {
+        if (staff.has(id + '/' + a.id)) continue;
+        if (a.status === 'failed') storte++;
+        else if (a.status === 'completed') fatte++;
       }
     }
     const B = window.ROOM.BACHECHE;
@@ -1133,7 +1233,8 @@ window.OFFICE = (() => {
         sez.append(nome, dove);
         // Come nella colonna del contesto: la lista e' `TaskPanel`, e se il foglio
         // non e' stato caricato resta il nome, che e' meglio di una pagina rotta.
-        e = { sez, nome, pannello: window.TaskPanel ? window.TaskPanel(dove) : null };
+        // Senza aiutanti: quelli hanno la sezione loro qui sotto, ad albero.
+        e = { sez, nome, pannello: window.TaskPanel ? window.TaskPanel(dove, { agents: false }) : null };
         elenchi.set(id, e);
       }
       // Riappendere una sezione che c'e' gia' la sposta invece di duplicarla: e'
@@ -1144,10 +1245,60 @@ window.OFFICE = (() => {
       quante += (board[id].items || []).length;
       fatte += board[id].done || 0;
     }
+    const gente = dipingiAlbero();
     sheetCount.textContent = quante ? t('tasks.count', { done: fatte, total: quante }) : '';
     sheetCount.hidden = !quante;
     sheetEmpty.textContent = t('office.boardEmpty');
-    sheetEmpty.hidden = quante > 0;
+    sheetEmpty.hidden = quante > 0 || gente > 0;
+  }
+
+  /* ---- chi lavora per chi ----
+   *
+   * L'ultima sezione del foglio: per ogni conversazione, i suoi aiutanti ad albero —
+   * chi ha lanciato chi, che tipo e', com'e' andata e quanto ci ha messo. Nella stanza
+   * si vede un gruppetto attorno a una scrivania; qui si legge cosa lo tiene insieme.
+   *
+   * Si rifa' a ogni giro invece di ridipingerla: sono righe di solo testo, senza
+   * niente da cliccare, e una manciata. */
+  let albero;
+
+  function dipingiAlbero() {
+    if (!albero) {
+      albero = el('section', 'of-sheet-who of-tree');
+      albero.append(el('h3', 'of-sheet-name'), el('div', 'of-tree-body'));
+    }
+    const con = [...people.keys()].filter((id) => aiutanti(id).length);
+    if (!con.length) {
+      albero.remove();
+      return 0;
+    }
+    albero.firstChild.textContent = t('office.tree');
+    const corpo = albero.lastChild;
+    const righe = [];
+    let n = 0;
+    for (const id of con) {
+      righe.push(el('div', 'of-tree-capo', people.get(id).pname.textContent));
+      for (const a of aiutanti(id)) {
+        n++;
+        const r = el('div', 'of-tree-row ' + (a.status || 'pending'));
+        r.style.setProperty('--lv', String(Math.max(1, a.depth || 1)));
+        r.dataset.livello = String(a.depth || 1);
+        r.append(el('i', 'of-tree-dot'), el('span', 'of-tree-txt', a.title || a.type || ''));
+        if (a.type) r.append(el('span', 'of-tree-type', a.type));
+        const quanto =
+          a.status === 'in_progress' && a.since
+            ? t('office.since', { time: durata(Date.now() - a.since) })
+            : a.ms
+              ? t('office.took', { time: durata(a.ms) })
+              : '';
+        if (quanto) r.append(el('span', 'of-tree-time', quanto));
+        r.title = [a.title, a.doing || a.summary || ''].filter(Boolean).join(' — ');
+        righe.push(r);
+      }
+    }
+    corpo.replaceChildren(...righe);
+    sheetBody.append(albero);
+    return n;
   }
 
   function paintStaff() {
@@ -1180,9 +1331,8 @@ window.OFFICE = (() => {
         // fra le due non parte mai.
         if (Math.hypot(qx - fx, qy - fy) > 2) chi.andata = entra(chi, capo, i);
       }
-      const cosa = it.activeForm || it.content || '';
-      // Se la tiene addosso: e' quello che dice quando parla del suo lavoro, ed e'
-      // quello che si legge cliccandolo nella fascia in cima.
+      const cosa = it.title || it.type || '';
+      // Se la tiene addosso: e' quello che dice quando parla del suo lavoro.
       chi.cosa = cosa;
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
@@ -1367,7 +1517,11 @@ window.OFFICE = (() => {
       // dentro non si sarebbe mai sentita una parola.
       if (d <= VICINO && Math.random() < 0.6) {
         chi.zitto = ora;
-        const fatte = (board[chi.capoId] && board[chi.capoId].done) || 0;
+        // Le cose fatte per quel capo: i passi del suo piano chiusi e gli aiutanti
+        // che hanno finito bene. Il numero dev'essere vero, o e' una presa in giro.
+        const fatte =
+          ((board[chi.capoId] && board[chi.capoId].done) || 0) +
+          aiutanti(chi.capoId).filter((a) => a.status === 'completed').length;
         const pescate = fatte > 0 ? ADULAZIONE_N.concat(ADULAZIONE) : ADULAZIONE;
         window.ROOM.parla(chi, caso(pescate).replace('{n}', fatte));
       } else if (d > LONTANO && Math.random() < 0.35) {

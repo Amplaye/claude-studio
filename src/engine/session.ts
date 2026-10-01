@@ -518,9 +518,10 @@ export class Session {
   /**
    * I messaggi di sistema con cui la CLI racconta le sue task.
    *
-   *   task_started   e' nata, e si chiama cosi'
-   *   task_progress  sta facendo questo, adesso
-   *   task_updated   e' cambiata: quasi sempre "completed" o "failed"
+   *   task_started       e' nata, si chiama cosi', e l'ha lanciata questa chiamata
+   *   task_progress      sta facendo questo, adesso
+   *   task_updated       e' cambiata: quasi sempre "completed" o "failed"
+   *   task_notification  e' finita: com'e' andata, e il riassunto
    *
    * Le `skip_transcript` sono faccende interne che nel discorso non si vedono — ma
    * in un pannello delle task ci vanno eccome, e la documentazione dell'SDK lo dice
@@ -529,24 +530,71 @@ export class Session {
   private onTask(m: {
     subtype?: string;
     task_id?: string;
+    tool_use_id?: string;
     description?: string;
+    subagent_type?: string;
+    task_type?: string;
+    workflow_name?: string;
+    spawn_depth?: number;
+    prompt?: string;
+    last_tool_name?: string;
+    summary?: string;
+    status?: string;
+    ambient?: boolean;
+    usage?: { duration_ms?: number };
     patch?: { status?: string; description?: string };
   }) {
     const id = String(m.task_id || '');
     if (!id) return;
+    // Chi e' e per chi lavora si sa solo qui: la CLI lo dice una volta, alla nascita,
+    // e il resto del filo parla per task_id. Buttarlo voleva dire un ufficio di gente
+    // tutta uguale, senza capo e senza compito.
+    const toolUseId = m.tool_use_id || undefined;
+    const ms = typeof m.usage?.duration_ms === 'number' ? m.usage.duration_ms : undefined;
     if (m.subtype === 'task_started') {
-      this.o.emit({ k: 'task', id, description: m.description, status: 'running' });
+      this.o.emit({
+        k: 'task',
+        id,
+        description: m.description,
+        status: 'running',
+        toolUseId,
+        depth: typeof m.spawn_depth === 'number' ? m.spawn_depth : undefined,
+        type: m.subagent_type || kindOf(m.task_type, m.workflow_name),
+        brief: m.prompt ? String(m.prompt).slice(0, 600) : undefined,
+        ambient: m.ambient || undefined,
+      });
     } else if (m.subtype === 'task_progress') {
       // Qui `description` non e' il nome della task: e' cosa sta facendo in questo
       // momento ("Running find …"), che e' la riga che il pannello mostra al posto
       // del nome finche' la task e' quella in corso.
-      this.o.emit({ k: 'task', id, doing: m.description });
+      this.o.emit({
+        k: 'task',
+        id,
+        doing: m.description,
+        toolUseId,
+        type: m.subagent_type || undefined,
+        lastTool: m.last_tool_name || undefined,
+        ms,
+        summary: m.summary || undefined,
+      });
     } else if (m.subtype === 'task_updated') {
       this.o.emit({
         k: 'task',
         id,
         description: m.patch?.description,
         status: m.patch?.status as never,
+      });
+    } else if (m.subtype === 'task_notification') {
+      // La fine, detta per bene: com'e' andata e il riassunto. Con gli aiutanti in
+      // sottofondo e' l'unico segnale che il lavoro e' finito davvero — il turno puo'
+      // essersi chiuso da un pezzo.
+      this.o.emit({
+        k: 'task',
+        id,
+        status: m.status as never,
+        toolUseId,
+        ms,
+        summary: m.summary || undefined,
       });
     }
   }
@@ -948,6 +996,30 @@ export class Session {
         text: flatten(b.content),
       });
     }
+  }
+}
+
+/**
+ * Il genere di una task che non e' un sub-agent: una shell in sottofondo, un
+ * workflow, uno strumento MCP lasciato a lavorare. Nell'ufficio sono gente al lavoro
+ * come gli altri, e "Bash" dice che cosa sono meglio di un nome vuoto.
+ */
+function kindOf(type?: string, workflow?: string): string | undefined {
+  switch (type) {
+    case undefined:
+    case '':
+    case 'local_agent':
+      return undefined;
+    case 'local_bash':
+      return 'Bash';
+    case 'local_workflow':
+      return workflow || 'Workflow';
+    case 'remote_agent':
+      return 'Remote';
+    case 'mcp_task':
+      return 'MCP';
+    default:
+      return type;
   }
 }
 
