@@ -652,7 +652,9 @@ t(
 // della scheda, e sarebbero cinque buste in faccia per niente. Il conto e' un
 // buco facile da rifare — basta segnare "gia' visto" solo quando qualcosa cambia,
 // e chi nasce fermo la sua prima busta non la manda mai.
-const buste = () => page.locator('.of-mail').count();
+// Solo le buste di turno: quelle del lavoro passato di mano hanno la loro classe e
+// il loro conto, piu' giu'.
+const buste = () => page.locator('.of-mail.su, .of-mail.giu').count();
 
 await ctx(data([]));
 await page.waitForTimeout(1400);
@@ -1175,6 +1177,264 @@ if (vicini.padre && vicini.figlio) {
   t(d <= 120, 'l’aiutante dell’aiutante si e’ seduto lontano da chi l’ha lanciato: ' + Math.round(d) + 'px');
 }
 
+// ---- le buste del lavoro passato di mano ----
+//
+// Il compito vola dalla scrivania di chi lo da' alla bacheca quando nasce un aiutante
+// — solo per chi nasce adesso, o aprendo l'ufficio partirebbero tutte insieme.
+// L'esito torna indietro quando l'aiutante ha finito davvero, verde o rosso, e NON
+// quando se ne va perche' il suo capo ha chiuso la conversazione. I messaggi fra
+// aiutanti volano da una scrivania all'altra (chi non e' nella stanza riceve dalla
+// porta), e quattro fra la stessa coppia in due minuti fanno un rimpallo.
+//
+// Una busta dura un secondo e mezzo: si raccolgono mentre partono, con da dove e per
+// dove, invece di sperare di guardare la stanza nell'istante giusto.
+await ctx(data([]));
+await tasks({});
+await fermi();
+await page.evaluate(() => {
+  window.__buste = [];
+  new MutationObserver((muts) => {
+    for (const m of muts) {
+      for (const n of m.addedNodes) {
+        if (!n.classList || !n.classList.contains('of-mail')) continue;
+        const p = (n.style.offsetPath.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+        window.__buste.push({ cls: [...n.classList], da: p.slice(0, 2), a: p.slice(4, 6) });
+      }
+    }
+  }).observe(document.querySelector('.of-stage'), { childList: true });
+});
+/** Le buste partite con tutte queste classi. */
+const partite = (...cls) =>
+  page.evaluate((c) => window.__buste.filter((b) => c.every((k) => b.cls.includes(k))), cls);
+/*
+ * Una persona della stanza, per nome: un capo si riconosce da come comincia la sua
+ * etichetta, un aiutante da come finisce il suo titolo ("Capo · lavoro") — che
+ * contiene anche il nome del capo, e cercarlo e basta li confonderebbe.
+ */
+await page.evaluate(() => {
+  window.__trova = (nome) =>
+    [...document.querySelectorAll('.of-guy')].find((x) =>
+      x.classList.contains('of-staff')
+        ? (x.title || '').endsWith('· ' + nome)
+        : (x.getAttribute('aria-label') || '').startsWith(nome + ' ')
+    );
+});
+/** Dove sta qualcuno, all'altezza delle mani: e' li' che parte e arriva una busta. */
+const mani = (nome) =>
+  page.evaluate((s) => {
+    const n = window.__trova(s);
+    return n ? [parseFloat(n.style.left) + 8, parseFloat(n.style.top) + 12] : null;
+  }, nome);
+const vicino = (p, q, r = 3) => !!p && !!q && Math.hypot(p[0] - q[0], p[1] - q[1]) <= r;
+/** Gli aiutanti seduti, cioe' arrivati al loro posto (scrivania o sgabello). */
+const sedutiStaff = (n) =>
+  page.evaluate((n) => {
+    const posti = [...ROOM.DESKS.map((_, i) => ROOM.posto(i)), ...ROOM.SGABELLI].map((c) => [c.x + 8, c.y + 24]);
+    const s = [...document.querySelectorAll('.of-staff:not(.via)')];
+    return (
+      s.length === n &&
+      s.every((e) => {
+        const x = parseFloat(e.style.left) + 8;
+        const y = parseFloat(e.style.top) + 24;
+        return posti.some(([px, py]) => Math.hypot(px - x, py - y) <= 2) && !e.classList.contains('archivio');
+      })
+    );
+  }, n);
+const aspetta = async (cond, ms) => {
+  for (let i = 0; i < ms / 400; i++) {
+    if (await cond()) return true;
+    await page.waitForTimeout(400);
+  }
+  return false;
+};
+
+await ctx(
+  data([
+    card({ id: 'posta-a', name: 'Chi da il lavoro', busy: true }),
+    card({ id: 'posta-b', name: 'Chi se ne andra', busy: true }),
+  ])
+);
+await fermi();
+const cinqueFa = Date.now() - 60000;
+const turnoA = (agents, over = {}) => ({ items: [], agents, done: 0, total: 0, active: -1, busy: true, ...over });
+await tasks({
+  'posta-a': turnoA([
+    A('pa1', 'Nato adesso', 'in_progress', { since: Date.now() }),
+    A('pa2', 'Gia al lavoro', 'in_progress', { since: cinqueFa }),
+  ]),
+  'posta-b': turnoA([A('pb1', 'Del capo che se ne va', 'in_progress', { since: Date.now() })]),
+});
+await page.waitForTimeout(300);
+const compiti = await partite('compito');
+t(compiti.length === 2, 'le buste del compito sono ' + compiti.length + ' invece di 2 — una per chi nasce adesso, nessuna per chi lavorava gia’');
+const bacheca = await page.evaluate(() => [ROOM.BACHECHE.muro.griglia[0] + 14, ROOM.BACHECHE.muro.griglia[1] + 8]);
+const scrivaniaCapo = await mani('Chi da il lavoro');
+t(
+  compiti.every((b) => vicino(b.a, bacheca)) && compiti.some((b) => vicino(b.da, scrivaniaCapo)),
+  'la busta del compito non va dalla scrivania di chi lo da’ alla bacheca: ' + JSON.stringify({ compiti, bacheca, scrivaniaCapo })
+);
+t(await aspetta(() => sedutiStaff(3), 30000), 'gli aiutanti nati per la posta non si sono seduti');
+
+// pa1 finisce bene, pa2 male; pb1 sta ancora lavorando quando il suo capo chiude.
+await tasks({
+  'posta-a': turnoA([A('pa1', 'Nato adesso', 'completed'), A('pa2', 'Gia al lavoro', 'failed')]),
+  'posta-b': turnoA([A('pb1', 'Del capo che se ne va', 'in_progress')]),
+});
+await ctx(data([card({ id: 'posta-a', name: 'Chi da il lavoro', busy: true })]));
+t(
+  await aspetta(async () => (await page.locator('.of-staff').count()) === 0, 40000),
+  'chi ha finito (o ha perso il capo) non se n’e’ andato'
+);
+const esiti = await partite('esito');
+const storti = await partite('esito', 'ko');
+t(esiti.length === 2, 'le buste dell’esito sono ' + esiti.length + ' invece di 2 — una per chi ha finito, nessuna per chi ha perso il capo');
+t(storti.length === 1, 'la busta di chi e’ andato male non e’ rossa: ' + storti.length);
+t(
+  esiti.every((b) => vicino(b.da, bacheca) && vicino(b.a, scrivaniaCapo)),
+  'l’esito non torna dalla bacheca alla scrivania di chi aveva dato il lavoro: ' + JSON.stringify({ esiti, scrivaniaCapo })
+);
+
+// I messaggi. Due aiutanti seduti, e tre lettere: una dall'uno all'altro, una vecchia
+// (non deve volare: e' arrivata quando non guardavi) e una a qualcuno che qui non c'e'.
+const m12 = (over = {}) =>
+  turnoA(
+    [
+      A('m1', 'Chi scrive', 'in_progress', { since: cinqueFa, lastTool: 'Read' }),
+      A('m2', 'Chi risponde', 'in_progress', { since: cinqueFa }),
+    ],
+    { lastTool: 'Read', ...over }
+  );
+await tasks({ 'posta-a': m12() });
+t(await aspetta(() => sedutiStaff(2), 30000), 'i due che si scrivono non si sono seduti');
+await page.waitForTimeout(800);
+await page.evaluate(() => (window.__buste = []));
+const lettera = (id, from, to, over = {}) => ({ id, from, to, text: 'Hai finito di contare?', at: Date.now(), ...over });
+const lettere = [
+  lettera('sm1', 'm1', 'm2'),
+  // Fuori anche dalla finestra del rimpallo: tre minuti fa.
+  lettera('sm0', 'm2', 'm1', { at: Date.now() - 180000 }),
+  lettera('sm2', 'm1', null, { out: true, toName: 'sconosciuto' }),
+];
+await tasks({ 'posta-a': m12({ mail: lettere }) });
+await page.waitForTimeout(300);
+const msg = await partite('lettera');
+const [m1, m2] = [await mani('Chi scrive'), await mani('Chi risponde')];
+const porta = await page.evaluate(() => ROOM.INGRESSO);
+t(msg.length === 2, 'le buste dei messaggi sono ' + msg.length + ' invece di 2 (quella vecchia non deve volare)');
+t(msg[0] && vicino(msg[0].da, m1) && vicino(msg[0].a, m2), 'il messaggio non vola da chi scrive a chi risponde: ' + JSON.stringify({ msg, m1, m2 }));
+t(msg[1] && vicino(msg[1].a, porta), 'il messaggio a chi non e’ nella stanza non esce dalla porta: ' + JSON.stringify({ msg, porta }));
+// Rispedire lo stesso quadro non rispedisce le buste: ognuna vola una volta sola.
+await tasks({ 'posta-a': m12({ mail: lettere, doing: 'ancora' }) });
+await page.waitForTimeout(300);
+t((await partite('lettera')).length === 2, 'lo stesso messaggio e’ volato due volte');
+
+// Il rimpallo: altre tre fra gli stessi due, e sono quattro in due minuti.
+const rimpallo = lettere.concat([lettera('sm3', 'm2', 'm1'), lettera('sm4', 'm1', 'm2'), lettera('sm5', 'm2', 'm1')]);
+await tasks({ 'posta-a': m12({ mail: rimpallo }) });
+await page.waitForTimeout(300);
+const segnate = await page.evaluate(() =>
+  [...document.querySelectorAll('.of-chi.rimpallo')].map((p) => [p.querySelector('.of-chi-nome').textContent, p.querySelector('.of-chi-rimpallo').textContent])
+);
+t(
+  segnate.length === 2 && segnate.every(([, n]) => n === '⇄ 4') && segnate.map(([nome]) => nome).sort().join('|') === 'Chi risponde|Chi scrive',
+  'il rimpallo non segna le due pedine con quattro buste: ' + JSON.stringify(segnate)
+);
+await page.locator('.of-kanban').click();
+await page.waitForTimeout(300);
+const rigaRimpallo = await page.evaluate(() => [...document.querySelectorAll('.of-sheet .of-tree-rimpallo')].map((n) => n.textContent));
+t(
+  rigaRimpallo.length === 1 && /Chi scrive/.test(rigaRimpallo[0]) && /Chi risponde/.test(rigaRimpallo[0]) && /\b4\b/.test(rigaRimpallo[0]),
+  'il foglio della bacheca non dice chi si sta scrivendo troppo: ' + JSON.stringify(rigaRimpallo)
+);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+
+// ---- l'archivio ----
+//
+// Chi cerca nella memoria va allo scaffale dei faldoni a passo svelto, ne prende uno
+// e lo lascia sulla sua scrivania fino a fine lavoro; la scheda dice quali note. Il
+// capo e un aiutante insieme: e' l'unica eccezione al "chi lavora resta seduto".
+const archivio = (over = {}) =>
+  turnoA(
+    [
+      A('m1', 'Chi scrive', 'in_progress', { since: cinqueFa, lastTool: 'mcp__memoria__memory_read', consulted: ['nota-x'] }),
+      A('m2', 'Chi risponde', 'in_progress', { since: cinqueFa }),
+    ],
+    { mail: rimpallo, lastTool: 'mcp__memoria__memory_search', consulted: ['deploy-venerdi', 'stampanti'], ...over }
+  );
+await tasks({ 'posta-a': archivio() });
+await page.waitForTimeout(700);
+const inArchivio = await page.evaluate(() => [...document.querySelectorAll('.of-guy.archivio')].map((n) => n.title || n.getAttribute('aria-label')));
+t(inArchivio.length === 2, 'chi ha cercato nella memoria non si e’ alzato per l’archivio: ' + JSON.stringify(inArchivio));
+t(
+  await aspetta(async () => !(await page.locator('.of-guy.archivio').count()), 40000),
+  'il giro dell’archivio non finisce'
+);
+const faldoni = await page.evaluate(() => {
+  const posti = ROOM.DESKS.map((_, i) => ROOM.posto(i));
+  return [...document.querySelectorAll('.of-faldone.posato')].map((f) => {
+    const x = parseFloat(f.style.left);
+    const y = parseFloat(f.style.top);
+    // Il faldone sta sul piano di una scrivania, accanto al monitor.
+    return posti.some((p) => Math.abs(x - (p.x - 10)) <= 1 && Math.abs(y - (p.y - 8)) <= 1);
+  });
+});
+t(faldoni.length === 2 && faldoni.every(Boolean), 'i faldoni non sono sulle scrivanie di chi li ha presi: ' + JSON.stringify(faldoni));
+const tornati = await page.evaluate(() => {
+  const posti = ROOM.DESKS.map((_, i) => ROOM.posto(i));
+  return ['Chi da il lavoro', 'Chi scrive']
+    .map((nome) => window.__trova(nome))
+    .map((n) => !!n && posti.some((p) => Math.abs(parseFloat(n.style.left) - p.x) <= 1 && Math.abs(parseFloat(n.style.top) - p.y) <= 1));
+});
+t(tornati.length === 2 && tornati.every(Boolean), 'chi e’ andato in archivio non e’ tornato al suo posto: ' + JSON.stringify(tornati));
+// La scheda dice cosa hanno consultato: solo i nomi delle note.
+await page.locator('.of-chi', { hasText: 'Chi da il lavoro' }).click();
+await page.waitForTimeout(200);
+const memoCapo = await page.evaluate(() => document.querySelector('.of-scheda-memo').textContent);
+t(memoCapo === 'Consulted: deploy-venerdi, stampanti', 'la scheda del capo non dice cosa ha consultato: ' + memoCapo);
+await page.keyboard.press('Escape');
+await page.locator('.of-chi', { hasText: 'Chi scrive' }).click();
+await page.waitForTimeout(200);
+const memoAiuto = await page.evaluate(() => document.querySelector('.of-scheda-memo').textContent);
+t(memoAiuto === 'Consulted: nota-x', 'la scheda dell’aiutante non dice cosa ha consultato: ' + memoAiuto);
+await page.keyboard.press('Escape');
+// Un'altra ricerca subito dopo non e' un altro viaggio: uno ogni tanto per persona.
+await tasks({ 'posta-a': archivio({ lastTool: 'Read' }) });
+await tasks({ 'posta-a': archivio() });
+await page.waitForTimeout(700);
+t(!(await page.locator('.of-guy.archivio').count()), 'una seconda ricerca subito dopo rimanda in archivio');
+// Fine del turno: il faldone del capo torna in archivio. Quello dell'aiutante resta
+// finche' lavora, e se ne va con lui.
+await ctx(data([card({ id: 'posta-a', name: 'Chi da il lavoro', busy: false, done: true })]));
+await page.waitForTimeout(300);
+t((await page.locator('.of-faldone.posato').count()) === 1, 'a fine turno il faldone del capo resta sulla scrivania');
+await tasks({
+  'posta-a': archivio({
+    busy: false,
+    agents: [A('m1', 'Chi scrive', 'completed'), A('m2', 'Chi risponde', 'completed')],
+  }),
+});
+await page.waitForTimeout(1500);
+t(!(await page.locator('.of-faldone').count()), 'chi se ne va lascia il faldone sulla scrivania');
+
+// ---- e con le animazioni ridotte le buste non restano appese ----
+await page.emulateMedia({ reducedMotion: 'reduce' });
+await page.evaluate(() => (window.__buste = []));
+await tasks({
+  'posta-a': archivio({ busy: false, agents: [], mail: [lettera('sm9', null, null, { out: true, toName: 'fuori' })] }),
+});
+await page.waitForTimeout(250);
+t((await partite('lettera')).length === 1, 'con le animazioni ridotte la busta non parte nemmeno');
+t(!(await page.locator('.of-mail.lettera').count()), 'con le animazioni ridotte la busta del messaggio resta appesa');
+// E quelle dell'esito di chi sta uscendo adesso: nemmeno quelle restano in aria.
+t(
+  await aspetta(async () => (await page.locator('.of-staff').count()) === 0, 40000),
+  'chi ha finito non se n’e’ andato, con le animazioni ridotte'
+);
+await page.waitForTimeout(300);
+t(!(await page.locator('.of-mail').count()), 'con le animazioni ridotte delle buste restano appese: ' + (await page.locator('.of-mail').count()));
+await page.emulateMedia({ reducedMotion: null });
+
 // ---- le tazze ----
 //
 // Quattro, e sono quelle: girano fra la rastrelliera, la mano di chi le porta e
@@ -1206,5 +1466,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la fascia in cima, la bacheca, l’aura del capo e le tazze'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la fascia in cima, la bacheca, l’aura del capo, le buste del lavoro, il rimpallo, l’archivio e le tazze'
 );

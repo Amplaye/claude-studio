@@ -345,6 +345,18 @@ dei permessi, il plan mode, la memoria o il filo delle task.
 quindi non c'e' una conversazione da riaprire — si danno allo store le notizie
 nell'ordine del motore (prima la chiamata Agent col suo filo, poi la `task_started` con
 l'id di quella chiamata) e si guarda che il piano resti intero e il genitore sia giusto.
+Sullo stesso store prova le buste e l'archivio: chi scrive a chi (`SendMessage` per
+nome dell'Agent, per id della task, per l'`agentId` restituito al modello, col
+riferimento di ListAgents in coda, e uno sconosciuto che resta col suo nome) e quali
+note ha consultato chi, che al messaggio dopo si azzerano.
+
+`office-check` raccoglie le buste mentre partono (durano un secondo e mezzo), con da
+dove e per dove: il compito alla nascita di un aiutante — solo di chi nasce adesso —,
+l'esito a lavoro finito e non quando il capo chiude, i messaggi fra due scrivanie o
+verso la porta, il rimpallo alla quarta busta, il giro all'archivio col faldone sulla
+scrivania (uno ogni 45 secondi per persona, via a fine turno), e con le animazioni
+ridotte nessuna busta che resti appesa. `ui-check` prova che la bozza resti alla sua
+conversazione quando l'ufficio cambia quella della scheda, anche dopo un reload.
 
 `router-check` e' l'unico che **spende**: sono turni veri su modelli veri, e il giro
 intero costa qualche dollaro e una decina di minuti. Serve a rispondere a una

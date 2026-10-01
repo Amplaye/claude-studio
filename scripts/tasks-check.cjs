@@ -642,6 +642,74 @@ function agents() {
   // Conversazione azzerata: non resta nessuno.
   store.clear(K);
   t(!(now().agents || []).length, 'dopo l’azzeramento restano degli aiutanti: ' + crew());
+
+  // ---- le buste e l'archivio ----
+  //
+  // Chi scrive a chi (SendMessage) e chi ha consultato cosa nella memoria. Il
+  // destinatario si trova per nome dell'Agent, per id della task o per l'agentId che la
+  // chiamata Agent ha restituito al modello; i nomi della conversazione stessa portano
+  // a lei, e uno sconosciuto resta col suo nome — nell'ufficio esce dalla porta.
+  const K2 = 'k-posta';
+  const SID2 = 'sid-posta';
+  own.adopt(K2, SID2, work);
+  const qui = () => last[SID2] || {};
+  store.setBusy(K2, true);
+  store.spawned(K2, 'tu-c', null, { description: 'Contare i file', name: 'contatore' });
+  store.fromCli(K2, 'task-c', { description: 'Contare i file', status: 'running', toolUseId: 'tu-c', depth: 1 });
+  store.spawned(K2, 'tu-l', null, { description: 'Leggere il README' });
+  store.fromCli(K2, 'task-l', { description: 'Leggere il README', status: 'running', toolUseId: 'tu-l', depth: 1 });
+  // La risposta della chiamata Agent: l'altro nome dell'aiutante, quello con cui il
+  // modello poi gli scrive.
+  store.answered(K2, 'tu-l', 'Async agent launched successfully.\nagentId: a7f3c9 (internal ID - do not mention to user.)');
+  store.messaged(K2, 'sm-1', null, { to: 'contatore', message: 'Quanti sono?' });
+  store.messaged(K2, 'sm-2', 'tu-c', { to: 'main', message: 'Sono 42' });
+  store.messaged(K2, 'sm-3', 'tu-c', { to: 'a7f3c9', message: { type: 'shutdown_request' } });
+  store.messaged(K2, 'sm-4', 'tu-l', { to: 'task-c', message: 'x'.repeat(300) });
+  store.messaged(K2, 'sm-5', null, { to: 'nessuno', message: 'Ci sei?' });
+  store.messaged(K2, 'sm-1', null, { to: 'contatore', message: 'Quanti sono?' }); // la stessa chiamata, due volte
+  // Il nome col riferimento che ListAgents mette accanto: il destinatario e' lo stesso.
+  store.messaged(K2, 'sm-6', 'tu-l', { to: 'contatore [3fa9c1]', message: 'Fatto' });
+  const mail = qui().mail || [];
+  const busta = (m) => `${m.id}:${m.from || '-'}>${m.to || (m.out ? 'fuori:' + m.toName : '-')}`;
+  t(
+    mail.map(busta).join(' ') ===
+      'sm-1:->task-c sm-2:task-c>- sm-3:task-c>task-l sm-4:task-l>task-c sm-5:->fuori:nessuno sm-6:task-l>task-c',
+    'chi scrive a chi non e’ quello giusto: ' + mail.map(busta).join(' ')
+  );
+  t(mail[3] && mail[3].text.length === 120 && mail[3].text.endsWith('…'), 'un messaggio lungo non e’ tagliato a 120: ' + (mail[3] && mail[3].text.length));
+  t(mail[2] && /shutdown_request/.test(mail[2].text), 'un messaggio che non e’ testo si perde: ' + JSON.stringify(mail[2]));
+  t(mail.every((m) => typeof m.at === 'number' && m.at > 0), 'un messaggio non dice quando e’ partito: ' + JSON.stringify(mail));
+
+  // L'archivio: la conversazione cerca, un aiutante legge una nota.
+  store.doing(K2, 'Memoria «stampanti»', 'mcp__memoria__memory_search');
+  t(qui().lastTool === 'mcp__memoria__memory_search', 'l’ultimo strumento del filo principale non arriva: ' + qui().lastTool);
+  store.consulting(K2, 'ms-1', null, 'mcp__memoria__memory_search', { query: 'stampanti' });
+  store.answered(
+    K2,
+    'ms-1',
+    'Note scritte in passato: valgono per la data indicata.\n\n' +
+      '1. fuoricitta-stampanti — Perché non stampava (project · 22/09/2026 · 1⚠️)\n   la stampante sta su una rete separata\n' +
+      '2. rt-cosa-e-provato [reference] — RT: provato e no (reference · 21/09/2026)\n'
+  );
+  store.consulting(K2, 'mr-1', 'tu-c', 'mcp__memoria__memory_read', { name: 'deploy-venerdi' });
+  t(
+    (qui().consulted || []).join(',') === 'fuoricitta-stampanti,rt-cosa-e-provato',
+    'le note trovate dalla ricerca non risultano consultate: ' + JSON.stringify(qui().consulted)
+  );
+  const contatore = (qui().agents || []).find((a) => a.id === 'task-c') || {};
+  t(
+    (contatore.consulted || []).join(',') === 'deploy-venerdi' && contatore.lastTool === 'mcp__memoria__memory_read',
+    'l’aiutante non dice cosa ha consultato: ' + JSON.stringify(contatore)
+  );
+  // Fine turno: la riga si svuota, il segnale resta. Il messaggio dopo azzera tutti e due.
+  store.doing(K2, '');
+  t(qui().lastTool === 'mcp__memoria__memory_search', 'a fine turno l’ultimo strumento si perde: ' + qui().lastTool);
+  store.newTurn(K2);
+  t(
+    !qui().consulted && !qui().lastTool,
+    'al messaggio dopo restano le note e lo strumento del turno prima: ' + JSON.stringify({ c: qui().consulted, l: qui().lastTool })
+  );
+  store.clear(K2);
   sub.dispose();
 }
 

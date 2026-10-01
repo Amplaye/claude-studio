@@ -23,7 +23,10 @@ const sprite = fs.readFileSync(path.join(root, 'media', 'ionicons.sprite.svg'), 
  * office-check continua a controllare che sia cosi'.
  */
 const stub = `<script>
-  window.acquireVsCodeApi = () => ({
+  // Senza memoria, di solito: ogni prova parte da una scheda vergine. Chi deve
+  // provare cosa resta dopo un reload (la bozza) se ne mette uno suo prima di
+  // caricare la pagina, e questo lo lascia stare.
+  window.acquireVsCodeApi ||= () => ({
     postMessage: (m) => { (window.__sent ||= []).push(m); },
     getState: () => ({}), setState: () => {},
   });

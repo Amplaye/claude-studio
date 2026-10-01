@@ -815,6 +815,16 @@ body.inoffice.linguette .top #btnNew {
 .of-tree-time {
   font-variant-numeric: tabular-nums;
 }
+/* Due che si scrivono di continuo: una riga sotto i loro nomi, col lilla delle
+   buste che si mandano. Si legge e basta — non ferma niente. */
+.of-tree-rimpallo {
+  margin: 2px 0 0 14px;
+  padding: 2px 7px;
+  border-left: 2px solid #b9a6e3;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.9;
+}
 .of-sheet-empty {
   margin: 0;
   padding: 16px 14px 18px;
@@ -1065,6 +1075,24 @@ body.inoffice.linguette .top #btnNew {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Il rimpallo: due frecce e quante buste, nel lilla dei messaggi che volano nella
+   stanza. Sulle due pedine della coppia, cosi' chi si scrive con chi si vede da
+   come sono segnate. */
+.of-chi.rimpallo {
+  border-color: #b9a6e3;
+}
+.of-chi-rimpallo {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, #b9a6e3 28%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.of-chi-rimpallo[hidden] {
+  display: none;
+}
 /* La faccia, piccola. Stessa striscia della stanza al naturale — sedici pixel
    dentro ventidue, tagliata dai piedi in giu'. */
 .of-facciola {
@@ -1139,9 +1167,19 @@ body.inoffice.linguette .top #btnNew {
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
+/* Le note prese dall'archivio — solo i nomi — e con chi si sta scrivendo troppo. */
+.of-scheda-memo,
+.of-scheda-rimpallo {
+  font-size: 10.5px;
+  line-height: 1.35;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
 .of-scheda-compito[hidden],
 .of-scheda-cosa[hidden],
-.of-scheda-extra[hidden] {
+.of-scheda-extra[hidden],
+.of-scheda-memo[hidden],
+.of-scheda-rimpallo[hidden] {
   display: none;
 }
 .of-scheda-pct {

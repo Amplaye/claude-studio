@@ -53,7 +53,8 @@
     "grid-outline",
     "volume-medium-outline",
     "arrow-undo-outline",
-    "library-outline"
+    "library-outline",
+    "mail-outline"
   ],
   "bar": {
     "studio-chat": "chatbubble-ellipses",

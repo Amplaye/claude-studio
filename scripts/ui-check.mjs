@@ -581,9 +581,36 @@ for (const surface of ['view', 'panel']) {
   await page.locator('.msg.user .recalled .rc-note').last().click();
   const sRec = await lastSent();
   t(sRec?.cmd === 'openFile' && sRec.path === memFile, 'a recalled note does not open in the editor: ' + JSON.stringify(sRec));
+  // ---- a message to a helper: one slim line, to whom and what ----
+  // In the office it is an envelope flying from one desk to another; in the chat it
+  // is a line like a Read, with its own icon — not a full card of JSON.
+  await post({
+    k: 'tool_start',
+    id: 'sm_1',
+    name: 'SendMessage',
+    input: { to: 'contatore', message: 'Hai finito di contare i file?' },
+    parent: null,
+  });
+  await page.waitForTimeout(80);
+  // While it runs: the envelope icon (when it is done the check takes its place).
+  const smIcon = await page.evaluate(
+    () => document.querySelector('.tool[data-tool="SendMessage"] .head .tool-ico use')?.getAttribute('href') || ''
+  );
+  t(smIcon === '#ion-mail', 'a SendMessage has no envelope icon: ' + smIcon);
+  await post({ k: 'tool_end', id: 'sm_1', ok: true, text: 'Message sent.' });
+  await page.waitForTimeout(120);
+  const smLine = await page.evaluate(() => {
+    const card = document.querySelector('.tool[data-tool="SendMessage"]');
+    return {
+      slim: !!card && card.classList.contains('slim'),
+      arg: card?.querySelector('.arg')?.textContent || '',
+    };
+  });
+  t(smLine.slim, 'a SendMessage is a full card instead of a slim line: ' + JSON.stringify(smLine));
+  t(smLine.arg === '→ contatore: Hai finito di contare i file?', 'a SendMessage does not say to whom and what: ' + JSON.stringify(smLine.arg));
   // Out of the way: the turn checked further down counts its own tools.
   await page.evaluate(() => {
-    for (const n of document.querySelectorAll('.tool[data-tool^="mcp__memoria__"]')) n.remove();
+    for (const n of document.querySelectorAll('.tool[data-tool^="mcp__memoria__"], .tool[data-tool="SendMessage"]')) n.remove();
   });
 
   // ---- the permission mode ----
@@ -1527,6 +1554,95 @@ for (const surface of ['view', 'panel']) {
   t(errors.length === 0, 'JS errors on the page (phase 4): ' + errors.join(' | '));
 
   await page.close();
+}
+
+// ---- la bozza resta alla sua conversazione ----
+//
+// Nell'ufficio una scheda tiene tante conversazioni, e la casella per scrivere e' una:
+// il testo non ancora mandato restava li' passando a un'altra dalla striscia, pronto
+// a partire verso chi non c'entrava niente. Qui si scrive in A, si passa a B (che deve
+// essere vuota), si scrive in B, e tornando su ognuna si ritrova la sua — allegati
+// compresi. Poi un reload: le chiavi dei controller cambiano, l'id della sessione no,
+// e la bozza di B deve tornare ripassando da B. E una chat che ricomincia nella stessa
+// faccia (stessa chiave: una conversazione nuova, una riaperta dalla cronologia) si
+// tiene il testo nella casella, com'e' sempre stato.
+{
+  const fails0 = fails.length;
+  /** Una scheda con la memoria vera di VS Code: quello che si mette da parte, resta. */
+  const stateful = (st) => {
+    window.__state = st;
+    window.acquireVsCodeApi = () => ({
+      postMessage: (m) => (window.__sent ||= []).push(m),
+      getState: () => window.__state,
+      setState: (s) => (window.__state = s),
+    });
+  };
+  const open = async (state) => {
+    const page = await browser.newPage({ viewport: { width: 1180, height: 900 }, colorScheme: 'dark' });
+    await page.addInitScript(stateful, state);
+    await page.goto(url);
+    return page;
+  };
+  const t = (cond, msg) => !cond && fails.push('[bozza] ' + msg);
+
+  let page = await open({});
+  const post = (m) => page.evaluate((x) => window.postMessage(x, '*'), m);
+  const box = () => page.evaluate(() => document.getElementById('input').value);
+  const chips = () => page.evaluate(() => document.querySelectorAll('#attach .att').length);
+  /** La faccia passa a un'altra conversazione, come fa la striscia dell'ufficio. */
+  const swap = async (key, sid, withSid = true) => {
+    await post({ k: 'reset' });
+    await post({ k: 'hello', cwd: '/x', project: 'x', cliVersion: '1', surface: 'panel', key, sid });
+    if (withSid) await post({ k: 'sid', id: sid });
+    await page.waitForTimeout(60);
+  };
+  await post({ k: 'hello', cwd: '/x', project: 'x', cliVersion: '1', surface: 'panel', key: 'chatA', sid: 'sid-a' });
+  await post({ k: 'sid', id: 'sid-a' });
+  await page.fill('#input', 'bozza di A');
+  await swap('chatB', 'sid-b');
+  t((await box()) === '', 'passando a un’altra conversazione il testo non mandato si porta dietro: ' + JSON.stringify(await box()));
+  await page.fill('#input', 'bozza di B');
+  await post({ k: 'attached', items: [{ path: 'C:/x/listino.pdf', name: 'listino.pdf', size: 2048 }] });
+  await page.waitForTimeout(60);
+  t((await chips()) === 1, 'l’allegato di B non si vede: ' + (await chips()));
+  await swap('chatA', 'sid-a');
+  t((await box()) === 'bozza di A', 'tornando su A la sua bozza non c’e’: ' + JSON.stringify(await box()));
+  t((await chips()) === 0, 'l’allegato di B e’ finito in A: ' + (await chips()));
+  await swap('chatB', 'sid-b');
+  t((await box()) === 'bozza di B', 'tornando su B la sua bozza non c’e’: ' + JSON.stringify(await box()));
+  t((await chips()) === 1, 'tornando su B il suo allegato si e’ perso: ' + (await chips()));
+
+  // La stessa chat che ricomincia: il testo resta nella casella.
+  await post({ k: 'sid', id: '' });
+  await post({ k: 'reset' });
+  await page.waitForTimeout(60);
+  t((await box()) === 'bozza di B', 'una conversazione nuova nella stessa faccia ha svuotato la casella: ' + JSON.stringify(await box()));
+  await post({ k: 'sid', id: 'sid-b' });
+
+  // Il reload. La faccia sta su A; B ha la sua bozza messa da parte sotto il suo id.
+  await swap('chatA', 'sid-a');
+  await page.waitForTimeout(400); // il salvataggio della casella aspetta un attimo
+  const st = await page.evaluate(() => window.__state);
+  t(st.drafts && st.drafts['sid-b'] === 'bozza di B', 'la bozza di B non e’ messa da parte sotto il suo id: ' + JSON.stringify(st.drafts));
+  t(st.draft === 'bozza di A', 'la casella della faccia non e’ quella di A: ' + JSON.stringify(st.draft));
+  await page.close();
+
+  page = await open(st);
+  // Chiavi nuove, come dopo un reload della finestra: la casella torna com'era.
+  await post({ k: 'hello', cwd: '/x', project: 'x', cliVersion: '1', surface: 'panel', key: 'chat1', sid: 'sid-a' });
+  await post({ k: 'sid', id: 'sid-a' });
+  await page.waitForTimeout(60);
+  t((await box()) === 'bozza di A', 'dopo il reload la casella non e’ quella di prima: ' + JSON.stringify(await box()));
+  await swap('chat2', 'sid-b');
+  t((await box()) === 'bozza di B', 'dopo il reload la bozza di B non torna: ' + JSON.stringify(await box()));
+  // E una conversazione che il suo id lo sa solo un attimo dopo: la bozza arriva con lui.
+  await swap('chat3', '', false);
+  t((await box()) === '', 'una conversazione senza id ha preso una bozza non sua: ' + JSON.stringify(await box()));
+  await post({ k: 'sid', id: 'sid-a' });
+  await page.waitForTimeout(60);
+  t((await box()) === 'bozza di A', 'la bozza non arriva quando la conversazione sa il suo id: ' + JSON.stringify(await box()));
+  await page.close();
+  if (fails.length === fails0) console.log('ui-check: la bozza resta alla sua conversazione');
 }
 
 // ---- the header at every sidebar width ----

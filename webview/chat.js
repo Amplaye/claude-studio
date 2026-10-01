@@ -146,6 +146,7 @@
     WebSearch: 'globe',
     Agent: 'people',
     Task: 'people',
+    SendMessage: 'mail',
     TodoWrite: 'list',
     Skill: 'cube',
     Artifact: 'layers',
@@ -219,6 +220,9 @@
     TaskUpdate: 1,
     TaskList: 1,
     ListAgents: 1,
+    // Un messaggio a un aiutante: una riga, a chi e cosa. Nell'ufficio e' una busta
+    // che vola da una scrivania all'altra.
+    SendMessage: 1,
   };
   /** Anche il ponte con l'editor: leggere gli errori o sapere quali file sono aperti
       non cambia niente sul disco. */
@@ -242,6 +246,13 @@
     if (name === 'TodoWrite' || name === PLAN_TOOL) {
       const n = (inp.todos || inp.steps || []).length;
       return n === 1 ? t('msg.item') : t('msg.items', { n });
+    }
+    // A chi, e cosa: "→ contatore: hai finito?". Il messaggio puo' anche non essere
+    // testo (una richiesta strutturata), e allora si legge com'e'.
+    if (name === 'SendMessage') {
+      const m = inp.message;
+      const what = typeof m === 'string' ? m : m != null ? JSON.stringify(m) : String(inp.summary || '');
+      return ((inp.to ? '→ ' + inp.to + ': ' : '') + what).replace(/\s+/g, ' ').slice(0, 200);
     }
     for (const k of ['command', 'file_path', 'path', 'pattern', 'query', 'url', 'description', 'prompt']) {
       const v = inp[k];
@@ -1856,7 +1867,13 @@
         cwd = m.cwd || '';
         if (m.tip) currentTip = m.tip;
         // Whatever was in the box when this face last went away.
-        {
+        //
+        // Solo al primo saluto della pagina. Un `hello` con un'altra chiave vuol dire
+        // che la faccia e' passata a un'altra conversazione (l'ufficio le cambia senza
+        // ricaricare): nella casella va la bozza di quella, e la tua resta alla sua.
+        if (m.key && convKey && m.key !== convKey) {
+          takeDraft(m.key, m.sid || '');
+        } else if (!convKey) {
           const draft = (vscode.getState() || {}).draft;
           if (draft && !input.value) {
             input.value = draft;
@@ -1864,6 +1881,7 @@
             input.setSelectionRange(draft.length, draft.length);
           }
         }
+        if (m.key) convKey = m.key;
         showEmpty();
         // Opening animation: the tab comes in whole, while the side panel
         // (which is always there) sticks to its own conversation.
@@ -1873,6 +1891,12 @@
         log.classList.add('fresh-open');
         break;
       case 'reset':
+        // La bozza si mette da parte adesso, sotto la conversazione che se ne va: e'
+        // l'ultimo momento in cui la faccia sa ancora qual era. Se poi arriva un
+        // `hello` con un'altra chiave la casella passa all'altra (`takeDraft`); se no
+        // e' la stessa chat che ricomincia, e il testo resta dov'e'.
+        draftAtSid = false;
+        keepDraft();
         // Conversazione cambiata: il conto di prima non e' piu' il tuo. Torna al
         // primo quadro dei consumi che arriva, con l'id nuovo.
         mySid = '';
@@ -1993,6 +2017,17 @@
         vscode.setState(Object.assign({}, vscode.getState() || {}, { sid: m.id || '' }));
         mySid = m.id || '';
         paintTok();
+        // La conversazione su cui la faccia e' appena passata sa adesso il suo id: se
+        // aveva una bozza messa da parte, e tu non hai ancora scritto niente, torna.
+        if (draftAtSid && mySid) {
+          draftAtSid = false;
+          const old = ((vscode.getState() || {}).drafts || {})[mySid];
+          if (old && !input.value && !images.length && !files.length) {
+            input.value = old;
+            grow();
+            writeDraft();
+          }
+        }
         break;
       case 'tabs':
         paintTabs(m.items || []);
@@ -2861,15 +2896,87 @@
   // remembers which conversation is in this tab. Half a paragraph typed and then a
   // reload, a theme change, a switch to another tab and back used to throw the lot
   // away, which is the cheapest possible way to lose real work.
+  //
+  // E la bozza e' della conversazione su cui l'hai scritta. Nell'ufficio una scheda
+  // sola ne tiene tante, e la casella e' una: passando a un'altra dalla striscia — o
+  // cliccando una persona nella stanza — il testo non ancora mandato restava li',
+  // pronto a partire verso chi non c'entrava niente. Adesso ognuna ha la sua: cambiando
+  // conversazione la tua resta dov'era, e tornandoci la ritrovi. Con gli allegati, che
+  // sono la stessa cosa: una foto incollata per una non deve finire nell'altra.
+  //
+  // Dentro la vita della pagina la conversazione si riconosce dalla chiave del suo
+  // controller (`hello.key`). Dopo un reload le chiavi sono nuove, e vale l'id della
+  // sessione: le bozze di chi ce l'ha si mettono da parte in `drafts` — solo il testo,
+  // perche' un'immagine in base64 nello stato della scheda e' una zavorra a ogni
+  // salvataggio. `draft` resta la casella di questa faccia, com'era.
   let draftTimer = 0;
+  /** La conversazione che questa faccia ha davanti: la chiave del suo controller. */
+  let convKey = '';
+  /** Le bozze delle conversazioni lasciate, per chiave: { text, images, files }. */
+  const bozze = new Map();
+  /** L'id sotto cui la casella e' stata messa da parte l'ultima volta. */
+  let savedSid = '';
+  /** Arrivata in una conversazione che non sapeva ancora il suo id: la bozza si cerca quando lo sa. */
+  let draftAtSid = false;
+  /** Quante bozze per id si tengono da parte: una scheda non deve ingrassare per sempre. */
+  const MAX_DRAFTS = 30;
+
   function saveDraft() {
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => {
-      vscode.setState(Object.assign({}, vscode.getState() || {}, { draft: input.value }));
-    }, 300);
+    draftTimer = setTimeout(writeDraft, 300);
+  }
+
+  function writeDraft() {
+    clearTimeout(draftTimer);
+    const st = Object.assign({}, vscode.getState() || {});
+    const drafts = Object.assign({}, st.drafts || {});
+    // La bozza segue la casella. Se la conversazione e' cambiata sotto di lei — una
+    // nuova, una riaperta dalla cronologia, nella stessa faccia — il testo e' rimasto
+    // nella casella, e quella di prima non lo tiene piu'. Il cambio di conversazione
+    // dell'ufficio no: li' la bozza resta a chi l'ha scritta (vedi `keepDraft`).
+    if (savedSid && savedSid !== mySid) delete drafts[savedSid];
+    if (mySid) {
+      delete drafts[mySid]; // in fondo all'elenco: e' la piu' recente
+      if (input.value) drafts[mySid] = input.value;
+    }
+    savedSid = mySid;
+    const ids = Object.keys(drafts);
+    for (const k of ids.slice(0, Math.max(0, ids.length - MAX_DRAFTS))) delete drafts[k];
+    vscode.setState(Object.assign(st, { draft: input.value, drafts }));
+  }
+
+  /** La faccia sta per lasciare questa conversazione: la sua bozza resta a lei. */
+  function keepDraft() {
+    if (convKey) bozze.set(convKey, { text: input.value, images, files });
+    writeDraft();
+  }
+
+  /**
+   * La faccia e' passata a un'altra conversazione (`hello` con un'altra chiave): nella
+   * casella va la bozza di quella — o niente, se non ne aveva.
+   */
+  function takeDraft(key, sid) {
+    const mine = bozze.get(key);
+    bozze.delete(key);
+    const stash = (vscode.getState() || {}).drafts || {};
+    const text = mine ? mine.text : (sid && stash[sid]) || '';
+    images = mine ? mine.images : [];
+    files = mine ? mine.files : [];
+    input.value = text;
+    grow();
+    paintAttach();
+    // Senza id ancora — una conversazione appena rimessa in piedi dopo un reload — la
+    // bozza messa da parte si cerca quando l'id arriva.
+    draftAtSid = !mine && !sid;
+    // L'id di questa faccia arriva fra un attimo (wire `sid`): fino ad allora la
+    // casella non e' di nessun id, e quella messa da parte sotto il suo resta dov'e'.
+    savedSid = '';
+    writeDraft();
   }
 
   input.addEventListener('input', () => {
+    // Hai cominciato a scrivere: e' questa la bozza, non una da ripescare.
+    draftAtSid = false;
     grow();
     refreshMenu();
     saveDraft();

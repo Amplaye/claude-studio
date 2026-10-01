@@ -206,6 +206,13 @@ export type Wire =
       surface: 'view' | 'panel';
       /** The line for the empty screen, already chosen: see src/chat/tips.ts. */
       tip?: { en: string; it: string } | null;
+      /**
+       * La conversazione che questa faccia ha davanti: la chiave del controller e l'id
+       * della sessione ('' se e' nuova). Serve alla bozza — il testo non mandato resta
+       * della conversazione su cui l'hai scritto, anche quando la faccia cambia.
+       */
+      key?: string;
+      sid?: string;
     }
   | { k: 'session'; id: string; model: string; cwd: string }
   // Quale conversazione sta in *questa* faccia. La pagina non la disegna: se la

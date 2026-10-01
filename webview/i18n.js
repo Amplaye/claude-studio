@@ -332,6 +332,9 @@
     'office.helpers1': '1 helper at work',
     'office.helpersN': '{n} helpers at work',
     'office.tree': 'Who works for whom',
+    'office.consulted': 'Consulted: {notes}',
+    'office.pingPong': '{n} letters back and forth with {name}',
+    'office.pingPongTree': '{a} and {b}: {n} letters in two minutes',
   };
 
   const IT = {
@@ -614,6 +617,9 @@
     'office.helpers1': '1 aiutante al lavoro',
     'office.helpersN': '{n} aiutanti al lavoro',
     'office.tree': 'Chi lavora per chi',
+    'office.consulted': 'Ha consultato: {notes}',
+    'office.pingPong': '{n} buste scambiate con {name}',
+    'office.pingPongTree': '{a} e {b} si sono scritti {n} volte in due minuti',
   };
 
   const DICT = { en: EN, it: IT };

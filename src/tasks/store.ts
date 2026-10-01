@@ -36,7 +36,7 @@
 // con l'albero di chi lavora per chi.
 import * as vscode from 'vscode';
 import { owned } from '../context/owned';
-import type { AgentItem, TaskBoard, TaskData, TaskItem } from './protocol';
+import type { AgentItem, MailItem, TaskBoard, TaskData, TaskItem } from './protocol';
 
 const EMPTY: TaskData = { items: [], done: 0, total: 0, active: -1, busy: false, doing: '' };
 
@@ -79,6 +79,8 @@ interface Agent {
   /** La durata detta dalla CLI, quando la dice. */
   ms?: number;
   endedAt?: number;
+  /** Le note della memoria che ha consultato. */
+  consulted?: string[];
 }
 
 /** Una chiamata Agent vista passare: da quale filo e' partita e cosa portava. */
@@ -93,6 +95,30 @@ interface Spawn {
 
 /** Quante chiamate Agent si ricordano al massimo: una conversazione lunga non cresce senza fine. */
 const MAX_SPAWNS = 300;
+/** I messaggi fra aiutanti che si tengono: bastano a contare un rimpallo di due minuti. */
+const MAX_MAIL = 20;
+/** Le note consultate che si nominano: oltre, la scheda diventa un elenco. */
+const MAX_CONSULTED = 8;
+/** Le chiamate alla memoria in volo, in attesa della risposta che dice cosa hanno trovato. */
+const MAX_MEMO = 50;
+
+/**
+ * I nomi con cui un aiutante scrive alla conversazione che l'ha lanciato, invece che a
+ * un altro aiutante. Non e' un elenco che la CLI pubblica: sono i nomi che si usano, e
+ * uno che manca porta la busta fuori dalla porta invece che alla scrivania del capo —
+ * un errore che si vede, non uno che rompe qualcosa.
+ */
+const AL_CAPO = /^(main|lead|leader|team-lead|parent|capo)$/i;
+
+/** "1. deploy-venerdi — …": le note che una ricerca nella memoria ha trovato (vedi memory/memory.ts). */
+function noteIn(text: string): string[] {
+  const out: string[] = [];
+  for (const riga of String(text || '').split(/\r?\n/)) {
+    const m = riga.match(/^\d+\. (\S+)(?: \[[^\]]*\])? — /);
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
 
 const finished = (s: TaskItem['status']) => s === 'completed' || s === 'failed';
 
@@ -114,6 +140,19 @@ interface List {
   agents: Agent[];
   /** Le chiamate Agent, sotto il loro id: e' da qui che un aiutante sa chi l'ha lanciato. */
   spawns: Map<string, Spawn>;
+  /**
+   * L'altro nome di un aiutante: l'`agentId` che la risposta della chiamata Agent da'
+   * al modello, e con cui il modello poi gli scrive. Sotto, la chiamata.
+   */
+  aliases: Map<string, string>;
+  /** L'ultimo strumento del filo principale: il segnale dell'archivio. */
+  lastTool: string;
+  /** Le note che il filo principale ha consultato in questo turno. */
+  consulted: string[];
+  /** Le chiamate alla memoria in volo: da quale filo, e quale strumento. */
+  memo: Map<string, { parent: string | null; tool: string }>;
+  /** I messaggi fra aiutanti, i piu' recenti. */
+  mail: MailItem[];
   /** Le TaskCreate in volo, sotto l'id della chiamata: aspettano il loro numero. */
   waiting: Map<string, Step>;
   /** Le TaskList in volo: la loro risposta e' l'elenco vero, e rimette tutto in riga. */
@@ -139,6 +178,11 @@ const blank = (): List => ({
   steps: [],
   agents: [],
   spawns: new Map(),
+  aliases: new Map(),
+  lastTool: '',
+  consulted: [],
+  memo: new Map(),
+  mail: [],
   waiting: new Map(),
   asked: new Set(),
   doing: '',
@@ -321,6 +365,22 @@ export class TaskStore {
   answered(key: string, callId: string, text: string) {
     const l = this.lists.get(key);
     if (!l) return;
+    // La risposta di una chiamata Agent porta l'altro nome dell'aiutante — l'agentId
+    // con cui il modello poi gli scrive. Si tiene, o quella busta non saprebbe dove andare.
+    if (l.spawns.has(callId)) {
+      const m = String(text || '').match(/agentId:\s*([A-Za-z0-9_-]+)/);
+      if (m) l.aliases.set(m[1], callId);
+      return;
+    }
+    // Quella di una ricerca nella memoria dice quali note ha trovato: sono quelle che
+    // chi l'ha fatta ha consultato.
+    const memo = l.memo.get(callId);
+    if (memo) {
+      l.memo.delete(callId);
+      const trovate = /_search$/.test(memo.tool) ? noteIn(text) : [];
+      if (trovate.length && this.consult(l, memo.parent, trovate)) this.settle(key, l);
+      return;
+    }
     if (l.asked.delete(callId)) {
       this.fromList(key, l, text);
       return;
@@ -430,6 +490,103 @@ export class TaskStore {
   }
 
   /**
+   * Una chiamata alla memoria, da qualunque filo. Chi l'ha fatta va all'archivio
+   * (l'ufficio lo vede da `lastTool`), e la sua scheda dira' cosa ha consultato: il
+   * nome della nota letta subito, quelle trovate da una ricerca quando arriva la
+   * risposta (vedi `answered`).
+   */
+  consulting(key: string, callId: string, parent: string | null, tool: string, input: unknown) {
+    if (!callId) return;
+    const l = this.of(key);
+    l.memo.set(callId, { parent, tool });
+    while (l.memo.size > MAX_MEMO) l.memo.delete(l.memo.keys().next().value as string);
+    // Un aiutante dice il suo ultimo strumento solo ogni tanto (task_progress): qui lo
+    // si sa subito, ed e' proprio il momento in cui alzarsi.
+    if (parent) {
+      const chi = l.agents.find((a) => a.toolUseId === parent);
+      if (chi) chi.lastTool = tool;
+    }
+    const name = (input as { name?: unknown } | null)?.name;
+    if (/_read$/.test(tool) && typeof name === 'string' && name.trim()) this.consult(l, parent, [name.trim()]);
+    this.settle(key, l);
+  }
+
+  /**
+   * Segna le note consultate da chi ha fatto la chiamata: la conversazione (`parent`
+   * vuoto) o l'aiutante del cui filo si tratta. Torna true se l'elenco e' cambiato.
+   */
+  private consult(l: List, parent: string | null, notes: string[]): boolean {
+    let list: string[];
+    if (parent) {
+      const chi = l.agents.find((a) => a.toolUseId === parent);
+      if (!chi) return false; // il filo di qualcuno che non conosciamo: non e' di nessuno qui
+      list = chi.consulted ??= [];
+    } else {
+      list = l.consulted;
+    }
+    let cambiato = false;
+    for (const n of notes) {
+      if (list.includes(n)) continue;
+      list.push(n);
+      cambiato = true;
+    }
+    if (list.length > MAX_CONSULTED) list.splice(0, list.length - MAX_CONSULTED);
+    return cambiato;
+  }
+
+  /**
+   * Un messaggio fra aiutanti (SendMessage), da qualunque filo.
+   *
+   * Il mittente e' il filo da cui parte: un aiutante, o la conversazione. Il
+   * destinatario e' `to`, che il modello scrive col nome dato all'Agent, con l'id
+   * della task o con l'agentId che la chiamata gli ha restituito; i nomi della
+   * conversazione stessa (AL_CAPO) portano a lei. Chi non e' nessuno di questi resta
+   * col suo nome, e nell'ufficio la busta esce dalla porta.
+   */
+  messaged(key: string, callId: string, parent: string | null, input: unknown) {
+    if (!callId) return;
+    const l = this.of(key);
+    if (l.mail.some((m) => m.id === callId)) return;
+    const o = (input ?? {}) as { to?: unknown; message?: unknown; summary?: unknown };
+    const from = parent ? l.agents.find((a) => a.toolUseId === parent) ?? null : null;
+    // "contatore [3fa9c1]": il nome col riferimento che ListAgents gli mette accanto
+    // quando due si chiamano uguale. Il destinatario lo dice il nome.
+    const to = typeof o.to === 'string' ? o.to.trim().replace(/\s*\[[^\]]*\]$/, '') : '';
+    const dest = to && !AL_CAPO.test(to) ? this.resolve(l, to) : null;
+    const raw =
+      typeof o.message === 'string'
+        ? o.message
+        : o.message != null
+          ? JSON.stringify(o.message)
+          : typeof o.summary === 'string'
+            ? o.summary
+            : '';
+    const text = raw.replace(/\s+/g, ' ').trim();
+    l.mail.push({
+      id: callId,
+      from: from ? from.id : null,
+      to: dest ? dest.id : null,
+      ...(to && !dest && !AL_CAPO.test(to) ? { out: true, toName: to.slice(0, 60) } : {}),
+      text: text.length > 120 ? text.slice(0, 119) + '…' : text,
+      at: Date.now(),
+    });
+    if (l.mail.length > MAX_MAIL) l.mail.splice(0, l.mail.length - MAX_MAIL);
+    this.settle(key, l);
+  }
+
+  /** Il destinatario di un messaggio: per nome, per id della task, o per agentId. */
+  private resolve(l: List, to: string): Agent | null {
+    const call = l.aliases.get(to);
+    return (
+      l.agents.find(
+        (a) =>
+          a.id === to ||
+          (a.toolUseId && (l.spawns.get(a.toolUseId)?.name === to || a.toolUseId === call))
+      ) ?? null
+    );
+  }
+
+  /**
    * Una notizia su un aiutante, da `task_started` / `task_progress` / `task_updated` /
    * `task_notification`.
    *
@@ -506,6 +663,14 @@ export class TaskStore {
     l.agents = l.agents.filter((a) => !finished(a.status));
     const vivi = new Set(l.agents.map((a) => a.toolUseId).filter(Boolean));
     for (const k of [...l.spawns.keys()]) if (!vivi.has(k)) l.spawns.delete(k);
+    for (const [alias, call] of [...l.aliases]) if (!vivi.has(call)) l.aliases.delete(alias);
+    // Le note consultate sono di questo turno: il faldone torna in archivio a fine
+    // lavoro, e la scheda del turno dopo non deve ricordarle come sue. E l'ultimo
+    // strumento con loro: l'ufficio si alza quando lo strumento *diventa* la memoria,
+    // e un turno chiuso con una ricerca lascerebbe il segnale gia' acceso — la prima
+    // ricerca del turno dopo non sarebbe un cambio, e nessuno andrebbe in archivio.
+    l.consulted = [];
+    l.lastTool = '';
     // Il vecchio sistema a task lo tiene il motore per tutta la sessione, e quello che
     // hai chiesto due messaggi fa e non e' ancora finito deve continuare a vedersi.
     // Solo un elenco scritto tutto intero (TodoWrite, il nostro `plan`) se ne va.
@@ -534,11 +699,15 @@ export class TaskStore {
    * sempre. Questa riga e' quello che rispondeva la frase fissa "sto capendo cosa
    * fare", tranne che questa e' vera.
    */
-  doing(key: string, text: string) {
+  doing(key: string, text: string, tool = '') {
     const l = this.of(key);
     const v = String(text || '').slice(0, 90);
-    if (l.doing === v) return;
+    // Lo strumento resta anche quando il turno finisce e la riga si svuota: e' il
+    // segnale dell'archivio, e conta quando cambia, non quando tace.
+    const t = tool || l.lastTool;
+    if (l.doing === v && l.lastTool === t) return;
     l.doing = v;
+    l.lastTool = t;
     // La scia. Un passo che comincia si aggiunge in fondo; la riga vuota di fine
     // turno no — quella dice "fermo", non e' un passo, e cancellerebbe l'ultimo.
     if (v && l.trail[l.trail.length - 1] !== v) {
@@ -629,6 +798,9 @@ export class TaskStore {
         ? { activeSince: l.steps[active].startedAt, expectedMs: expected(l.steps) }
         : {}),
       ...(agents.length ? { agents } : {}),
+      ...(l.lastTool ? { lastTool: l.lastTool } : {}),
+      ...(l.consulted.length ? { consulted: l.consulted.slice() } : {}),
+      ...(l.mail.length ? { mail: l.mail.slice() } : {}),
     };
     this.lists.set(key, l);
     this.emit();
@@ -684,6 +856,7 @@ export class TaskStore {
         ...(ms ? { ms } : {}),
         ...(a.summary ? { summary: a.summary } : {}),
         ...(a.ambient ? { ambient: true } : {}),
+        ...(a.consulted?.length ? { consulted: a.consulted.slice() } : {}),
       };
     };
     const walk = (parentId: string | null, depth: number) => {

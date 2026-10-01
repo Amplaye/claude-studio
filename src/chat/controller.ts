@@ -159,6 +159,9 @@ function absolute(p: string): string {
  */
 const OUR_TOOLS = /^mcp__(editor|memoria)__/;
 
+/** Le due chiamate alla memoria: nell'ufficio, chi le fa va all'archivio. */
+const MEMORY_TOOL = /^mcp__memoria__memory_(search|read)$/;
+
 /** Le modalita' che la testata sa mostrare. `dontAsk` e `auto` la CLI le conosce, noi no. */
 const MODES = new Set<string>(['default', 'acceptEdits', 'plan', 'bypassPermissions']);
 
@@ -265,6 +268,13 @@ export class ChatController {
    * sua conversazione, quella ha la precedenza e questa si lascia sostituire.
    */
   private provisional = false;
+  /**
+   * Si sta ridisegnando una trascrizione. Gli eventi passano dalla stessa strada di
+   * quelli vivi, ed e' giusto per il piano e per le card; ma una ricerca nella memoria
+   * o un messaggio fra aiutanti di ieri, ripassati tutti d'un fiato, nell'ufficio
+   * farebbero alzare qualcuno adesso e volare dieci buste insieme.
+   */
+  private replaying = false;
   /** Permessi in attesa di risposta, per tool_use_id. */
   private pending = new Map<string, Pending>();
   private prefs: Prefs;
@@ -407,6 +417,12 @@ export class ChatController {
       cliVersion: cli ? claudeCliVersion(cli) : '',
       surface: s.kind,
       tip: tips.next(),
+      // Di chi e' questa faccia, adesso. Nell'ufficio una scheda sola ne tiene tante e
+      // le cambia senza ricaricare la pagina: e' da qui che la pagina sa di essere
+      // passata a un'altra conversazione, e che il testo non ancora mandato e' rimasto
+      // a quella di prima (vedi la bozza in chat.js).
+      key: this.key,
+      sid: this.sid,
     });
     s.post({ k: 'mode', value: this.mode });
     s.post({ k: 'prefs', value: this.prefs });
@@ -912,7 +928,13 @@ export class ChatController {
     this.setSid(fork ? '' : id);
     // `past` gia' letto da chi chiama (vedi restoreSession): la trascrizione e' un
     // file solo, e riaprirlo due volte per la stessa conversazione non serve a nessuno.
-    for (const e of past ?? (await replaySession(id, currentCwd()))) this.emit(e);
+    const events = past ?? (await replaySession(id, currentCwd()));
+    this.replaying = true;
+    try {
+      for (const e of events) this.emit(e);
+    } finally {
+      this.replaying = false;
+    }
     this.titleChanged();
   }
 
@@ -1475,7 +1497,13 @@ export class ChatController {
     // ne sono — cioe' quasi sempre, perche' le task della CLI sono i sub-agent e un
     // turno normale non ne apre nessuno. Solo il filo principale: i passi di un
     // sub-agent li racconta la sua riga nella lista.
-    if (e.k === 'tool_start' && !e.parent) tasks.doing(this.key, stepLabel(e.name, e.input));
+    //
+    // Con il nome dello strumento: e' il segnale dell'archivio — quando e' la memoria,
+    // nell'ufficio chi sta a quella scrivania va allo scaffale dei faldoni. Non da una
+    // trascrizione riletta: una ricerca di ieri non fa alzare nessuno oggi.
+    if (e.k === 'tool_start' && !e.parent) {
+      tasks.doing(this.key, stepLabel(e.name, e.input), this.replaying ? '' : e.name);
+    }
     if (e.k === 'turn_end') tasks.doing(this.key, '');
     // I passi che Claude si segna. TodoWrite era l'unico ascoltato qui, e la CLI ha
     // smesso di averlo: adesso scrive una task per volta con TaskCreate e la muove con
@@ -1522,6 +1550,14 @@ export class ChatController {
     // questa chiamata, e lo store li mette insieme (vedi `tree` in tasks/store.ts).
     if (e.k === 'tool_start' && (e.name === 'Agent' || e.name === 'Task')) {
       tasks.spawned(this.key, e.id, e.parent ?? null, e.input);
+    }
+    // Chi consulta la memoria e chi scrive a chi, da qualunque filo: nell'ufficio sono
+    // il giro all'archivio e le buste fra le scrivanie. Il filo dice chi e' stato — la
+    // conversazione, o l'aiutante lanciato da quella chiamata Agent — e lo store sa
+    // chi e' il destinatario. Mai da una trascrizione riletta (vedi `replaying`).
+    if (e.k === 'tool_start' && !this.replaying) {
+      if (MEMORY_TOOL.test(e.name)) tasks.consulting(this.key, e.id, e.parent ?? null, e.name, e.input);
+      else if (e.name === 'SendMessage') tasks.messaged(this.key, e.id, e.parent ?? null, e.input);
     }
     // La sorgente viva. I tre strumenti qui sopra la CLI non ce li ha piu' — restano
     // per chi gira una versione vecchia — e le task di adesso arrivano da qui: sono

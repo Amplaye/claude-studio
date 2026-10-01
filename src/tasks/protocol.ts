@@ -85,6 +85,35 @@ export interface TaskData {
    * finche' lavorano, anche oltre la fine del turno.
    */
   agents?: AgentItem[];
+  /**
+   * L'ultimo strumento del filo principale. E' il segnale dell'archivio: quando e' la
+   * memoria, chi sta a quella scrivania va allo scaffale dei faldoni.
+   */
+  lastTool?: string;
+  /** Le note che il filo principale ha consultato in questo turno: "deploy-venerdi". */
+  consulted?: string[];
+  /** I messaggi fra aiutanti (SendMessage) degli ultimi minuti: nell'ufficio sono buste. */
+  mail?: MailItem[];
+}
+
+/**
+ * Un messaggio fra aiutanti, come lo vede l'ufficio: da chi a chi, e cosa.
+ *
+ * `from` e `to` sono id di aiutanti; null e' la conversazione. Un destinatario che
+ * qui non e' nessuno — un nome che non abbiamo visto nascere — ha `out` e il suo
+ * nome in `toName`, e nell'ufficio la busta esce dalla porta.
+ */
+export interface MailItem {
+  /** La chiamata SendMessage. */
+  id: string;
+  from: string | null;
+  to: string | null;
+  out?: boolean;
+  toName?: string;
+  /** Il testo, tagliato a 120 caratteri. */
+  text: string;
+  /** Quando (epoch ms). */
+  at: number;
 }
 
 /**
@@ -120,6 +149,8 @@ export interface AgentItem {
   ms?: number;
   /** Come e' andata, detto da lui alla fine. */
   summary?: string;
+  /** Le note della memoria che ha consultato. */
+  consulted?: string[];
   /**
    * Una faccenda di casa — un osservatore, una task che la CLI tiene per se': nel
    * pannello delle task si vede, ma non e' qualcuno al lavoro, e nell'ufficio non entra.

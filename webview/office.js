@@ -175,6 +175,56 @@ window.OFFICE = (() => {
   const comeSta = (s) =>
     s.busy ? t('ctx.busy') : s.done ? t('ctx.done') : s.recent ? t('ctx.recent') : t('ctx.idle');
 
+  /* ---- il rimpallo ----
+   *
+   * Due che si scrivono di continuo: quattro buste fra la stessa coppia in due
+   * minuti. Puo' voler dire che stanno lavorando sul serio insieme, o che si
+   * rimbalzano la stessa domanda senza venirne fuori — da qui non si sa quale, e
+   * infatti non si ferma niente: si fa vedere, sulle due pedine e nel foglio, e chi
+   * guarda decide. */
+  const RIMPALLO = 4;
+  const FINESTRA_RIMPALLO = 120000;
+
+  /**
+   * Le coppie di una conversazione che si sono scritte almeno RIMPALLO volte negli
+   * ultimi due minuti, in un verso o nell'altro: `{ a, b, n }`, dove '' e' la
+   * conversazione stessa. Le buste uscite dalla porta non contano: dall'altra parte
+   * non c'e' nessuno di qui.
+   */
+  function coppieScritte(id) {
+    const ora = Date.now();
+    const coppie = new Map();
+    for (const m of (board[id] && board[id].mail) || []) {
+      if (m.out || ora - m.at > FINESTRA_RIMPALLO) continue;
+      const a = m.from || '';
+      const b = m.to || '';
+      if (a === b) continue;
+      const k = a < b ? a + '\n' + b : b + '\n' + a;
+      coppie.set(k, (coppie.get(k) || 0) + 1);
+    }
+    return [...coppie]
+      .filter(([, n]) => n >= RIMPALLO)
+      .map(([k, n]) => {
+        const [a, b] = k.split('\n');
+        return { a, b, n };
+      });
+  }
+
+  /** Le stesse, per persona: chi ('' = la conversazione) -> quante buste e con chi. */
+  function rimpalli(id) {
+    const out = new Map();
+    for (const { a, b, n } of coppieScritte(id)) {
+      for (const [chi, con] of [
+        [a, b],
+        [b, a],
+      ]) {
+        const prima = out.get(chi);
+        if (!prima || prima.n < n) out.set(chi, { n, con });
+      }
+    }
+    return out;
+  }
+
   function abitanti() {
     const cards = (last && last.cards) || [];
     const out = [];
@@ -183,6 +233,15 @@ window.OFFICE = (() => {
       if (!chi) continue;
       const aspetta = !!(s.asks && s.asks.length);
       const vivi = alLavoro(s.id);
+      const tutti = new Map(aiutanti(s.id).map((a) => [a.id, a]));
+      // Il nome dell'altro capo della coppia: un aiutante si chiama col suo lavoro, la
+      // conversazione col suo nome.
+      const nomeDi = (k) => (k ? (tutti.get(k) && (tutti.get(k).title || tutti.get(k).type)) || '' : s.name);
+      const scritti = rimpalli(s.id);
+      const rimpallo = (k) => {
+        const r = scritti.get(k);
+        return r ? { n: r.n, nome: nomeDi(r.con) } : null;
+      };
       out.push({
         key: 'c:' + s.id,
         id: s.id,
@@ -203,6 +262,7 @@ window.OFFICE = (() => {
         focused: !!s.focused,
         busy: !!s.busy,
         asking: aspetta,
+        rimpallo: rimpallo(''),
       });
       // I suoi, in ordine d'albero, e tutti: anche chi nella stanza un posto non ce
       // l'ha — perche' il capo e' in piedi, o perche' sono piu' di quanti ne stanno
@@ -212,7 +272,6 @@ window.OFFICE = (() => {
       //
       // Il livello e' quello che si vede: un aiutante il cui capo ha gia' finito
       // non resta rientrato sotto il vuoto, sale al posto di chi se n'e' andato.
-      const tutti = new Map(aiutanti(s.id).map((a) => [a.id, a]));
       const livelli = new Map();
       for (const a of vivi) {
         const padre = a.parentId ? tutti.get(a.parentId) : null;
@@ -237,6 +296,7 @@ window.OFFICE = (() => {
           focused: false,
           busy: true,
           asking: false,
+          rimpallo: rimpallo(a.id),
         });
       }
     }
@@ -268,9 +328,12 @@ window.OFFICE = (() => {
         const corpo = el('span', 'of-body');
         faccia.append(corpo);
         const nome = el('span', 'of-chi-nome');
-        b.append(faccia, nome);
+        // Il segno del rimpallo: due frecce e quante buste. Nascosto finche' non serve.
+        const scritti = el('span', 'of-chi-rimpallo');
+        scritti.hidden = true;
+        b.append(faccia, nome, scritti);
         b.onclick = () => apriScheda(a.key, b);
-        p = { el: b, corpo, nome };
+        p = { el: b, corpo, nome, scritti };
         pedine.set(a.key, p);
       }
       // Rimessa in fila senza toccarla se e' gia' al posto giusto: riappendere un
@@ -291,7 +354,12 @@ window.OFFICE = (() => {
       p.el.classList.toggle('busy', a.busy);
       p.el.classList.toggle('asking', !!a.asking);
       p.el.classList.toggle('aperta', guardato === a.key);
-      p.el.title = a.capo ? t('office.worksFor', { name: a.genitore }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa;
+      p.el.classList.toggle('rimpallo', !!a.rimpallo);
+      p.scritti.hidden = !a.rimpallo;
+      p.scritti.textContent = a.rimpallo ? '⇄ ' + a.rimpallo.n : '';
+      p.el.title =
+        (a.capo ? t('office.worksFor', { name: a.genitore }) + ' - ' + a.cosa : a.nome + ' - ' + a.cosa) +
+        (a.rimpallo ? ' - ' + t('office.pingPong', { n: a.rimpallo.n, name: a.rimpallo.nome }) : '');
       p.el.setAttribute('aria-label', p.el.title);
       p.el.setAttribute('aria-expanded', guardato === a.key ? 'true' : 'false');
     }
@@ -363,6 +431,12 @@ window.OFFICE = (() => {
       const squadra = a.squadra ? (a.squadra === 1 ? t('office.helpers1') : t('office.helpersN', { n: a.squadra })) : '';
       riga(scheda.extra, [adesso, squadra].filter(Boolean).join(' · '));
     }
+    // Cosa ha preso dall'archivio: e' il faldone che si vede sulla sua scrivania,
+    // detto per nome.
+    const note = ag ? ag.consulted : board[a.id] && board[a.id].consulted;
+    riga(scheda.memo, note && note.length ? t('office.consulted', { notes: note.join(', ') }) : '');
+    // E con chi si sta scrivendo troppo, se succede.
+    riga(scheda.rimpallo, a.rimpallo ? t('office.pingPong', { n: a.rimpallo.n, name: a.rimpallo.nome }) : '');
     scheda.pct.hidden = a.pct == null;
     if (a.pct != null) {
       scheda.pctVal.textContent = Math.round(a.pct) + '%';
@@ -416,6 +490,11 @@ window.OFFICE = (() => {
     const sCompito = el('div', 'of-scheda-compito');
     const sCosa = el('div', 'of-scheda-cosa');
     const sExtra = el('div', 'of-scheda-extra');
+    // Le note che ha tirato fuori dall'archivio: solo i nomi, mai quello che c'e'
+    // dentro — in una nota possono esserci credenziali, e questa scheda si guarda.
+    const sMemo = el('div', 'of-scheda-memo');
+    // Il rimpallo: due che si scrivono di continuo. Si dice e basta, non ferma niente.
+    const sRimpallo = el('div', 'of-scheda-rimpallo');
     const sPct = el('div', 'of-scheda-pct');
     const sPctLab = el('span', null, t('office.ctxUsed'));
     const sPctVal = el('span', 'of-scheda-val');
@@ -425,7 +504,7 @@ window.OFFICE = (() => {
     const sPctFill = el('div', 'of-cell-fill');
     sPctBar.append(sPctFill);
     sPct.append(sPctTop, sPctBar);
-    box.append(sNome, sRuolo, sCompito, sCosa, sExtra, sPct);
+    box.append(sNome, sRuolo, sCompito, sCosa, sExtra, sMemo, sRimpallo, sPct);
     scheda = {
       el: box,
       nome: sNome,
@@ -433,6 +512,8 @@ window.OFFICE = (() => {
       compito: sCompito,
       cosa: sCosa,
       extra: sExtra,
+      memo: sMemo,
+      rimpallo: sRimpallo,
       pct: sPct,
       pctLab: sPctLab,
       pctVal: sPctVal,
@@ -761,7 +842,9 @@ window.OFFICE = (() => {
     // Il seme e' il capo piu' l'id della task: la stessa faccia che ha nella fila in
     // cima (vedi `abitanti`), e la stessa per tutto il tempo che lavora.
     const nome = it.id;
-    const chi = { chiave, capoId: capo.id, nome, el: b, fig: who, seme: capo.seme + '/' + nome };
+    // `padre` e' chi gli ha passato il lavoro, se e' un altro aiutante: e' alla sua
+    // scrivania che torna la busta dell'esito.
+    const chi = { chiave, capoId: capo.id, nome, padre: it.parentId || null, el: b, fig: who, seme: capo.seme + '/' + nome };
     // Dietro un impiegato non c'e' nessuna conversazione dove andare: cliccarlo
     // dice cosa sta facendo, che e' l'unica cosa che ha da dire. Dalla fila in
     // cima si arriva alla stessa scheda, e da li' anche con la tastiera.
@@ -935,6 +1018,8 @@ window.OFFICE = (() => {
       chi.va = false;
       // E il portatile si apre adesso, che e' quando si e' seduti.
       paintPortatili();
+      // Se ha cercato nella memoria mentre arrivava, in archivio ci va adesso.
+      archivioStaff(chi);
     }
   }
 
@@ -955,8 +1040,11 @@ window.OFFICE = (() => {
     // Prima si aspetta che abbia finito di arrivare. Un sub-agent puo' chiudersi
     // mentre chi lo porta e' ancora per strada, e due tragitti sullo stesso
     // elemento se lo litigano un tratto per uno: la persona rimbalza e non arriva
-    // piu' da nessuna parte.
+    // piu' da nessuna parte. Lo stesso per il giro all'archivio.
     await chi.andata;
+    await chi.giro;
+    // Il faldone torna in archivio: chi se ne va non lascia carte sulla scrivania.
+    window.ROOM.riponi(chi);
     window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
     if (await window.ROOM.viaggio(chi.el, ...window.ROOM.BACHECHE.muro.posto)) {
       await attesa(GESTO);
@@ -970,6 +1058,9 @@ window.OFFICE = (() => {
       }
       staff.delete(chi.chiave);
       paintBacheche();
+      // E com'e' andata torna a chi gli aveva passato il lavoro: una busta dalla
+      // bacheca alla sua scrivania, verde o rossa come il foglio appena riappeso.
+      if (chi.esito) esito(chi);
       // E poi si esce, dalla porta, come si e' entrati. Sparire davanti alla
       // bacheca voleva dire che chi finiva svaniva dentro il muro.
       if (chi.el.isConnected) await uscita(chi);
@@ -1295,10 +1386,183 @@ window.OFFICE = (() => {
         r.title = [a.title, a.doing || a.summary || ''].filter(Boolean).join(' — ');
         righe.push(r);
       }
+      // E chi si sta scrivendo troppo: la stessa cosa delle due pedine in cima, detta
+      // per intero.
+      const nomi = new Map(aiutanti(id).map((a) => [a.id, a.title || a.type || '']));
+      const nome = (k) => (k ? nomi.get(k) || '' : people.get(id).pname.textContent);
+      for (const { a, b, n } of coppieScritte(id)) {
+        righe.push(el('div', 'of-tree-rimpallo', t('office.pingPongTree', { a: nome(a), b: nome(b), n })));
+      }
     }
     corpo.replaceChildren(...righe);
     sheetBody.append(albero);
     return n;
+  }
+
+  // ---------- le buste del lavoro passato di mano ----------
+  //
+  // Quelle di turno vanno fra la porta e una scrivania: dicono che sei tu a scrivere
+  // e Claude a rispondere. Queste stanno tutte dentro la stanza, perche' e' li' che il
+  // lavoro passa di mano: il compito va dalla scrivania di chi lo da' alla bacheca —
+  // dove l'aiutante appena entrato lo va a staccare — l'esito torna indietro quando
+  // ha finito, e i messaggi fra aiutanti volano da una scrivania all'altra.
+  //
+  // Il colore dice quale: gialla come il foglietto che diventera', verde o rossa
+  // come il foglio appena riappeso, lilla per i messaggi.
+
+  /** Il compito vola solo per chi e' nato adesso: aprendo l'ufficio a meta' lavoro non parte una raffica. */
+  const NATO_DA = 10000;
+  /** E un messaggio vecchio non si rispedisce: e' gia' arrivato, quando ancora non guardavi. */
+  const POSTA_FRESCA = 10000;
+  /** I messaggi gia' volati, per id della chiamata: ognuno una volta sola. */
+  const spedite = new Set();
+
+  /** Dove sta una persona, per una busta: all'altezza delle mani, non dei piedi. */
+  const mani = (n) => [parseFloat(n.style.left) + 8, parseFloat(n.style.top) + 12];
+
+  /**
+   * Dove consegnare a qualcuno di `capo`: la sua scrivania (o lo sgabello) se ce l'ha,
+   * se no dove sta adesso. Senza `agente` e' il capo stesso. Null se non e' nella
+   * stanza: chi chiama decide se la busta esce dalla porta o non parte.
+   */
+  function postoDi(capo, agente) {
+    if (!capo || !capo.el.isConnected) return null;
+    if (!agente) return capo.casa ? [capo.casa.x + 8, capo.casa.y + 12] : mani(capo.el);
+    const chiave = capo.id + '/' + agente;
+    const banco = banchi.get(chiave);
+    if (banco != null) {
+      const p = postoBanco(banco);
+      return [p.x + 8, p.y + 12];
+    }
+    const chi = staff.get(chiave);
+    return chi && !chi.esce ? mani(chi.el) : null;
+  }
+
+  /** La bacheca: la busta atterra sul legno, in mezzo ai foglietti. */
+  function suBacheca() {
+    const [gx, gy] = window.ROOM.BACHECHE.muro.griglia;
+    return [gx + 14, gy + 8];
+  }
+
+  /** Il compito: dalla scrivania di chi lo da' — il capo, o l'aiutante che l'ha lanciato — alla bacheca. */
+  function compito(capo, it) {
+    const da = postoDi(capo, it.parentId) || postoDi(capo, null);
+    if (da) window.ROOM.posta(stage, da, suBacheca(), 'compito');
+  }
+
+  /** L'esito: dalla bacheca a chi gli aveva passato il lavoro, se e' ancora nella stanza. */
+  function esito(chi) {
+    const capo = people.get(chi.capoId);
+    const a = postoDi(capo, chi.padre) || postoDi(capo, null);
+    if (a) window.ROOM.posta(stage, suBacheca(), a, chi.esito === 'ko' ? 'esito ko' : 'esito');
+  }
+
+  /**
+   * I messaggi fra aiutanti (SendMessage), ognuno una busta. Da chi a chi lo dice il
+   * quadro; chi non e' nella stanza riceve dalla porta — o spedisce da li', se e'
+   * lui a mancare. Se mancano tutti e due non c'e' niente da far vedere.
+   */
+  function paintPosta() {
+    const ora = Date.now();
+    for (const id of Object.keys(board)) {
+      const capo = people.get(id);
+      for (const m of board[id].mail || []) {
+        if (!m || !m.id || spedite.has(m.id)) continue;
+        spedite.add(m.id);
+        if (!capo || ora - (m.at || 0) > POSTA_FRESCA) continue;
+        const da = postoDi(capo, m.from);
+        const a = m.out ? null : postoDi(capo, m.to);
+        if (!da && !a) continue;
+        window.ROOM.posta(stage, da || window.ROOM.INGRESSO, a || window.ROOM.INGRESSO, 'lettera');
+      }
+    }
+    // Il registro non cresce per sempre: quelle di un'ora fa non tornano piu' nel quadro.
+    for (const v of spedite) {
+      if (spedite.size <= 400) break;
+      spedite.delete(v);
+    }
+  }
+
+  // ---------- l'archivio ----------
+  //
+  // Chi cerca nella memoria si alza, va allo scaffale dei faldoni in sala riunioni a
+  // passo svelto, se ne prende uno e torna: il faldone resta sulla scrivania finche'
+  // il lavoro non e' finito, e la sua scheda dice quali note ha tirato fuori. Il come
+  // sta in room.js; qui c'e' il chi e il quando.
+  //
+  // E' l'unica eccezione al "chi lavora resta seduto", e vale solo per chi ha un
+  // posto: chi sta in piedi in fila non ha una scrivania da cui alzarsi e su cui
+  // posarlo.
+
+  /** Lo strumento che manda all'archivio. */
+  const MEMORIA = /^mcp__memoria__/;
+  /** Un giro ogni tanto per persona: chi cerca tre volte di fila non fa tre viaggi. */
+  const GIRO_ARCHIVIO = 45000;
+  /** Chi era in piedi quando ha cercato ci va appena si siede — se nel frattempo non e' passato troppo. */
+  const ATTESA_ARCHIVIO = 30000;
+
+  /**
+   * Il segnale e' lo strumento che *diventa* la memoria: due ricerche di fila sono un
+   * giro solo. La prima volta che si vede qualcuno non e' un cambio — aprendo
+   * l'ufficio a meta' lavoro non si manda in archivio chi ci e' andato un minuto fa.
+   */
+  function segnaArchivio(chi, strumento) {
+    const era = chi.strumento;
+    chi.strumento = strumento;
+    if (era === undefined || !MEMORIA.test(strumento) || MEMORIA.test(era)) return;
+    if (Date.now() - (chi.ultimoArchivio || 0) < GIRO_ARCHIVIO) return;
+    chi.vuoleArchivio = Date.now();
+  }
+
+  /**
+   * Ci va, se puo' adesso. `torna` e' dove rimettere i piedi, `dove` dove posare il
+   * faldone (niente: se lo tiene in mano), `posa` come rivestirsi una volta seduto.
+   */
+  function inArchivio(chi, torna, dove, posa) {
+    chi.vuoleArchivio = 0;
+    chi.ultimoArchivio = Date.now();
+    chi.giro = window.ROOM.archivio(chi, torna, dove).then(() => {
+      if (chi.el.isConnected && !chi.fuori && !chi.esce) window.ROOM.vesti(chi.fig, chi.seme, posa());
+    });
+  }
+
+  /** Un capo: dalla sua scrivania, e il faldone accanto al monitor. */
+  function archivioCapo(capo) {
+    if (!capo.vuoleArchivio) return;
+    if (Date.now() - capo.vuoleArchivio > ATTESA_ARCHIVIO) {
+      capo.vuoleArchivio = 0;
+      return;
+    }
+    if (!capo.casa || capo.fuori || !capo.el.isConnected) return;
+    const c = capo.casa;
+    inArchivio(capo, [c.x + 8, c.y + 24], [c.x - 10, c.y - 8, c.y + 10], () => capo.posa);
+  }
+
+  /** Un aiutante: solo seduto. Sulla scrivania il faldone si posa; sullo sgabello resta in mano. */
+  function archivioStaff(chi) {
+    if (!chi.vuoleArchivio) return;
+    if (Date.now() - chi.vuoleArchivio > ATTESA_ARCHIVIO) {
+      chi.vuoleArchivio = 0;
+      return;
+    }
+    const i = banchi.get(chi.chiave);
+    if (i == null || chi.va || chi.esce || chi.archivio || !chi.el.isConnected) return;
+    const p = postoBanco(i);
+    inArchivio(chi, [p.x + 8, p.y + 24], sgabello(i) ? null : [p.x - 10, p.y - 8, p.y + 10], () => 'digita');
+  }
+
+  /** Il giro di controllo: chi ha appena cercato nella memoria, e chi ci deve ancora andare. */
+  function paintArchivio() {
+    for (const [id, capo] of people) {
+      segnaArchivio(capo, (board[id] && board[id].lastTool) || '');
+      archivioCapo(capo);
+    }
+    for (const chi of staff.values()) {
+      if (chi.esce) continue;
+      const a = aiutanti(chi.capoId).find((x) => x.id === chi.nome);
+      segnaArchivio(chi, (a && a.lastTool) || '');
+      archivioStaff(chi);
+    }
   }
 
   function paintStaff() {
@@ -1306,8 +1570,15 @@ window.OFFICE = (() => {
 
     // Chi ha finito se ne va — ma per la porta, non svanendo: e' l'unica cosa che
     // fa vedere che un sub-agent e' finito invece che sparito.
+    //
+    // E se ha finito davvero se lo segna, per la busta dell'esito. Davvero: dal
+    // quadro, non dal fatto che se ne vada — si esce anche quando il capo chiude la
+    // conversazione o perde la scrivania, e allora non c'e' nessun esito da portare.
     for (const [chiave, chi] of staff) {
-      if (!voluti.has(chiave) && !chi.esce) esce(chi);
+      if (voluti.has(chiave) || chi.esce) continue;
+      const a = aiutanti(chi.capoId).find((x) => x.id === chi.nome);
+      if (a && (a.status === 'completed' || a.status === 'failed')) chi.esito = a.status === 'failed' ? 'ko' : 'ok';
+      esce(chi);
     }
 
     // Poi si vede chi si siede dove: prima i posti, e solo dopo dove va la gente.
@@ -1319,7 +1590,11 @@ window.OFFICE = (() => {
         chi = buildStaff(chiave, capo, it);
         staff.set(chiave, chi);
         chi.andata = entra(chi, capo, i);
-      } else if (!chi.va && !chi.esce) {
+        // Il compito parte adesso dalla scrivania di chi lo da', e lo aspetta sulla
+        // bacheca: e' li' che chi e' appena entrato va a staccarlo. Solo per chi e'
+        // nato adesso — gli altri l'avevano gia' preso prima che guardassi.
+        if (it.since && Date.now() - it.since < NATO_DA) compito(capo, it);
+      } else if (!chi.va && !chi.esce && !chi.archivio) {
         // Il posto puo' cambiare sotto i piedi: un fratello che finisce fa
         // scalare tutti gli altri di uno, e una conversazione nuova si riprende
         // la scrivania. Ci si sposta camminando, invece di teletrasportarsi.
@@ -1357,6 +1632,10 @@ window.OFFICE = (() => {
 
     paintPortatili();
     paintBacheche();
+    // Chi va in archivio, e le buste fra chi si scrive. Dopo i posti: tutte e due
+    // vogliono sapere chi siede dove.
+    paintArchivio();
+    paintPosta();
     // E il foglio aperto, se e' aperto: e' la stessa roba dei foglietti sul muro,
     // e non puo' restare indietro di un turno rispetto a loro.
     dipingiBacheca();
@@ -1503,7 +1782,7 @@ window.OFFICE = (() => {
   function aura() {
     const ora = Date.now();
     for (const chi of staff.values()) {
-      if (chi.va || chi.esce || chi.dice) continue;
+      if (chi.va || chi.esce || chi.dice || chi.archivio) continue;
       const capo = people.get(chi.capoId);
       if (!capo || !capo.el.isConnected) continue;
       if (ora - (chi.zitto || 0) < RESPIRO) continue;
@@ -1572,7 +1851,13 @@ window.OFFICE = (() => {
       window.ROOM.posta(stage, p.x + 8, p.y + 12, chi.busy ? 'su' : 'giu');
     }
     if (chi.busy) chi.da = Date.now();
-    else chi.festa = chi.da != null && Date.now() - chi.da >= TURNO_VERO;
+    else {
+      chi.festa = chi.da != null && Date.now() - chi.da >= TURNO_VERO;
+      // Il lavoro e' finito: il faldone torna in archivio, e chi doveva ancora
+      // andarci non ci va piu' — cercare per un turno chiuso non e' lavoro.
+      window.ROOM.riponi(chi);
+      chi.vuoleArchivio = 0;
+    }
   }
 
   function paintPerson(chi, s, seat) {

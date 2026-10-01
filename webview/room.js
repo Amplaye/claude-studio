@@ -73,7 +73,7 @@ window.ROOM = (() => {
      ai posti che occupano davvero. Tutto il resto della stanza legge queste, e
      non si accorge di niente quando la stanza cresce. */
   let WALLS, PROPS, DISEGNATI, DESKS, SGABELLI, BACHECHE, BAR, SCAFFALI;
-  let METE, COMMISSIONI, DESTINAZIONI, INGRESSO, VANO, PORTA;
+  let METE, COMMISSIONI, DESTINAZIONI, INGRESSO, VANO, PORTA, ARCHIVIO;
 
   const SV = window.SV;
 
@@ -437,6 +437,18 @@ window.ROOM = (() => {
     muro: { griglia: [71, 10], posto: [112, 52], z: 37 },
   };
 
+  /* ---- l'archivio ----
+   *
+   * Lo scaffale dei faldoni, in sala riunioni contro il muro di sopra (`shelfFull`
+   * in PROPS0): e' la memoria del progetto fatta mobile. Chi cerca nella memoria ci
+   * va davvero, a passo svelto, si prende un faldone e se lo porta alla scrivania.
+   *
+   * Nessun mobile nuovo: lo scaffale c'era gia', e il corridoio non regge niente di
+   * piu' largo di ventidue pixel. Questo e' solo il punto dove ci si ferma davanti —
+   * sotto il bordo del mobile, a meta' della sua larghezza.
+   */
+  const ARCHIVIO0 = [36, 60];
+
   /* ---- il bar, e le tazze che ci girano ----
    *
    * Quattro tazze, e sono quelle. Chi va a prendersi un caffe' ne prende una
@@ -459,8 +471,8 @@ window.ROOM = (() => {
     [292, 32],
     [301, 32],
   ];
-  /** Presa, erogazione, lavaggio, deposito, e il broncio di chi non ne trova. */
-  const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600 };
+  /** Presa, erogazione, lavaggio, deposito, il broncio di chi non ne trova, e il faldone sfilato dallo scaffale. */
+  const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600, faldone: 900 };
   /* E quello che si dice al bar mentre lo si fa. Un mucchio per gesto: la
      ricarica, il lavaggio, la tazza presa dalla rastrelliera e il broncio di
      chi non ne trova. Sono i quattro momenti del giro del caffe', e uno che
@@ -804,6 +816,7 @@ window.ROOM = (() => {
       fx: c.fx ? pt(c.fx) : c.fx,
     }));
     INGRESSO = pt(INGRESSO0);
+    ARCHIVIO = pt(ARCHIVIO0);
     VANO = [AX(VANO0[0], ancoraX(VANO0[0])), VANO0[1]];
     // La porta della posta non e' quella dei piedi: e' il bordo di sotto della
     // cornice, cioe' fuori dallo schermo verso chi guarda, e sta sempre in mezzo.
@@ -821,6 +834,7 @@ window.ROOM = (() => {
       lavandino: BAR.lavandino,
       porta: INGRESSO,
       bacheca: BACHECHE.muro.posto,
+      archivio: ARCHIVIO,
       ...Object.fromEntries(SGABELLI.map((g, i) => ['sgabello' + i, [g.x + 8, g.y + 24]])),
       ...Object.fromEntries(COMMISSIONI.map((c, i) => [c.k + i, c.posto])),
     };
@@ -1183,12 +1197,15 @@ window.ROOM = (() => {
     !c.fuori && !c.ferma && !c.lavora && c.casa && Date.now() - (c.ultimo || 0) >= RIPOSO;
   const piedi = (chi) => [parseFloat(chi.el.style.left) + 8, parseFloat(chi.el.style.top) + 24];
 
-  function muovi(chi, fx, fy) {
+  /** Il passo di chi va all'archivio: doppio. Ha una cosa da cercare e torna a lavorare. */
+  const SVELTO = 2;
+
+  function muovi(chi, fx, fy, passo = 1) {
     const x = fx - 8;
     const y = fy - 24;
     const dx = x - parseFloat(chi.el.style.left);
     const dy = y - parseFloat(chi.el.style.top);
-    const ms = (Math.hypot(dx, dy) / VELOCITA) * 1000;
+    const ms = (Math.hypot(dx, dy) / (VELOCITA * passo)) * 1000;
     chi.el.style.transition = 'left ' + ms + 'ms linear, top ' + ms + 'ms linear';
     chi.el.style.left = x + 'px';
     chi.el.style.top = y + 'px';
@@ -1224,13 +1241,91 @@ window.ROOM = (() => {
    * loro capo e se ne vanno quando hanno finito — e per loro serve solo la
    * strada. Il tragitto e' quello vero: la stanza sa dove sono i mobili.
    */
-  async function viaggio(el, fx, fy) {
+  async function viaggio(el, fx, fy, passo = 1) {
     const chi = { el };
     for (const [x, y] of cammino(...piedi(chi), fx, fy)) {
       if (!el.isConnected) return false;
-      await muovi(chi, x, y);
+      await muovi(chi, x, y, passo);
     }
     return el.isConnected;
+  }
+
+  // ---------- l'archivio ----------
+  //
+  // Chi cerca nella memoria si alza, va allo scaffale dei faldoni a passo doppio, se
+  // ne prende uno e torna: il faldone resta sulla scrivania finche' il lavoro non e'
+  // finito. E' l'unica eccezione al "chi lavora resta seduto", e ha senso che lo sia:
+  // andare a prendere una cosa in archivio *e'* lavoro, e da lontano si vede chi sta
+  // andando a ripescare quello che si era scritto.
+  //
+  // Il giro lo decide chi conosce le persone (office.js): qui c'e' solo come si fa.
+
+  /** Se lo prende in mano: sul fianco, come la tazza. */
+  function prendiFaldone(chi) {
+    if (chi.faldone) chi.faldone.remove();
+    chi.faldone = el('i', 'of-faldone addosso');
+    chi.el.append(chi.faldone);
+  }
+
+  /**
+   * E lo posa dove gli si dice — `[x, y, profondita']`, di solito la sua scrivania.
+   * Senza un posto (chi lavora in piedi non ha un tavolo) se lo tiene in mano.
+   */
+  function posaFaldone(chi, dove) {
+    if (!chi.faldone || !dove || !palco || !chi.el.isConnected) return;
+    chi.faldone.remove();
+    chi.faldone = null;
+    if (chi.faldoneFermo) chi.faldoneFermo.remove();
+    const n = el('i', 'of-faldone posato');
+    n.style.left = dove[0] + 'px';
+    n.style.top = dove[1] + 'px';
+    n.style.zIndex = dove[2];
+    palco.append(n);
+    chi.faldoneFermo = n;
+  }
+
+  /** Il lavoro e' finito, o chi l'aveva se ne va: il faldone torna in archivio. */
+  function riponi(chi) {
+    if (chi.faldone) chi.faldone.remove();
+    if (chi.faldoneFermo) chi.faldoneFermo.remove();
+    chi.faldone = null;
+    chi.faldoneFermo = null;
+  }
+
+  /**
+   * Il giro: allo scaffale, il faldone, e di nuovo a `torna` (dove si rimettono i
+   * piedi). `dove` e' dove posare il faldone una volta tornati.
+   *
+   * Torna falso se non e' partito (era gia' in giro) o se per strada e' sparito. Chi
+   * chiama decide come rivestirlo al ritorno: un capo torna alla sua posa, un aiutante
+   * a battere a macchina.
+   */
+  async function archivio(chi, torna, dove) {
+    if (chi.archivio || !chi.el.isConnected) return false;
+    chi.archivio = true;
+    // `fuori` e' la parola che la stanza e l'ufficio gia' conoscono per "sta
+    // camminando, non spostarlo": senza, il primo ridisegno lo rimette a sedere a
+    // meta' corridoio.
+    const eraFuori = !!chi.fuori;
+    chi.fuori = true;
+    chi.el.classList.add('fuori', 'archivio');
+    try {
+      vesti(chi.fig, chi.seme, 'cammina');
+      if (await viaggio(chi.el, ...ARCHIVIO, SVELTO)) {
+        vesti(chi.fig, chi.seme, 'fermo');
+        await attesa(TEMPI.faldone);
+        if (!chi.el.isConnected) return false;
+        prendiFaldone(chi);
+        vesti(chi.fig, chi.seme, 'cammina');
+      }
+      if (!chi.el.isConnected || !(await viaggio(chi.el, ...torna, SVELTO))) return false;
+      posaFaldone(chi, dove);
+      return true;
+    } finally {
+      chi.el.classList.remove('fuori', 'archivio');
+      chi.fuori = eraFuori;
+      chi.archivio = false;
+    }
   }
 
   /** Aspetta, ma con un orecchio: se Claude riparte la pausa finisce subito. */
@@ -1524,7 +1619,9 @@ window.ROOM = (() => {
   // ---------- la posta ----------
   //
   // Una busta che vola dalla porta a una scrivania quando parte un turno, e
-  // dalla scrivania alla porta quando il turno finisce.
+  // dalla scrivania alla porta quando il turno finisce. E le buste del lavoro
+  // passato di mano: il compito che va dalla scrivania di chi lo da' alla bacheca,
+  // l'esito che torna indietro, i messaggi fra aiutanti (vedi office.js).
   //
   // Non e' un vezzo: uno schermo acceso e uno che si spegne dicono *com'e'
   // adesso*, e stando dall'altra parte della stanza il momento in cui cambia si
@@ -1539,23 +1636,31 @@ window.ROOM = (() => {
   // che insegue una persona e' una busta che sbanda. L'arco lo fa `offset-path`:
   // una curva di due punti e un'animazione sola, invece di un timer che ridipinge
   // un elemento sessanta volte al secondo per un secondo e mezzo.
-  /** Quante ne stanno in aria insieme. Oltre, sono coriandoli. */
+  /** Quante ne stanno in aria insieme, di qualunque genere. Oltre, sono coriandoli. */
   const MAX_BUSTE = 8;
 
   /**
-   * Manda una busta fra la porta e `[x, y]`.
+   * Manda una busta da un punto a un altro.
    *
-   * `verso` e' `'giu''` quando la risposta esce e `'su'` quando il turno entra;
-   * decide il colore e da che parte si vola.
+   * Due firme. Quella di sempre, `posta(stage, x, y, verso)`, vola fra la porta e
+   * `[x, y]`: `verso` e' `'giu'` quando la risposta esce e `'su'` quando il turno
+   * entra. Quella nuova, `posta(stage, [x0, y0], [x1, y1], genere)`, vola fra due
+   * punti qualsiasi — una scrivania e la bacheca, due scrivanie — e `genere` e' la
+   * classe che le da' il colore: `compito`, `esito` (con `ko` se e' andata male),
+   * `lettera`. Il tetto e' uno solo per tutte: otto buste in aria sono gia' tante.
    */
-  function posta(stage, x, y, verso) {
+  function posta(stage, a, b, c) {
+    if (typeof a === 'number') {
+      const [px, py] = PORTA;
+      return c === 'su' ? posta(stage, [px, py], [a, b], 'su') : posta(stage, [a, b], [px, py], 'giu');
+    }
     // Si contano quelle che ci sono, invece di tenere il conto: la stanza si
     // rimonta da capo quando la scheda si riapre, e un contatore sopravvissuto a
     // un rimontaggio e' un contatore che dice otto per sempre.
-    if (stage.querySelectorAll('.of-mail').length >= MAX_BUSTE) return;
-    const [px, py] = PORTA;
-    const [x0, y0, x1, y1] = verso === 'su' ? [px, py, x, y] : [x, y, px, py];
-    const n = el('div', 'of-mail ' + verso);
+    if (!a || !b || stage.querySelectorAll('.of-mail').length >= MAX_BUSTE) return;
+    const [x0, y0] = a;
+    const [x1, y1] = b;
+    const n = el('div', 'of-mail ' + c);
     // Il punto di controllo sta in mezzo e trentotto pixel piu' in alto: e'
     // quello che fa la campata. Piatta, una busta sembra trascinata per terra.
     const cx = (x0 + x1) / 2;
@@ -1616,6 +1721,11 @@ window.ROOM = (() => {
     get PORTA() {
       return PORTA;
     },
+    get ARCHIVIO() {
+      return ARCHIVIO;
+    },
+    archivio,
+    riponi,
     SW,
     SH,
     posto,
@@ -1638,6 +1748,8 @@ window.ROOM = (() => {
      * meno grave di uno che si ferma a discuterne.
      */
     congeda(chi) {
+      // Il faldone non ha un conto da tenere: torna in archivio e basta.
+      riponi(chi);
       if (!chi.tazza && !chi.tazzaFerma) return;
       if (chi.tazza) chi.tazza.remove();
       if (chi.tazzaFerma) chi.tazzaFerma.remove();

@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.35.0
+
+- **Nell'ufficio il lavoro passa di mano con una busta.** Quando una conversazione
+  lancia un aiutante, una busta gialla vola dalla sua scrivania alla bacheca, dove
+  l'aiutante appena entrato va a staccarla. Quando ha finito, dalla bacheca ne torna
+  una verde, o rossa se e' andata male, alla scrivania di chi gli aveva dato il
+  lavoro. Solo a lavoro finito davvero: un aiutante che se ne va perche' la sua
+  conversazione e' stata chiusa non manda niente.
+
+- **I messaggi fra aiutanti sono buste lilla**, da una scrivania all'altra; chi non e'
+  nella stanza riceve dalla porta. In chat lo stesso messaggio (SendMessage) e' una
+  riga stretta con l'icona della busta: a chi, e cosa.
+
+- **Due che si scrivono di continuo si vedono.** Quattro buste fra la stessa coppia in
+  due minuti: le due pedine in cima si segnano «⇄ 4», la scheda dice con chi, e il
+  foglio della bacheca lo scrive sotto «Chi lavora per chi». E' solo da vedere: non
+  ferma niente.
+
+- **Chi cerca nella memoria va in archivio.** Si alza, va a passo svelto allo scaffale
+  dei faldoni in sala riunioni, ne prende uno e lo lascia sulla scrivania fino a fine
+  lavoro; la sua scheda dice «Ha consultato: …», solo i nomi delle note. Al massimo un
+  giro ogni 45 secondi per persona, ed e' l'unica eccezione al «chi lavora resta
+  seduto». Riaprendo una conversazione dalla cronologia, le ricerche e i messaggi di
+  allora non fanno alzare nessuno e non fanno volare niente.
+
+- **Il testo non ancora mandato resta alla sua conversazione.** Nell'ufficio la
+  casella per scrivere e' una per tutte, e passando a un'altra conversazione dalla
+  striscia (o cliccando una persona nella stanza) quello che avevi scritto restava
+  li', pronto a partire verso chi non c'entrava. Adesso ognuna ha la sua bozza,
+  allegati compresi: cambiando conversazione la tua resta dov'era, e tornandoci la
+  ritrovi — anche dopo un reload della finestra.
+
 ## 0.34.0
 
 - **Nell'ufficio si vede chi lavora per chi.** Nella fila in cima ogni conversazione
