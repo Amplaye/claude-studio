@@ -1194,7 +1194,7 @@ window.ROOM = (() => {
   const caso = (a) => a[Math.floor(Math.random() * a.length)];
   /** Chi si puo' alzare adesso: ha un posto, non sta gia' fuori, non lavora, e ci e' stato un po'. */
   const libero = (c) =>
-    !c.fuori && !c.ferma && !c.lavora && c.casa && Date.now() - (c.ultimo || 0) >= RIPOSO;
+    !c.fuori && !c.ferma && !c.lavora && !c.inDialogo && c.casa && Date.now() - (c.ultimo || 0) >= RIPOSO;
   const piedi = (chi) => [parseFloat(chi.el.style.left) + 8, parseFloat(chi.el.style.top) + 24];
 
   /** Il passo di chi va all'archivio: doppio. Ha una cosa da cercare e torna a lavorare. */
@@ -1336,25 +1336,165 @@ window.ROOM = (() => {
     }
   }
 
-  /* Uno parla alla volta e per tre secondi: due nuvolette insieme a questa
-     misura sono due rettangoli bianchi, e nessuno legge due rettangoli bianchi.
+  /* Uno parla alla volta, e la nuvoletta dura quanto serve a leggerla: tre secondi
+     scarsi per due parole, fino a cinque per una riga e mezza. Due nuvolette sulla
+     stessa testa sono due rettangoli bianchi, e nessuno legge due rettangoli
+     bianchi; in tutta la stanza ne stanno al massimo quattro.
 
      `testo` si passa quando quello che si dice dipende da chi lo dice — le
      battute che si tirano al capo, o la task che si sta facendo. Senza, si pesca
-     dal mucchio del posto dove uno sta. */
-  function parla(chi, testo) {
-    if (chi.dice || !chi.el.isConnected) return;
-    const n = el('div', 'of-say');
+     dal mucchio del posto dove uno sta.
+
+     `verso` e' da che parte sta chi ascolta: la nuvoletta si allunga da quella
+     parte e la codina resta sulla testa di chi parla. E' quello che fa leggere due
+     nuvolette di fila come una risposta, invece che come due che parlano da soli.
+     `tipo` finisce in `data-tipo`: serve a chi controlla (le adulazioni col numero
+     vero), non al disegno.
+
+     Torna quanto restera' a schermo, o zero se non ha parlato. */
+  const MAX_NUVOLETTE = 4;
+  /** Due righe di nuvoletta: oltre i cinquanta caratteri si taglia, a parola intera. */
+  const LUNGA = 50;
+  function accorcia(s) {
+    const t = String(s || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= LUNGA) return t;
+    const cut = t.slice(0, LUNGA - 1);
+    const sp = cut.lastIndexOf(' ');
+    return (sp > 30 ? cut.slice(0, sp) : cut).replace(/[\s,.;:–-]+$/, '') + '…';
+  }
+  /** Una nuvoletta nuova non si appoggia su una che c'e' gia': due vicini che parlano
+      insieme fanno una macchia sola. Chi risponde aspetta che l'altra sfumi. */
+  function siPesta(chi) {
+    const [x, y] = piedi(chi);
+    for (const n of palco.querySelectorAll('.of-say')) {
+      const altro = n.parentElement;
+      if (!altro || altro === chi.el) continue;
+      const ax = parseFloat(altro.style.left) + 8;
+      const ay = parseFloat(altro.style.top) + 24;
+      if (Math.abs(ax - x) < 100 && Math.abs(ay - y) < 22) return true;
+    }
+    return false;
+  }
+  function parla(chi, testo, opt = {}) {
+    if (chi.dice || !chi.el.isConnected) return 0;
+    if (palco && palco.querySelectorAll('.of-say').length >= MAX_NUVOLETTE) return 0;
+    if (palco && siPesta(chi)) return 0;
     // Senza testo si pesca dal mucchio di dove si sta: al bar si parla di caffe',
     // in riunione di riunioni, e alla propria scrivania del proprio lavoro.
-    n.textContent = testo || caso(FRASI[DOVE[chi.meta] || 'scrivania']);
+    const detto = accorcia(testo || caso(FRASI[DOVE[chi.meta] || 'scrivania']));
+    // Vicino ai muri la nuvoletta si allunga verso il centro, qualunque cosa dica il
+    // verso: tagliata dal bordo della scheda e' una frase a meta'.
+    const [x] = piedi(chi);
+    let verso = opt.verso;
+    if (x < 64) verso = 'dx';
+    else if (x > W - 64) verso = 'sx';
+    const n = el('div', verso ? 'of-say ' + verso : 'of-say');
+    n.textContent = detto;
+    if (opt.tipo) n.dataset.tipo = opt.tipo;
+    // Le battute della stessa scena portano lo stesso numero: da fuori (i controlli)
+    // si sa chi ha risposto a chi anche quando un altro parla in mezzo.
+    if (opt.scena) n.dataset.scena = String(opt.scena);
+    const dura = Math.min(5200, 2400 + detto.length * 55);
+    n.style.setProperty('--dura', dura + 'ms');
     chi.el.append(n);
     chi.dice = n;
     setTimeout(() => {
       n.remove();
       if (chi.dice === n) chi.dice = null;
-    }, 3200);
+    }, dura);
+    return dura;
   }
+
+  /* ---- le chiacchiere a due ----
+   *
+   * Una battuta per volta, ognuna verso chi ascolta, e la risposta parte quando la
+   * domanda sta sfumando. Chi c'e' dentro e' occupato per tutta la scena: nessun
+   * altro giro gli mette in bocca una frase sua a meta' discorso.
+   *
+   * Si ferma da sola se uno dei due se ne va, o se dopo due secondi non riesce ancora
+   * a parlare (la stanza ha gia' quattro nuvolette in aria): una risposta che arriva
+   * dieci secondi dopo la domanda non e' una risposta.
+   *
+   * Cosa si dicono lo decide chi conosce le persone (office.js e dialoghi.js); qui
+   * c'e' solo il come. */
+  const MAX_DIALOGHI = 2;
+  let dialoghi = 0;
+  /** Il numero dell'ultima scena cominciata. */
+  let scene = 0;
+
+  const versoDi = (a, b) => {
+    const [xa] = piedi(a);
+    const [xb] = piedi(b);
+    return xb > xa + 4 ? 'dx' : xb < xa - 4 ? 'sx' : undefined;
+  };
+
+  async function dialogo(battute) {
+    if (!battute || !battute.length || dialoghi >= MAX_DIALOGHI) return false;
+    const chi = [...new Set(battute.map((b) => b.chi))];
+    if (chi.some((c) => !c || !c.el || !c.el.isConnected || c.inDialogo)) return false;
+    dialoghi++;
+    const scena = ++scene;
+    chi.forEach((c) => (c.inDialogo = true));
+    try {
+      for (const b of battute) {
+        let ms = 0;
+        for (let k = 0; k < 10 && !ms; k++) {
+          if (!b.chi.el.isConnected || (b.a && !b.a.el.isConnected)) return false;
+          ms = b.chi.dice
+            ? 0
+            : parla(b.chi, b.testo, { verso: b.a ? versoDi(b.chi, b.a) : undefined, tipo: b.tipo, scena });
+          if (!ms) await attesa(200);
+        }
+        if (!ms) return false;
+        await attesa(ms * 0.86);
+      }
+      return true;
+    } finally {
+      chi.forEach((c) => (c.inDialogo = false));
+      dialoghi--;
+    }
+  }
+
+  /* ---- la visita ----
+   *
+   * Chi non ha niente da fare ogni tanto si alza e va alla scrivania di un collega:
+   * due parole, e torna al suo posto. `dove` e' dove fermarsi — la corsia accanto
+   * alla scrivania di chi va trovato — e `intanto` e' la chiacchierata, che chi
+   * chiama sa scrivere e la stanza no. Come il bar: due in giro al massimo, e chi
+   * lavora resta seduto (se Claude riparte a meta' strada si torna indietro). */
+  const libera = (c) =>
+    !c.fuori && !c.ferma && !c.lavora && !c.inDialogo && c.casa && Date.now() - (c.ultimo || 0) >= 45000;
+
+  async function visita(chi, dove, intanto) {
+    if (!chi || !libera(chi) || !dove) return false;
+    if (elencoVivi().filter((c) => c.fuori).length >= MAX_FUORI) return false;
+    chi.fuori = true;
+    chi.meta = 'visita';
+    chi.el.classList.add('fuori');
+    vesti(chi.fig, chi.seme, 'cammina');
+    let arrivato = false;
+    try {
+      if (await vai(chi, ...dove)) {
+        arrivato = true;
+        vesti(chi.fig, chi.seme, 'fermo');
+        if (intanto) await intanto();
+        await pausa(chi, 700);
+        vesti(chi.fig, chi.seme, 'cammina');
+      }
+      if (chi.el.isConnected && chi.casa) await vai(chi, chi.casa.x + 8, chi.casa.y + 24, true);
+    } finally {
+      posa(chi);
+      vesti(chi.fig, chi.seme, chi.posa);
+      chi.el.classList.remove('fuori');
+      chi.fuori = false;
+      chi.meta = null;
+      chi.ultimo = Date.now();
+    }
+    return arrivato;
+  }
+
+  /** Chi c'e' nella stanza, per chi deve contare quanti sono in giro. Lo da' `accendi`. */
+  let elencoVivi = () => [];
 
   // ---------- il caffe' ----------
 
@@ -1606,12 +1746,15 @@ window.ROOM = (() => {
     }
   }
 
-  /** Le chiacchiere vanno per conto loro: si parla anche da seduti — ma non
-      mentre si lavora, che e' il punto di tutto il resto. */
+  /** Le frasi di riempimento vanno per conto loro: si parla anche da seduti — ma
+      non mentre si lavora, che e' il punto di tutto il resto. Piu' rade di prima:
+      adesso la gente si parla davvero (office.js), e una frase sparata a caso fra
+      due battute di una conversazione la interrompe. */
   async function chiacchiere(elenco) {
     for (;;) {
-      await attesa(4000 + Math.random() * 5000);
-      const vivi = elenco().filter((c) => !c.ferma && !c.lavora && !c.dice);
+      await attesa(7000 + Math.random() * 7000);
+      if (dialoghi) continue;
+      const vivi = elenco().filter((c) => !c.ferma && !c.lavora && !c.dice && !c.inDialogo);
       if (vivi.length) parla(caso(vivi));
     }
   }
@@ -1766,9 +1909,16 @@ window.ROOM = (() => {
     cella,
     /** Si accende una volta: da li' in poi la stanza vive da sola. */
     accendi(elenco) {
+      elencoVivi = elenco;
       vita(elenco);
       chiacchiere(elenco);
       commissioni(elenco);
+    },
+    dialogo,
+    visita,
+    /** Due chiacchiere in corso al massimo: chi ne vuole cominciare una guarda qui. */
+    get dialoghi() {
+      return dialoghi;
     },
   };
 })();

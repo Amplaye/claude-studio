@@ -163,6 +163,28 @@ window.OFFICE = (() => {
   const aiutanti = (id) => ((board[id] && board[id].agents) || []).filter((a) => !a.ambient);
   const alLavoro = (id) => aiutanti(id).filter((a) => a.status === 'in_progress');
 
+  /* ---- e chi porta il passo del piano ----
+   *
+   * Il passo in corso e' una persona: entra dalla porta, stacca il suo foglietto dalla
+   * bacheca, si siede accanto al capo, e quando il passo e' fatto lo riappende verde e
+   * se ne va. Nella 0.34 era stato tolto — «una persona finta, il lavoro lo fa la
+   * conversazione stessa» — e l'ufficio si e' svuotato: i sub-agent veri sono rari, i
+   * passi ci sono quasi a ogni messaggio, ed era il loro andirivieni a far sembrare la
+   * stanza un posto dove si lavora.
+   *
+   * Solo finche' la conversazione lavora davvero: un passo rimasto «in corso» a turno
+   * finito non lo sta facendo nessuno, e uno seduto li' per un'ora mentirebbe. Nella
+   * fila in cima non c'e': la fila dice chi c'e', e il passo e' gia' la riga «cosa sta
+   * facendo» della sua conversazione. */
+  const MAX_PASSI = 2;
+  const passiVivi = (id) => {
+    const b = board[id];
+    if (!b || !b.busy) return [];
+    return (b.items || []).filter((it) => it.status === 'in_progress').slice(0, MAX_PASSI);
+  };
+  /** Il nome di chi porta un passo: il numero se la CLI gliel'ha dato, se no il testo. */
+  const chiavePasso = (it) => 'passo:' + (it.id || it.content);
+
   /** "12s", "4m 05s", "1h 02m": quanto, detto come si legge un orologio. */
   function durata(ms) {
     const s = Math.max(0, Math.round(ms / 1000));
@@ -264,6 +286,33 @@ window.OFFICE = (() => {
         asking: aspetta,
         rimpallo: rimpallo(''),
       });
+      // Chi porta il passo del piano: nella stanza c'e', nella fila no (vedi
+      // `passiVivi`). Sta qui perche' cliccandolo nella stanza esce la sua scheda.
+      const items = (board[s.id] && board[s.id].items) || [];
+      for (const it of passiVivi(s.id)) {
+        out.push({
+          key: 's:' + s.id + '/' + chiavePasso(it),
+          id: s.id,
+          fila: false,
+          passo: it,
+          numero: items.indexOf(it) + 1,
+          totale: items.length,
+          nome: it.activeForm || it.content,
+          seme: chi.seme + '/' + chiavePasso(it),
+          posa: 'digita',
+          stato: t('ctx.busy'),
+          cosa: it.activeForm || it.content,
+          adesso: (board[s.id] && board[s.id].doing) || '',
+          pct: null,
+          capo: s.name,
+          genitore: s.name,
+          livello: 1,
+          focused: false,
+          busy: true,
+          asking: false,
+          rimpallo: null,
+        });
+      }
       // I suoi, in ordine d'albero, e tutti: anche chi nella stanza un posto non ce
       // l'ha — perche' il capo e' in piedi, o perche' sono piu' di quanti ne stanno
       // attorno a una scrivania. La fila e' l'elenco di chi lavora; la stanza e' solo
@@ -310,7 +359,7 @@ window.OFFICE = (() => {
 
   function paintGente() {
     if (!gente) return;
-    const tutti = abitanti();
+    const tutti = abitanti().filter((a) => a.fila !== false);
     const vive = new Set(tutti.map((a) => a.key));
     for (const [k, p] of pedine) {
       if (!vive.has(k)) {
@@ -421,6 +470,14 @@ window.OFFICE = (() => {
       riga(scheda.compito, brief ? t('office.brief', { text: brief.length > 160 ? brief.slice(0, 159) + '…' : brief }) : '');
       riga(scheda.cosa, ag.doing ? t('office.now', { text: ag.doing }) : '');
       riga(scheda.extra, ag.since ? t('office.since', { time: durata(Date.now() - ag.since) }) : '');
+    } else if (a.passo) {
+      // Chi porta un passo del piano: di chi e' il piano, a che punto, cosa sta facendo
+      // adesso il filo, e da quanto. E' la stessa conversazione vista dal passo.
+      scheda.ruolo.textContent = t('office.stepFor', { name: a.genitore });
+      riga(scheda.compito, a.numero > 0 ? t('office.stepN', { n: a.numero, total: a.totale }) : '');
+      riga(scheda.cosa, a.adesso ? t('office.now', { text: a.adesso }) : '');
+      const da = board[a.id] && board[a.id].activeSince;
+      riga(scheda.extra, da ? t('office.since', { time: durata(Date.now() - da) }) : '');
     } else {
       // Una conversazione: come sta, a che passo del piano e', cosa sta facendo il
       // suo filo adesso, e quanti aiutanti ha al lavoro.
@@ -433,7 +490,7 @@ window.OFFICE = (() => {
     }
     // Cosa ha preso dall'archivio: e' il faldone che si vede sulla sua scrivania,
     // detto per nome.
-    const note = ag ? ag.consulted : board[a.id] && board[a.id].consulted;
+    const note = ag ? ag.consulted : a.passo ? null : board[a.id] && board[a.id].consulted;
     riga(scheda.memo, note && note.length ? t('office.consulted', { notes: note.join(', ') }) : '');
     // E con chi si sta scrivendo troppo, se succede.
     riga(scheda.rimpallo, a.rimpallo ? t('office.pingPong', { n: a.rimpallo.n, name: a.rimpallo.nome }) : '');
@@ -445,7 +502,7 @@ window.OFFICE = (() => {
     }
     // L'orologio vivo: "da quanto lavora" fermo al momento in cui hai aperto la
     // scheda dice un'ora che non e' piu' quella.
-    const gira = !!(ag && ag.since);
+    const gira = !!((ag && ag.since) || (a.passo && board[a.id] && board[a.id].activeSince));
     if (gira && !lancetta) lancetta = setInterval(paintScheda, 1000);
     if (!gira && lancetta) {
       clearInterval(lancetta);
@@ -605,6 +662,8 @@ window.OFFICE = (() => {
     window.ROOM.accendi(() => [...people.values()]);
     // E chi lavora per qualcuno tiene d'occhio il suo capo.
     setInterval(aura, GIRO_AURA);
+    // E fra un'occasione e l'altra, chi si trova vicino fa due chiacchiere.
+    setInterval(chiacchierata, GIRO_CHIACCHIERE);
 
     window.I18N.onChange(() => {
       titleText.nodeValue = t('office.title');
@@ -805,8 +864,8 @@ window.OFFICE = (() => {
   // Il legame e' gratis: la chiave del quadro delle task e' l'id della sessione,
   // cioe' lo stesso `id` che ha la card del capo.
 
-  /** Quanti se ne tengono per capo. Oltre, sono una folla attorno a una scrivania. */
-  const MAX_STAFF = 4;
+  /** Quanti se ne tengono per capo, passi del piano compresi. Oltre, sono una folla attorno a una scrivania. */
+  const MAX_STAFF = 5;
   /**
    * Dove si mettono, in pixel dai piedi del capo: due per parte, nelle corsie fra
    * una colonna di scrivanie e l'altra.
@@ -830,8 +889,8 @@ window.OFFICE = (() => {
   /** chiave `idCapo/idTask` -> l'impiegato. */
   const staff = new Map();
 
-  function buildStaff(chiave, capo, it) {
-    const b = el('span', 'of-guy of-staff busy');
+  function buildStaff(chiave, capo, it, passo) {
+    const b = el('span', passo ? 'of-guy of-staff of-passo busy' : 'of-guy of-staff busy');
     const who = el('span', 'of-body');
     const bubble = el('span', 'of-bubble');
     const dots = el('span', 'of-dots');
@@ -840,11 +899,21 @@ window.OFFICE = (() => {
     b.append(el('span', 'of-ring'), who, bubble);
     crowd.append(b);
     // Il seme e' il capo piu' l'id della task: la stessa faccia che ha nella fila in
-    // cima (vedi `abitanti`), e la stessa per tutto il tempo che lavora.
-    const nome = it.id;
+    // cima (vedi `abitanti`), e la stessa per tutto il tempo che lavora. Chi porta un
+    // passo del piano si chiama col passo.
+    const nome = passo ? chiavePasso(it) : it.id;
     // `padre` e' chi gli ha passato il lavoro, se e' un altro aiutante: e' alla sua
     // scrivania che torna la busta dell'esito.
-    const chi = { chiave, capoId: capo.id, nome, padre: it.parentId || null, el: b, fig: who, seme: capo.seme + '/' + nome };
+    const chi = {
+      chiave,
+      capoId: capo.id,
+      nome,
+      passo: !!passo,
+      padre: passo ? null : it.parentId || null,
+      el: b,
+      fig: who,
+      seme: capo.seme + '/' + nome,
+    };
     // Dietro un impiegato non c'e' nessuna conversazione dove andare: cliccarlo
     // dice cosa sta facendo, che e' l'unica cosa che ha da dire. Dalla fila in
     // cima si arriva alla stessa scheda, e da li' anche con la tastiera.
@@ -919,7 +988,10 @@ window.OFFICE = (() => {
       const p = postoBanco(banco);
       return [p.x + 8, p.y + 24];
     }
-    return [capo.casa.x + 8 + POSTI_STAFF[i][0], capo.casa.y + 24 + POSTI_STAFF[i][1]];
+    // I posti in piedi sono quattro: il quinto, se mai non trovasse una sedia in tutta
+    // la stanza, ricomincia dal primo invece di cadere fuori dall'elenco.
+    const [dx, dy] = POSTI_STAFF[i % POSTI_STAFF.length];
+    return [capo.casa.x + 8 + dx, capo.casa.y + 24 + dy];
   }
 
   /* ---- i portatili ----
@@ -971,9 +1043,13 @@ window.OFFICE = (() => {
     const out = new Map();
     for (const [id, capo] of people) {
       if (!capo.casa) continue;
-      alLavoro(id)
-        .slice(0, MAX_STAFF)
-        .forEach((it, i) => out.set(id + '/' + it.id, { capo, it, i }));
+      // Prima chi porta il passo: e' il lavoro della conversazione stessa, e si siede
+      // piu' vicino di tutti. Poi gli aiutanti, nell'ordine in cui sono partiti.
+      const chi = [
+        ...passiVivi(id).map((it) => ({ it, passo: true, k: chiavePasso(it) })),
+        ...alLavoro(id).map((it) => ({ it, passo: false, k: it.id })),
+      ];
+      chi.slice(0, MAX_STAFF).forEach(({ it, passo, k }, i) => out.set(id + '/' + k, { capo, it, i, passo }));
     }
     return out;
   }
@@ -1043,6 +1119,8 @@ window.OFFICE = (() => {
     // piu' da nessuna parte. Lo stesso per il giro all'archivio.
     await chi.andata;
     await chi.giro;
+    // Alzandosi dice com'e' andata a chi gli aveva dato il lavoro.
+    if (chi.esito) congedo(chi);
     // Il faldone torna in archivio: chi se ne va non lascia carte sulla scrivania.
     window.ROOM.riponi(chi);
     window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
@@ -1121,9 +1199,19 @@ window.OFFICE = (() => {
     for (const id of Object.keys(board)) {
       if (!people.has(id)) continue;
       for (const it of board[id].items || []) {
-        if (it.status === 'pending') fare++;
-        else if (it.status === 'failed') storte++;
+        if (it.status === 'pending') {
+          fare++;
+          continue;
+        }
+        // Un passo in mano a chi lo porta non e' sul muro: ne' mentre ci lavora, ne'
+        // mentre lo riporta fatto. Il foglio e' uno solo.
+        const chi = staff.get(id + '/' + chiavePasso(it));
+        if (chi && chi.foglio) continue;
+        if (it.status === 'failed') storte++;
         else if (it.status === 'completed') fatte++;
+        // Un passo in corso che nessuno ha staccato — chi lo porta e' ancora per strada,
+        // o la conversazione si e' fermata — e' ancora appeso, giallo come una cosa da fare.
+        else if (it.status === 'in_progress') fare++;
       }
       // E il lavoro degli aiutanti finiti: il foglio che hanno riappeso, verde o
       // rosso. Chi lo sta ancora riportando ce l'ha in mano, e un foglio e' uno solo.
@@ -1184,8 +1272,12 @@ window.OFFICE = (() => {
     n.append(box);
 
     // Il fondo chiude, la scatola no: un clic dentro la lista non deve far sparire
-    // la lista che si sta leggendo.
-    n.onclick = (e) => e.target === n && apriBacheca(false);
+    // la lista che si sta leggendo. Con le graffe e senza valore di ritorno: un
+    // `onclick` che torna `false` annulla il clic, e dentro il foglio non si apriva
+    // piu' nemmeno una sezione chiusa.
+    n.onclick = (e) => {
+      if (e.target === n) apriBacheca(false);
+    };
     // Esc chiude. Basta ascoltarlo qui dentro perche' aprendo il foglio il fuoco ci
     // finisce dentro: un ascoltatore su tutto il documento avrebbe litigato con
     // l'Esc della chat, che sta nella stessa pagina.
@@ -1345,56 +1437,177 @@ window.OFFICE = (() => {
 
   /* ---- chi lavora per chi ----
    *
-   * L'ultima sezione del foglio: per ogni conversazione, i suoi aiutanti ad albero —
-   * chi ha lanciato chi, che tipo e', com'e' andata e quanto ci ha messo. Nella stanza
-   * si vede un gruppetto attorno a una scrivania; qui si legge cosa lo tiene insieme.
+   * L'ultima sezione del foglio: per ogni conversazione, una scheda con la sua
+   * squadra. Era un elenco unico di righe rientrate — capo, aiutante, aiutante,
+   * capo — e con una dozzina di aiutanti diventava un muro di testo dove non si
+   * capiva piu' chi lavorasse per chi, ne' chi stesse lavorando adesso.
    *
-   * Si rifa' a ogni giro invece di ridipingerla: sono righe di solo testo, senza
-   * niente da cliccare, e una manciata. */
+   * Adesso ogni conversazione e' una scheda: la sua faccia e il suo nome in testa,
+   * e accanto quanti sono al lavoro, quanti hanno finito e quanti no. Sotto, chi
+   * lavora adesso — con la stessa faccia che ha nella stanza, cosa sta facendo e da
+   * quanto — e chi e' stato lanciato da un altro aiutante gli sta appeso sotto, con
+   * un gomito che lo dice. Chi ha finito sta raccolto in fondo, chiuso: e' storia, e
+   * si apre se serve. La scheda ricorda se l'hai aperta.
+   *
+   * Si rifa' a ogni giro invece di ridipingerla: sono poche righe, e quello che deve
+   * sopravvivere (aperto o chiuso) sta in `finitiAperti`. */
   let albero;
+  /** id conversazione -> la sezione «hanno finito» e' aperta. Chi non c'e' e' come la vuole la scheda. */
+  const finitiAperti = new Map();
+
+  /** Una faccina della stanza, per la scheda: stessa striscia, stesso seme. */
+  function faccina(seme) {
+    const f = el('span', 'of-facciola');
+    const corpo = el('span', 'of-body');
+    f.append(corpo);
+    window.ROOM.vesti(corpo, seme, 'fermo');
+    return f;
+  }
+
+  /** Una pastiglia coi numeri della squadra: «2 al lavoro», «5 finiti», «1 non riuscito». */
+  function pastiglia(cls, testo) {
+    const p = el('span', 'of-pastiglia ' + cls);
+    p.append(el('i'), document.createTextNode(testo));
+    return p;
+  }
 
   function dipingiAlbero() {
     if (!albero) {
       albero = el('section', 'of-sheet-who of-tree');
-      albero.append(el('h3', 'of-sheet-name'), el('div', 'of-tree-body'));
+      albero.append(el('h3', 'of-sheet-name'), el('p', 'of-tree-intro'), el('div', 'of-tree-body'));
     }
-    const con = [...people.keys()].filter((id) => aiutanti(id).length);
+    // Prima chi ha qualcuno al lavoro adesso: e' la scheda che si viene a guardare.
+    const con = [...people.keys()]
+      .filter((id) => aiutanti(id).length)
+      .sort((p, q) => alLavoro(q).length - alLavoro(p).length);
     if (!con.length) {
       albero.remove();
       return 0;
     }
-    albero.firstChild.textContent = t('office.tree');
-    const corpo = albero.lastChild;
-    const righe = [];
+    albero.children[0].textContent = t('office.tree');
+    albero.children[1].textContent = t('office.treeIntro');
+    const corpo = albero.children[2];
+    // Quello che e' aperto adesso resta aperto: lo si legge dalle schede che stanno per
+    // essere rifatte, e non dall'evento `toggle`, che arriva dopo — un aggiornamento
+    // che cade fra il clic e l'evento richiudeva la sezione appena aperta.
+    for (const vecchia of corpo.querySelectorAll('.of-squadra')) {
+      const det = vecchia.querySelector('details.of-finiti');
+      if (det) finitiAperti.set(vecchia.dataset.id, det.open);
+    }
+    const schede = [];
     let n = 0;
     for (const id of con) {
-      righe.push(el('div', 'of-tree-capo', people.get(id).pname.textContent));
-      for (const a of aiutanti(id)) {
-        n++;
-        const r = el('div', 'of-tree-row ' + (a.status || 'pending'));
-        r.style.setProperty('--lv', String(Math.max(1, a.depth || 1)));
-        r.dataset.livello = String(a.depth || 1);
-        r.append(el('i', 'of-tree-dot'), el('span', 'of-tree-txt', a.title || a.type || ''));
-        if (a.type) r.append(el('span', 'of-tree-type', a.type));
-        const quanto =
-          a.status === 'in_progress' && a.since
-            ? t('office.since', { time: durata(Date.now() - a.since) })
-            : a.ms
-              ? t('office.took', { time: durata(a.ms) })
-              : '';
-        if (quanto) r.append(el('span', 'of-tree-time', quanto));
-        r.title = [a.title, a.doing || a.summary || ''].filter(Boolean).join(' — ');
-        righe.push(r);
+      const capo = people.get(id);
+      const tutti = aiutanti(id);
+      const vivi = tutti.filter((a) => a.status === 'in_progress');
+      const finiti = tutti.filter((a) => a.status === 'completed' || a.status === 'failed');
+      const ok = finiti.filter((a) => a.status === 'completed').length;
+      const ko = finiti.length - ok;
+      n += tutti.length;
+
+      const sq = el('article', 'of-squadra');
+      sq.dataset.id = id;
+      const testa = el('header', 'of-squadra-head');
+      const conti = el('span', 'of-squadra-conti');
+      if (vivi.length) conti.append(pastiglia('vivo', t('office.treeLive', { n: vivi.length })));
+      if (ok) conti.append(pastiglia('riuscito', t('office.treeOk', { n: ok })));
+      if (ko) conti.append(pastiglia('fallito', t('office.treeKo', { n: ko })));
+      testa.append(faccina(capo.seme), el('span', 'of-squadra-nome', capo.pname.textContent), conti);
+      sq.append(testa);
+
+      // Chi lavora adesso, ad albero. Il livello e' quello che si vede: chi e' stato
+      // lanciato da un aiutante che ha gia' finito sale sotto la conversazione, invece
+      // di restare appeso a un gomito che non porta a nessuno.
+      if (vivi.length) {
+        const lista = el('ul', 'of-albero');
+        // Prima la forma dell'albero — chi e' appeso a chi, e chi e' l'ultimo dei suoi
+        // fratelli — poi le righe: i fili che scendono da un aiutante al suo prossimo
+        // fratello passano attraverso le righe dei figli, e per disegnarli bisogna gia'
+        // sapere chi viene dopo.
+        const vis = [];
+        const perId = new Map();
+        for (const a of vivi) {
+          const padre = a.parentId && perId.has(a.parentId) ? perId.get(a.parentId) : null;
+          const v = { a, lv: padre ? padre.lv + 1 : 1, padre };
+          vis.push(v);
+          perId.set(a.id, v);
+        }
+        const figli = new Map();
+        for (const v of vis) {
+          const k = v.padre ? v.padre.a.id : '';
+          if (!figli.has(k)) figli.set(k, []);
+          figli.get(k).push(v);
+        }
+        const ultimo = (v) => {
+          const f = figli.get(v.padre ? v.padre.a.id : '');
+          return f[f.length - 1] === v;
+        };
+        const filo = (cls, k) => {
+          const f = el('i', cls);
+          f.style.setProperty('--k', String(k));
+          return f;
+        };
+        vis.forEach((v, i) => {
+          const { a, lv } = v;
+          const r = el('li', 'of-nodo in_progress');
+          r.dataset.livello = String(lv);
+          r.style.setProperty('--lv', String(lv));
+          if (lv > 1) {
+            // I fili degli antenati che hanno ancora un fratello sotto: passano dritti.
+            for (let p = v.padre; p && p.lv > 1; p = p.padre) if (!ultimo(p)) r.append(filo('of-filo', p.lv));
+            // E il proprio gomito, che parte dalla faccia di chi l'ha lanciato — o dal
+            // filo del fratello di sopra — e prosegue in giu' se c'e' un altro fratello.
+            const primo = i > 0 && vis[i - 1] === v.padre;
+            r.append(filo('of-gomito' + (primo ? ' primo' : ''), lv));
+            if (!ultimo(v)) r.append(filo('of-filo basso', lv));
+          }
+          const testo = el('span', 'of-nodo-testo');
+          testo.append(el('span', 'of-nodo-titolo', a.title || a.type || ''));
+          const sotto = [a.type, a.doing].filter(Boolean).join(' · ');
+          if (sotto) testo.append(el('span', 'of-nodo-sotto', sotto));
+          r.append(faccina(capo.seme + '/' + a.id), testo);
+          if (a.since) r.append(el('span', 'of-nodo-tempo', durata(Date.now() - a.since)));
+          r.title = [a.title, a.brief ? t('office.brief', { text: a.brief }) : ''].filter(Boolean).join('\n');
+          lista.append(r);
+        });
+        sq.append(lista);
+      } else {
+        sq.append(el('p', 'of-squadra-vuota', t('office.treeNone')));
       }
+
+      // Chi ha finito: in fondo e chiuso, i piu' recenti prima. Aperto da solo se e'
+      // tutto quello che c'e' da leggere — o se l'hai aperto tu.
+      if (finiti.length) {
+        const det = el('details', 'of-finiti');
+        const aperto = finitiAperti.has(id) ? finitiAperti.get(id) : !vivi.length && finiti.length <= 3;
+        det.open = aperto;
+        det.addEventListener('toggle', () => finitiAperti.set(id, det.open));
+        det.append(el('summary', null, t('office.treeFinished', { n: finiti.length })));
+        const lista = el('ul', 'of-albero chiuso');
+        for (const a of finiti.slice().reverse()) {
+          const r = el('li', 'of-nodo ' + a.status);
+          r.append(el('i', 'of-nodo-esito'), el('span', 'of-nodo-titolo', a.title || a.type || ''));
+          if (a.type) r.append(el('span', 'of-nodo-tipo', a.type));
+          if (a.ms) r.append(el('span', 'of-nodo-tempo', durata(a.ms)));
+          r.title = [a.title, a.summary || ''].filter(Boolean).join('\n');
+          lista.append(r);
+        }
+        det.append(lista);
+        sq.append(det);
+      }
+
       // E chi si sta scrivendo troppo: la stessa cosa delle due pedine in cima, detta
       // per intero.
-      const nomi = new Map(aiutanti(id).map((a) => [a.id, a.title || a.type || '']));
-      const nome = (k) => (k ? nomi.get(k) || '' : people.get(id).pname.textContent);
-      for (const { a, b, n } of coppieScritte(id)) {
-        righe.push(el('div', 'of-tree-rimpallo', t('office.pingPongTree', { a: nome(a), b: nome(b), n })));
+      const nomi = new Map(tutti.map((a) => [a.id, a.title || a.type || '']));
+      const nome = (k) => (k ? nomi.get(k) || '' : capo.pname.textContent);
+      for (const { a, b, n: quante } of coppieScritte(id)) {
+        sq.append(el('p', 'of-tree-rimpallo', t('office.pingPongTree', { a: nome(a), b: nome(b), n: quante })));
       }
+      schede.push(sq);
     }
-    corpo.replaceChildren(...righe);
+    // Chi non c'e' piu' non tiene aperta niente.
+    for (const id of [...finitiAperti.keys()]) if (!people.has(id)) finitiAperti.delete(id);
+    corpo.replaceChildren(...schede);
     sheetBody.append(albero);
     return n;
   }
@@ -1474,6 +1687,12 @@ window.OFFICE = (() => {
         const a = m.out ? null : postoDi(capo, m.to);
         if (!da && !a) continue;
         window.ROOM.posta(stage, da || window.ROOM.INGRESSO, a || window.ROOM.INGRESSO, 'lettera');
+        // E chi la manda la dice, con le parole vere del messaggio; chi la riceve
+        // risponde, se e' nella stanza.
+        const mitt = m.from ? staff.get(id + '/' + m.from) : capo;
+        const dest = m.out ? null : m.to ? staff.get(id + '/' + m.to) : capo;
+        const testo = corto(maschera(m.text), 40);
+        if (mitt && testo && Math.random() < 0.8) recitaAppena('lettera', mitt, dest, { testo }, 3);
       }
     }
     // Il registro non cresce per sempre: quelle di un'ora fa non tornano piu' nel quadro.
@@ -1521,9 +1740,21 @@ window.OFFICE = (() => {
   function inArchivio(chi, torna, dove, posa) {
     chi.vuoleArchivio = 0;
     chi.ultimoArchivio = Date.now();
-    chi.giro = window.ROOM.archivio(chi, torna, dove).then(() => {
+    chi.giro = window.ROOM.archivio(chi, torna, dove).then((ok) => {
       if (chi.el.isConnected && !chi.fuori && !chi.esce) window.ROOM.vesti(chi.fig, chi.seme, posa());
+      if (ok) dopoArchivio(chi);
     });
+  }
+
+  /** Tornato dall'archivio: dice cosa ha ripescato, a chi gli sta vicino. */
+  function dopoArchivio(chi) {
+    if (!chi.el.isConnected || chi.esce || Math.random() > 0.7) return;
+    const note = chi.capoId
+      ? ((aiutanti(chi.capoId).find((x) => x.id === chi.nome) || {}).consulted || [])
+      : (board[chi.id] && board[chi.id].consulted) || [];
+    const nota = note[note.length - 1];
+    if (!nota) return;
+    recitaAppena('archivio', chi, vicinoA(chi, 120), { nota: corto(nota, 26) });
   }
 
   /** Un capo: dalla sua scrivania, e il faldone accanto al monitor. */
@@ -1558,7 +1789,9 @@ window.OFFICE = (() => {
       archivioCapo(capo);
     }
     for (const chi of staff.values()) {
-      if (chi.esce) continue;
+      // Chi porta un passo non ha un filo suo: la ricerca nella memoria l'ha fatta la
+      // conversazione, e in archivio ci va il capo.
+      if (chi.esce || chi.passo) continue;
       const a = aiutanti(chi.capoId).find((x) => x.id === chi.nome);
       segnaArchivio(chi, (a && a.lastTool) || '');
       archivioStaff(chi);
@@ -1576,7 +1809,12 @@ window.OFFICE = (() => {
     // conversazione o perde la scrivania, e allora non c'e' nessun esito da portare.
     for (const [chiave, chi] of staff) {
       if (voluti.has(chiave) || chi.esce) continue;
-      const a = aiutanti(chi.capoId).find((x) => x.id === chi.nome);
+      // Il passo si cerca fra i passi, l'aiutante fra gli aiutanti. Un passo sparito —
+      // piano riscritto, messaggio nuovo — o rimasto in corso a turno finito non ha un
+      // esito da portare: chi lo portava se ne va e basta.
+      const a = chi.passo
+        ? ((board[chi.capoId] && board[chi.capoId].items) || []).find((x) => chiavePasso(x) === chi.nome)
+        : aiutanti(chi.capoId).find((x) => x.id === chi.nome);
       if (a && (a.status === 'completed' || a.status === 'failed')) chi.esito = a.status === 'failed' ? 'ko' : 'ok';
       esce(chi);
     }
@@ -1584,16 +1822,20 @@ window.OFFICE = (() => {
     // Poi si vede chi si siede dove: prima i posti, e solo dopo dove va la gente.
     assegnaBanchi(voluti);
 
-    for (const [chiave, { capo, it, i }] of voluti) {
+    for (const [chiave, { capo, it, i, passo }] of voluti) {
       let chi = staff.get(chiave);
       if (!chi) {
-        chi = buildStaff(chiave, capo, it);
+        chi = buildStaff(chiave, capo, it, passo);
         staff.set(chiave, chi);
         chi.andata = entra(chi, capo, i);
+        // Arrivato al suo posto, si presenta a chi gli ha dato il lavoro.
+        chi.andata.then(() => presentati(chi));
         // Il compito parte adesso dalla scrivania di chi lo da', e lo aspetta sulla
         // bacheca: e' li' che chi e' appena entrato va a staccarlo. Solo per chi e'
-        // nato adesso — gli altri l'avevano gia' preso prima che guardassi.
-        if (it.since && Date.now() - it.since < NATO_DA) compito(capo, it);
+        // nato adesso — gli altri l'avevano gia' preso prima che guardassi. Un passo
+        // nasce quando si accende: e' l'orologio del passo in corso.
+        const nato = passo ? board[capo.id] && board[capo.id].activeSince : it.since;
+        if (nato && Date.now() - nato < NATO_DA) compito(capo, it);
       } else if (!chi.va && !chi.esce && !chi.archivio) {
         // Il posto puo' cambiare sotto i piedi: un fratello che finisce fa
         // scalare tutti gli altri di uno, e una conversazione nuova si riprende
@@ -1606,9 +1848,10 @@ window.OFFICE = (() => {
         // fra le due non parte mai.
         if (Math.hypot(qx - fx, qy - fy) > 2) chi.andata = entra(chi, capo, i);
       }
-      const cosa = it.title || it.type || '';
+      const cosa = passo ? it.activeForm || it.content || '' : it.title || it.type || '';
       // Se la tiene addosso: e' quello che dice quando parla del suo lavoro.
       chi.cosa = cosa;
+      chi.tipo = passo ? '' : it.type || '';
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
     }
@@ -1782,7 +2025,7 @@ window.OFFICE = (() => {
   function aura() {
     const ora = Date.now();
     for (const chi of staff.values()) {
-      if (chi.va || chi.esce || chi.dice || chi.archivio) continue;
+      if (chi.va || chi.esce || chi.dice || chi.archivio || chi.inDialogo) continue;
       const capo = people.get(chi.capoId);
       if (!capo || !capo.el.isConnected) continue;
       if (ora - (chi.zitto || 0) < RESPIRO) continue;
@@ -1802,10 +2045,39 @@ window.OFFICE = (() => {
           ((board[chi.capoId] && board[chi.capoId].done) || 0) +
           aiutanti(chi.capoId).filter((a) => a.status === 'completed').length;
         const pescate = fatte > 0 ? ADULAZIONE_N.concat(ADULAZIONE) : ADULAZIONE;
-        window.ROOM.parla(chi, caso(pescate).replace('{n}', fatte));
+        const battuta = caso(pescate).replace('{n}', fatte);
+        // E una volta su due il capo risponde: un'adulazione che cade nel vuoto e'
+        // un cartello, una a cui il capo risponde «adulatore» e' un ufficio.
+        if (Math.random() < 0.5 && !capo.inDialogo && !capo.dice) {
+          const r = window.DIALOGHI && window.DIALOGHI.scena('adulazione', ritratto(chi), ritratto(capo), stanzaOra());
+          if (r) {
+            capo.zitto = ora;
+            window.ROOM.dialogo([
+              { chi, a: capo, testo: battuta, tipo: 'adula' },
+              ...r.map((b) => ({ chi: capo, a: chi, testo: b.testo })),
+            ]);
+            continue;
+          }
+        }
+        window.ROOM.parla(chi, battuta, { tipo: 'adula', verso: versoVerso(chi, capo) });
       } else if (d > LONTANO && Math.random() < 0.35) {
         chi.zitto = ora;
-        window.ROOM.parla(chi, caso(PETTEGOLEZZI));
+        // Alle spalle del capo, e a volte un collega lo sente e dice la sua.
+        const collega = vicinoA(chi, 110, (c) => c !== capo && c.capoId === chi.capoId);
+        const r =
+          collega &&
+          Math.random() < 0.4 &&
+          window.DIALOGHI &&
+          window.DIALOGHI.scena('pettegolezzo', ritratto(chi), ritratto(collega), stanzaOra());
+        if (r) {
+          collega.zitto = ora;
+          window.ROOM.dialogo([
+            { chi, a: collega, testo: caso(PETTEGOLEZZI) },
+            ...r.map((b) => ({ chi: collega, a: chi, testo: b.testo })),
+          ]);
+        } else {
+          window.ROOM.parla(chi, caso(PETTEGOLEZZI));
+        }
       } else if (Math.random() < 0.25) {
         // Ne' vicino al capo ne' abbastanza lontano da sparlarne: allora si parla
         // di quello che si sta facendo, che e' quello di cui parla davvero chi sta
@@ -1814,6 +2086,393 @@ window.OFFICE = (() => {
         window.ROOM.parla(chi, suLavoro(chi.cosa));
       }
     }
+  }
+
+  // ---------- le chiacchiere vere ----------
+  //
+  // Prima ognuno parlava da solo: una frase pescata dal mucchio del posto dove stava,
+  // o una battuta al capo. Adesso si parlano — una domanda e la sua risposta, fra due
+  // che stanno vicini — e quello di cui parlano e' vero: il passo che uno sta facendo,
+  // il file che ha aperto, quanti passi mancano, il messaggio che un aiutante ha
+  // appena scritto all'altro, il contesto che sta finendo, l'ora e il branch.
+  //
+  // Le frasi stanno in dialoghi.js, coi buchi da riempire. Qui si decide chi parla
+  // con chi, e quando: a ogni cosa vera che succede (un passo preso o chiuso, un
+  // aiutante che arriva o finisce, una lettera, un ritorno dall'archivio, una
+  // conversazione che apri, una domanda che ti aspetta, il contesto quasi pieno), e
+  // fra un'occasione e l'altra due che si trovano vicini — al bar, in riunione, alla
+  // scrivania accanto — o uno che si alza e va a trovare un collega.
+
+  /** Ogni quanto si guarda se c'e' qualcuno da far chiacchierare. */
+  const GIRO_CHIACCHIERE = 6500;
+  /** Quanto tace qualcuno dopo una scena, prima di essere ripescato per un'altra. */
+  const RESPIRO_SCENA = 16000;
+  /** Ogni quanto qualcuno puo' alzarsi per andare a trovare un collega. */
+  const OGNI_VISITA = [35000, 70000];
+
+  /** Accorciato a parola intera: «Riporto gli agenti in…», non «Riporto gli agenti in uffic…». */
+  const corto = (s, n) => {
+    const t = String(s || '').replace(/\s+/g, ' ').trim();
+    if (t.length <= n) return t;
+    const cut = t.slice(0, n - 1);
+    const sp = cut.lastIndexOf(' ');
+    return (sp >= n * 0.55 ? cut.slice(0, sp) : cut).replace(/[\s,.;:–-]+$/, '') + '…';
+  };
+  const maiuscola = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+
+  /** Il genere di un aiutante, detto come lo direbbe un collega. */
+  const TIPI = {
+    explore: 'esploratore',
+    'general-purpose': 'tuttofare',
+    plan: 'pianificatore',
+    claude: 'jolly',
+    'statusline-setup': 'tecnico',
+    bash: 'terminale',
+    workflow: 'regista',
+    mcp: 'connettore',
+  };
+  const tipoDi = (t) => (t ? TIPI[String(t).toLowerCase()] || String(t).replace(/[-_]+/g, ' ').toLowerCase() : '');
+
+  /** «al 34%», «all'85%»: l'articolo davanti a un numero detto a voce. */
+  const alPct = (n) => {
+    const v = Math.round(n);
+    const vocale = v === 1 || v === 8 || v === 11 || (v >= 80 && v <= 89);
+    return (vocale ? 'all’' : 'al ') + v + '%';
+  };
+
+  /** Il verbo di uno strumento, al presente, al gerundio e al participio. */
+  const AZIONI = {
+    Read: ['leggo', 'leggendo', 'letto'],
+    Reading: ['leggo', 'leggendo', 'letto'],
+    Edit: ['modifico', 'modificando', 'modificato'],
+    MultiEdit: ['modifico', 'modificando', 'modificato'],
+    Editing: ['modifico', 'modificando', 'modificato'],
+    NotebookEdit: ['modifico', 'modificando', 'modificato'],
+    Write: ['scrivo', 'scrivendo', 'scritto'],
+    Writing: ['scrivo', 'scrivendo', 'scritto'],
+    Grep: ['cerco in', 'cercando in', 'cercato in'],
+    Glob: ['cerco', 'cercando', 'cercato'],
+  };
+
+  /** Un comando, detto come lo dice chi l'ha lanciato: «i test», «la build». */
+  function comandoDi(c) {
+    const s = String(c || '').toLowerCase();
+    if (!s) return '';
+    if (/\b(vitest|jest|mocha|pytest|playwright|npm (run )?test|[\w-]*-check|smoke)\b/.test(s)) return 'i test';
+    if (/\b(build|tsc|esbuild|webpack|compile|package)\b/.test(s)) return 'la build';
+    if (/\bgit commit\b/.test(s)) return 'il commit';
+    if (/\bgit push\b/.test(s)) return 'il push';
+    if (/\b(deploy|wrangler|vercel)\b/.test(s)) return 'il deploy';
+    if (/\b(npm|pnpm|yarn) (i|install|add|ci)\b/.test(s)) return 'le dipendenze';
+    if (/^git\b/.test(s)) return 'git';
+    return '';
+  }
+
+  /**
+   * Cosa sta facendo, da quella riga che dice il filo: «Read package.json»,
+   * «Bash npm test», «Running find src». Un file solo se ha l'aria di un nome di
+   * file — in ufficio si dice «sto leggendo office.js», non il percorso intero.
+   */
+  function strumentoDi(doing) {
+    const m = String(doing || '').trim().match(/^(\S+)\s*(.*)$/);
+    if (!m) return {};
+    const out = {};
+    const [, tool, resto] = m;
+    const file = (resto.match(/[\w.@-]+\.[A-Za-z][A-Za-z0-9]{0,4}\b/g) || []).pop();
+    const az = AZIONI[tool];
+    if (az && file && file.length <= 26) {
+      out.file = file;
+      [out.azione, out.azioneG, out.azioneP] = az;
+    }
+    if (tool === 'Bash' || tool === 'Running' || tool === 'PowerShell') out.comando = comandoDi(resto) || undefined;
+    return out;
+  }
+
+  /** Le parole che non si dicono ad alta voce: chiavi, token, password. */
+  const maschera = (s) =>
+    String(s || '')
+      .replace(/\b(sk|pk|rk|ghp|gho|github_pat|xox[abp]|sbp|AKIA)[-_A-Za-z0-9]{8,}/g, '•••')
+      .replace(/\b[A-Za-z0-9+/_-]{32,}\b/g, '•••')
+      .replace(/(password|passwd|token|secret|api[_-]?key)\s*[:=]\s*\S+/gi, '$1 •••');
+
+  /**
+   * Il ritratto di una persona della stanza, nella forma che vuole dialoghi.js: chi
+   * e', su cosa lavora, a che punto e' il piano del suo capo, cosa sta toccando.
+   */
+  function ritratto(chi) {
+    const r = {};
+    if (!chi) return r;
+    const ora = Date.now();
+    const id = chi.capoId || chi.id;
+    const b = board[id] || {};
+    const items = b.items || [];
+    const card = ((last && last.cards) || []).find((c) => c.id === id);
+    let doing = '';
+    if (chi.capoId) {
+      const capo = people.get(chi.capoId);
+      r.ruolo = chi.passo ? 'passo' : 'aiutante';
+      r.capo = corto(capo ? capo.pname.textContent : '', 20);
+      r.lavoro = corto(chi.cosa, 28);
+      r.nome = corto(chi.cosa, 20);
+      if (chi.passo) {
+        const it = items.find((x) => chiavePasso(x) === chi.nome);
+        if (it) r.numero = items.indexOf(it) + 1;
+        doing = b.doing;
+        if (b.activeSince) r.durata = durata(ora - b.activeSince);
+      } else {
+        const a = aiutanti(id).find((x) => x.id === chi.nome);
+        if (a) {
+          r.tipo = tipoDi(a.type);
+          r.Tipo = maiuscola(r.tipo);
+          doing = a.doing;
+          if (a.status !== 'in_progress' && a.ms) r.durata = durata(a.ms);
+          else if (a.since) r.durata = durata(ora - a.since);
+        }
+      }
+    } else {
+      r.ruolo = 'capo';
+      r.nome = corto(card ? card.name : chi.pname && chi.pname.textContent, 20);
+      r.lavoro = corto(cheFa(id), 28);
+      r.aiutanti = alLavoro(id).length;
+      r.occupato = !!(card && card.busy);
+      r.finito = !!(card && card.done && !card.busy);
+      if (card && card.pct != null) {
+        r.ctx = Math.round(card.pct);
+        r.alCtx = alPct(card.pct);
+      }
+      if (card && card.busy) doing = b.doing;
+    }
+    // Il piano e' quello del capo, per tutti quelli che lavorano per lui.
+    if (items.length) {
+      r.totale = items.length;
+      r.fatte = b.done || 0;
+      r.mancano = Math.max(0, items.length - (b.done || 0));
+    }
+    return Object.assign(r, strumentoDi(doing));
+  }
+
+  const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+
+  /** La stanza adesso: il progetto, i consumi, l'ora, la bacheca. */
+  function stanzaOra() {
+    const d = last || {};
+    const adesso = new Date();
+    const h = adesso.getHours();
+    const ora = h + ':' + String(adesso.getMinutes()).padStart(2, '0');
+    const s = {
+      progetto: d.project || '',
+      branch: d.branch || '',
+      sporco: !!d.dirty,
+      quanti: (d.cards || []).length,
+      gente: people.size + staff.size,
+      ora,
+      alleOra: (h === 1 ? 'all’' : 'alle ') + ora,
+      sonoLe: h === 1 ? 'è l’' + ora : 'sono le ' + ora,
+      momento: h >= 5 && h < 12 ? 'mattina' : h >= 12 && h < 18 ? 'pomeriggio' : h >= 18 && h < 23 ? 'sera' : 'notte',
+      giorno: GIORNI[adesso.getDay()],
+      resetSessione: d.sessionReset || '',
+      fare: 0,
+      fatte: 0,
+      storte: 0,
+    };
+    if (d.usage && d.usage.session != null) {
+      s.sessione = Math.round(d.usage.session);
+      s.alSessione = alPct(d.usage.session);
+    }
+    if (d.usage && d.usage.week != null) {
+      s.settimana = Math.round(d.usage.week);
+      s.alSettimana = alPct(d.usage.week);
+    }
+    // I foglietti, contati come li conta la bacheca: quelli sul muro.
+    if (bacheche) {
+      s.fare = bacheche.querySelectorAll('.of-note.fare').length;
+      s.fatte = bacheche.querySelectorAll('.of-note.fatta').length;
+      s.storte = bacheche.querySelectorAll('.of-note.storta').length;
+    }
+    return s;
+  }
+
+  /** Tutti quelli che stanno nella stanza: i capi e chi lavora per loro. */
+  const presenti = () => [...people.values(), ...staff.values()].filter((c) => c.el.isConnected && !c.esce);
+
+  /** Pronto a fare due chiacchiere: fermo, non gia' in una scena, e zitto da un po'. */
+  const pronto = (c, ora = Date.now()) =>
+    c.el.isConnected &&
+    !c.inDialogo &&
+    !c.dice &&
+    !c.va &&
+    !c.esce &&
+    !c.archivio &&
+    !c.ferma &&
+    !c.el.classList.contains('soglia') &&
+    c.fig.dataset.posa !== 'cammina' &&
+    ora - (c.zitto || 0) >= RESPIRO_SCENA;
+
+  const distanza = (a, b) => {
+    const [x, y] = piedi(a.el);
+    const [p, q] = piedi(b.el);
+    return Math.hypot(p - x, q - y);
+  };
+
+  /** Da che parte sta chi ascolta, per la nuvoletta di una battuta sola. */
+  const versoVerso = (a, b) => {
+    const [x] = piedi(a.el);
+    const [p] = piedi(b.el);
+    return p > x + 4 ? 'dx' : p < x - 4 ? 'sx' : undefined;
+  };
+
+  /** Il piu' vicino a qualcuno entro `raggio`, fra quelli che passano il filtro. */
+  function vicinoA(chi, raggio, filtro = () => true) {
+    let meglio = null;
+    let quanto = raggio;
+    for (const c of presenti()) {
+      if (c === chi || !filtro(c)) continue;
+      if (c.inDialogo || c.va || c.el.classList.contains('soglia')) continue;
+      const d = distanza(chi, c);
+      if (d <= quanto) {
+        quanto = d;
+        meglio = c;
+      }
+    }
+    return meglio;
+  }
+
+  /** Chi ha lanciato questo aiutante: l'aiutante padre se e' nella stanza, se no il capo. */
+  const capoDi = (chi) => (chi.padre && staff.get(chi.capoId + '/' + chi.padre)) || people.get(chi.capoId) || null;
+
+  /**
+   * Recita una scena fra A e B (B puo' mancare: allora solo scene da soli). Torna la
+   * promessa della scena, o null se non si e' recitato niente.
+   */
+  function recita(tipo, A, B, x) {
+    if (!window.DIALOGHI || !window.ROOM || !A || !A.el.isConnected) return null;
+    if (B && (!B.el.isConnected || B === A)) B = null;
+    const righe = window.DIALOGHI.scena(tipo, ritratto(A), B ? ritratto(B) : null, stanzaOra(), x || {});
+    if (!righe) return null;
+    const ora = Date.now();
+    A.zitto = ora;
+    if (B) B.zitto = ora;
+    return window.ROOM.dialogo(
+      righe.map((r) => {
+        const chi = r.chi === 'b' ? B : A;
+        return { chi, a: chi === A ? B : A, testo: r.testo };
+      })
+    );
+  }
+
+  /* ---- le occasioni ---- */
+
+  /**
+   * Un'occasione vera non si butta perche' uno dei due sta gia' parlando: aspetta il
+   * suo turno, un respiro alla volta, per qualche secondo. Le frasi si scrivono al
+   * momento in cui si dicono, quindi i numeri sono quelli di allora.
+   */
+  function recitaAppena(tipo, A, B, x, prove = 5) {
+    if (!A || !A.el.isConnected) return;
+    const parla = (c) => c && (c.inDialogo || c.dice);
+    if ((parla(A) || parla(B) || (window.ROOM && window.ROOM.dialoghi >= 2)) && prove > 0) {
+      setTimeout(() => recitaAppena(tipo, A, B, x, prove - 1), 1400);
+      return;
+    }
+    recita(tipo, A, B, x);
+  }
+
+  /** Appena seduto: si presenta a chi gli ha dato il lavoro. */
+  function presentati(chi) {
+    if (!chi.el.isConnected || chi.esce) return;
+    if (Math.random() > (chi.passo ? 0.6 : 0.85)) return;
+    const capo = capoDi(chi);
+    const vicino = capo && distanza(chi, capo) <= 200 ? capo : null;
+    recitaAppena(chi.passo ? 'arrivo-passo' : 'arrivo-aiutante', chi, vicino);
+  }
+
+  /** Finito (bene o male): lo dice a chi gli aveva dato il lavoro, mentre si alza. */
+  function congedo(chi) {
+    if (!chi.esito || !chi.el.isConnected) return;
+    const capo = capoDi(chi);
+    const vicino = capo && capo.el.isConnected && distanza(chi, capo) <= 220 ? capo : null;
+    const tipo = chi.passo ? 'passo' : 'aiutante';
+    recitaAppena((chi.esito === 'ko' ? 'fallito-' : 'finito-') + tipo, chi, vicino, null, 2);
+  }
+
+  /** Il giro delle chiacchiere: due che si trovano vicini, e ogni tanto una visita. */
+  let prossimaVisita = Date.now() + 20000;
+
+  function chiacchierata() {
+    if (!window.ROOM || !window.DIALOGHI || document.hidden) return;
+    const ora = Date.now();
+    if (ora >= prossimaVisita) {
+      prossimaVisita = ora + OGNI_VISITA[0] + Math.random() * (OGNI_VISITA[1] - OGNI_VISITA[0]);
+      if (visita()) return;
+    }
+    // Una scena alla volta, fra un'occasione e l'altra: le occasioni (che sono vere)
+    // possono aggiungersene una seconda, il riempitivo no.
+    if (window.ROOM.dialoghi > 0 || Math.random() < 0.3) return;
+    const tutti = presenti().filter((c) => pronto(c, ora));
+    const coppie = [];
+    const alBar = (c) => c.fuori && (c.meta === 'caffe' || c.meta === 'spuntino');
+    const inRiunione = (c) => c.fuori && c.meta === 'riunione';
+    const seduto = (c) => !c.fuori;
+    for (let i = 0; i < tutti.length; i++) {
+      for (let j = i + 1; j < tutti.length; j++) {
+        let [a, b] = [tutti[i], tutti[j]];
+        const d = distanza(a, b);
+        if (d > 140) continue;
+        // Chi lavora per qualcuno parla col suo capo: A e' sempre l'aiutante.
+        if (b.capoId && capoDi(b) === a) [a, b] = [b, a];
+        if (a.capoId && capoDi(a) === b) coppie.push({ a, b, tipo: 'capoAiutante', peso: 3 });
+        else if (a.capoId && a.capoId === b.capoId && d <= 110) coppie.push({ a, b, tipo: 'colleghi', peso: 2 });
+        else if (alBar(a) && alBar(b) && d <= 90) coppie.push({ a, b, tipo: 'bar', peso: 4 });
+        else if (inRiunione(a) && inRiunione(b) && d <= 90) coppie.push({ a, b, tipo: 'riunione', peso: 3 });
+        else if (seduto(a) && seduto(b) && d <= 100) coppie.push({ a, b, tipo: 'vicini', peso: 1 });
+      }
+    }
+    if (!coppie.length) return;
+    let tiro = Math.random() * coppie.reduce((n, c) => n + c.peso, 0);
+    const c = coppie.find((x) => (tiro -= x.peso) < 0) || coppie[0];
+    // Fra pari non c'e' un primo: chi comincia si tira a sorte.
+    const scambia = c.tipo !== 'capoAiutante' && Math.random() < 0.5;
+    recita(c.tipo, scambia ? c.b : c.a, scambia ? c.a : c.b);
+  }
+
+  /**
+   * Uno che non ha niente da fare si alza e va alla scrivania di un collega — meglio
+   * se quel collega sta lavorando: e' a lui che si chiede «come va?». Si ferma nella
+   * corsia accanto, dove stanno in piedi gli aiutanti, se li' non c'e' nessuno.
+   */
+  function visita() {
+    const ora = Date.now();
+    const liberi = [...people.values()].filter(
+      (c) => c.casa && !c.fuori && !c.lavora && pronto(c, ora) && ora - (c.ultimo || 0) >= 45000
+    );
+    if (!liberi.length) return false;
+    const chi = caso(liberi);
+    const bersagli = [...people.values()].filter(
+      (c) => c !== chi && c.casa && !c.fuori && c.el.isConnected && !c.inDialogo
+    );
+    if (!bersagli.length) return false;
+    const al = bersagli.filter((c) => c.lavora);
+    const da = caso(al.length && Math.random() < 0.75 ? al : bersagli);
+    const R = window.ROOM;
+    const occupato = (x, y) =>
+      R.occupata[R.cella(x, y)] ||
+      presenti().some((c) => {
+        if (c === chi) return false;
+        const [p, q] = piedi(c.el);
+        return Math.hypot(p - x, q - y) < 12;
+      });
+    const lati = [
+      [da.casa.x + 8 + 40, da.casa.y + 24 - 10],
+      [da.casa.x + 8 - 40, da.casa.y + 24 - 10],
+    ];
+    if (Math.random() < 0.5) lati.reverse();
+    const dove = lati.find(([x, y]) => !occupato(x, y));
+    if (!dove) return false;
+    R.visita(chi, dove, () => {
+      if (!da.el.isConnected || da.inDialogo) return null;
+      return recita('visita', chi, da);
+    });
+    return true;
   }
 
   /** Colore della barra: lo stesso semaforo del pannello. */
@@ -1850,9 +2509,16 @@ window.OFFICE = (() => {
       const p = chi.casa || { x: parseFloat(chi.el.style.left) || 0, y: parseFloat(chi.el.style.top) || 0 };
       window.ROOM.posta(stage, p.x + 8, p.y + 12, chi.busy ? 'su' : 'giu');
     }
-    if (chi.busy) chi.da = Date.now();
-    else {
+    if (chi.busy) {
+      chi.da = Date.now();
+      // Il tuo messaggio e' appena arrivato: ogni tanto lo dice.
+      if (visto && Math.random() < 0.3) setTimeout(() => recitaAppena('turno-iniziato', chi, null, null, 2), 700);
+    } else {
       chi.festa = chi.da != null && Date.now() - chi.da >= TURNO_VERO;
+      // E chi gli sta vicino se ne accorge, quando il lavoro e' stato vero.
+      if (visto && chi.festa && Math.random() < 0.7) {
+        setTimeout(() => recitaAppena('turno-finito', vicinoA(chi, 150), chi), 900);
+      }
       // Il lavoro e' finito: il faldone torna in archivio, e chi doveva ancora
       // andarci non ci va piu' — cercare per un turno chiuso non e' lavoro.
       window.ROOM.riponi(chi);
@@ -1912,6 +2578,27 @@ window.OFFICE = (() => {
 
     // Cosa aspetta da te. Prima della classe: il clic la legge da qui.
     chi.asks = s.asks || [];
+
+    // Le occasioni di questa persona, viste come cambi e non come stati: la prima
+    // volta che la si vede non e' un cambio (aprendo l'ufficio non parlano tutti).
+    const visto = chi.ritratta;
+    chi.ritratta = true;
+    // La conversazione che hai appena aperto ti saluta.
+    if (visto && s.focused && !chi.fuoco && Math.random() < 0.6) setTimeout(() => recitaAppena('focus', chi, null, null, 2), 400);
+    chi.fuoco = !!s.focused;
+    // Una domanda che ti aspetta: lo dice, e un vicino rincara.
+    const chiede = chi.asks.length > 0;
+    if (visto && chiede && !chi.chiede) recitaAppena('domanda', chi, vicinoA(chi, 140));
+    chi.chiede = chiede;
+    // Il contesto che passa l'85%: e' il momento della scatoletta viola, e chi gli
+    // sta accanto glielo fa notare.
+    const pieno = s.pct != null && s.pct >= 85;
+    if (visto && pieno && !chi.pieno) {
+      const v = vicinoA(chi, 140);
+      if (v) recitaAppena('contesto', v, chi);
+      else recitaAppena('contesto-solo', chi);
+    }
+    chi.pieno = pieno;
     b.classList.toggle('asking', chi.asks.length > 0);
     chi.plate.classList.toggle('asking', chi.asks.length > 0);
     b.classList.toggle('own', !!s.own);
@@ -1960,6 +2647,9 @@ window.OFFICE = (() => {
         window.ROOM.congeda(chi);
         chi.plate.remove();
         people.delete(id);
+        // Qualcuno lo saluta, se c'e' qualcuno vicino.
+        const v = Math.random() < 0.5 ? vicinoA(chi, 160) : null;
+        if (v) recitaAppena('saluto', v, null, { nome: corto(chi.pname.textContent, 20) }, 2);
         // Non sparisce da seduto: si alza e se ne va dalla porta, che e' l'unica
         // che c'e'. Fuori da `people` la stanza non lo tocca piu' — non lo manda
         // al bar e non lo rimette a sedere — e l'elemento resta in vita giusto il
@@ -2011,8 +2701,12 @@ window.OFFICE = (() => {
       if (!chi.entrato) {
         chi.entrato = true;
         const dove = chi.casa ? [chi.casa.x + 8, chi.casa.y + 24] : [fila[0] + 8, fila[1] + 24];
+        // Chi arriva a ufficio gia' aperto e' una conversazione nuova: qualcuno gli da'
+        // il benvenuto. Chi arriva all'apertura no — sarebbero sei benvenuti in fila.
+        const nuovo = avviato;
         entrata(chi, ...dove).then(() => {
           if (chi.el.isConnected) window.ROOM.vesti(chi.fig, chi.seme, chi.posa);
+          if (nuovo && chi.el.isConnected) recitaAppena('benvenuto', vicinoA(chi, 170), chi);
         });
       }
     }
@@ -2043,7 +2737,22 @@ window.OFFICE = (() => {
     paintCella(usoS, 'ctx.session', d.usage?.session, d.sessionReset);
     paintCella(usoW, 'ctx.week', d.usage?.week, d.weekReset);
     uso.hidden = !d.usage;
+
+    // La sessione che passa l'ottanta (e il novanta): qualcuno lo dice ad alta voce.
+    const ses = d.usage && d.usage.session;
+    if (sessionePrima != null && ses != null && [80, 90].some((k) => ses >= k && sessionePrima < k)) {
+      const tutti = presenti().filter((c) => pronto(c));
+      const a = tutti.length ? caso(tutti) : null;
+      if (a) recitaAppena('consumi', a, vicinoA(a, 140));
+    }
+    if (ses != null) sessionePrima = ses;
+    if (list.length) avviato = true;
   }
+
+  /** La sessione al giro prima, per accorgersi di quando passa una soglia. */
+  let sessionePrima = null;
+  /** Il primo giro con qualcuno dentro e' passato: chi arriva da qui in poi e' nuovo. */
+  let avviato = false;
 
   return {
     /** Si monta una volta sola, dentro il contenitore che gli da' la pagina. */

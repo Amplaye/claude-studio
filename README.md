@@ -17,9 +17,12 @@ Nothing new to learn, nothing new to pay — and it keeps the CLI updated on its
 
 ## THE OFFICE
 
-Every open conversation is a person at a desk. Sub-agents come in through the
-door, take their note off the board, sit down next to whoever opened them, and
-leave when they're done.
+Every open conversation is a person at a desk. Sub-agents — and whoever carries
+the plan step being worked on — come in through the door, take their note off
+the board, sit down next to whoever opened them, and leave when they're done.
+And they talk to each other about what is really going on: the step they're on,
+the file they opened, how many steps are left, the message one helper just sent
+another.
 
 <table>
 <tr>

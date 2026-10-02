@@ -698,7 +698,10 @@ const T = (id, content, status) => ({ id, content, status });
  * stessa lista, e un passo del piano in corso diventava una persona finta.
  */
 const A = (id, title, status, over = {}) => ({ id, title, status, parentId: null, depth: 1, ...over });
-/** I passi di capo-a: uno in corso — che non deve far entrare nessuno — e gli altri. */
+/**
+ * I passi di capo-a: uno in corso — che fa entrare chi lo porta, finche' la
+ * conversazione lavora — e gli altri.
+ */
 const pianoA = [
   T('p0', 'Scrivere il piano', 'in_progress'),
   T('3', 'Poi', 'pending'),
@@ -736,12 +739,22 @@ await tasks({
 // quindi si raccolgono mentre compaiono.
 await page.evaluate(() => {
   window.__dette = [];
+  // Tutte le nuvolette della stanza, con chi le dice e verso chi: servono all'aura
+  // del capo (le adulazioni col numero) e alle chiacchiere a due.
+  window.__tutte = [];
   new MutationObserver((muts) => {
     for (const m of muts) {
       for (const n of m.addedNodes) {
-        if (n.classList && n.classList.contains('of-say') && n.parentElement.classList.contains('of-staff')) {
-          window.__dette.push(n.textContent);
-        }
+        if (!n.classList || !n.classList.contains('of-say')) continue;
+        const chi = n.parentElement;
+        window.__tutte.push({
+          testo: n.textContent,
+          tipo: n.dataset.tipo || '',
+          scena: n.dataset.scena || '',
+          chi: chi.title || chi.getAttribute('aria-label') || '',
+          at: Date.now(),
+        });
+        if (chi.classList.contains('of-staff')) window.__dette.push({ testo: n.textContent, tipo: n.dataset.tipo || '' });
       }
     }
   }).observe(document.querySelector('.of-crowd'), { childList: true, subtree: true });
@@ -749,9 +762,14 @@ await page.evaluate(() => {
 
 // Il tempo di attraversare la stanza: entrano dalla porta, non compaiono al
 // posto — e adesso il posto e' una scrivania in fondo al salone, che dalla
-// bacheca della sala riunioni e' mezza stanza in diagonale.
+// bacheca della sala riunioni e' mezza stanza in diagonale. Sono quattro: i tre
+// aiutanti e chi porta il passo in corso di capo-a.
 await page.waitForTimeout(16000);
-t((await staff()) === 3, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 3');
+t((await staff()) === 4, 'gli impiegati arrivati sono ' + (await staff()) + ' invece di 4 (tre aiutanti e il passo in corso)');
+t(
+  (await page.locator('.of-staff.of-passo:not(.via)').count()) === 1,
+  'chi porta il passo in corso non e’ entrato: ' + (await page.locator('.of-staff.of-passo').count())
+);
 
 // E si siedono: due conversazioni prendono due scrivanie, le altre sei
 // restano libere, e i tre impiegati se ne prendono una a testa. Il posto si
@@ -812,7 +830,7 @@ const f = await fogli();
 t(f.fare === 2, 'i foglietti da fare sono ' + f.fare + ' invece di 2');
 t(f.storte === 1, 'i foglietti andati storti sono ' + f.storte + ' invece di 1');
 t(f.fatte === 2, 'i foglietti fatti sono ' + f.fatte + ' invece di 2');
-t(f.mano === 3, 'i foglietti in mano sono ' + f.mano + ' invece di 3');
+t(f.mano === 4, 'i foglietti in mano sono ' + f.mano + ' invece di 4');
 t(
   f.muro === f.fare + f.storte + f.fatte,
   'sulla bacheca c’e’ un foglietto che non e’ di nessuno stato: ' + f.muro
@@ -833,12 +851,15 @@ const foglio = await page.evaluate(() => ({
   aperto: !document.querySelector('.of-sheet').hidden,
   nomi: [...document.querySelectorAll('.of-sheet-who:not(.of-tree) .of-sheet-name')].map((n) => n.textContent),
   righe: document.querySelectorAll('.of-sheet .tk-row').length,
-  // Gli aiutanti non stanno fra i passi: hanno la sezione loro, ad albero.
+  // Gli aiutanti non stanno fra i passi: hanno la sezione loro, una scheda per squadra.
   crewNeiPassi: document.querySelectorAll('.of-sheet .tk-agent').length,
   albero: !!document.querySelector('.of-sheet .of-tree'),
   alberoTitolo: document.querySelector('.of-sheet .of-tree .of-sheet-name')?.textContent || '',
-  capi: [...document.querySelectorAll('.of-sheet .of-tree-capo')].map((n) => n.textContent),
-  aiutanti: [...document.querySelectorAll('.of-sheet .of-tree-row')].map((n) => n.querySelector('.of-tree-txt').textContent),
+  capi: [...document.querySelectorAll('.of-sheet .of-squadra-nome')].map((n) => n.textContent),
+  aiutanti: [...document.querySelectorAll('.of-sheet .of-albero:not(.chiuso) .of-nodo-titolo')].map((n) => n.textContent),
+  // Le facce sono quelle della stanza: ognuna ha la sua striscia.
+  facce: [...document.querySelectorAll('.of-sheet .of-squadra .of-facciola .of-body')].filter((b) => b.style.getPropertyValue('--npc')).length,
+  conti: [...document.querySelectorAll('.of-sheet .of-squadra')].map((s) => [...s.querySelectorAll('.of-pastiglia')].map((p) => p.textContent).join('+')),
 }));
 t(foglio.aperto, 'la bacheca non si apre a cliccarla');
 t(
@@ -848,10 +869,16 @@ t(
 t(foglio.righe === 6, 'le righe sul foglio sono ' + foglio.righe + ' invece di 6');
 t(!foglio.crewNeiPassi, 'gli aiutanti sono finiti fra i passi del piano: ' + foglio.crewNeiPassi);
 t(foglio.albero && foglio.alberoTitolo === 'Who works for whom', "il foglio non ha la sezione «chi lavora per chi»: " + foglio.alberoTitolo);
+// Prima la squadra con piu' gente al lavoro: capo-a ne ha due, capo-b uno.
 t(
   foglio.capi.join(' | ') === 'Prima conversazione | Seconda conversazione' &&
     foglio.aiutanti.join(' | ') === 'Leggere | Cercare | Impaginare',
   "l'albero non dice chi lavora per chi: " + foglio.capi.join(' | ') + ' — ' + foglio.aiutanti.join(' | ')
+);
+t(foglio.facce === 5, 'le schede della squadra non hanno le facce della stanza: ' + foglio.facce + ' invece di 5');
+t(
+  foglio.conti.join(' | ') === '2 at work | 1 at work',
+  'le pastiglie delle squadre non contano chi lavora: ' + foglio.conti.join(' | ')
 );
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
@@ -875,10 +902,54 @@ t(
 await page.waitForTimeout(10000);
 const dette = await page.evaluate(() => window.__dette);
 t(dette.length > 0, 'nessuno ha aperto bocca in dieci secondi: l’aura del capo non gira');
+// Il numero conta nelle adulazioni (`data-tipo="adula"`): le altre battute ne dicono
+// di veri anche loro — il passo 1 di 6, un orario — e non sono il conto dei fatti.
+const adulazioni = dette.filter((d) => d.tipo === 'adula').map((d) => d.testo);
 t(
-  dette.every((s) => !/\d/.test(s) || s.includes('3')),
-  'una battuta dice un numero che non e’ quello vero: ' + dette.join(' | ')
+  adulazioni.every((s) => !/\d/.test(s) || s.includes('3')),
+  'una battuta dice un numero che non e’ quello vero: ' + adulazioni.join(' | ')
 );
+
+// ---- e si parlano ----
+//
+// Due che stanno vicini si dicono qualcosa: una battuta e la sua risposta, una per
+// uno. Qui i capi lavorano e hanno gli aiutanti accanto, e in trenta secondi (dieci
+// gia' passati) almeno una scena a due deve esserci stata: due nuvolette della stessa
+// scena (`data-scena`), di due persone diverse — anche se in mezzo ha parlato qualcun
+// altro. E nessuna deve avere un buco non riempito.
+await page.waitForTimeout(20000);
+const tutte = await page.evaluate(() => window.__tutte);
+const perScena = new Map();
+for (const n of tutte) {
+  if (!n.scena) continue;
+  if (!perScena.has(n.scena)) perScena.set(n.scena, new Set());
+  perScena.get(n.scena).add(n.chi);
+}
+const scambi = [...perScena.values()].filter((chi) => chi.size >= 2);
+t(scambi.length > 0, 'in trenta secondi nessuno ha risposto a nessuno: ' + tutte.map((n) => n.testo).join(' | '));
+const buchi = tutte.filter((n) => /[{}]|undefined|NaN|null/.test(n.testo));
+t(!buchi.length, 'una nuvoletta ha un buco non riempito: ' + buchi.map((n) => n.testo).join(' | '));
+const lunghe = tutte.filter((n) => n.testo.length > 50);
+t(!lunghe.length, 'una nuvoletta passa le due righe: ' + lunghe.map((n) => n.testo).join(' | '));
+
+// ---- chi porta il passo ----
+//
+// Si clicca e dice di chi e' il piano e a che punto: il passo 1 di 6.
+const passo = page.locator('.of-staff.of-passo:not(.via)').first();
+if (await passo.count()) {
+  await passo.click();
+  await page.waitForTimeout(200);
+  const sp = await page.evaluate(() => ({
+    nome: document.querySelector('.of-scheda-nome').textContent,
+    ruolo: document.querySelector('.of-scheda-ruolo').textContent,
+    compito: document.querySelector('.of-scheda-compito').textContent,
+  }));
+  t(sp.nome === 'Scrivere il piano', 'la scheda di chi porta il passo non dice il passo: ' + sp.nome);
+  t(/Plan step · works for Prima conversazione/.test(sp.ruolo), 'la scheda del passo non dice di chi e’ il piano: ' + sp.ruolo);
+  t(sp.compito === 'Step 1 of 6', 'la scheda del passo non dice a che punto: ' + sp.compito);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+}
 
 // E chi ha finito se ne va: per la porta, e ci mette il tempo di arrivarci. Uno bene
 // e uno male, perche' la bacheca li deve riappendere tutti e due — verde e rosso.
@@ -1084,10 +1155,11 @@ t(!rimasti, rimasti + ' portatili rimasti aperti su un tavolo dove non c’e’ 
 //
 // La fila in cima e' un albero: ogni conversazione, e subito dopo i suoi aiutanti,
 // ognuno dopo chi l'ha lanciato e un passo piu' rientrato. Qui A ha due aiutanti, e
-// il primo ne ha lanciato un terzo; A ha anche un passo del piano in corso, che non
-// deve far entrare nessuno — erano la stessa lista, e un passo in corso diventava
-// una persona finta. E l'ultima conversazione non ha la scrivania: prima i suoi
-// aiutanti sparivano dalla fila, perche' la fila leggeva chi era nella stanza.
+// il primo ne ha lanciato un terzo; A ha anche un passo del piano in corso, che nella
+// stanza entra (lo porta qualcuno) ma nella fila no: la fila dice chi c'e', e il
+// passo e' gia' la riga «cosa sta facendo» della sua conversazione. E l'ultima
+// conversazione non ha la scrivania: prima i suoi aiutanti sparivano dalla fila,
+// perche' la fila leggeva chi era nella stanza.
 await ctx(data([]));
 await tasks({});
 await fermi();
@@ -1155,11 +1227,11 @@ await page.waitForTimeout(200);
 const capoA = await scheda();
 t(/Read package\.json/.test(capoA.extra) && /3 helpers at work/.test(capoA.extra), 'la scheda della conversazione non dice cosa fa e quanti ne ha al lavoro: ' + capoA.extra);
 await page.keyboard.press('Escape');
-// Nella stanza: tre aiutanti di A (il passo del piano non e' nessuno), nessuno del
+// Nella stanza: tre aiutanti di A e chi porta il suo passo del piano, nessuno del
 // capo in piedi — chi e' in piedi non ha un posto attorno a cui metterli. Venti
 // secondi: alla porta si entra uno alla volta, e prima di loro passano nove capi.
 await page.waitForTimeout(20000);
-t((await staff()) === 3, 'nella stanza gli aiutanti sono ' + (await staff()) + ' invece di 3');
+t((await staff()) === 4, 'nella stanza gli aiutanti sono ' + (await staff()) + ' invece di 4 (tre e il passo)');
 // E l'aiutante dell'aiutante si siede vicino a chi l'ha lanciato, non al capo.
 const vicini = await page.evaluate(() => {
   const p = (s) => {
@@ -1176,6 +1248,33 @@ if (vicini.padre && vicini.figlio) {
   const d = Math.hypot(vicini.padre[0] - vicini.figlio[0], vicini.padre[1] - vicini.figlio[1]);
   t(d <= 120, 'l’aiutante dell’aiutante si e’ seduto lontano da chi l’ha lanciato: ' + Math.round(d) + 'px');
 }
+
+// E quando il passo e' fatto, chi lo portava lo riappende verde e se ne va: il foglio
+// verde in piu' sulla bacheca e' il suo.
+const verdiPrima = await page.locator('.of-bacheche .of-note.fatta').count();
+await tasks({
+  'albero-a': {
+    items: [T('pa', 'Un passo del piano', 'completed')],
+    agents: [
+      A('a1', 'Aiutante uno', 'in_progress'),
+      A('a11', 'Aiutante dell’aiutante', 'in_progress', { parentId: 'a1', depth: 2 }),
+      A('a2', 'Aiutante due', 'in_progress'),
+    ],
+    done: 1,
+    total: 1,
+    active: -1,
+    busy: true,
+  },
+  'in-piedi': { items: [], agents: [A('z1', 'Aiuto di chi sta in piedi', 'in_progress')], done: 0, total: 0, active: -1, busy: true },
+});
+let passoUscito = false;
+for (let i = 0; i < 75 && !passoUscito; i++) {
+  await page.waitForTimeout(400);
+  passoUscito = !(await page.locator('.of-staff.of-passo').count());
+}
+t(passoUscito, 'chi portava il passo non se n’e’ andato a passo fatto');
+const verdiDopo = await page.locator('.of-bacheche .of-note.fatta').count();
+t(verdiDopo === verdiPrima + 1, 'il passo fatto non e’ tornato verde sulla bacheca: ' + verdiPrima + ' → ' + verdiDopo);
 
 // ---- le buste del lavoro passato di mano ----
 //
@@ -1417,6 +1516,52 @@ await tasks({
 await page.waitForTimeout(1500);
 t(!(await page.locator('.of-faldone').count()), 'chi se ne va lascia il faldone sulla scrivania');
 
+// ---- la squadra con tanta gente ----
+//
+// «Chi lavora per chi» con una lista lunga: chi lavora adesso in alto, ad albero, e
+// chi ha finito raccolto sotto, chiuso. Le cose che si rompono in silenzio: il
+// gomito di chi e' stato lanciato da un aiutante, la sezione chiusa che si apre al
+// clic (un `onclick` del foglio tornava `false` e annullava ogni clic li' dentro), e
+// che resti aperta quando il quadro cambia sotto i piedi.
+const tanti5 = [1, 2, 3, 4, 5].map((n) => A('f' + n, 'Finito ' + n, n === 3 ? 'failed' : 'completed', { type: 'Explore', ms: n * 1000 }));
+const squadra = (extra = []) =>
+  turnoA([
+    A('v1', 'Padre', 'in_progress', { since: Date.now() - 4000, type: 'general-purpose' }),
+    A('v11', 'Figlio', 'in_progress', { since: Date.now() - 2000, parentId: 'v1', depth: 2 }),
+    A('v12', 'Altro figlio', 'in_progress', { since: Date.now() - 1000, parentId: 'v1', depth: 2 }),
+    ...tanti5,
+    ...extra,
+  ]);
+await tasks({ 'posta-a': squadra() });
+await page.waitForTimeout(400);
+await page.locator('.of-kanban').click();
+await page.waitForTimeout(300);
+const sq = await page.evaluate(() => {
+  const s = document.querySelector('.of-sheet .of-squadra');
+  const det = s && s.querySelector('details.of-finiti');
+  return {
+    vivi: [...s.querySelectorAll('.of-albero:not(.chiuso) .of-nodo')].map((n) => n.dataset.livello + ':' + n.querySelector('.of-nodo-titolo').textContent),
+    gomiti: s.querySelectorAll('.of-albero:not(.chiuso) .of-gomito').length,
+    filo: s.querySelectorAll('.of-albero:not(.chiuso) .of-filo.basso').length,
+    chiusa: det ? !det.open : null,
+    somma: det ? det.querySelector('summary').textContent : '',
+    finiti: s.querySelectorAll('.of-finiti .of-nodo').length,
+    pastiglie: [...s.querySelectorAll('.of-pastiglia')].map((p) => p.textContent).join('+'),
+  };
+});
+t(sq.vivi.join(' | ') === '1:Padre | 2:Figlio | 2:Altro figlio', 'la squadra non e’ un albero: ' + sq.vivi.join(' | '));
+t(sq.gomiti === 2 && sq.filo === 1, 'i fili dell’albero non portano dal padre ai figli: ' + JSON.stringify(sq));
+t(sq.chiusa === true && sq.somma === 'Finished · 5' && sq.finiti === 5, 'chi ha finito non sta raccolto sotto, chiuso: ' + JSON.stringify(sq));
+t(sq.pastiglie === '3 at work+4 done+1 failed', 'le pastiglie della squadra non tornano: ' + sq.pastiglie);
+await page.locator('.of-sheet .of-finiti summary').first().click();
+await page.waitForTimeout(150);
+t(await page.evaluate(() => document.querySelector('.of-sheet .of-finiti').open), 'cliccando «Finished» la sezione non si apre');
+await tasks({ 'posta-a': squadra([A('v2', 'Nuovo arrivato', 'in_progress', { since: Date.now() })]) });
+await page.waitForTimeout(300);
+t(await page.evaluate(() => document.querySelector('.of-sheet .of-finiti').open), 'la sezione aperta si richiude quando il quadro cambia');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(200);
+
 // ---- e con le animazioni ridotte le buste non restano appese ----
 await page.emulateMedia({ reducedMotion: 'reduce' });
 await page.evaluate(() => (window.__buste = []));
@@ -1466,5 +1611,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, gli sgabelli coi portatili, la fascia in cima, la bacheca, l’aura del capo, le buste del lavoro, il rimpallo, l’archivio e le tazze'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, chi porta il passo, gli sgabelli coi portatili, la fascia in cima, la bacheca, chi lavora per chi, l’aura del capo, le chiacchiere a due, le buste del lavoro, il rimpallo, l’archivio e le tazze'
 );

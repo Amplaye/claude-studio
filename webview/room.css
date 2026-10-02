@@ -990,34 +990,80 @@
 /* ---- quello che uno dice ----
    Sopra la testa e ben sotto la targhetta: la targhetta sta in alto sulla
    scrivania e li' resta anche mentre uno cammina, quindi le due non si
-   incontrano mai. Compare e sparisce da sola; il JS mette solo il testo. */
+   incontrano mai. Compare e sparisce da sola; il JS mette solo il testo.
+
+   Appesa dal basso e non dall'alto: adesso che si parla di cose vere — un passo
+   del piano, un file, un messaggio — una riga non basta sempre, e la seconda deve
+   crescere verso l'alto, non scendere sulla faccia di chi parla. Due righe al
+   massimo: oltre, e' un cartello.
+
+   La codina e' due pixel di cornice e uno di carta, sotto la nuvoletta: e' quella
+   a dire chi parla quando due stanno vicini. */
 .of-say {
+  --codina: 50%;
   position: absolute;
   left: 50%;
-  top: -15px;
+  bottom: calc(100% + 4px);
+  width: max-content;
+  max-width: 92px;
   transform: translateX(-50%);
-  padding: 1px 2px;
-  white-space: nowrap;
+  padding: 1px 3px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center;
   pointer-events: none;
   z-index: 50;
-  font: 700 6px/1.4 ui-sans-serif, system-ui, sans-serif;
+  font: 700 6px/1.3 ui-sans-serif, system-ui, sans-serif;
   background: var(--paper);
   color: #4a2c1c;
   box-shadow:
     inset 0 0 0 1px var(--of-contorno),
     2px 2px 0 rgba(46, 28, 44, 0.5);
-  animation: of-fiato 3.2s ease-out both;
+  animation: of-fiato var(--dura, 3.2s) ease-out both;
+}
+/* Le due righe non le taglia il CSS ma chi parla (room.js accorcia oltre i
+   cinquanta caratteri, a parola intera): un `line-clamp` vuole `overflow: hidden`,
+   e la codina sta proprio fuori dal bordo. */
+.of-say::after {
+  content: '';
+  position: absolute;
+  left: var(--codina);
+  top: 100%;
+  width: 3px;
+  height: 2px;
+  margin-left: -1px;
+  background: var(--paper);
+  box-shadow:
+    -1px 0 0 var(--of-contorno),
+    1px 0 0 var(--of-contorno),
+    0 1px 0 var(--of-contorno),
+    2px 2px 0 rgba(46, 28, 44, 0.35);
+}
+/* Chi ascolta sta a destra: la nuvoletta parte dalla testa e si allunga verso di
+   lui, con la codina a sinistra. E il contrario. */
+.of-say.dx {
+  --codina: 7px;
+  left: 2px;
+  transform: none;
+  text-align: left;
+}
+.of-say.sx {
+  --codina: calc(100% - 7px);
+  left: auto;
+  right: 2px;
+  transform: none;
+  text-align: right;
 }
 /* Entra di scatto e se ne va sfumando: chi parla comincia di colpo e smette
    piano. */
 @keyframes of-fiato {
   0% {
     opacity: 0;
-    transform: translate(-50%, 3px);
+    translate: 0 3px;
   }
   8% {
     opacity: 1;
-    transform: translate(-50%, 0);
+    translate: 0 0;
   }
   85% {
     opacity: 1;

@@ -737,51 +737,90 @@ body.inoffice.linguette .top #btnNew {
   padding-top: 6px;
 }
 /* ---- chi lavora per chi ----
-   Una riga per aiutante, rientrata sotto chi l'ha lanciato, col pallino del suo
-   stato: lo stesso alfabeto dei foglietti sul muro — verde fatto, rosso storto — piu'
-   il battito di chi lavora adesso. */
+   Una scheda per conversazione: in testa la sua faccia, il nome e tre pastiglie coi
+   conti (al lavoro, finiti, non riusciti); sotto, chi lavora adesso con la faccia
+   che ha nella stanza, cosa sta facendo e da quanto; in fondo, chiusi, quelli che
+   hanno finito. Era un elenco solo di righe rientrate, e con una dozzina di aiutanti
+   non si capiva piu' dove finiva una squadra e cominciava l'altra.
+
+   Lo stesso alfabeto dei foglietti sul muro — verde fatto, rosso storto — piu' il
+   battito di chi lavora adesso. */
+.of-tree-intro {
+  margin: 4px 12px 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  opacity: 0.75;
+}
 .of-tree-body {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 6px 12px 12px;
+  gap: 8px;
+  padding: 10px 12px 12px;
 }
-.of-tree-capo {
-  margin-top: 6px;
-  font-size: 11px;
+.of-squadra {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  overflow: hidden;
+}
+.of-squadra-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.of-tree .of-facciola {
+  border-radius: 6px;
+}
+.of-squadra-nome {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
   font-weight: 700;
-  opacity: 0.8;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.of-tree-capo:first-child {
-  margin-top: 0;
-}
-.of-tree-row {
+.of-squadra-conti {
+  flex: 0 1 auto;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.of-pastiglia {
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 2px 0 2px calc(var(--lv, 1) * 14px);
-  font-size: 11.5px;
-  line-height: 1.35;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.of-tree-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
+.of-pastiglia i {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  background: currentColor;
 }
-.of-tree-row.in_progress .of-tree-dot {
-  background: var(--claude-2);
+.of-pastiglia.vivo {
+  color: var(--claude-2);
+  background: color-mix(in srgb, var(--claude-2) 16%, transparent);
+}
+.of-pastiglia.vivo i {
   animation: of-tree-beat 1.4s ease-in-out infinite;
 }
-.of-tree-row.completed .of-tree-dot {
-  background: var(--ok);
+.of-pastiglia.riuscito {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
 }
-.of-tree-row.failed .of-tree-dot {
-  background: var(--bad);
+.of-pastiglia.fallito {
+  color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 16%, transparent);
 }
 @keyframes of-tree-beat {
   50% {
@@ -789,36 +828,178 @@ body.inoffice.linguette .top #btnNew {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .of-tree-row.in_progress .of-tree-dot {
+  .of-pastiglia.vivo i {
     animation: none;
   }
 }
-.of-tree-txt {
+
+/* Chi lavora adesso, ad albero: ogni livello e' una faccia piu' in la', e chi e'
+   stato lanciato da un aiutante gli sta appeso sotto con un gomito che parte dal
+   centro della faccia di chi l'ha lanciato. */
+.of-albero {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.of-nodo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px 3px calc((var(--lv, 1) - 1) * 22px + 4px);
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+.of-nodo:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+/* Tutte alte uguali: i fili si agganciano al centro delle facce, e con righe di
+   altezze diverse il centro si sposta. */
+.of-albero:not(.chiuso) .of-nodo {
+  min-height: 34px;
+}
+/* I fili dell'albero. `--k` e' il livello del figlio a cui portano: stanno sul
+   centro della faccia di suo padre, ventidue pixel per livello. Il gomito arriva al
+   centro della riga e piega verso la faccia; il filo passa dritto per tutta la riga
+   (o, `basso`, solo dalla meta' in giu': il fratello che viene dopo). Il gomito del
+   primo figlio parte da sotto la faccia del padre, sei pixel piu' su. */
+.of-filo,
+.of-gomito {
+  --filo: color-mix(in srgb, var(--fg) 38%, transparent);
+  position: absolute;
+  left: calc((var(--k, 2) - 2) * 22px + 14px);
+  pointer-events: none;
+}
+.of-filo {
+  top: -3px;
+  bottom: 0;
+  border-left: 1.5px solid var(--filo);
+}
+.of-filo.basso {
+  top: 50%;
+}
+.of-gomito {
+  top: -3px;
+  height: calc(50% + 3px);
+  width: 12px;
+  border-left: 1.5px solid var(--filo);
+  border-bottom: 1.5px solid var(--filo);
+  border-bottom-left-radius: 6px;
+}
+.of-gomito.primo {
+  top: -9px;
+  height: calc(50% + 9px);
+}
+.of-nodo-testo {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.of-nodo-titolo {
+  font-weight: 650;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.of-tree-row.in_progress .of-tree-txt {
-  font-weight: 600;
-}
-.of-tree-type,
-.of-tree-time {
-  flex: 0 0 auto;
-  font-size: 10px;
-  opacity: 0.65;
-}
-.of-tree-type {
+.of-nodo-sotto {
   font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.7;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
-.of-tree-time {
+.of-nodo-tempo {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  opacity: 0.7;
   font-variant-numeric: tabular-nums;
 }
-/* Due che si scrivono di continuo: una riga sotto i loro nomi, col lilla delle
+.of-squadra-vuota {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+  opacity: 0.7;
+}
+
+/* Chi ha finito: una riga per uno, senza faccia — e' storia — col pallino del suo
+   esito. Chiusi di solito; aperti, scorrono dentro la scheda invece di allungarla
+   all'infinito. */
+.of-finiti {
+  border-top: 1px solid var(--line);
+}
+.of-finiti > summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+  opacity: 0.85;
+}
+.of-finiti > summary::-webkit-details-marker {
+  display: none;
+}
+.of-finiti > summary::before {
+  content: '';
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 0.15s ease;
+}
+.of-finiti[open] > summary::before {
+  transform: rotate(90deg);
+}
+.of-finiti > summary:hover {
+  opacity: 1;
+}
+.of-finiti > summary:focus-visible {
+  outline: 2px solid var(--claude-2);
+  outline-offset: -2px;
+}
+.of-albero.chiuso {
+  max-height: 210px;
+  overflow: auto;
+  padding-top: 0;
+}
+.of-albero.chiuso .of-nodo {
+  gap: 7px;
+  padding-left: 6px;
+}
+.of-albero.chiuso .of-nodo-titolo {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+}
+.of-nodo-esito {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.of-nodo.completed .of-nodo-esito {
+  background: var(--ok);
+}
+.of-nodo.failed .of-nodo-esito {
+  background: var(--bad);
+}
+.of-nodo-tipo {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.6;
+}
+/* Due che si scrivono di continuo: una riga in fondo alla scheda, col lilla delle
    buste che si mandano. Si legge e basta — non ferma niente. */
 .of-tree-rimpallo {
-  margin: 2px 0 0 14px;
+  margin: 0 12px 8px;
   padding: 2px 7px;
   border-left: 2px solid #b9a6e3;
   font-size: 11px;

@@ -145,6 +145,15 @@ in `C:\Users\Steward\.claude\plans\l-auto-mode-dimenticatelo-indexed-moonbeam.md
 
 ## Cose imparate provando (non si vedono dal codice)
 
+- **Un `onclick` che torna `false` annulla il clic.** Il foglio della bacheca si
+  chiudeva con `n.onclick = (e) => e.target === n && apriBacheca(false)`: cliccando
+  dentro, l'espressione vale `false`, e un gestore assegnato come proprieta' che torna
+  `false` e' un `preventDefault()`. Per mesi non se n'e' accorto nessuno perche' dentro
+  il foglio non c'era niente con un comportamento suo; con la sezione «Hanno finito»
+  (un `<details>`) il clic non la apriva. Si e' visto solo provando un `<details>`
+  nuovo prima fuori e poi dentro il foglio. I gestori come proprieta' vanno con le
+  graffe.
+
 - **Due giri dello stesso banco non sono confrontabili.** Provato: stessa batteria,
   stesse identiche parole, a venti minuti di distanza. Totali $9,08 e $5,13 — il 44%
   di scarto — e il singolo "ciao" e' passato da $0,021 a $0,170, **otto volte tanto**,

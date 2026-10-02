@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.36.0
+
+- **L'ufficio si riempie di nuovo.** Dalla 0.34 nella stanza entravano solo i
+  sub-agent, che sono rari: i passi del piano non facevano piu' entrare nessuno, e
+  l'ufficio restava quasi vuoto. Adesso il passo in corso torna a essere una persona:
+  entra dalla porta quando il passo comincia, stacca il suo foglietto dalla bacheca, si
+  siede accanto alla sua conversazione, e quando il passo e' fatto lo riappende verde e
+  se ne va. Solo mentre la conversazione lavora davvero. Nella fila in cima non c'e' —
+  il passo e' gia' la riga «cosa sta facendo» della sua conversazione — ma cliccandolo
+  nella stanza la scheda dice di chi e' il piano, a che passo siamo e da quanto.
+
+- **Gli agenti si parlano.** Prima ognuno diceva da solo una frase pescata da un
+  mucchio fisso. Adesso due che stanno vicini si fanno una domanda e si rispondono, e
+  parlano di cose vere: il passo che stanno facendo, il file che hanno aperto, quanti
+  passi mancano, il contesto che sta finendo, il branch, l'ora e il giorno. La
+  nuvoletta si allunga verso chi ascolta, va a capo su due righe e non si appoggia mai
+  su quella di un vicino.
+
+- **E parlano quando succede qualcosa.** Chi arriva al suo posto si presenta al capo;
+  chi finisce gli dice com'e' andata; un aiutante che scrive a un altro dice ad alta
+  voce il messaggio vero (accorciato, con chiavi e password coperte) e l'altro risponde;
+  chi torna dall'archivio dice cosa ha ripescato; la conversazione che apri ti saluta;
+  chi aspetta una tua risposta lo dice, e il vicino rincara; chi ha il contesto quasi
+  pieno se lo sente dire. Fra un'occasione e l'altra si chiacchiera al bar, in
+  riunione e fra vicini di scrivania, e ogni tanto qualcuno si alza e va a trovare un
+  collega che sta lavorando. Le battute al capo di sempre adesso hanno una risposta.
+
+- **«Chi lavora per chi» si legge anche con tanta gente.** Era un elenco unico di righe
+  rientrate, e con una dozzina di aiutanti non si capiva piu' niente. Adesso ogni
+  conversazione ha la sua scheda: la faccia e il nome in testa, con quanti sono al
+  lavoro, quanti hanno finito e quanti non ce l'hanno fatta; sotto, chi lavora adesso,
+  con la stessa faccia che ha nella stanza, cosa sta facendo e da quanto, ad albero coi
+  fili che dicono chi ha lanciato chi; in fondo, chiusi, quelli che hanno finito.
+
+- Nel foglio della bacheca un clic su qualcosa che si apre (una sezione chiusa, per
+  esempio) non faceva niente: il gestore che chiude il foglio cliccando sul fondo
+  annullava anche tutti gli altri clic. Sistemato.
+
 ## 0.35.0
 
 - **Nell'ufficio il lavoro passa di mano con una busta.** Quando una conversazione

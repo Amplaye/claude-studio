@@ -70,6 +70,7 @@ export function bindWebview(
     npcJs: 'npc.js',
     ghiaiaJs: 'ghiaia.js',
     roomJs: 'room.js',
+    dialoghiJs: 'dialoghi.js',
     officeJs: 'office.js',
     chatJs: 'chat.js',
     // I mobili dell'ufficio: un foglio ritagliato da SeasonVale, impacchettato

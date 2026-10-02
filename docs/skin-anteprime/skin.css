@@ -1,0 +1,295 @@
+/* Claude Studio — due pelli nuove per l'ufficio, IN ANTEPRIMA.
+ *
+ * Non e' ancora codice dell'estensione: e' la bozza da guardare prima di costruirle
+ * davvero. La stanza e' quella vera (room.js, room.css, la stessa gente e le stesse
+ * scene); cambiano solo i materiali — pavimenti, muri, finestre, mobili ricolorati,
+ * schermi, targhette e nuvolette. La pianta resta identica: niente cambia a dove si
+ * mettono i piedi, quindi passare da una pelle all'altra non sposta nessuno.
+ *
+ * Le pelli stanno su `.of-stage[data-skin=...]`; il foglio dei mobili ricolorato
+ * arriva in `--sheet-skin` (lo prepara scripts/skin-anteprime.mjs).
+ */
+
+/* =====================================================================
+   NOTTE IN CITTA' — l'ufficio a mezzanotte: moquette blu, muri scuri col filo
+   al neon, lo skyline acceso dalle finestre, e la luce che viene dagli schermi.
+   ===================================================================== */
+.of-stage[data-skin='notte'] {
+  --wood-hi: #7f88c4;
+  --wood: #474c7e;
+  --wood-lo: #343861;
+  --of-contorno: #090a14;
+  --floor: #1b1e33;
+  --sand: #262a42;
+  --sand-hi: #30354f;
+  --sand-jo: #1a1d31;
+  --wall: #2a2f4d;
+  --wall-hi: #3b4170;
+  --wall-lo: #1d2140;
+  --wall-jo: #151830;
+  --paper: #161a2e;
+  --olive: #3fd8f2;
+  --olive-lo: #1d86b0;
+  --shade: rgba(3, 4, 12, 0.6);
+  --neon: #5ef1ff;
+  --neon-2: #ff6ad5;
+}
+.of-stage[data-skin='notte'] .of-prop {
+  background-image: var(--sheet-skin, var(--sheet-room));
+}
+/* Moquette a quadrotte: una su due appena piu' chiara, e le fughe di un pixel. */
+.of-stage[data-skin='notte'] .of-floor {
+  background-color: var(--floor);
+  background-image:
+    linear-gradient(90deg, rgba(120, 140, 255, 0.07) 0 1px, transparent 1px),
+    linear-gradient(180deg, rgba(120, 140, 255, 0.07) 0 1px, transparent 1px),
+    conic-gradient(rgba(255, 255, 255, 0.025) 0 25%, transparent 0 50%, rgba(255, 255, 255, 0.025) 0 75%, transparent 0);
+  background-size:
+    16px 16px,
+    16px 16px,
+    32px 32px;
+}
+/* Le stanze di sopra: lastre di cemento scuro, lucide. */
+.of-stage[data-skin='notte'] .of-floor::after {
+  background-color: var(--sand);
+  background-image:
+    linear-gradient(90deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(135deg, rgba(120, 200, 255, 0.07) 0 14%, rgba(120, 200, 255, 0.03) 14% 30%, transparent 30%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  box-shadow: inset 0 -1px 0 var(--neon);
+}
+/* Muri scuri col filo al neon in cima: e' quello che si vede per primo, al buio. */
+.of-stage[data-skin='notte'] .of-wall {
+  background-color: var(--wall);
+  background-image:
+    repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, transparent 1px 16px),
+    linear-gradient(180deg, var(--wall-hi) 0 2px, transparent 2px);
+  box-shadow:
+    inset 0 1px 0 var(--neon),
+    0 0 6px rgba(94, 241, 255, 0.28),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+/* E il muro di sopra e' una vetrata: la citta' di notte, coi palazzi accesi. */
+.of-stage[data-skin='notte'] .of-wall.nord {
+  background-color: #0a0d24;
+  background-image: var(--skyline);
+  background-size: 64px 16px;
+  box-shadow:
+    inset 0 -2px 0 var(--wall-hi),
+    inset 0 1px 0 var(--neon),
+    0 0 8px rgba(94, 241, 255, 0.3),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+.of-stage[data-skin='notte'] .of-porta {
+  background: linear-gradient(180deg, #05060f 0 11px, rgba(0, 0, 0, 0.5) 11px);
+  box-shadow:
+    inset 2px 0 0 #39e58c,
+    inset -2px 0 0 #39e58c,
+    0 0 8px rgba(57, 229, 140, 0.45);
+}
+.of-stage[data-skin='notte'] .of-porta .anta {
+  background: linear-gradient(180deg, #4a5080 0 2px, #2f3358 2px 8px, #22254a 8px);
+}
+/* Gli schermi fanno luce: l'alone attorno e' la sola lampada della stanza. */
+.of-stage[data-skin='notte'] .of-screen {
+  background: #0b0c18;
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno);
+}
+.of-stage[data-skin='notte'] .of-mon.on .of-screen {
+  background: linear-gradient(180deg, #b8fbff 0 3px, var(--olive) 3px 6px, var(--olive-lo) 6px);
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno),
+    0 0 10px 3px rgba(63, 216, 242, 0.35);
+}
+.of-stage[data-skin='notte'] .of-mon.working .of-screen {
+  background: linear-gradient(180deg, #ffd0f2 0 3px, var(--neon-2) 3px 6px, #b03a92 6px);
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno),
+    0 0 12px 4px rgba(255, 106, 213, 0.38);
+}
+.of-stage[data-skin='notte'] .of-mon::before,
+.of-stage[data-skin='notte'] .of-mon::after {
+  background: #2a2d48;
+}
+/* La pozza di luce sotto ogni scrivania (l'anteprima la mette per terra). */
+.of-stage[data-skin='notte'] .of-luce {
+  position: absolute;
+  width: 84px;
+  height: 46px;
+  margin-left: -42px;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(94, 241, 255, 0.2), rgba(94, 241, 255, 0.08) 60%, transparent);
+}
+/* Le piante al buio, e la ghiaia dell'atrio. */
+.of-stage[data-skin='notte'] .of-prop[data-k^='vaso'],
+.of-stage[data-skin='notte'] .of-prop[data-k^='plant'] {
+  filter: brightness(0.72) saturate(0.85) drop-shadow(2px 2px 0 var(--shade));
+}
+.of-stage[data-skin='notte'] .of-ghiaia {
+  filter: brightness(0.45) saturate(0.6) hue-rotate(190deg);
+}
+.of-stage[data-skin='notte'] .of-macchina,
+.of-stage[data-skin='notte'] .of-lavandino,
+.of-stage[data-skin='notte'] .of-cestino {
+  filter: brightness(0.75) drop-shadow(2px 2px 0 var(--shade));
+}
+/* Targhette e nuvolette: scure, con la scritta chiara e il filo al neon. */
+.of-stage[data-skin='notte'] .of-plate,
+.of-stage[data-skin='notte'] .of-say {
+  background: var(--paper);
+  color: #e6f6ff;
+  box-shadow:
+    inset 0 0 0 1px var(--neon),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+.of-stage[data-skin='notte'] .of-say::after {
+  background: var(--paper);
+  box-shadow:
+    -1px 0 0 var(--neon),
+    1px 0 0 var(--neon),
+    0 1px 0 var(--neon);
+}
+.of-stage[data-skin='notte'] .of-bar2 {
+  background: rgba(94, 241, 255, 0.18);
+}
+.of-stage[data-skin='notte'] .of-body {
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55)) brightness(0.95);
+}
+/* L'alone di chi lavora: azzurro come gli schermi, invece del legno. */
+.of-stage[data-skin='notte'] .of-guy.busy .of-ring {
+  background: radial-gradient(closest-side, rgba(94, 241, 255, 0.55), rgba(94, 241, 255, 0.2) 62%, transparent 78%);
+}
+
+/* =====================================================================
+   BALI — l'ufficio di BaliFlow come se fosse a Bali: pavimento di teak chiaro,
+   muri di bambu', il mare dalle finestre, un tappeto di rattan sotto le
+   scrivanie e mobili color miele.
+   ===================================================================== */
+.of-stage[data-skin='bali'] {
+  --wood-hi: #ffe2a6;
+  --wood: #d9a05a;
+  --wood-lo: #b07a3f;
+  --of-contorno: #3d2a17;
+  --floor: #e2c38f;
+  --sand: #f1e6d0;
+  --sand-hi: #fbf5e8;
+  --sand-jo: #d8c6a2;
+  --wall: #cdb56a;
+  --wall-hi: #e6d38c;
+  --wall-lo: #a48a43;
+  --wall-jo: #7d6a30;
+  --paper: #fffaf0;
+  --olive: #3ec7c4;
+  --olive-lo: #1d8f95;
+  --shade: rgba(86, 58, 24, 0.32);
+  --mare: #22b3c4;
+}
+.of-stage[data-skin='bali'] .of-prop {
+  background-image: var(--sheet-skin, var(--sheet-room));
+}
+/* Teak chiaro a doghe lunghe: le fughe sfalsate come in un parquet vero. */
+.of-stage[data-skin='bali'] .of-floor {
+  background-color: var(--floor);
+  background-image:
+    repeating-linear-gradient(180deg, #c99f63 0 1px, #edd3a3 1px 2px, transparent 2px 12px),
+    repeating-linear-gradient(90deg, transparent 0 47px, rgba(140, 95, 40, 0.35) 47px 48px),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, rgba(255, 245, 210, 0.25) 0 18%, rgba(255, 245, 210, 0.1) 18% 36%, transparent 36%);
+}
+/* Le stanze di sopra: pietra bianca con le fughe color sabbia. */
+.of-stage[data-skin='bali'] .of-floor::after {
+  background-color: var(--sand);
+  background-image:
+    linear-gradient(90deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0 16%, rgba(255, 255, 255, 0.15) 16% 32%, transparent 32%);
+  background-size:
+    24px 24px,
+    24px 24px,
+    auto;
+  box-shadow: inset 0 -1px 0 var(--sand-jo);
+}
+/* Il tappeto di rattan sotto le scrivanie (l'anteprima lo stende per terra). */
+.of-stage[data-skin='bali'] .of-tappeto {
+  position: absolute;
+  pointer-events: none;
+  background-color: #d8b77c;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(120, 82, 36, 0.28) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(255, 245, 220, 0.3) 0 2px, transparent 2px 6px);
+  box-shadow:
+    inset 0 0 0 2px #b88b4c,
+    inset 0 0 0 4px #ecd29e,
+    inset 0 0 0 5px #b88b4c,
+    2px 2px 0 rgba(86, 58, 24, 0.2);
+}
+/* Muri di bambu': canne in piedi coi nodi, e la luce che le prende di lato. */
+.of-stage[data-skin='bali'] .of-wall {
+  background-color: var(--wall);
+  background-image:
+    repeating-linear-gradient(180deg, transparent 0 6px, rgba(110, 85, 25, 0.55) 6px 7px, transparent 7px 13px),
+    repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, var(--wall-hi) 1px 2px, var(--wall) 2px 4px, var(--wall-lo) 4px 5px);
+  box-shadow:
+    inset 1px 1px 0 var(--wall-hi),
+    inset -1px -1px 0 var(--wall-lo),
+    2px 2px 0 rgba(86, 58, 24, 0.3);
+}
+/* Il muro di sopra e' una vetrata sul mare: cielo, orizzonte, onde. */
+.of-stage[data-skin='bali'] .of-wall.nord {
+  background-color: #9fe0f2;
+  background-image: var(--marina);
+  background-size: 64px 16px;
+  box-shadow:
+    inset 0 -2px 0 var(--wall-lo),
+    inset 0 2px 0 var(--wall),
+    2px 2px 0 rgba(86, 58, 24, 0.3);
+}
+.of-stage[data-skin='bali'] .of-porta {
+  background: linear-gradient(180deg, #8fd6e8 0 7px, #36b5c6 7px 11px, rgba(0, 0, 0, 0.2) 11px);
+  box-shadow:
+    inset 2px 0 0 var(--wall-lo),
+    inset -2px 0 0 var(--wall-lo);
+}
+.of-stage[data-skin='bali'] .of-porta .anta {
+  background: repeating-linear-gradient(90deg, #a77a3e 0 1px, #d6aa63 1px 3px);
+}
+.of-stage[data-skin='bali'] .of-mon.on .of-screen {
+  background: linear-gradient(180deg, #c9fbf6 0 3px, var(--olive) 3px 6px, var(--olive-lo) 6px);
+}
+.of-stage[data-skin='bali'] .of-mon.working .of-screen {
+  background: linear-gradient(180deg, #ffe0cf 0 3px, #ff8a65 3px 6px, #e0603c 6px);
+}
+.of-stage[data-skin='bali'] .of-plate,
+.of-stage[data-skin='bali'] .of-say {
+  background: var(--paper);
+  color: #3d2a17;
+  box-shadow:
+    inset 0 0 0 1px #1d8f95,
+    2px 2px 0 rgba(86, 58, 24, 0.35);
+}
+.of-stage[data-skin='bali'] .of-say::after {
+  background: var(--paper);
+  box-shadow:
+    -1px 0 0 #1d8f95,
+    1px 0 0 #1d8f95,
+    0 1px 0 #1d8f95;
+}
+.of-stage[data-skin='bali'] .of-prop[data-k^='vaso'],
+.of-stage[data-skin='bali'] .of-prop[data-k^='plant'] {
+  filter: saturate(1.25) brightness(1.05) drop-shadow(2px 2px 0 var(--shade));
+}
+.of-stage[data-skin='bali'] .of-ghiaia {
+  filter: sepia(0.35) brightness(1.05);
+}
+/* L'alone di chi lavora: turchese come il mare dalle finestre. */
+.of-stage[data-skin='bali'] .of-guy.busy .of-ring {
+  background: radial-gradient(closest-side, rgba(34, 179, 196, 0.5), rgba(34, 179, 196, 0.18) 62%, transparent 78%);
+}
