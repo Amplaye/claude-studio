@@ -46,6 +46,10 @@ function fakeWebview(state) {
     },
     postMessage: async (m) => {
       got.push(m);
+      // A page of history is drawn event by event, exactly like the live ones (see
+      // drawPage in webview/chat.js): for whoever reads `got`, what is inside it is
+      // what the page shows. The page itself stays in, for the checks about pages.
+      if (m && (m.k === 'replay' || m.k === 'older')) for (const e of m.events || []) got.push(e);
       if (m && m.k === 'sid') w.state = { ...w.state, sid: m.id || '' };
       return true;
     },
@@ -271,7 +275,9 @@ function boot(root, onPost, tweak) {
   // vederlo passare, uno per uno, mentre passa.
   const collect = view.webview.postMessage;
   view.webview.postMessage = async (m) => {
-    onPost(m);
+    // Una pagina di storia passa evento per evento, come la disegna la pagina vera.
+    if (m && (m.k === 'replay' || m.k === 'older')) for (const e of m.events || []) onPost(e);
+    else onPost(m);
     return collect(m);
   };
   registered.provider.resolveWebviewView(view);

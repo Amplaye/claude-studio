@@ -1601,6 +1601,165 @@ t(
   'le tazze non sono piu\' quattro: ' + JSON.stringify(tazze)
 );
 
+// ---- la scheda dentro lo schermo ----
+//
+// Chi sta nell'ultima fila di scrivanie ha sotto solo il muro, e la scheda che si
+// apriva sotto la pedina usciva dal bordo di sotto, tagliata a meta'. Adesso, se
+// sotto non ci sta, si apre sopra. Si porta un impiegato in fondo alla stanza a
+// mano — la stanza lo manderebbe dove vuole lei — e lo si clicca.
+await ctx(data([card({ id: 'giu-a', name: 'In fondo', busy: true })]));
+await tasks({
+  'giu-a': {
+    items: [],
+    agents: [A('g1', 'Cerca in fondo', 'in_progress', { type: 'Explore', doing: 'Read fondo.ts', brief: 'Un compito lungo abbastanza da andare a capo nella scheda, almeno una volta o due' })],
+    done: 0,
+    total: 0,
+    active: -1,
+    busy: true,
+  },
+});
+await fermi();
+const fondo = await page.evaluate(() => {
+  const b = document.querySelector('.of-staff:not(.via)');
+  if (!b) return null;
+  b.style.transition = 'none';
+  b.style.top = window.ROOM.H - 34 + 'px';
+  void b.offsetHeight;
+  b.click();
+  const s = document.querySelector('.of-scheda');
+  const r = s.getBoundingClientRect();
+  const o = document.querySelector('.office').getBoundingClientRect();
+  const p = b.getBoundingClientRect();
+  return { aperta: !s.hidden, sotto: Math.round(r.bottom - o.bottom), sopra: Math.round(r.top - o.top), sopraLui: r.bottom <= p.top + 1 };
+});
+t(!!fondo, 'per la prova della scheda in fondo non e’ entrato nessun impiegato');
+if (fondo) {
+  t(fondo.aperta, 'cliccando l’impiegato in fondo la scheda non si apre');
+  t(fondo.sotto <= -8 && fondo.sopra >= 8, 'la scheda di chi sta in fondo esce dallo schermo: ' + JSON.stringify(fondo));
+  t(fondo.sopraLui, 'la scheda di chi sta in fondo non si e’ aperta sopra di lui: ' + JSON.stringify(fondo));
+}
+await page.keyboard.press('Escape');
+await page.waitForTimeout(150);
+
+// E la nuvoletta di chi sta col naso contro il muro di sopra: sopra la testa non ci
+// sta, e usciva dalla stanza tagliata dal bordo. Va sotto i piedi.
+const muro = await page.evaluate(() => {
+  document.querySelectorAll('.of-say').forEach((n) => n.remove());
+  const g = document.querySelector('.of-crowd .of-guy:not(.via)');
+  if (!g) return null;
+  g.style.transition = 'none';
+  g.style.top = '8px';
+  const ms = window.ROOM.parla({ el: g }, 'Ciao dal muro di sopra');
+  const s = g.querySelector('.of-say');
+  if (!s) return { ms, nessuna: true };
+  const r = s.getBoundingClientRect();
+  const st = document.querySelector('.of-stage').getBoundingClientRect();
+  return { ms, sotto: s.classList.contains('sotto'), dentro: r.top >= st.top - 0.5 };
+});
+t(!!muro && !muro.nessuna, 'contro il muro di sopra nessuno riesce a parlare: ' + JSON.stringify(muro));
+if (muro && !muro.nessuna) {
+  t(muro.sotto && muro.dentro, 'la nuvoletta di chi sta contro il muro di sopra esce dalla stanza: ' + JSON.stringify(muro));
+}
+
+// ---- le pelli ----
+//
+// Tre stanze sulla stessa pianta: cambiare pelle e' un attributo sul palco, e i nodi
+// restano quelli — nessun mobile si rimonta, nessuno rientra dalla porta. I mobili
+// ricolorati devono arrivare davvero (un foglio mancante lascia rettangoli vuoti, e
+// lo direbbe `requestfailed`), la vetrata e' il muro di sopra e solo quello, la
+// scelta parte verso l'estensione per essere ricordata, e quella che arriva dalle
+// preferenze — un'altra finestra, un reload — la stanza la indossa da sola.
+const bottone = await page.evaluate(() => {
+  const b = document.querySelector('.of-bar .of-pelle');
+  document.querySelectorAll('.of-wall, .of-prop').forEach((n) => (n.__marca = 1));
+  return { esiste: !!b, prima: !!b && b.nextElementSibling === document.querySelector('.of-uso') };
+});
+t(bottone.esiste, 'nella fascia non c’e’ il bottone delle pelli');
+t(bottone.prima, 'il bottone delle pelli non sta subito prima dei consumi');
+// Mentre Claude lavora, perche' Esc sul menu non deve fermare anche lui.
+await post({ k: 'busy', value: true });
+await page.waitForTimeout(60);
+await page.locator('.of-pelle').click();
+await page.waitForTimeout(150);
+const menuPelli = await page.evaluate(() => {
+  const m = document.querySelector('.of-pelli');
+  const r = m.getBoundingClientRect();
+  return {
+    aperto: !m.hidden,
+    voci: [...m.querySelectorAll('button')].map((b) => b.dataset.pelle + ':' + b.getAttribute('aria-checked')).join(' '),
+    nomi: [...m.querySelectorAll('.of-pelle-nome')].map((n) => n.textContent).join(' / '),
+    dentro: r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+  };
+});
+t(menuPelli.aperto, 'il bottone delle pelli non apre il menu');
+t(menuPelli.voci === 'classico:true notte:false bali:false', 'il menu delle pelli non dice quale e’ scelta: ' + menuPelli.voci);
+t(menuPelli.nomi === 'Classic / Night in the city / Bali', 'il menu delle pelli non ha i nomi giusti: ' + menuPelli.nomi);
+t(menuPelli.dentro, 'il menu delle pelli esce dallo schermo');
+const giaMandati = await page.evaluate(() => (window.__sent || []).length);
+await page.keyboard.press('Escape');
+await page.waitForTimeout(100);
+const escPelli = await page.evaluate(
+  (n) => ({
+    chiuso: document.querySelector('.of-pelli').hidden,
+    fermato: (window.__sent || []).slice(n).some((m) => m.cmd === 'interrupt'),
+  }),
+  giaMandati
+);
+t(escPelli.chiuso, 'Esc non chiude il menu delle pelli');
+t(!escPelli.fermato, 'Esc sul menu delle pelli ha fermato anche Claude');
+await post({ k: 'busy', value: false });
+
+const veste = async (nome) => {
+  await page.locator('.of-pelle').click();
+  await page.waitForTimeout(100);
+  await page.locator(`.of-pelli button[data-pelle="${nome}"]`).click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(root, 'dist', 'preview-office-' + nome + '.png') });
+  return page.evaluate(() => {
+    const visibili = (sel) => [...document.querySelectorAll(sel)].filter((n) => getComputedStyle(n).display !== 'none').length;
+    const nord = [...document.querySelectorAll('.of-wall.nord')];
+    return {
+      skin: document.querySelector('.of-stage').dataset.skin || 'classico',
+      luci: visibili('.of-luce'),
+      tappeto: visibili('.of-tappeto'),
+      nord: nord.length,
+      vetrata: nord.length > 0 && nord.every((n) => /data:image\/svg/.test(getComputedStyle(n).backgroundImage)),
+      foglio: getComputedStyle(document.querySelector('.of-prop')).backgroundImage,
+      stessi: [...document.querySelectorAll('.of-wall, .of-prop')].every((n) => n.__marca === 1),
+      chiuso: document.querySelector('.of-pelli').hidden,
+      mandata: (window.__sent || [])
+        .filter((m) => m.cmd === 'setPrefs' && m.value && m.value.skin)
+        .map((m) => m.value.skin)
+        .at(-1),
+    };
+  });
+};
+const notte = await veste('notte');
+t(notte.skin === 'notte', 'scelta «Notte in città», la stanza non la indossa: ' + notte.skin);
+t(notte.luci === 8 && notte.tappeto === 0, 'di notte mancano le luci sotto le scrivanie (o c’e’ il tappeto): ' + JSON.stringify(notte));
+t(notte.nord === 2 && notte.vetrata, 'di notte il muro di sopra non e’ la vetrata con la citta’: ' + JSON.stringify(notte));
+t(/sv-room-notte\.png/.test(notte.foglio), 'di notte i mobili non sono quelli ricolorati: ' + notte.foglio);
+t(notte.stessi, 'cambiando pelle la stanza si e’ rimontata');
+t(notte.chiuso, 'scelta la pelle, il menu resta aperto');
+t(notte.mandata === 'notte', 'la pelle scelta non parte verso l’estensione: ' + notte.mandata);
+const bali = await veste('bali');
+t(bali.skin === 'bali' && bali.tappeto === 1 && bali.luci === 0, 'a Bali manca il tappeto (o restano le luci): ' + JSON.stringify(bali));
+t(bali.vetrata, 'a Bali il muro di sopra non e’ la vetrata sul mare');
+t(/sv-room-bali\.png/.test(bali.foglio), 'a Bali i mobili non sono quelli ricolorati: ' + bali.foglio);
+t(bali.stessi, 'passando a Bali la stanza si e’ rimontata');
+t(bali.mandata === 'bali', 'la pelle Bali non parte verso l’estensione: ' + bali.mandata);
+await post({ k: 'prefs', value: { skin: 'classico' } });
+await page.waitForTimeout(150);
+const legno = await page.evaluate(() => ({
+  skin: document.querySelector('.of-stage').dataset.skin || 'classico',
+  luci: [...document.querySelectorAll('.of-luce, .of-tappeto')].filter((n) => getComputedStyle(n).display !== 'none').length,
+  foglio: getComputedStyle(document.querySelector('.of-prop')).backgroundImage,
+}));
+t(
+  legno.skin === 'classico' && legno.luci === 0 && /sv-room\.png/.test(legno.foglio),
+  'le preferenze non riportano la stanza di legno: ' + JSON.stringify(legno)
+);
+
 t(!errors.length, 'la pagina ha protestato: ' + errors.join(' | '));
 
 await page.screenshot({ path: path.join(root, 'dist', 'preview-office-full.png') });
@@ -1611,5 +1770,5 @@ if (fails.length) {
   process.exit(1);
 }
 console.log(
-  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, chi porta il passo, gli sgabelli coi portatili, la fascia in cima, la bacheca, chi lavora per chi, l’aura del capo, le chiacchiere a due, le buste del lavoro, il rimpallo, l’archivio e le tazze'
+  'office-check ok — il bottone, la pianta, la gente, i posti a sedere, la posta, gli impiegati, chi porta il passo, gli sgabelli coi portatili, la fascia in cima, la bacheca, chi lavora per chi, l’aura del capo, le chiacchiere a due, le buste del lavoro, il rimpallo, l’archivio, le tazze, la scheda in fondo e le pelli'
 );

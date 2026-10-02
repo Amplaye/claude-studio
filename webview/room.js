@@ -375,6 +375,9 @@ window.ROOM = (() => {
   let nodiMuro = [];
   let nodiProp = [];
   let nodiDis = [];
+  /** Per terra, solo in una pelle: una pozza di luce per scrivania, e il tappeto. */
+  let luci = [];
+  let tappeto;
   let scrivanie = [];
 
   /**
@@ -975,11 +978,28 @@ window.ROOM = (() => {
     stage.style.setProperty('--sheet-room', 'url("' + foglio + '")');
     stage.append(el('div', 'of-floor'));
 
-    nodiMuro = WALLS.map(() => {
-      const n = el('div', 'of-wall');
+    nodiMuro = WALLS.map((w, i) => {
+      // Il muro di sopra — i due pezzi ai lati della porta — e' l'unico che da'
+      // sul fuori: nelle pelli (skins.css) diventa una vetrata. Nella stanza di
+      // legno la classe non cambia niente.
+      const m = MURI[i];
+      const n = el('div', m.r === 0 && m.h === 1 ? 'of-wall nord' : 'of-wall');
       stage.append(n);
       return n;
     });
+    /* Quello che sta per terra solo in una pelle: le pozze di luce sotto le
+       scrivanie (la notte, quando l'unica lampada e' lo schermo) e il tappeto di
+       rattan sotto il blocco dei banchi (Bali). Senza la sua pelle non si vede —
+       vedi skins.css — ma c'e' sempre, cosi' cambiare pelle e' solo un attributo
+       e non una stanza da rimontare. Piatti come la ghiaia: sotto tutti, e non
+       fermano nessuno. */
+    luci = DESKS.map(() => {
+      const n = el('i', 'of-luce');
+      stage.append(depth(n, 2));
+      return n;
+    });
+    tappeto = el('i', 'of-tappeto');
+    stage.append(depth(tappeto, 1));
     /* La porta. Due ante che si aprono verso i due stipiti, e dietro il buio di
        quello che c'e' fuori. Nel foglio non c'e' — SeasonVale e' una fattoria —
        e comunque e' l'unica parte del muro che deve muoversi, il che vuol dire
@@ -1099,6 +1119,24 @@ window.ROOM = (() => {
       s.mon.style.top = d.b - SH + 4 - 16 + 'px';
       depth(s.mon, d.b + 1);
     });
+    // La luce sotto ogni scrivania e il tappeto sotto tutte: le scrivanie stanno
+    // in mezzo al salone, e quando la stanza cresce si spostano con loro.
+    DESKS.forEach((d, i) => {
+      const l = luci[i];
+      if (!l) return;
+      l.style.left = d.x + SW / 2 + 'px';
+      l.style.top = d.b - 20 + 'px';
+    });
+    if (tappeto && DESKS.length) {
+      const x0 = Math.min(...DESKS.map((d) => d.x)) - 18;
+      const x1 = Math.max(...DESKS.map((d) => d.x)) + SW + 18;
+      const y0 = Math.min(...DESKS.map((d) => d.b)) - SH - 24;
+      const y1 = Math.max(...DESKS.map((d) => d.b)) + 30;
+      tappeto.style.left = x0 + 'px';
+      tappeto.style.top = y0 + 'px';
+      tappeto.style.width = x1 - x0 + 'px';
+      tappeto.style.height = y1 - y0 + 'px';
+    }
     if (ante) {
       ante.style.left = VANO[0] + 'px';
       ante.style.width = VANO[1] + 'px';
@@ -1388,7 +1426,11 @@ window.ROOM = (() => {
     let verso = opt.verso;
     if (x < 64) verso = 'dx';
     else if (x > W - 64) verso = 'sx';
-    const n = el('div', verso ? 'of-say ' + verso : 'of-say');
+    // E col naso contro il muro di sopra la nuvoletta sopra la testa non ci sta —
+    // due righe e il suo stacco sono ventidue pixel — e usciva dalla stanza: va sotto
+    // i piedi.
+    const sotto = (parseFloat(chi.el.style.top) || 0) < 22;
+    const n = el('div', 'of-say' + (verso ? ' ' + verso : '') + (sotto ? ' sotto' : ''));
     n.textContent = detto;
     if (opt.tipo) n.dataset.tipo = opt.tipo;
     // Le battute della stessa scena portano lo stesso numero: da fuori (i controlli)

@@ -1,0 +1,415 @@
+/* Claude Studio — le pelli dell'ufficio: «Notte in città» e «Bali».
+ *
+ * La stanza e' sempre quella (room.js, room.css, la stessa gente e le stesse scene):
+ * cambiano solo i materiali — pavimenti, muri, vetrate, mobili ricolorati, schermi,
+ * targhette e nuvolette. La pianta resta identica e niente cambia a dove si mettono
+ * i piedi, quindi passare da una pelle all'altra mentre la stanza vive non sposta
+ * nessuno: e' un attributo sul palco (`data-skin`), non una stanza rimontata.
+ *
+ * Sta dopo office.css apposta, ma non ne dipende: ogni regola parte dal palco con
+ * la sua pelle, e vince per specificita'. I fogli dei mobili ricolorati arrivano in
+ * `--sheet-notte` e `--sheet-bali` (li mette office.js dai data-attributi della
+ * pagina, come il foglio classico); se mancano, i mobili restano quelli di legno.
+ * Le vetrate sono piastrelle SVG in data URI, scritte qui da scripts/skin-fogli.mjs.
+ *
+ * Due cose della stanza non sono materiali, e restano uguali in ogni pelle: la
+ * targhetta e l'alone della conversazione che stai guardando, che sono dell'accento.
+ */
+
+/* =====================================================================
+   NOTTE IN CITTA' — l'ufficio a mezzanotte: moquette blu, muri scuri col filo
+   al neon, lo skyline acceso dalle vetrate, e la luce che viene dagli schermi.
+   ===================================================================== */
+.of-stage[data-skin='notte'] {
+  --wood-hi: #7f88c4;
+  --wood: #474c7e;
+  --wood-lo: #343861;
+  --of-contorno: #090a14;
+  --floor: #1b1e33;
+  --sand: #262a42;
+  --sand-hi: #30354f;
+  --sand-jo: #1a1d31;
+  --wall: #2a2f4d;
+  --wall-hi: #3b4170;
+  --wall-lo: #1d2140;
+  --wall-jo: #151830;
+  --paper: #161a2e;
+  --olive: #3fd8f2;
+  --olive-lo: #1d86b0;
+  --shade: rgba(3, 4, 12, 0.6);
+  --neon: #5ef1ff;
+  --neon-2: #ff6ad5;
+}
+.of-stage[data-skin='notte'] .of-prop {
+  background-image: var(--sheet-notte, var(--sheet-room));
+}
+/* Moquette a quadrotte: una su due appena piu' chiara, e le fughe di un pixel. */
+.of-stage[data-skin='notte'] .of-floor {
+  background-color: var(--floor);
+  background-image:
+    linear-gradient(90deg, rgba(120, 140, 255, 0.07) 0 1px, transparent 1px),
+    linear-gradient(180deg, rgba(120, 140, 255, 0.07) 0 1px, transparent 1px),
+    conic-gradient(rgba(255, 255, 255, 0.025) 0 25%, transparent 0 50%, rgba(255, 255, 255, 0.025) 0 75%, transparent 0);
+  background-size:
+    16px 16px,
+    16px 16px,
+    32px 32px;
+}
+/* Le stanze di sopra: lastre di cemento scuro, lucide. */
+.of-stage[data-skin='notte'] .of-floor::after {
+  background-color: var(--sand);
+  background-image:
+    linear-gradient(90deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(135deg, rgba(120, 200, 255, 0.07) 0 14%, rgba(120, 200, 255, 0.03) 14% 30%, transparent 30%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  box-shadow: inset 0 -1px 0 var(--neon);
+}
+/* Muri scuri col filo al neon in cima: e' quello che si vede per primo, al buio. */
+.of-stage[data-skin='notte'] .of-wall {
+  background-color: var(--wall);
+  background-image:
+    repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, transparent 1px 16px),
+    linear-gradient(180deg, var(--wall-hi) 0 2px, transparent 2px);
+  box-shadow:
+    inset 0 1px 0 var(--neon),
+    0 0 6px rgba(94, 241, 255, 0.28),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+/* E il muro di sopra e' una vetrata: la citta' di notte, coi palazzi accesi. */
+.of-stage[data-skin='notte'] .of-wall.nord {
+  background-color: #0a0d24;
+  background-image: var(--skyline);
+  background-size: 64px 16px;
+  box-shadow:
+    inset 0 -2px 0 var(--wall-hi),
+    inset 0 1px 0 var(--neon),
+    0 0 8px rgba(94, 241, 255, 0.3),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+.of-stage[data-skin='notte'] .of-porta {
+  background: linear-gradient(180deg, #05060f 0 11px, rgba(0, 0, 0, 0.5) 11px);
+  box-shadow:
+    inset 2px 0 0 #39e58c,
+    inset -2px 0 0 #39e58c,
+    0 0 8px rgba(57, 229, 140, 0.45);
+}
+.of-stage[data-skin='notte'] .of-porta .anta {
+  background: linear-gradient(180deg, #4a5080 0 2px, #2f3358 2px 8px, #22254a 8px);
+}
+/* Gli schermi fanno luce: l'alone attorno e' la sola lampada della stanza. */
+.of-stage[data-skin='notte'] .of-screen {
+  background: #0b0c18;
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno);
+}
+.of-stage[data-skin='notte'] .of-mon.on .of-screen {
+  background: linear-gradient(180deg, #b8fbff 0 3px, var(--olive) 3px 6px, var(--olive-lo) 6px);
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno),
+    0 0 10px 3px rgba(63, 216, 242, 0.35);
+}
+.of-stage[data-skin='notte'] .of-mon.working .of-screen {
+  background: linear-gradient(180deg, #ffd0f2 0 3px, var(--neon-2) 3px 6px, #b03a92 6px);
+  box-shadow:
+    inset 0 0 0 2px #2f3352,
+    inset 0 0 0 3px var(--of-contorno),
+    0 0 12px 4px rgba(255, 106, 213, 0.38);
+}
+.of-stage[data-skin='notte'] .of-mon::before,
+.of-stage[data-skin='notte'] .of-mon::after {
+  background: #2a2d48;
+}
+/* La pozza di luce sotto ogni scrivania: la mette room.js, una per banco. */
+.of-stage[data-skin='notte'] .of-luce {
+  display: block;
+  width: 84px;
+  height: 46px;
+  margin-left: -42px;
+  background: radial-gradient(closest-side, rgba(94, 241, 255, 0.2), rgba(94, 241, 255, 0.08) 60%, transparent);
+}
+/* Le piante al buio, e la ghiaia dell'atrio. */
+.of-stage[data-skin='notte'] .of-prop[data-k^='vaso'],
+.of-stage[data-skin='notte'] .of-prop[data-k^='plant'] {
+  filter: brightness(0.72) saturate(0.85) drop-shadow(2px 2px 0 var(--shade));
+}
+.of-stage[data-skin='notte'] .of-ghiaia {
+  filter: brightness(0.45) saturate(0.6) hue-rotate(190deg);
+}
+.of-stage[data-skin='notte'] .of-macchina,
+.of-stage[data-skin='notte'] .of-lavandino,
+.of-stage[data-skin='notte'] .of-cestino {
+  filter: brightness(0.75) drop-shadow(2px 2px 0 var(--shade));
+}
+/* Targhette e nuvolette: scure, con la scritta chiara e il filo al neon. */
+.of-stage[data-skin='notte'] .of-plate,
+.of-stage[data-skin='notte'] .of-say {
+  background: var(--paper);
+  color: #e6f6ff;
+  box-shadow:
+    inset 0 0 0 1px var(--neon),
+    2px 2px 0 rgba(0, 0, 0, 0.55);
+}
+/* La codina: il filo e' quello del neon, sopra o sotto che stia (room.css). */
+.of-stage[data-skin='notte'] .of-say {
+  --say-filo: var(--neon);
+}
+.of-stage[data-skin='notte'] .of-bar2 {
+  background: rgba(94, 241, 255, 0.18);
+}
+.of-stage[data-skin='notte'] .of-body {
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.55)) brightness(0.95);
+}
+/* L'alone di chi lavora: azzurro come gli schermi, invece del legno. Non su quella
+   che stai guardando: li' vince il faretto, come nella stanza di legno. */
+.of-stage[data-skin='notte'] .of-guy.busy:not(.focused) .of-ring {
+  background: radial-gradient(closest-side, rgba(94, 241, 255, 0.55), rgba(94, 241, 255, 0.2) 62%, transparent 78%);
+}
+
+/* =====================================================================
+   BALI — l'ufficio di BaliFlow come se fosse a Bali: pavimento di teak chiaro,
+   muri di bambu', il mare dalle vetrate, un tappeto di rattan sotto le
+   scrivanie e mobili color miele.
+   ===================================================================== */
+.of-stage[data-skin='bali'] {
+  --wood-hi: #ffe2a6;
+  --wood: #d9a05a;
+  --wood-lo: #b07a3f;
+  --of-contorno: #3d2a17;
+  --floor: #e2c38f;
+  --sand: #f1e6d0;
+  --sand-hi: #fbf5e8;
+  --sand-jo: #d8c6a2;
+  --wall: #cdb56a;
+  --wall-hi: #e6d38c;
+  --wall-lo: #a48a43;
+  --wall-jo: #7d6a30;
+  --paper: #fffaf0;
+  --olive: #3ec7c4;
+  --olive-lo: #1d8f95;
+  --shade: rgba(86, 58, 24, 0.32);
+  --mare: #22b3c4;
+}
+.of-stage[data-skin='bali'] .of-prop {
+  background-image: var(--sheet-bali, var(--sheet-room));
+}
+/* Teak chiaro a doghe lunghe: le fughe sfalsate come in un parquet vero. */
+.of-stage[data-skin='bali'] .of-floor {
+  background-color: var(--floor);
+  background-image:
+    repeating-linear-gradient(180deg, #c99f63 0 1px, #edd3a3 1px 2px, transparent 2px 12px),
+    repeating-linear-gradient(90deg, transparent 0 47px, rgba(140, 95, 40, 0.35) 47px 48px),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 5px),
+    linear-gradient(135deg, rgba(255, 245, 210, 0.25) 0 18%, rgba(255, 245, 210, 0.1) 18% 36%, transparent 36%);
+}
+/* Le stanze di sopra: pietra bianca con le fughe color sabbia. */
+.of-stage[data-skin='bali'] .of-floor::after {
+  background-color: var(--sand);
+  background-image:
+    linear-gradient(90deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--sand-jo) 0 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0 16%, rgba(255, 255, 255, 0.15) 16% 32%, transparent 32%);
+  background-size:
+    24px 24px,
+    24px 24px,
+    auto;
+  box-shadow: inset 0 -1px 0 var(--sand-jo);
+}
+/* Il tappeto di rattan sotto le scrivanie: lo stende room.js, sotto il blocco dei banchi. */
+.of-stage[data-skin='bali'] .of-tappeto {
+  display: block;
+  background-color: #d8b77c;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(120, 82, 36, 0.28) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(-45deg, rgba(255, 245, 220, 0.3) 0 2px, transparent 2px 6px);
+  box-shadow:
+    inset 0 0 0 2px #b88b4c,
+    inset 0 0 0 4px #ecd29e,
+    inset 0 0 0 5px #b88b4c,
+    2px 2px 0 rgba(86, 58, 24, 0.2);
+}
+/* Muri di bambu': canne in piedi coi nodi, e la luce che le prende di lato. */
+.of-stage[data-skin='bali'] .of-wall {
+  background-color: var(--wall);
+  background-image:
+    repeating-linear-gradient(180deg, transparent 0 6px, rgba(110, 85, 25, 0.55) 6px 7px, transparent 7px 13px),
+    repeating-linear-gradient(90deg, var(--wall-jo) 0 1px, var(--wall-hi) 1px 2px, var(--wall) 2px 4px, var(--wall-lo) 4px 5px);
+  box-shadow:
+    inset 1px 1px 0 var(--wall-hi),
+    inset -1px -1px 0 var(--wall-lo),
+    2px 2px 0 rgba(86, 58, 24, 0.3);
+}
+/* Il muro di sopra e' una vetrata sul mare: cielo, orizzonte, onde. */
+.of-stage[data-skin='bali'] .of-wall.nord {
+  background-color: #9fe0f2;
+  background-image: var(--marina);
+  background-size: 64px 16px;
+  box-shadow:
+    inset 0 -2px 0 var(--wall-lo),
+    inset 0 2px 0 var(--wall),
+    2px 2px 0 rgba(86, 58, 24, 0.3);
+}
+.of-stage[data-skin='bali'] .of-porta {
+  background: linear-gradient(180deg, #8fd6e8 0 7px, #36b5c6 7px 11px, rgba(0, 0, 0, 0.2) 11px);
+  box-shadow:
+    inset 2px 0 0 var(--wall-lo),
+    inset -2px 0 0 var(--wall-lo);
+}
+.of-stage[data-skin='bali'] .of-porta .anta {
+  background: repeating-linear-gradient(90deg, #a77a3e 0 1px, #d6aa63 1px 3px);
+}
+.of-stage[data-skin='bali'] .of-mon.on .of-screen {
+  background: linear-gradient(180deg, #c9fbf6 0 3px, var(--olive) 3px 6px, var(--olive-lo) 6px);
+}
+.of-stage[data-skin='bali'] .of-mon.working .of-screen {
+  background: linear-gradient(180deg, #ffe0cf 0 3px, #ff8a65 3px 6px, #e0603c 6px);
+}
+.of-stage[data-skin='bali'] .of-plate,
+.of-stage[data-skin='bali'] .of-say {
+  background: var(--paper);
+  color: #3d2a17;
+  box-shadow:
+    inset 0 0 0 1px #1d8f95,
+    2px 2px 0 rgba(86, 58, 24, 0.35);
+}
+.of-stage[data-skin='bali'] .of-say {
+  --say-filo: #1d8f95;
+}
+.of-stage[data-skin='bali'] .of-prop[data-k^='vaso'],
+.of-stage[data-skin='bali'] .of-prop[data-k^='plant'] {
+  filter: saturate(1.25) brightness(1.05) drop-shadow(2px 2px 0 var(--shade));
+}
+.of-stage[data-skin='bali'] .of-ghiaia {
+  filter: sepia(0.35) brightness(1.05);
+}
+/* L'alone di chi lavora: turchese come il mare dalle vetrate. */
+.of-stage[data-skin='bali'] .of-guy.busy:not(.focused) .of-ring {
+  background: radial-gradient(closest-side, rgba(34, 179, 196, 0.5), rgba(34, 179, 196, 0.18) 62%, transparent 78%);
+}
+
+/* La conversazione che stai guardando resta dell'accento in ogni pelle: le regole
+   qui sopra vincono per specificita' su quelle di office.css, e senza questa la
+   targhetta perdeva la sua cornice proprio nelle pelli nuove. */
+.of-stage[data-skin] .of-plate.focused {
+  box-shadow:
+    inset 0 0 0 1px var(--claude-1),
+    0 0 0 1px var(--claude-1),
+    2px 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* @tessere — le scrive scripts/skin-fogli.mjs, non si toccano a mano */
+.of-stage[data-skin='notte'] {
+  --skyline: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'64'%20height%3D'16'%20shape-rendering%3D'crispEdges'%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'64'%20height%3D'16'%20fill%3D'%230a0d26'%2F%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'64'%20height%3D'4'%20fill%3D'%230d1130'%2F%3E%3Crect%20x%3D'5'%20y%3D'2'%20width%3D'1'%20height%3D'1'%20fill%3D'%23cfe8ff'%2F%3E%3Crect%20x%3D'23'%20y%3D'1'%20width%3D'1'%20height%3D'1'%20fill%3D'%23cfe8ff'%2F%3E%3Crect%20x%3D'41'%20y%3D'3'%20width%3D'1'%20height%3D'1'%20fill%3D'%23cfe8ff'%2F%3E%3Crect%20x%3D'58'%20y%3D'1'%20width%3D'1'%20height%3D'1'%20fill%3D'%23cfe8ff'%2F%3E%3Crect%20x%3D'30'%20y%3D'2'%20width%3D'1'%20height%3D'1'%20fill%3D'%23cfe8ff'%2F%3E%3Crect%20x%3D'0'%20y%3D'5'%20width%3D'9'%20height%3D'11'%20fill%3D'%23141a3a'%2F%3E%3Crect%20x%3D'9'%20y%3D'9'%20width%3D'6'%20height%3D'7'%20fill%3D'%23192043'%2F%3E%3Crect%20x%3D'15'%20y%3D'3'%20width%3D'10'%20height%3D'13'%20fill%3D'%2310152f'%2F%3E%3Crect%20x%3D'25'%20y%3D'7'%20width%3D'7'%20height%3D'9'%20fill%3D'%23171d3f'%2F%3E%3Crect%20x%3D'32'%20y%3D'4'%20width%3D'11'%20height%3D'12'%20fill%3D'%23121834'%2F%3E%3Crect%20x%3D'43'%20y%3D'10'%20width%3D'6'%20height%3D'6'%20fill%3D'%231a2146'%2F%3E%3Crect%20x%3D'49'%20y%3D'6'%20width%3D'9'%20height%3D'10'%20fill%3D'%23111630'%2F%3E%3Crect%20x%3D'58'%20y%3D'8'%20width%3D'6'%20height%3D'8'%20fill%3D'%23171d3f'%2F%3E%3Crect%20x%3D'2'%20y%3D'7'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'5'%20y%3D'9'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'3'%20y%3D'12'%20width%3D'1'%20height%3D'1'%20fill%3D'%237ff4ff'%2F%3E%3Crect%20x%3D'11'%20y%3D'11'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'17'%20y%3D'5'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'20'%20y%3D'8'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'18'%20y%3D'11'%20width%3D'1'%20height%3D'1'%20fill%3D'%237ff4ff'%2F%3E%3Crect%20x%3D'22'%20y%3D'13'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'27'%20y%3D'9'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'29'%20y%3D'12'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'34'%20y%3D'6'%20width%3D'1'%20height%3D'1'%20fill%3D'%237ff4ff'%2F%3E%3Crect%20x%3D'37'%20y%3D'8'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'40'%20y%3D'11'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'35'%20y%3D'13'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'45'%20y%3D'12'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'51'%20y%3D'8'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'54'%20y%3D'10'%20width%3D'1'%20height%3D'1'%20fill%3D'%237ff4ff'%2F%3E%3Crect%20x%3D'52'%20y%3D'13'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'60'%20y%3D'10'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'61'%20y%3D'13'%20width%3D'1'%20height%3D'1'%20fill%3D'%23ffd36b'%2F%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'1'%20height%3D'16'%20fill%3D'%232a2f4d'%2F%3E%3Crect%20x%3D'32'%20y%3D'0'%20width%3D'1'%20height%3D'16'%20fill%3D'%232a2f4d'%2F%3E%3C%2Fsvg%3E");
+}
+.of-stage[data-skin='bali'] {
+  --marina: url("data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'64'%20height%3D'16'%20shape-rendering%3D'crispEdges'%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'64'%20height%3D'16'%20fill%3D'%23a6e4f5'%2F%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'64'%20height%3D'3'%20fill%3D'%23c6f0fb'%2F%3E%3Crect%20x%3D'6'%20y%3D'2'%20width%3D'7'%20height%3D'1'%20fill%3D'%23ffffff'%2F%3E%3Crect%20x%3D'8'%20y%3D'1'%20width%3D'3'%20height%3D'1'%20fill%3D'%23ffffff'%2F%3E%3Crect%20x%3D'41'%20y%3D'3'%20width%3D'8'%20height%3D'1'%20fill%3D'%23ffffff'%2F%3E%3Crect%20x%3D'43'%20y%3D'2'%20width%3D'4'%20height%3D'1'%20fill%3D'%23ffffff'%2F%3E%3Crect%20x%3D'0'%20y%3D'7'%20width%3D'64'%20height%3D'1'%20fill%3D'%232a9fb5'%2F%3E%3Crect%20x%3D'0'%20y%3D'8'%20width%3D'64'%20height%3D'8'%20fill%3D'%2322b3c4'%2F%3E%3Crect%20x%3D'0'%20y%3D'12'%20width%3D'64'%20height%3D'4'%20fill%3D'%231aa0b6'%2F%3E%3Crect%20x%3D'3'%20y%3D'10'%20width%3D'4'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'20'%20y%3D'12'%20width%3D'5'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'37'%20y%3D'9'%20width%3D'4'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'52'%20y%3D'11'%20width%3D'6'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'12'%20y%3D'14'%20width%3D'3'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'45'%20y%3D'14'%20width%3D'4'%20height%3D'1'%20fill%3D'%237fe1e6'%2F%3E%3Crect%20x%3D'0'%20y%3D'0'%20width%3D'2'%20height%3D'16'%20fill%3D'%23b8964c'%2F%3E%3Crect%20x%3D'2'%20y%3D'0'%20width%3D'1'%20height%3D'16'%20fill%3D'%238a6d33'%2F%3E%3Crect%20x%3D'32'%20y%3D'0'%20width%3D'2'%20height%3D'16'%20fill%3D'%23b8964c'%2F%3E%3Crect%20x%3D'34'%20y%3D'0'%20width%3D'1'%20height%3D'16'%20fill%3D'%238a6d33'%2F%3E%3C%2Fsvg%3E");
+}
+/* @tessere-fine */
+
+/* ---------- la scelta, nella fascia in cima ----------
+   Un bottone solo, subito prima dei consumi: la pelle si cambia di rado, e una fila
+   di tre bottoni sempre in vista si sarebbe presa il posto della gente. Il menu che
+   apre ha le tre stanze con un campione dei loro colori. */
+.of-pelle {
+  flex: 0 0 auto;
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--ctl);
+  height: var(--ctl);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.of-pelle:hover,
+.of-pelle[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+  background: color-mix(in srgb, var(--claude-1) 10%, transparent);
+}
+.of-pelle:focus-visible {
+  outline: 2px solid var(--claude-1);
+  outline-offset: 1px;
+}
+.of-pelli {
+  position: absolute;
+  /* Sopra tutto l'ufficio, anche sopra il foglio della bacheca (9500): e' un menu
+     appena aperto, e un menu che si apre dietro a qualcosa non si puo' usare. */
+  z-index: 9600;
+  min-width: 186px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.65);
+}
+.of-pelli[hidden] {
+  display: none;
+}
+.of-pelli-tit {
+  padding: 3px 7px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.of-pelli button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.of-pelli button:hover,
+.of-pelli button:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+.of-pelli button[aria-checked='true'] {
+  font-weight: 800;
+}
+.of-pelli button[aria-checked='true']::after {
+  content: '';
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--claude-1);
+}
+/* Il campione: pavimento, muro e l'accento della pelle, tre strisce come una
+   mazzetta di colori. */
+.of-campione {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.of-campione.classico {
+  background: linear-gradient(180deg, #cf8c4a 0 34%, #8a4e2c 34% 74%, #e86837 74%);
+}
+.of-campione.notte {
+  background: linear-gradient(180deg, #0a0d24 0 34%, #1b1e33 34% 74%, #5ef1ff 74%);
+}
+.of-campione.bali {
+  background: linear-gradient(180deg, #a6e4f5 0 34%, #e2c38f 34% 74%, #22b3c4 74%);
+}

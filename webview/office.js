@@ -430,14 +430,43 @@ window.OFFICE = (() => {
   function apriScheda(key, ancora) {
     guardato = guardato === key ? null : key;
     if (guardato && ancora) {
-      // Sotto la pedina, ma mai oltre il bordo: una scheda che esce dalla scheda
-      // e' una scheda tagliata a meta'.
+      // Dove sta la pedina, in coordinate dell'ufficio. Il posto vero della scheda
+      // lo decide `piazzaScheda`, quando la scheda e' gia' scritta e se ne conosce
+      // l'altezza: prima non si sa se sotto ci sta.
       const b = ancora.getBoundingClientRect();
       const r = root.getBoundingClientRect();
-      scheda.el.style.left = Math.max(8, Math.min(b.left - r.left, r.width - 268)) + 'px';
-      scheda.el.style.top = b.bottom - r.top + 6 + 'px';
+      ancoraScheda = { left: b.left - r.left, top: b.top - r.top, bottom: b.bottom - r.top };
     }
     paintGente();
+  }
+
+  /** Dove sta la pedina della scheda aperta, in coordinate dell'ufficio. */
+  let ancoraScheda = null;
+
+  /**
+   * Sotto la pedina, ma mai fuori dall'ufficio: una scheda che esce dallo schermo e'
+   * una scheda tagliata a meta'. Ed era proprio quello che succedeva cliccando chi
+   * sta nell'ultima fila di scrivanie — sotto c'e' solo il muro, e la scheda finiva
+   * oltre il bordo di sotto. Se sotto non ci sta si apre sopra la pedina; se non ci
+   * sta neanche sopra (una finestra bassa), si appoggia al bordo che c'e'.
+   *
+   * Si rifa' a ogni ridisegno della scheda, non solo all'apertura: la scheda e' viva,
+   * e una riga che va a capo la allunga.
+   */
+  function piazzaScheda() {
+    if (!ancoraScheda || scheda.el.hidden) return;
+    const W = root.clientWidth;
+    const H = root.clientHeight;
+    const w = scheda.el.offsetWidth;
+    const h = scheda.el.offsetHeight;
+    const left = Math.max(8, Math.min(ancoraScheda.left, W - w - 8));
+    let top = ancoraScheda.bottom + 6;
+    if (top + h > H - 8) {
+      const sopra = ancoraScheda.top - 6 - h;
+      top = sopra >= 8 ? sopra : Math.max(8, H - h - 8);
+    }
+    scheda.el.style.left = left + 'px';
+    scheda.el.style.top = top + 'px';
   }
 
   /** L'orologio della scheda aperta: gira solo finche' c'e' un orologio da far girare. */
@@ -500,6 +529,7 @@ window.OFFICE = (() => {
       scheda.pctFill.style.width = Math.max(0, Math.min(100, a.pct)) + '%';
       scheda.pctFill.style.background = barColor(a.pct);
     }
+    piazzaScheda();
     // L'orologio vivo: "da quanto lavora" fermo al momento in cui hai aperto la
     // scheda dice un'ora che non e' piu' quella.
     const gira = !!((ag && ag.since) || (a.passo && board[a.id] && board[a.id].activeSince));
@@ -577,9 +607,65 @@ window.OFFICE = (() => {
       pctFill: sPctFill,
     };
 
-    // Il nome del posto, chi c'e', e i consumi. La fila in mezzo si prende lo
-    // spazio che avanza ed e' lei a spingere i consumi contro il bordo destro.
-    bar.append(title, gente, uso);
+    /* La pelle della stanza: il legno di sempre, la notte in citta', Bali. Un
+       bottone solo, subito prima dei consumi — si cambia di rado, e tre bottoni
+       sempre in vista si sarebbero presi il posto della gente — che apre le tre
+       stanze, ognuna col suo campione di colori. */
+    pelleBtn = el('button', 'of-pelle');
+    pelleBtn.type = 'button';
+    pelleBtn.setAttribute('aria-haspopup', 'menu');
+    pelleBtn.setAttribute('aria-expanded', 'false');
+    // A mano come l'icona del titolo: qui dentro `ico` e' quella, non la funzione.
+    const tavolozza = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    tavolozza.setAttribute('class', 'ico');
+    const usoT = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    usoT.setAttribute('href', '#ion-color-palette');
+    tavolozza.appendChild(usoT);
+    pelleBtn.append(tavolozza);
+    pelleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      apriPelli(pelliMenu.hidden);
+    });
+    pelliMenu = el('div', 'of-pelli');
+    pelliMenu.hidden = true;
+    pelliMenu.setAttribute('role', 'menu');
+    pelliMenu.append(el('div', 'of-pelli-tit'));
+    for (const p of PELLI) {
+      const b = el('button');
+      b.type = 'button';
+      b.dataset.pelle = p;
+      b.setAttribute('role', 'menuitemradio');
+      b.append(el('span', 'of-campione ' + p), el('span', 'of-pelle-nome'));
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scegliPelle(p);
+        apriPelli(false);
+        pelleBtn.focus();
+      });
+      pelliMenu.append(b);
+    }
+    // Le frecce scorrono le tre stanze, come in ogni menu.
+    pelliMenu.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const voci = [...pelliMenu.querySelectorAll('button')];
+      const i = voci.indexOf(document.activeElement);
+      voci[(i + (e.key === 'ArrowDown' ? 1 : -1) + voci.length) % voci.length].focus();
+    });
+    // Si chiude come ogni menu: cliccando altrove — anche nella chat, che sta fuori
+    // dall'ufficio e il cui clic qui non arriverebbe mai — o con Esc.
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!pelliMenu.hidden && !pelliMenu.contains(e.target) && !pelleBtn.contains(e.target)) apriPelli(false);
+      },
+      true
+    );
+
+    // Il nome del posto, chi c'e', la pelle e i consumi. La fila in mezzo si prende
+    // lo spazio che avanza ed e' lei a spingere i consumi contro il bordo destro: la
+    // pelle sta subito prima, perche' i consumi restano dove l'occhio li cerca.
+    bar.append(title, gente, pelleBtn, uso);
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');
@@ -594,6 +680,12 @@ window.OFFICE = (() => {
     const abs = (p) => (p ? new URL(p, document.baseURI).href : '');
     scrivanie = window.ROOM.monta(stage, abs(root.dataset.room));
     seats = new Array(scrivanie.length).fill(null);
+    // I mobili ricolorati delle due pelli, stessa strada del foglio di legno. Se una
+    // non arriva, skins.css ripiega sul foglio classico: mobili di legno in una
+    // stanza blu, ma nessun rettangolo vuoto.
+    if (root.dataset.roomNotte) stage.style.setProperty('--sheet-notte', 'url("' + abs(root.dataset.roomNotte) + '")');
+    if (root.dataset.roomBali) stage.style.setProperty('--sheet-bali', 'url("' + abs(root.dataset.roomBali) + '")');
+    vestiPelle();
 
     crowd = el('div', 'of-crowd');
     // I foglietti stanno appesi ai muri, quindi sotto la gente: uno che passa
@@ -634,7 +726,7 @@ window.OFFICE = (() => {
     // Il foglio sta dentro il riquadro della stanza e non dentro tutto l'ufficio:
     // copre la pianta, non la fascia in cima.
     wrap.append(stage, sheet);
-    root.append(bar, wrap, scheda.el);
+    root.append(bar, wrap, scheda.el, pelliMenu);
 
     // La scheda si chiude come si chiude una cosa aperta per sbaglio: col tasto
     // che chiude tutto, o cliccando altrove. La pedina se la richiude da se',
@@ -647,9 +739,17 @@ window.OFFICE = (() => {
       paintGente();
     });
     root.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape' || !guardato) return;
-      guardato = null;
-      paintGente();
+      if (e.key !== 'Escape') return;
+      if (!pelliMenu.hidden) {
+        apriPelli(false);
+        pelleBtn.focus();
+      } else if (guardato) {
+        guardato = null;
+        paintGente();
+      } else return;
+      // Esc qui ha chiuso qualcosa, e basta: senza, il tasto saliva fino alla pagina,
+      // che lo prende per «ferma Claude» — chiudevi una scheda e fermavi il turno.
+      e.preventDefault();
     });
 
     new ResizeObserver(fit).observe(wrap);
@@ -668,9 +768,71 @@ window.OFFICE = (() => {
     window.I18N.onChange(() => {
       titleText.nodeValue = t('office.title');
       vestiBacheca();
+      scriviPelli();
       if (last) render(last);
     });
     vestiBacheca();
+    scriviPelli();
+  }
+
+  // ---------- la pelle ----------
+
+  /** Le stanze che l'ufficio sa indossare: il legno di sempre e le due di skins.css. */
+  const PELLI = ['classico', 'notte', 'bali'];
+  /** Quella scelta. Arriva con le preferenze, anche prima che l'ufficio sia montato. */
+  let pelle = 'classico';
+  let pelleBtn;
+  let pelliMenu;
+
+  /**
+   * Mette la pelle al palco. E' solo un attributo: la pianta non cambia, i nodi sono
+   * gli stessi, e chi sta camminando continua a camminare.
+   */
+  function vestiPelle() {
+    if (stage) {
+      if (pelle === 'classico') delete stage.dataset.skin;
+      else stage.dataset.skin = pelle;
+    }
+    if (pelliMenu) {
+      for (const b of pelliMenu.querySelectorAll('button')) {
+        b.setAttribute('aria-checked', String(b.dataset.pelle === pelle));
+      }
+    }
+  }
+
+  /** Le parole del bottone e del menu, nella lingua di adesso. */
+  function scriviPelli() {
+    if (!pelleBtn) return;
+    pelleBtn.title = t('office.skin');
+    pelleBtn.setAttribute('aria-label', t('office.skin'));
+    pelliMenu.querySelector('.of-pelli-tit').textContent = t('office.skin');
+    for (const b of pelliMenu.querySelectorAll('button')) {
+      b.querySelector('.of-pelle-nome').textContent = t('office.skin.' + b.dataset.pelle);
+    }
+  }
+
+  /** La scelta e' tua: si vede subito, e la si ricorda con le altre preferenze. */
+  function scegliPelle(p) {
+    if (!PELLI.includes(p)) return;
+    pelle = p;
+    vestiPelle();
+    send({ cmd: 'setPrefs', value: { skin: p } });
+  }
+
+  /** Il menu delle pelli, sotto il bottone e allineato al suo bordo destro. */
+  function apriPelli(aperto) {
+    if (!pelliMenu) return;
+    pelliMenu.hidden = !aperto;
+    pelleBtn.setAttribute('aria-expanded', String(!!aperto));
+    if (!aperto) return;
+    vestiPelle();
+    const b = pelleBtn.getBoundingClientRect();
+    const r = root.getBoundingClientRect();
+    const w = pelliMenu.offsetWidth;
+    pelliMenu.style.left = Math.max(8, Math.min(b.right - r.left - w, r.width - w - 8)) + 'px';
+    pelliMenu.style.top = b.bottom - r.top + 6 + 'px';
+    const scelta = pelliMenu.querySelector('button[aria-checked="true"]') || pelliMenu.querySelector('button');
+    if (scelta) scelta.focus();
   }
 
   let fitOn;
@@ -2773,5 +2935,15 @@ window.OFFICE = (() => {
     },
     /** Tornato a schermo dopo essere stato via: la misura di prima non vale piu'. */
     resize: fit,
+    /**
+     * La pelle scelta, come arriva dalle preferenze. Vale anche prima che l'ufficio
+     * sia montato: la stanza la indossa appena nasce.
+     */
+    pelle(p) {
+      const v = PELLI.includes(p) ? p : 'classico';
+      if (v === pelle) return;
+      pelle = v;
+      vestiPelle();
+    },
   };
 })();

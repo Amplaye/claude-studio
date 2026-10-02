@@ -145,6 +145,39 @@ in `C:\Users\Steward\.claude\plans\l-auto-mode-dimenticatelo-indexed-moonbeam.md
 
 ## Cose imparate provando (non si vedono dal codice)
 
+- **Un evento per messaggio, e uno scorrimento per evento, costano secondi.** Entrando
+  in una conversazione l'estensione rimandava la storia un evento alla volta, e la
+  pagina dopo ogni pezzo faceva `scrollTop = scrollHeight`: leggere `scrollHeight`
+  subito dopo aver aggiunto un nodo obbliga il browser a rifare il layout di tutto il
+  discorso, e cosi' per ogni evento. Misurato: 1.488 eventi in 12,3 secondi; gli stessi
+  in un messaggio solo, disegnati senza scorrere ne' animare, 0,26. Per questo la storia
+  arriva a pagine (`replay`, `older`) e si disegna in blocco. Lo stesso vale per
+  `getTotalLength()` di un tracciato SVG: chiede anche lui un layout fresco, e la
+  spunta che si disegna da sola lo chiedeva una volta per strumento finito — adesso la
+  lunghezza e' un numero, perche' il tracciato e' sempre quello.
+- **Una pagina di storia si taglia solo dove non resta niente aperto.** Un risultato
+  separato dalla sua card non trova piu' dove andare, e la card, rimasta nella pagina
+  prima, gira per sempre come se lo strumento stesse ancora lavorando. Lo stesso per i
+  pezzi di un sub-agent (vanno dentro la card dello strumento che l'ha lanciato) e per
+  un verdetto senza la sua domanda. E la riga di fine turno conta i passi dal messaggio
+  che ha aperto il turno: una pagina che comincia a meta' turno si porta dietro quelli
+  di prima (`carry`), se no dice tre passi per un turno che ne ha fatti novanta.
+- **Una trascrizione riletta passa dalla stessa strada degli eventi vivi**, ed e' giusto
+  per il piano e le card — ma non per quello che agisce sul mondo. L'editor che segue
+  Claude riapriva, uno dopo l'altro, tutti i file scritti da una conversazione di ieri
+  appena la si riapriva dalla cronologia. Tutto quello che muove qualcosa fuori dalla
+  chat guarda `replaying`.
+- **Ogni chat tiene la sua copia delle preferenze.** Cambiate da una conversazione, le
+  altre restavano indietro, e nell'ufficio — che cambia conversazione senza ricaricare
+  la pagina — `hello` rimandava la copia vecchia: la scelta appena fatta tornava indietro
+  da sola. Si rileggono dal `globalState` a ogni saluto (`syncPrefs`).
+- **Esc nell'ufficio sale fino alla pagina.** La scheda di una persona si chiudeva con
+  Esc su un gestore dell'ufficio, ma il tasto continuava a salire fino a quello della
+  pagina, che lo prende per «ferma Claude». Chi chiude qualcosa con Esc deve fare
+  `preventDefault()`: e' il segnale su cui quello della pagina si ferma.
+- **Dentro `build()` dell'ufficio `ico` non e' la funzione delle icone**: e' l'icona del
+  titolo, una costante con lo stesso nome. Un'icona nuova nella fascia va creata a mano.
+
 - **Un `onclick` che torna `false` annulla il clic.** Il foglio della bacheca si
   chiudeva con `n.onclick = (e) => e.target === n && apriBacheca(false)`: cliccando
   dentro, l'espressione vale `false`, e un gestore assegnato come proprieta' che torna
@@ -366,6 +399,24 @@ verso la porta, il rimpallo alla quarta busta, il giro all'archivio col faldone 
 scrivania (uno ogni 45 secondi per persona, via a fine turno), e con le animazioni
 ridotte nessuna busta che resti appesa. `ui-check` prova che la bozza resti alla sua
 conversazione quando l'ufficio cambia quella della scheda, anche dopo un reload.
+Sempre `office-check` prova le pelli (la stanza indossa la scelta senza rimontarsi, i
+mobili ricolorati arrivano davvero, la vetrata e' il muro di sopra, la scelta parte verso
+l'estensione e quella delle preferenze si indossa da sola, Esc chiude il menu senza
+fermare Claude), la scheda di chi sta in fondo che si apre sopra di lui e la nuvoletta
+contro il muro di sopra che va sotto i piedi.
+
+La chat a pagine ha due prove. `pages-check` e' pura, su `src/chat/pages.ts`: una
+conversazione finta con dentro tutto quello che complica (un turno di novanta passi, un
+sub-agent di trenta, permessi, la fila, un blocco che sta ancora scrivendo) tagliata in
+pagine, e nessun taglio a meta' di qualcosa, le pagine che insieme ridanno la storia
+intera, il `carry` dei conti del turno, il peso. `pages-ui-check` guarda la pagina vera:
+la coda senza entrate e senza schermata vuota, la pagina prima che arriva sopra senza
+spostare quello che leggi, la risposta di un'altra versione buttata, l'orologio di un
+turno in corso, e quanto ci mette una pagina grossa.
+
+I materiali delle pelli — i fogli dei mobili ricolorati e le due vetrate — li rifa'
+`node scripts/skin-fogli.mjs`, solo quando cambia `webview/sv-room.png` o si
+ritoccano i colori: stanno in git e la build non li tocca.
 
 `router-check` e' l'unico che **spende**: sono turni veri su modelli veri, e il giro
 intero costa qualche dollaro e una decina di minuti. Serve a rispondere a una

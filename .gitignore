@@ -20,6 +20,3 @@ media/ionicons-studio.woff2
 
 # le misure del banco di prova: nascono in locale, non appartengono al repo
 .bench/
-
-# le anteprime delle pelli dell'ufficio: le rifa scripts/skin-anteprime.mjs
-docs/skin-anteprime/*.png

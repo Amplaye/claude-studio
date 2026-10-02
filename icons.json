@@ -54,7 +54,8 @@
     "volume-medium-outline",
     "arrow-undo-outline",
     "library-outline",
-    "mail-outline"
+    "mail-outline",
+    "color-palette-outline"
   ],
   "bar": {
     "studio-chat": "chatbubble-ellipses",

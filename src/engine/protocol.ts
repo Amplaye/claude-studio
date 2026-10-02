@@ -127,7 +127,17 @@ export interface Prefs {
    * a una nota ci si arriva solo se l'indice la nomina.
    */
   memoryRecall: boolean;
+  /**
+   * La pelle dell'ufficio: il legno di sempre, la notte in citta', Bali. Cambia solo i
+   * materiali della stanza (webview/skins.css), mai la pianta: si cambia in tempo
+   * reale e nessuno si sposta.
+   */
+  skin: Skin;
 }
+
+/** Le pelli che l'ufficio sa indossare. */
+export type Skin = 'classico' | 'notte' | 'bali';
+export const SKINS: readonly Skin[] = ['classico', 'notte', 'bali'];
 
 export const DEFAULT_PREFS: Prefs = {
   model: '',
@@ -142,6 +152,7 @@ export const DEFAULT_PREFS: Prefs = {
   follow: true,
   autofix: true,
   memoryRecall: true,
+  skin: 'classico',
 };
 
 /**
@@ -213,7 +224,33 @@ export type Wire =
        */
       key?: string;
       sid?: string;
+      /**
+       * Dietro questo saluto arriva una pagina di storia (`replay`). La pagina allora
+       * non disegna la schermata vuota: farebbe partire la macchina da scrivere e i
+       * bottoni che cadono per un decimo di secondo, prima di buttarli via.
+       */
+      past?: boolean;
     }
+  /**
+   * Una pagina della conversazione: la coda, quella che si guarda entrando.
+   *
+   * Entrando in una chat si rimandava tutta la storia, un messaggio per evento —
+   * fino a quattromila, ognuno disegnato e fatto scorrere per conto suo — e cambiare
+   * conversazione nell'ufficio costava secondi. Adesso arriva la coda in un colpo
+   * solo, e il resto si chiede quando lo si va a guardare (`older`, comando
+   * omonimo). Una pagina comincia sempre dove nessuno resta a meta': un messaggio
+   * tuo, o un punto in cui non c'e' uno strumento ne' un permesso ancora aperto —
+   * cosi' nessun risultato finisce lontano dalla sua card.
+   *
+   * `first` e' il segnalibro del primo evento della pagina, `more` dice se prima ce
+   * n'e' ancora, `epoch` di quale versione della conversazione si parla (una chat
+   * azzerata o riaperta ne ha un'altra, e una risposta in ritardo si butta).
+   * `carry` sono i passi e i file del turno cominciati prima del taglio, perche' la
+   * riga di fine turno conti tutto il turno e non solo il pezzo che si vede.
+   */
+  | { k: 'replay'; key: string; epoch: number; first: number; more: boolean; events: Wire[]; carry?: PageCarry }
+  /** La pagina prima, chiesta scorrendo in su: va in cima, sopra quello che c'e'. */
+  | { k: 'older'; key: string; epoch: number; first: number; more: boolean; events: Wire[]; carry?: PageCarry }
   | { k: 'session'; id: string; model: string; cwd: string }
   // Quale conversazione sta in *questa* faccia. La pagina non la disegna: se la
   // ricorda con vscode.setState, che e' l'unica memoria che sopravvive a
@@ -240,7 +277,13 @@ export type Wire =
   | { k: 'delta'; id: string; kind: BlockKind; text: string; parent?: string | null }
   | { k: 'block_final'; id: string; kind: BlockKind; text: string; parent?: string | null }
   | { k: 'tool_start'; id: string; name: string; input: unknown; parent?: string | null }
-  | { k: 'tool_end'; id: string; ok: boolean; text: string }
+  /**
+   * `lines` e `clipped` ci sono quando il risultato e' stato accorciato prima di
+   * partire: la card ne mostra comunque le prime quattrocento righe, e un `Read` di un
+   * file enorme viaggiava intero ogni volta che si rientrava nella conversazione.
+   * `lines` resta il conto vero, quello che la card scrive accanto al nome.
+   */
+  | { k: 'tool_end'; id: string; ok: boolean; text: string; lines?: number; clipped?: boolean }
   | {
       k: 'ask';
       id: string;
@@ -429,10 +472,18 @@ export type Wire =
    * alla decima, e nel frattempo spende.
    */
   | { k: 'autofix'; n: number; files: string[]; round: number; gaveUp?: boolean }
-  | { k: 'busy'; value: boolean }
+  /**
+   * `since` arriva solo col saluto, quando ci si attacca a un turno gia' in corso:
+   * e' quando e' partito. Senza, l'orologio della testata ripartiva da zero a ogni
+   * cambio di conversazione, e il conto dei passi pure.
+   */
+  | { k: 'busy'; value: boolean; since?: number }
   | { k: 'error'; message: string }
   // A new conversation draws the empty screen again, so it gets a new tip with it.
-  | { k: 'reset'; tip?: { en: string; it: string } | null }
+  // `swap`: la faccia passa a un'altra conversazione, che arriva subito dietro col suo
+  // saluto — la schermata vuota la decide quello. `wait`: si sta rileggendo una
+  // conversazione dal disco, e la sua pagina arriva fra un attimo.
+  | { k: 'reset'; tip?: { en: string; it: string } | null; swap?: boolean; wait?: boolean }
   /**
    * Le conversazioni che vivono dentro questa stessa scheda.
    *
@@ -442,6 +493,13 @@ export type Wire =
    * schede normali non ricevono mai questo filo, e la striscia non compare.
    */
   | { k: 'tabs'; items: TabItem[] };
+
+/** I passi e i file di un turno cominciato prima del taglio di una pagina. */
+export interface PageCarry {
+  steps: number;
+  /** [percorso, quante volte], nell'ordine in cui il turno li ha toccati. */
+  files: [string, number][];
+}
 
 /** Una nota ricordata da sola: quanto basta per riconoscerla e aprirla. */
 export interface RecalledNote {
@@ -560,6 +618,10 @@ export type Cmd =
   // di adesso, e se non lo e' lo si chiede (vedi ChatController.freshModels).
   | { cmd: 'models' }
   | { cmd: 'history' }
+  // «Fammi vedere quello che c'era prima»: la pagina di storia che precede l'evento
+  // `before`, chiesta scorrendo in su. `epoch` e' quella della pagina che si ha in
+  // mano: se nel frattempo la conversazione e' cambiata, la domanda non vale piu'.
+  | { cmd: 'older'; before: number; epoch: number }
   // `fork` = resume but on a new branch, without touching the original conversation
   | { cmd: 'open'; id: string; fork?: boolean }
   | { cmd: 'files'; q: string }

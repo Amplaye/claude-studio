@@ -18,6 +18,17 @@
   /** L'ultimo quadro dei consumi arrivato, per ridipingere senza aspettarne un altro. */
   let lastCtx = null;
 
+  // ---------- the conversation, a page at a time ----------
+  // Declared up here because half the page reads them: see "pages of history" below.
+  /** A page of history is being drawn: no entrances, no announcements, no scrolling per piece. */
+  let bulk = false;
+  /** Where `add` puts things while an older page is built off screen. */
+  let sink = null;
+  /** The empty screen, while it's up. */
+  let emptyBox = null;
+  /** Your last message on screen (or in the page being built): where recalled notes go. */
+  let lastUser = null;
+
   // ---------- DOM helpers ----------
   const el = (tag, cls, text) => {
     const e = document.createElement(tag);
@@ -112,10 +123,21 @@
     return svg;
   }
 
+  /**
+   * How long the checkmark's path is: 340.2 for the long stroke plus 135.8 for the
+   * short one. It is always the same path, so it is a number and not a measurement:
+   * `getTotalLength()` asked the browser for a fresh layout of the whole page, once
+   * per finished tool — a hundred layouts to redraw a conversation with a hundred
+   * steps.
+   */
+  const CHECK_LEN = 476;
+
   /** The checkmark is a real path (not a <use>): that way it can draw itself. */
   function drawnCheck(cls) {
     const svg = document.createElementNS(SVG, 'svg');
-    svg.setAttribute('class', cls ? 'ico ' + cls : 'ico');
+    // Drawn as part of a page of history it is already there: it does not draw itself
+    // again, a hundred at a time, every time you come back to the conversation.
+    svg.setAttribute('class', (cls ? 'ico ' + cls : 'ico') + (bulk ? ' still' : ''));
     svg.setAttribute('viewBox', '0 0 512 512');
     const p = document.createElementNS(SVG, 'path');
     p.setAttribute('d', 'M416 128 192 384l-96-96');
@@ -125,11 +147,7 @@
     p.setAttribute('stroke-linecap', 'round');
     p.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(p);
-    try {
-      svg.style.setProperty('--len', Math.ceil(p.getTotalLength()) || 480);
-    } catch (_) {
-      svg.style.setProperty('--len', 480);
-    }
+    svg.style.setProperty('--len', CHECK_LEN);
     return svg;
   }
 
@@ -286,24 +304,45 @@
     { root: log, rootMargin: '160px' }
   );
 
+  /**
+   * Empties the thread — and the observer above lets go of every card it was
+   * watching. It never did: an observer holds on to what it observes, so every
+   * conversation switch left the whole previous thread alive in memory, taken off
+   * the page but never freed, one more copy at every switch.
+   */
+  function clearLog() {
+    seen.disconnect();
+    log.replaceChildren();
+    emptyBox = null;
+  }
+
   /** If the piece comes from a sub-agent it goes inside the card of the Task that
-      launched it; otherwise at the bottom of the conversation. */
+      launched it; otherwise at the bottom of the conversation.
+
+      While a page of history is being drawn nothing scrolls per piece — that asked
+      the browser for a fresh layout of the whole thread once per event, which is
+      what made a long conversation take seconds to come back — and nothing makes an
+      entrance: those messages were already there. An older page goes into `sink`,
+      off screen, and lands on top in one go. */
   function add(node, parent) {
+    if (bulk) node.classList.add('replayed');
     const nest = parent && tools.get(parent);
     if (nest && nest._kids) {
       nest._kids.appendChild(node);
       seen.observe(node);
-      toBottom();
+      if (!bulk) toBottom();
       return node;
     }
-    const empty = log.querySelector('.empty');
-    if (empty) {
+    // The empty screen goes as soon as the first real thing arrives. Kept in a
+    // variable: looking it up in the log meant walking the whole thread every time.
+    if (emptyBox) {
       emptyStop();
-      empty.remove();
+      emptyBox.remove();
+      emptyBox = null;
     }
-    log.appendChild(node);
+    (sink || log).appendChild(node);
     seen.observe(node);
-    toBottom();
+    if (!bulk) toBottom();
     return node;
   }
 
@@ -386,7 +425,7 @@
   // handful of keys you actually need on the first day.
   function showEmpty() {
     emptyStop();
-    log.replaceChildren();
+    clearLog();
     const box = el('div', 'empty');
     const title = typed('h2', t('empty.title'));
     // The tip belongs to the session, not to the repaint: it is chosen once by the
@@ -425,6 +464,7 @@
     });
     box.append(keys);
     log.appendChild(box);
+    emptyBox = box;
 
     // The screen assembles in one order: the mark turns in, the title types itself,
     // then the blurb, then the pills drop in. Each step starts the next one, so the
@@ -457,13 +497,28 @@
     ghost.style.height = box.height + 'px';
     // same stylesheet as the log, so the moved nodes stay identical to how they were
     const inner = el('div', 'log log-ghost-in');
-    inner.style.transform = `translateY(${-log.scrollTop}px)`;
-    inner.append(...kids);
+    // Only what you could actually see leaves on screen. The rest of a long thread —
+    // hundreds of cards above and below the window — would be moved, restyled and
+    // animated for a third of a second to show nothing.
+    const shown = kids.filter((k) => {
+      const r = k.getBoundingClientRect();
+      return r.bottom > box.top && r.top < box.bottom;
+    });
+    if (shown.length) {
+      // The first card that was in view lands exactly where it was: its distance from
+      // the top of the log, minus the padding the copy puts before it.
+      const pad = parseFloat(getComputedStyle(log).paddingTop) || 0;
+      inner.style.transform = `translateY(${shown[0].getBoundingClientRect().top - box.top - pad}px)`;
+      inner.append(...shown);
+    } else {
+      inner.style.transform = `translateY(${-log.scrollTop}px)`;
+      inner.append(...kids);
+    }
     ghost.append(inner);
     col.appendChild(ghost);
     setTimeout(() => ghost.remove(), 420);
 
-    log.replaceChildren();
+    clearLog();
     log.classList.remove('swap-in');
     void log.offsetWidth; // restarts even on two changes back to back
     log.classList.add('swap-in');
@@ -968,7 +1023,13 @@
     add(node, parent);
   }
 
-  function toolEnd(id, ok, text) {
+  /**
+   * `info` carries what the extension knows about a result it shortened before
+   * sending (`lines`, the real count, and `clipped`): the card shows the first four
+   * hundred lines anyway, and a huge `Read` used to travel whole every time you came
+   * back to the conversation.
+   */
+  function toolEnd(id, ok, text, info) {
     const node = tools.get(id);
     if (!node) return;
     node.classList.remove('running');
@@ -979,7 +1040,8 @@
     const fresh = ok ? drawnCheck('tool-ico') : icon('alert-circle', 'tool-ico');
     node._ico.replaceWith(fresh);
     node._ico = fresh;
-    if (ok) {
+    // The flash says "this one just finished": on a page of history nothing just did.
+    if (ok && !bulk) {
       const spark = el('span', 'spark');
       node.appendChild(spark);
       setTimeout(() => spark.remove(), 800);
@@ -989,7 +1051,7 @@
     // credentials: what shows here is which notes, and when they were written.
     if (ok && MEMORY_TOOL.test(node.dataset.tool)) {
       memoryResult(node, text);
-      toBottom();
+      if (!bulk) toBottom();
       return;
     }
 
@@ -998,23 +1060,24 @@
     const res = ok && QUIET[node.dataset.tool] ? '' : String(text || '').trim();
     if (res) {
       const lines = res.split('\n');
-      const out = el('div', 'out', lines.length > 400 ? lines.slice(0, 400).join('\n') + '\n…' : res);
+      const total = Math.max(lines.length, (info && info.lines) || 0);
+      const cut = lines.length > 400 || !!(info && info.clipped);
       // In cards that already have something to show (diff, todo, sub-agent)
       // the result is a note at the bottom, not the main content.
       if (node._kids) node._body.append(el('div', 'sub-result', res.slice(0, 2000)));
-      else node._body.append(out);
+      else node._body.append(el('div', 'out', cut ? lines.slice(0, 400).join('\n') + '\n…' : res));
       const n = node.querySelector('.count');
       if (n) n.remove();
-      if (lines.length > 12) {
+      if (total > 12) {
         node.querySelector('.head').insertBefore(
-          el('span', 'count', t('msg.lines', { n: lines.length })),
+          el('span', 'count', t('msg.lines', { n: total })),
           node.querySelector('.chev')
         );
       }
     } else if (!node._full && !node.open) {
       node.classList.add('bare'); // nothing to open: drop the arrow
     }
-    toBottom();
+    if (!bulk) toBottom();
   }
 
   // ---------- the memory ----------
@@ -1088,7 +1151,9 @@
 
   /** "Recalled: a, b" — what the memory put next to your message on its own. */
   function recalledRow(m) {
-    const last = [...log.querySelectorAll('.msg.user')].at(-1);
+    // Your last message, kept as it is drawn — in the log, or in the older page
+    // being built off screen. Looking it up meant walking the whole thread.
+    const last = lastUser;
     const notes = (m.notes || []).filter((n) => n && n.slug);
     if (!last || !notes.length) return;
     const old = last.querySelector('.recalled');
@@ -1097,7 +1162,7 @@
     row.append(icon('library'), el('span', 'rc-label', t('mem.recalled')));
     for (const n of notes) row.append(noteButton({ slug: n.slug, date: dayOf(n.date), file: n.file }, 'rc-note'));
     last.append(row);
-    toBottom();
+    if (!bulk) toBottom();
   }
 
   // ---------- permissions ----------
@@ -1257,12 +1322,26 @@
     node.setAttribute('role', 'alertdialog');
     node.setAttribute('aria-label', title);
     asks.set(m.id, node);
+    // On a page of history the question is old news — answered a few lines further
+    // down, almost always. Whether one is still waiting is decided once the page is
+    // drawn (see `afterPage`), and an older page must never yank you to the bottom.
+    if (bulk) {
+      add(node);
+      return;
+    }
     stick = true; // a permission request must not get lost off screen
     add(node);
+    callAttention(node, title);
+  }
+
+  /**
+   * A question that is waiting for you says so, and takes the keyboard. Not while you
+   * are typing, though: stealing the caret mid-sentence to put it on "Deny" is how a
+   * queued message ends up half written into a button. If you are writing, the card
+   * waits its turn.
+   */
+  function callAttention(node, title) {
     say(title);
-    // The keyboard goes to the card. Not while you are typing, though: stealing the
-    // caret mid-sentence to put it on "Deny" is how a queued message ends up half
-    // written into a button. If you are writing, the card waits its turn.
     const typing =
       document.activeElement &&
       (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT');
@@ -1305,7 +1384,7 @@
         own.remove();
       }
     }
-    toBottom();
+    if (!bulk) toBottom();
   }
 
   // ---------- the plan, saved ----------
@@ -1350,11 +1429,13 @@
     const call = tools.get(m.id);
     if (call) {
       tools.delete(m.id);
+      if (bulk) node.classList.add('replayed');
+      seen.unobserve(call);
       call.replaceWith(node);
       seen.observe(node);
-      toBottom();
+      if (!bulk) toBottom();
     } else add(node);
-    say(t('plan.ready') + ': ' + (m.name || ''));
+    if (!bulk) say(t('plan.ready') + ': ' + (m.name || ''));
   }
 
   // ---------- errors ----------
@@ -1442,7 +1523,10 @@
     add(waiting);
   }
   function hideWaiting() {
-    if (!waiting) return;
+    // An older page being built off screen is yesterday: the pulse at the bottom is
+    // about now, and stays.
+    if (!waiting || sink) return;
+    seen.unobserve(waiting);
     waiting.remove();
     waiting = null;
   }
@@ -1741,6 +1825,9 @@
 
   /** Every event that means "it's alive" passes through here. */
   function activity(key, vars) {
+    // A page of history is not news: the pill and the screen reader stay on what is
+    // happening now, instead of reading out a hundred steps of yesterday.
+    if (bulk) return;
     actKey = key;
     actVars = vars || null;
     actLast = Date.now();
@@ -1748,12 +1835,20 @@
     say(vars ? t(key, vars) : t(key));
   }
 
-  function startActivity() {
+  /**
+   * `since`: the turn was already running when this face arrived (a conversation
+   * switch, a tab opened halfway). The clock starts from when it really started, and
+   * the steps the page of history has just counted stay counted — before, both went
+   * back to zero at every switch.
+   */
+  function startActivity(since) {
     if (!actBar) return;
-    actStart = Date.now();
-    actLast = actStart;
-    stepsN = 0;
-    filesTouched.clear();
+    actStart = since || Date.now();
+    actLast = Date.now();
+    if (!since) {
+      stepsN = 0;
+      filesTouched.clear();
+    }
     actKey = 'act.working';
     actVars = null;
     actBar.hidden = false;
@@ -1776,14 +1871,17 @@
 
   // ---------- busy ----------
   let busy = false;
-  function setBusy(v) {
+  function setBusy(v, since) {
     busy = v;
     sendBtn.classList.toggle('stop', v);
     sendBtn.title = v ? t('composer.stop') : t('composer.send');
     sendBtn.replaceChildren(v ? stopSquare() : sendArrow());
     if (v) {
       showWaiting();
-      if (!actTimer) startActivity();
+      if (!actTimer) startActivity(since);
+      // Switched from one conversation at work to another at work: the clock that was
+      // running belonged to the first one.
+      else if (since) actStart = since;
     } else {
       hideWaiting();
       stopActivity();
@@ -1842,11 +1940,20 @@
   }
 
   // ---------- messages from the extension ----------
+  // One function and not the listener itself: the events inside a page of history
+  // go through exactly the same road as the live ones (see `drawPage`).
   window.addEventListener('message', (ev) => {
     const m = ev.data;
     if (!m || !m.k) return;
+    handle(m);
+  });
+
+  function handle(m) {
     switch (m.k) {
-      case 'hello':
+      case 'hello': {
+        // The first greeting of this page, or a switch to another conversation (the
+        // office changes them without reloading anything).
+        const firstHello = !convKey;
         // In a tab the text column stays narrow: lines two metres long don't get
         // read. The "open as tab" button disappears when you're already there.
         document.body.classList.toggle('wide', m.surface === 'panel');
@@ -1882,13 +1989,32 @@
           }
         }
         if (m.key) convKey = m.key;
-        showEmpty();
+        // A conversation is coming right behind this greeting: the empty screen would
+        // start typing itself out for a tenth of a second, only to be thrown away.
+        if (m.past) {
+          emptyStop();
+          clearLog();
+        } else showEmpty();
         // Opening animation: the tab comes in whole, while the side panel
-        // (which is always there) sticks to its own conversation.
-        if (m.surface === 'panel') playTabIn();
-        log.classList.remove('fresh-open');
-        void log.offsetWidth;
-        log.classList.add('fresh-open');
+        // (which is always there) sticks to its own conversation. Only when the page
+        // opens: on a switch the thread already slides in (see `swapLog`), and the
+        // whole column zooming in on top of that every time was motion — and work —
+        // for nothing.
+        if (firstHello) {
+          if (m.surface === 'panel') playTabIn();
+          log.classList.remove('fresh-open');
+          void log.offsetWidth;
+          log.classList.add('fresh-open');
+        }
+        break;
+      }
+      // The tail of the conversation, in one message. The older pages come when you
+      // scroll up to them (`older`).
+      case 'replay':
+        drawPage(m);
+        break;
+      case 'older':
+        drawOlder(m);
         break;
       case 'reset':
         // La bozza si mette da parte adesso, sotto la conversazione che se ne va: e'
@@ -1908,12 +2034,21 @@
         waiting = null;
         stepsN = 0;
         filesTouched.clear();
+        lastUser = null;
+        // The pages belonged to the conversation that is leaving: the row on top goes
+        // before the thread is handed to the ghost, and an answer still on its way
+        // will not match any more.
+        setOlder(false);
+        pageEpoch = 0;
         // Con la conversazione se ne va anche la fila: quei messaggi erano per lei.
         clearQueued();
         // A new conversation is a new empty screen, so it earns a new tip.
         if (m.tip) currentTip = m.tip;
-        // the previous conversation scrolls out while the new one takes its place
-        swapLog(showEmpty);
+        // the previous conversation scrolls out while the new one takes its place.
+        // On a switch the greeting right behind decides whether there is an empty
+        // screen to draw; while a transcript is read from disk its page is a moment
+        // away — in both cases the empty screen would only flash.
+        swapLog(m.swap || m.wait ? () => {} : showEmpty);
         break;
       case 'mode':
         paintMode(m.value);
@@ -1925,6 +2060,9 @@
         // other face of the chat lands.
         window.I18N.set(prefs.lang || 'en');
         paintCfg();
+        // La pelle dell'ufficio sta con le altre preferenze: si ricorda fra una
+        // finestra e l'altra, e la stanza la indossa anche se non e' ancora montata.
+        if (window.OFFICE) window.OFFICE.pelle(prefs.skin);
         break;
       case 'models':
         models = m.items || [];
@@ -1995,7 +2133,7 @@
         break;
       case 'ask_done':
         askDone(m);
-        if (busy) showWaiting();
+        if (busy && !bulk) showWaiting();
         break;
       case 'plan_ready':
         hideWaiting();
@@ -2041,7 +2179,15 @@
         );
         break;
       case 'user': {
+        // On a page of history a message of yours opens a new turn: its steps and its
+        // files count from here. Live, the same happens when the turn starts (see
+        // `startActivity`) — the page has no `busy` to tell it.
+        if (bulk) {
+          stepsN = 0;
+          filesTouched.clear();
+        }
         const n = el('div', 'msg user');
+        lastUser = n;
         n.append(...attachRows(m.images, m.files));
         if (m.text) n.append(el('div', 'utext', m.text));
         // Torna a prima di questo messaggio.
@@ -2079,6 +2225,12 @@
       // Ha una card sua e non entra come un messaggio tuo: un turno che riparte in
       // silenzio e' la cosa piu' inquietante che un pannello possa fare.
       case 'autofix':
+        // A fix round is a turn of its own: on a page of history its steps count from
+        // here, like after a message of yours (pages.ts counts it the same way).
+        if (bulk) {
+          stepsN = 0;
+          filesTouched.clear();
+        }
         add(autofixCard(m));
         break;
       case 'turn_start':
@@ -2115,7 +2267,7 @@
         activity('act.tool', { tool: toolName(m.name) });
         break;
       case 'tool_end':
-        toolEnd(m.id, m.ok, m.text);
+        toolEnd(m.id, m.ok, m.text, m);
         activity('act.working');
         break;
       case 'turn_end':
@@ -2123,13 +2275,182 @@
         turnRecap(m);
         break;
       case 'busy':
-        setBusy(m.value);
+        setBusy(m.value, m.since);
         break;
       case 'error':
         errorCard(m.message);
         break;
     }
-  });
+  }
+
+  // ---------- pages of history ----------
+  //
+  // Coming into a conversation used to mean all of it: every event of the transcript
+  // posted one by one — up to four thousand — each drawn, each scrolled to, each
+  // making its entrance. Switching conversation in the office took seconds, and the
+  // page filled up with cards nobody was going to scroll back to.
+  //
+  // Now the tail comes in one message and is drawn in one go: no entrances (those
+  // messages were already there), no scrolling per piece (a fresh layout of the whole
+  // thread every time), no announcements. When you scroll up to the top, the page
+  // before arrives the same way and lands above, without moving what you were reading.
+  // Where a page starts — never in the middle of something — is decided by the
+  // extension (src/chat/pages.ts).
+
+  /** Which version of the conversation the pages on screen belong to (0 = none). */
+  let pageEpoch = 0;
+  /** The bookmark of the first event on screen: what to ask "before" of. */
+  let firstSeq = 0;
+  /** The row at the top that says there is more, and fetches it. */
+  let olderBox = null;
+  let olderBusy = false;
+  let olderTimer = 0;
+  /** The row is near the top of the window: time to fetch, before you get there. */
+  const olderSeen = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((e) => e.isIntersecting)) askOlder();
+    },
+    { root: log, rootMargin: '600px 0px 0px 0px' }
+  );
+
+  /** Draws the events of a page with the per-turn counters it starts from. */
+  function drawEvents(m) {
+    stepsN = (m.carry && m.carry.steps) || 0;
+    filesTouched.clear();
+    for (const [p, n] of (m.carry && m.carry.files) || []) filesTouched.set(p, n);
+    bulk = true;
+    try {
+      for (const e of m.events || []) handle(e);
+    } finally {
+      bulk = false;
+    }
+  }
+
+  /** The tail of a conversation: it takes the whole log, and you land at the bottom. */
+  function drawPage(m) {
+    if (m.key && convKey && m.key !== convKey) return;
+    emptyStop();
+    clearLog();
+    lastUser = null;
+    // The cards these pointed at have just left the log.
+    blocks.clear();
+    tools.clear();
+    asks.clear();
+    plansShown.clear();
+    pageEpoch = m.epoch || 0;
+    firstSeq = m.first || 0;
+    if (!(m.events || []).length) {
+      showEmpty();
+      return;
+    }
+    drawEvents(m);
+    setOlder(!!m.more);
+    stick = true;
+    log.scrollTop = log.scrollHeight;
+    afterPage();
+  }
+
+  /**
+   * A question still waiting for you at the end of the page — the conversation is
+   * stuck on it — says so and takes the keyboard, as it did when it arrived.
+   */
+  function afterPage() {
+    let open = null;
+    for (const node of asks.values()) if (!node.classList.contains('resolved')) open = node;
+    if (open) callAttention(open, open.getAttribute('aria-label') || '');
+  }
+
+  /**
+   * The page before, landing on top. It is built off screen with counters of its own
+   * — the turn running now keeps its steps, its blocks and its pulse — and goes in
+   * above the thread in one go, with the scroll moved by exactly what was added: what
+   * you were reading stays where it was.
+   */
+  function drawOlder(m) {
+    if ((m.key && convKey && m.key !== convKey) || !pageEpoch || m.epoch !== pageEpoch) return;
+    clearTimeout(olderTimer);
+    olderBusy = false;
+    // An answer to a question asked twice, or for a part already on screen.
+    if (!(m.first < firstSeq)) {
+      paintOlder();
+      return;
+    }
+    const keep = { steps: stepsN, files: [...filesTouched], blocks: [...blocks], lastUser };
+    const frag = document.createDocumentFragment();
+    blocks.clear();
+    lastUser = null;
+    sink = frag;
+    try {
+      drawEvents(m);
+    } finally {
+      sink = null;
+      stepsN = keep.steps;
+      filesTouched.clear();
+      for (const [p, n] of keep.files) filesTouched.set(p, n);
+      blocks.clear();
+      for (const [k, v] of keep.blocks) blocks.set(k, v);
+      lastUser = keep.lastUser;
+    }
+    const h0 = log.scrollHeight;
+    const t0 = log.scrollTop;
+    if (olderBox && olderBox.parentNode === log) olderBox.after(frag);
+    else log.prepend(frag);
+    log.scrollTop = t0 + (log.scrollHeight - h0);
+    firstSeq = m.first;
+    setOlder(!!m.more);
+    // Still near the top (a short page)? The observer only speaks when something
+    // changes, and nothing did: asking it again makes it look once more.
+    if (olderBox) {
+      olderSeen.unobserve(olderBox);
+      olderSeen.observe(olderBox);
+    }
+  }
+
+  /** The row at the top: there while there is more, gone when there is not. */
+  function setOlder(more) {
+    if (!more) {
+      clearTimeout(olderTimer);
+      olderBusy = false;
+      if (olderBox) {
+        olderSeen.unobserve(olderBox);
+        olderBox.remove();
+        olderBox = null;
+      }
+      return;
+    }
+    if (!olderBox) {
+      olderBox = el('div', 'log-older');
+      const b = el('button', 'log-older-btn');
+      b.type = 'button';
+      b.append(icon('arrow-up'), el('span', 'log-older-t'));
+      b.addEventListener('click', askOlder);
+      olderBox.append(b);
+    }
+    if (log.firstChild !== olderBox) log.prepend(olderBox);
+    paintOlder();
+    olderSeen.unobserve(olderBox);
+    olderSeen.observe(olderBox);
+  }
+
+  function paintOlder() {
+    if (!olderBox) return;
+    olderBox.classList.toggle('busy', olderBusy);
+    olderBox.querySelector('.log-older-t').textContent = t(olderBusy ? 'log.olderLoading' : 'log.older');
+  }
+
+  function askOlder() {
+    if (olderBusy || !olderBox || !pageEpoch) return;
+    olderBusy = true;
+    paintOlder();
+    vscode.postMessage({ cmd: 'older', before: firstSeq, epoch: pageEpoch });
+    // No answer — the conversation changed under the question — and the row goes back
+    // to being a button you can press, instead of loading forever.
+    clearTimeout(olderTimer);
+    olderTimer = setTimeout(() => {
+      olderBusy = false;
+      paintOlder();
+    }, 8000);
+  }
 
   // ---------- the "@" and "/" menu ----------
   const menu = $('menu');
@@ -3945,9 +4266,10 @@
     paintCfg();
     setBusy(busy);
     // The empty state is ours to redraw; a conversation in progress isn't.
-    if (log.querySelector('.empty')) showEmpty();
+    if (emptyBox) showEmpty();
     const label = waiting && waiting.querySelector('.pulse-label');
     if (label) label.textContent = t('msg.thinking');
+    paintOlder();
     paintActivity();
     paintAttach();
     // An open menu still holds the old words: it's rebuilt against what you typed.

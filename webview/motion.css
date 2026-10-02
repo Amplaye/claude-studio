@@ -321,6 +321,18 @@
   animation: cs-chunk 0.22s ease-out both;
 }
 
+/* A page of history arrives already there: its messages make no entrance — a
+   hundred blurred cards rising at once was the slowest frame of a conversation
+   switch — and its checkmarks are drawn, not drawing. What is about now keeps
+   moving: a tool still running, reasoning still arriving, a question still waiting. */
+.msg.replayed,
+.replayed .chunk {
+  animation: none;
+}
+.ico.still path {
+  animation: none !important;
+}
+
 .caret {
   display: inline-block;
   width: 0.5em;

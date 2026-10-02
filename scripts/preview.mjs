@@ -72,7 +72,10 @@ function build(page, out) {
     .replace(/\{\{(\w+)Js\}\}/g, (_, k) => `webview/${k}.js`)
     // Il foglio dei mobili dell'ufficio. Nella webview vera e' un URI di VS Code;
     // qui e' il file. Le persone non hanno un foglio: le disegna npc.js.
-    .replace(/\{\{roomPng\}\}/g, 'webview/sv-room.png');
+    .replace(/\{\{roomPng\}\}/g, 'webview/sv-room.png')
+    // E gli stessi mobili ricolorati per le due pelli (scripts/skin-fogli.mjs).
+    .replace(/\{\{roomNottePng\}\}/g, 'webview/sv-room-notte.png')
+    .replace(/\{\{roomBaliPng\}\}/g, 'webview/sv-room-bali.png');
   fs.writeFileSync(path.join(dist, out), html, 'utf8');
   console.log('dist/' + out);
 }

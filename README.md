@@ -24,10 +24,21 @@ And they talk to each other about what is really going on: the step they're on,
 the file they opened, how many steps are left, the message one helper just sent
 another.
 
+Three rooms to work in, switched from the palette in the strip on top: the wooden
+office, *Night in the city*, and *Bali*. The room changes on the spot — nobody gets
+up, nothing moves.
+
 <table>
 <tr>
 <td width="64%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio.png" alt="THE OFFICE" /></td>
 <td><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio-pianta.png" alt="The floor plan" /></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio-notte.png" alt="Night in the city" /><br /><em>Night in the city</em></td>
+<td width="50%"><img src="https://raw.githubusercontent.com/Amplaye/claude-studio/main/docs/img/ufficio-bali.png" alt="Bali" /><br /><em>Bali</em></td>
 </tr>
 </table>
 
@@ -66,15 +77,20 @@ its own tools.
 |---|---|---|
 | touches nothing | asks first | gets on with it |
 
-## What's new in 0.24
+## What's new in 0.37
 
-- **THE OFFICE.** The strip on top says where you are and how much is left; who's
-  in is the room. Three more stools, at the heads of the tables.
-- **At the desk you work.** Getting up is a break now, not the default.
-- **One board.** What's done goes on the wall with the rest, not on a side table.
-- **What you type while it works changes the plan.** A queued message stays fifteen
-  seconds within reach — correct it, take it back — then it goes into the turn
-  that's *running*, instead of waiting for the end of it.
+- **Two more offices.** *Night in the city* — dark carpet, neon trim, the skyline
+  lit up behind the glass, the screens the only lamps — and *Bali* — pale teak,
+  bamboo walls, the sea through the windows, a rattan rug under the desks. Pick one
+  from the palette in the office strip; it is remembered with your other settings.
+- **Switching conversation is instant.** A conversation comes back as its last
+  page, drawn in one go; the rest arrives as you scroll up, without moving what you
+  are reading. A long conversation that took twelve seconds now takes a blink.
+- **Lighter.** A huge tool result travels trimmed to what its card shows, with the
+  real line count next to the name; reopened history makes no entrances and reads
+  nothing aloud.
+- **Nothing falls off the screen.** The card of someone in the back row opens
+  above them; a bubble against the top wall goes under the speaker's feet.
 
 ## Shortcuts
 

@@ -1130,6 +1130,48 @@ body.inoffice .top.busy .modeseg-btn:not(.on) span {
   flex: 0 0 auto;
 }
 
+/* The row at the top of a conversation that has more before what is on screen. It
+   fetches the page before by itself as you scroll near it, so it is mostly seen
+   saying "loading"; it is a button for the times it does not get there on its own. */
+.log-older {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  /* Nothing on screen holds on to this row: the scroll is moved by hand when a page
+     lands above it (see drawOlder), and the browser's own anchoring must not move it
+     a second time. */
+  overflow-anchor: none;
+}
+.log-older-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  opacity: 0.75;
+  cursor: pointer;
+  transition:
+    opacity 0.16s ease,
+    border-color 0.16s ease;
+}
+.log-older-btn:hover,
+.log-older-btn:focus-visible {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--claude-1) 55%, var(--line));
+}
+.log-older.busy .log-older-btn {
+  cursor: progress;
+}
+.log-older.busy .log-older-btn .ico {
+  animation: cs-breathe 1.5s ease-in-out infinite;
+}
+
 /* What you write takes the full column, like everything else. It used to be a
    bubble hugging the right edge: it read as a different kind of object and it
    broke the one straight line the eye follows down the thread. It keeps the clay

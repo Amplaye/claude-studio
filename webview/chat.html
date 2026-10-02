@@ -12,6 +12,9 @@
          aggiunge quello che la stanza non sa. -->
     <link rel="stylesheet" href="{{roomCss}}" />
     <link rel="stylesheet" href="{{officeCss}}" />
+    <!-- Le pelli dell'ufficio, per ultime: vincono per specificita' e non per
+         posto, ma chi legge sa cosi' che vengono dopo tutto il resto. -->
+    <link rel="stylesheet" href="{{skinsCss}}" />
     <title>Claude Studio</title>
   </head>
   <body>
@@ -229,8 +232,15 @@
 
          I due fogli di sprite arrivano da qui dentro perche' il CSP non fa passare
          uno <style> scritto nella pagina, e un data-attributo e' la strada che resta
-         per far arrivare un URI della webview al foglio di stile. -->
-    <div class="office" id="office" data-room="{{roomPng}}"></div>
+         per far arrivare un URI della webview al foglio di stile. Gli altri due
+         sono gli stessi mobili ricolorati per le pelli (skins.css). -->
+    <div
+      class="office"
+      id="office"
+      data-room="{{roomPng}}"
+      data-room-notte="{{roomNottePng}}"
+      data-room-bali="{{roomBaliPng}}"
+    ></div>
 
     <!-- i18n first: everything after it draws in the chosen language from the
          very first frame, instead of flashing English and then correcting itself. -->

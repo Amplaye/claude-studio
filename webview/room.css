@@ -151,6 +151,16 @@
     4px 4px 0 rgba(46, 28, 44, 0.18);
 }
 
+/* Quello che sta per terra solo in una pelle — le pozze di luce sotto le
+   scrivanie, il tappeto di rattan — c'e' sempre, ma nella stanza di legno non si
+   vede: lo accende la sua pelle (skins.css). */
+.of-luce,
+.of-tappeto {
+  display: none;
+  position: absolute;
+  pointer-events: none;
+}
+
 /* Un mobile: la sua misura vera, ritagliata dal foglio. Niente
    ridimensionamenti — il foglio e' a 16 e la stanza e' a 16, quindi un pixel
    resta un pixel. */
@@ -1024,6 +1034,8 @@
 /* Le due righe non le taglia il CSS ma chi parla (room.js accorcia oltre i
    cinquanta caratteri, a parola intera): un `line-clamp` vuole `overflow: hidden`,
    e la codina sta proprio fuori dal bordo. */
+/* `--say-filo` e' il filo attorno alla codina: il contorno della stanza, o quello
+   che sceglie una pelle (skins.css). */
 .of-say::after {
   content: '';
   position: absolute;
@@ -1034,10 +1046,24 @@
   margin-left: -1px;
   background: var(--paper);
   box-shadow:
-    -1px 0 0 var(--of-contorno),
-    1px 0 0 var(--of-contorno),
-    0 1px 0 var(--of-contorno),
+    -1px 0 0 var(--say-filo, var(--of-contorno)),
+    1px 0 0 var(--say-filo, var(--of-contorno)),
+    0 1px 0 var(--say-filo, var(--of-contorno)),
     2px 2px 0 rgba(46, 28, 44, 0.35);
+}
+/* Col naso contro il muro di sopra la nuvoletta sopra la testa usciva dalla stanza,
+   tagliata dal bordo: li' va sotto i piedi, con la codina in su (room.js, `sotto`). */
+.of-say.sotto {
+  bottom: auto;
+  top: calc(100% + 3px);
+}
+.of-say.sotto::after {
+  top: auto;
+  bottom: 100%;
+  box-shadow:
+    -1px 0 0 var(--say-filo, var(--of-contorno)),
+    1px 0 0 var(--say-filo, var(--of-contorno)),
+    0 -1px 0 var(--say-filo, var(--of-contorno));
 }
 /* Chi ascolta sta a destra: la nuvoletta parte dalla testa e si allunga verso di
    lui, con la codina a sinistra. E il contrario. */

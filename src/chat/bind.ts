@@ -62,6 +62,7 @@ export function bindWebview(
     chatCss: 'chat.css',
     roomCss: 'room.css',
     officeCss: 'office.css',
+    skinsCss: 'skins.css',
     i18nJs: 'i18n.js',
     ctxpanelJs: 'ctxpanel.js',
     taskspanelJs: 'taskspanel.js',
@@ -78,6 +79,9 @@ export function bindWebview(
     // della pagina — vedi chat.html. La gente no: la disegna npc.js, e non passa
     // da nessuna immagine.
     roomPng: 'sv-room.png',
+    // Gli stessi mobili ricolorati per le pelli dell'ufficio (scripts/skin-fogli.mjs).
+    roomNottePng: 'sv-room-notte.png',
+    roomBaliPng: 'sv-room-bali.png',
   });
 
   /**
@@ -190,6 +194,10 @@ export function bindWebview(
       case 'open':
         void chat.open(m.id, !!m.fork);
         return;
+      // La pagina e' scorsa fino in cima: vuole la pagina di storia prima della sua.
+      case 'older':
+        chat.older(surface, m.before, m.epoch);
+        return;
       case 'files':
         void chat.sendFiles(m.q, surface);
         return;
@@ -235,13 +243,15 @@ export function bindWebview(
     /**
      * Cambia la conversazione senza ricaricare la pagina: la vecchia si stacca, lo
      * schermo si azzera e la nuova si racconta da capo (`hello` rimanda mode,
-     * preferenze, trascrizione e id). E' quello che fa la striscia dell'ufficio.
+     * preferenze, la coda della trascrizione e id). E' quello che fa la striscia
+     * dell'ufficio. `swap`: la schermata vuota la decide il saluto che segue, che sa
+     * se dietro arriva una conversazione.
      */
     swap(next: ChatController) {
       if (next === chat) return;
       chat.detach(surface);
       chat = next;
-      void webview.postMessage({ k: 'reset' });
+      void webview.postMessage({ k: 'reset', swap: true });
       chat.attach(surface);
       chat.hello(surface);
     },

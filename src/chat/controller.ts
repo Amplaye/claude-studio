@@ -15,10 +15,11 @@ import type {
   Pasted,
   Prefs,
   SentFile,
+  Skin,
   Thinking,
   Wire,
 } from '../engine/protocol';
-import { needsThinking } from '../engine/protocol';
+import { SKINS, needsThinking } from '../engine/protocol';
 import { pickFiles, previewFile, stashFile } from './attach';
 import { type CommandHost, runLocalCommand } from './commands';
 import { inPlans, planDecision } from './planGuard';
@@ -44,6 +45,7 @@ import {
 import type { AskRequest } from '../engine/session';
 import { Session } from '../engine/session';
 import { recentSessions, replaySession } from './history';
+import { type Past, page, seqIndex, slimToolEnd } from './pages';
 import { sound } from './sound';
 import { tips } from './tips';
 import { forgetSession, readSessionNames, writeSessionName } from '../context/sessions';
@@ -58,6 +60,15 @@ export interface Surface {
 
 /** Oltre questo si buttano via gli eventi piu' vecchi: e' solo materiale da ridisegno. */
 const MAX_HISTORY = 4000;
+
+/**
+ * Le versioni delle conversazioni, uniche in tutta l'estensione: ogni chat ne prende
+ * una nuova quando nasce e ogni volta che si azzera. Una pagina di storia chiesta da
+ * una faccia porta quella che aveva in mano, e se nel frattempo la faccia e' passata a
+ * un'altra conversazione — o la stessa si e' azzerata — la domanda non vale piu'.
+ * Uniche e non per chat: due chat appena nate avrebbero tutte e due la versione 1.
+ */
+let epochs = 0;
 
 /** Le scelte restano fra una finestra e l'altra: sono tue, non del progetto. */
 const PREFS_KEY = 'claudeStudio.prefs';
@@ -207,7 +218,14 @@ export const chats = new Map<string, ChatController>();
 
 export class ChatController {
   private session?: Session;
-  private history: Wire[] = [];
+  /** Quello che si e' detto, numerato: e' da qui che escono le pagine (vedi pages.ts). */
+  private history: Past[] = [];
+  /** Il numero dell'ultimo evento messo in storia. */
+  private seq = 0;
+  /** La versione di questa conversazione: cambia a ogni azzeramento (vedi `epochs`). */
+  private epoch = ++epochs;
+  /** I blocchi con dei pezzetti di streaming in storia, da buttare quando si chiudono. */
+  private streaming = new Set<string>();
   /** Com'era il codice prima di ogni messaggio: e' quello che "/rewind" rimette. */
   private readonly checkpoints = new Checkpoints();
   private surfaces = new Set<Surface>();
@@ -347,7 +365,7 @@ export class ChatController {
     if (owned.all().some((s) => s.key === this.key)) return;
     const id = this.session?.sessionId ?? this.resume?.id ?? '';
     if (!id) return;
-    const first = this.history.find((e) => e.k === 'user') as { text?: string } | undefined;
+    const first = this.history.find((h) => h.e.k === 'user')?.e as { text?: string } | undefined;
     owned.adopt(this.key, id, currentCwd(), (first?.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 80));
   }
 
@@ -423,16 +441,40 @@ export class ChatController {
       // a quella di prima (vedi la bozza in chat.js).
       key: this.key,
       sid: this.sid,
+      past: this.history.length > 0,
     });
+    // Le preferenze di adesso, non quelle che questa chat si era messa da parte: nel
+    // frattempo puo' averle cambiate un'altra conversazione (vedi syncPrefs).
+    this.syncPrefs();
     s.post({ k: 'mode', value: this.mode });
     s.post({ k: 'prefs', value: this.prefs });
     if (this.models.length) s.post({ k: 'models', items: this.models });
     if (this.commands.length) s.post({ k: 'commands', items: this.commands });
-    for (const e of this.history) s.post(e);
+    // La coda della conversazione, in un colpo solo. Il resto la pagina lo chiede
+    // scorrendo in su (vedi `older`): rimandarla tutta, un evento per messaggio, era
+    // quello che rendeva lento ogni cambio di conversazione.
+    if (this.history.length) s.post(this.pageWire('replay', this.history.length));
     // Una faccia che si attacca a una conversazione gia' in corso deve saperne l'id
     // subito: e' quello che si mettera' da parte per riaprirla al prossimo reload.
     s.post({ k: 'sid', id: this.sid });
-    s.post({ k: 'busy', value: this.busy });
+    // E se sta lavorando, da quando: l'orologio della testata riparte da li', non da zero.
+    s.post(this.busy ? { k: 'busy', value: true, since: this.turnSince || undefined } : { k: 'busy', value: false });
+  }
+
+  /** Una pagina della storia, quella che finisce prima dell'evento in posizione `end`. */
+  private pageWire(k: 'replay' | 'older', end: number): Wire {
+    const p = page(this.history, end, end >= this.history.length, this.seq + 1);
+    return { k, key: this.key, epoch: this.epoch, ...p };
+  }
+
+  /**
+   * La pagina chiede quello che c'era prima del suo primo evento: e' scorsa in su
+   * fino in cima. Se nel frattempo la conversazione e' cambiata — azzerata, riaperta,
+   * o la faccia e' passata a un'altra — la domanda non vale piu' e non si risponde.
+   */
+  older(s: Surface, before: number, epoch: number) {
+    if (epoch !== this.epoch) return;
+    s.post(this.pageWire('older', seqIndex(this.history, before)));
   }
 
   // ---- le scelte della testata (modello, impegno, pensiero, avvisi) --------
@@ -855,7 +897,7 @@ export class ChatController {
     // Quello che si e' scritto e quello che ha risposto: i pezzi finiti, non i
     // frammenti dello streaming (quelli ridirebbero la stessa frase a pezzi).
     const lines: string[] = [];
-    for (const e of this.history) {
+    for (const { e } of this.history) {
       if (e.k === 'user') lines.push(`> ${e.text}`);
       else if (e.k === 'block_final' && e.kind === 'text' && e.text.trim()) lines.push(e.text);
     }
@@ -914,7 +956,10 @@ export class ChatController {
    * lavora su un ramo nuovo.
    */
   async open(id: string, fork = false, past?: Wire[]) {
-    this.clear();
+    // `wait`: la pagina non disegna la schermata vuota per il decimo di secondo che
+    // serve a leggere la trascrizione — la conversazione arriva subito dietro.
+    this.clear({ wait: true });
+    const epoch = this.epoch;
     this.resume = { id, fork };
     // La barra di contesto lo sa subito, non al prossimo messaggio: il motore
     // parte solo quando scrivi, e fino ad allora il pannello indicherebbe ancora
@@ -929,12 +974,18 @@ export class ChatController {
     // `past` gia' letto da chi chiama (vedi restoreSession): la trascrizione e' un
     // file solo, e riaprirlo due volte per la stessa conversazione non serve a nessuno.
     const events = past ?? (await replaySession(id, currentCwd()));
+    // Due clic di fila sulla cronologia: mentre si leggeva questa, ne e' stata aperta
+    // un'altra. Vince l'ultima — mescolarle vorrebbe dire due conversazioni in una.
+    if (epoch !== this.epoch) return;
     this.replaying = true;
     try {
-      for (const e of events) this.emit(e);
+      // Gli eventi passano dalla stessa strada di quelli vivi (il piano, le card, la
+      // barra di contesto), ma alla pagina no: le arriva la coda, in un colpo solo.
+      for (const e of events) this.emit(e, true);
     } finally {
       this.replaying = false;
     }
+    this.broadcast(this.pageWire('replay', this.history.length));
     this.titleChanged();
   }
 
@@ -1018,17 +1069,21 @@ export class ChatController {
     return this.opening;
   }
 
-  private clear() {
+  private clear(opts?: { wait?: boolean }) {
     this.provisional = false; // quello che c'era non c'e' piu': non e' piu' roba da sostituire
     this.setSid(''); // la faccia non sta piu' su niente: non c'e' piu' niente da riaprire
     this.closeAllPending('Switching conversation.');
     this.endEngine();
     this.history = [];
+    this.streaming.clear();
+    // Un'altra versione della conversazione: le pagine chieste su quella di prima
+    // non hanno piu' risposta.
+    this.epoch = ++epochs;
     this.busy = false;
     this.checkpoints.clear(); // i punti di prima appartenevano alla conversazione andata
     owned.end(this.key); // la card della barra di contesto non ha piu' niente da mostrare
     tasks.clear(this.key); // le task erano di quella conversazione
-    this.broadcast({ k: 'reset', tip: tips.next() });
+    this.broadcast({ k: 'reset', tip: tips.next(), ...(opts?.wait ? { wait: true } : {}) });
     this.broadcast({ k: 'mode', value: this.mode });
     this.titleChanged();
   }
@@ -1434,7 +1489,12 @@ export class ChatController {
     return this.session;
   }
 
-  private emit(e: Wire) {
+  /**
+   * Un evento del motore (o di una trascrizione riletta). `quiet`: va in storia e a
+   * tutti quelli che ascoltano qui dentro, ma alla pagina no — e' chi chiama a
+   * mandarle la pagina intera, in un colpo solo (vedi `open`).
+   */
+  private emit(e: Wire, quiet = false) {
     // La modalita' detta dalla CLI resta qui: alla pagina arriva, se cambia, come `mode`.
     if (e.k === 'cli_mode') {
       this.cliMode(e.value);
@@ -1457,7 +1517,11 @@ export class ChatController {
     // principale: ogni scheda si riapre da sola alla prossima finestra, e per farlo
     // deve sapere di essere questa. Un fork prende il suo id proprio qui.
     if (e.k === 'session') this.setSid(e.id);
-    this.remember(e);
+    // La copia per la pagina e per la storia: il risultato di uno strumento, se e'
+    // enorme, accorciato a quello che la card mostra. Tutto il resto, qui sotto,
+    // legge l'evento intero.
+    const shown = slimToolEnd(e);
+    this.remember(shown);
     // La barra di contesto ascolta lo stesso filo delle facce della chat: cosi' sa
     // per certo che sessione e' e a che punto sta, senza andarselo a cercare.
     // Tutte le chat, non solo la principale: ogni scheda e' una conversazione vera
@@ -1584,7 +1648,11 @@ export class ChatController {
     // la'. Solo il filo principale: quello che scrive un sub-agent lo racconta la sua
     // card, e far saltare l'editor per ognuna delle sue modifiche sarebbe una
     // giostra.
-    if (e.k === 'tool_start' && !e.parent && WRITERS.has(e.name)) {
+    //
+    // Mai da una trascrizione riletta: riaprendo una conversazione di ieri l'editor
+    // riapriva, uno dopo l'altro, tutti i file che quella conversazione aveva scritto
+    // — e li contava fra i «toccati» di un turno che non c'e'.
+    if (e.k === 'tool_start' && !e.parent && WRITERS.has(e.name) && !this.replaying) {
       const i = (e.input ?? {}) as { file_path?: unknown; path?: unknown; new_string?: unknown; content?: unknown };
       const file = String(i.file_path || i.path || '');
       if (file) {
@@ -1608,9 +1676,9 @@ export class ChatController {
       }
     }
 
-    if (e.k === 'turn_end') void this.autofix(e.ok);
+    if (e.k === 'turn_end' && !this.replaying) void this.autofix(e.ok);
 
-    this.broadcast(e);
+    if (!quiet) this.broadcast(shown);
   }
 
   /**
@@ -1662,9 +1730,33 @@ export class ChatController {
     //    non accetta, cioe' proprio il 400 che questa regola esiste per evitare.
     const thinking: Thinking = needsThinking(effort) ? 'on' : p.thinking;
 
-    return model === p.model && effort === p.effort && thinking === p.thinking
+    // 4. La pelle dell'ufficio: una di quelle che esistono, o la stanza di legno.
+    const skin: Skin = SKINS.includes(p.skin) ? p.skin : 'classico';
+
+    return model === p.model && effort === p.effort && thinking === p.thinking && skin === p.skin
       ? p
-      : { ...p, model, effort, thinking };
+      : { ...p, model, effort, thinking, skin };
+  }
+
+  /**
+   * Le preferenze sono una sola per tutte le conversazioni, ma ogni chat ne tiene una
+   * copia: cambiate da un'altra — la lingua, il modello, la pelle dell'ufficio — questa
+   * restava indietro. E nell'ufficio, che passa da una conversazione all'altra senza
+   * ricaricare la pagina, `hello` rimandava la copia vecchia: la scelta appena fatta
+   * tornava indietro da sola. Prima di ridirle si rileggono da dove stanno davvero, e
+   * un motore acceso le prende dal turno dopo, come quando le scegli.
+   */
+  private syncPrefs() {
+    const stored = { ...DEFAULT_PREFS, ...(this.ctx.globalState.get<Partial<Prefs>>(PREFS_KEY) ?? {}) };
+    const next = this.normalise(stored);
+    const before = this.prefs;
+    if (JSON.stringify(next) === JSON.stringify(before)) return;
+    this.prefs = next;
+    if (this.session) {
+      if (next.model !== before.model) void this.session.setModel(next.model);
+      if (next.effort !== before.effort) void this.session.setEffort(next.effort);
+      if (next.thinking !== before.thinking) void this.session.setThinking(next.thinking);
+    }
   }
 
   /** Le impostazioni si sono aperte: e' li' che l'elenco dei modelli si guarda. */
@@ -1747,13 +1839,19 @@ export class ChatController {
     // apri una seconda faccia.
     if (e.k === 'hello' || e.k === 'turn_start' || e.k === 'chime') return;
     if (e.k === 'prefs' || e.k === 'models' || e.k === 'commands') return;
+    // Le pagine non si mettono in storia: sono la storia, gia' impaginata.
+    if (e.k === 'replay' || e.k === 'older') return;
 
-    if (e.k === 'block_final') {
+    // Il giro sulla storia intera solo per i blocchi che hanno davvero dei pezzetti
+    // da buttare: una trascrizione riletta arriva gia' composta, e passare quattromila
+    // eventi per ognuno dei suoi blocchi era lavoro per niente.
+    if (e.k === 'block_final' && this.streaming.delete(e.id)) {
       this.history = this.history.filter(
-        (h) => !((h.k === 'delta' || h.k === 'block_start') && h.id === e.id)
+        (h) => !((h.e.k === 'delta' || h.e.k === 'block_start') && h.e.id === e.id)
       );
     }
-    this.history.push(e);
+    if (e.k === 'delta' || e.k === 'block_start') this.streaming.add(e.id);
+    this.history.push({ n: ++this.seq, e });
     if (this.history.length > MAX_HISTORY) this.history.splice(0, this.history.length - MAX_HISTORY);
   }
 }

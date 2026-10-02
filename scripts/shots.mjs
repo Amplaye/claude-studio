@@ -534,6 +534,16 @@ await shot(browser, { file: 'pannello.png', width: 480, height: 900, surface: 'v
   // E la pianta da sola, che e' la foto che sta bene stretta in una tabella.
   await page.locator('.of-stage').screenshot({ path: path.join(out, 'ufficio-pianta.png') });
   console.log('docs/img/ufficio-pianta.png');
+  // E le altre due stanze, dalla stessa scena: la pelle si cambia e nessuno si muove.
+  for (const [skin, file] of [
+    ['notte', 'ufficio-notte.png'],
+    ['bali', 'ufficio-bali.png'],
+  ]) {
+    await post({ k: 'prefs', value: { skin } });
+    await wait(400);
+    await page.locator('.of-stage').screenshot({ path: path.join(out, file) });
+    console.log('docs/img/' + file);
+  }
   await page.close();
 }
 

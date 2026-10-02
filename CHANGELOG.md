@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.37.0
+
+- **Due uffici in piu'.** «Notte in città»: moquette blu, muri scuri col filo al
+  neon, lo skyline acceso dietro le vetrate, e la luce che viene dagli schermi — una
+  pozza azzurra sotto ogni scrivania. «Bali»: teak chiaro, muri di bambu', il mare
+  dalle vetrate, un tappeto di rattan sotto le scrivanie e mobili color miele. Si
+  sceglie dalla tavolozza nella fascia in cima, accanto ai consumi: la stanza cambia
+  sul momento, nessuno si alza e nessun mobile si sposta. La scelta si ricorda con le
+  altre preferenze, fra una finestra e l'altra.
+
+- **Cambiare conversazione e' istantaneo.** Entrando in una chat si rimandava tutta
+  la storia, un pezzo alla volta, e ogni pezzo si disegnava, faceva la sua entrata e
+  faceva scorrere la pagina: una conversazione lunga ci metteva secondi a tornare (su
+  1.488 eventi, 12 secondi). Adesso torna l'ultima pagina, disegnata in un colpo solo
+  (gli stessi 1.488 eventi: un quarto di secondo), e il resto arriva da solo quando
+  scorri in su, sopra quello che stai leggendo senza spostarlo di un pixel. Una pagina
+  non si taglia mai a meta' di qualcosa: nessun risultato lontano dalla sua card, e la
+  riga di fine turno conta tutto il turno anche quando comincia nella pagina prima.
+
+- **Meno peso.** Il risultato enorme di uno strumento — un file intero letto, un log —
+  arrivava alla chat intero ogni volta che ci si rientrava, anche se la card ne mostra
+  quattrocento righe: adesso parte accorciato, col conto vero delle righe accanto al
+  nome. E riaprendo una conversazione dalla cronologia non si rifa' piu' lavoro per
+  niente: i messaggi vecchi non entrano in scena, le spunte non si ridisegnano, e lo
+  screen reader non legge ad alta voce cento passi di ieri.
+
+- **Tornando su un turno in corso** l'orologio della testata riparte da quando il turno
+  e' cominciato, non da zero, e i passi gia' fatti restano contati.
+
+- **Niente esce piu' dallo schermo.** La scheda di chi sta nell'ultima fila di
+  scrivanie si apriva sotto di lui e finiva tagliata dal bordo: adesso, se sotto non ci
+  sta, si apre sopra. E chi parla col naso contro il muro di sopra ha la nuvoletta
+  sotto i piedi invece che fuori dalla stanza.
+
+- Riaprendo una conversazione dalla cronologia, con «l'editor lo segue» acceso, l'editor
+  riapriva uno dopo l'altro tutti i file che quella conversazione aveva scritto.
+  Sistemato: una conversazione riletta non muove l'editor.
+
+- Nell'ufficio una scelta fatta in una conversazione (la lingua, il modello) poteva
+  tornare indietro passando a un'altra: ognuna teneva la sua copia delle preferenze.
+  Adesso si rileggono a ogni cambio.
+
+- Esc per chiudere la scheda di una persona dell'ufficio fermava anche il turno di
+  Claude, se stava lavorando. Adesso chiude la scheda e basta.
+
 ## 0.36.0
 
 - **L'ufficio si riempie di nuovo.** Dalla 0.34 nella stanza entravano solo i
