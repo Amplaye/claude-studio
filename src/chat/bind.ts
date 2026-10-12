@@ -73,6 +73,9 @@ export function bindWebview(
     roomJs: 'room.js',
     dialoghiJs: 'dialoghi.js',
     officeJs: 'office.js',
+    // L'ufficio in 3D: non sta fra gli <script> della pagina, lo carica office.js
+    // solo quando qualcuno accende la vista (vedi data-office3d in chat.html).
+    office3dJs: 'office3d.js',
     chatJs: 'chat.js',
     // I mobili dell'ufficio: un foglio ritagliato da SeasonVale, impacchettato
     // da scripts/sv-sheet.mjs. Il foglio di stile lo prende da un data-attributo

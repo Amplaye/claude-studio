@@ -2,7 +2,7 @@
   "name": "claude-studio",
   "displayName": "Claude Studio",
   "description": "Same Claude Code, in a panel you can actually watch. Live progress, diffs you open when you want, one-click permissions, any file attached — and THE OFFICE: a desk for every open conversation.",
-  "version": "0.37.2",
+  "version": "0.38.0",
   "publisher": "MrWilson",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -317,6 +317,7 @@
     "playwright": "^1.60.0",
     "svg2ttf": "^6.1.0",
     "svgicons2svgfont": "^15.0.1",
+    "three": "^0.186.1",
     "ttf2woff2": "^8.0.1",
     "typescript": "^5.9.3"
   },

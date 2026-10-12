@@ -1374,3 +1374,61 @@ body.inoffice.linguette .top #btnNew {
 .of-scheda-pct[hidden] {
   display: none;
 }
+
+/* ---------- la vista: piatta o in 3D ----------
+
+   Due bottoni attaccati, subito prima della pelle: uno e' sempre premuto. Quello
+   del 3D si spegne da solo quando qui il 3D non si puo' fare, e il motivo sta nel
+   suo titolo. */
+.of-vista {
+  flex: 0 0 auto;
+  display: inline-flex;
+  height: var(--ctl);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.of-vista button {
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.of-vista button + button {
+  border-left: 1px solid var(--line);
+}
+.of-vista button[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--claude-1) 22%, transparent);
+}
+.of-vista button:focus-visible {
+  outline: 2px solid var(--claude-1);
+  outline-offset: -2px;
+}
+.of-vista button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* La tela del 3D sta sotto il palco e riempie il riquadro. Il palco resta montato
+   sopra di lei: quello che ha un gemello a volumi si nasconde, e tutto il resto —
+   bottoni, targhette, nuvolette, aloni, foglietti, tazze — resta dov'e' nel
+   documento e lo sposta lo specchio (webview3d/mirror.js).
+
+   visibility e non display: le pelli accendono le loro cose con display
+   (skins.css viene dopo e vincerebbe), e un nodo tolto dal flusso perderebbe le
+   transizioni che lo specchio legge per sapere dove sta la gente. */
+.of-tre {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.office.tre .of-stage :is(.of-floor, .of-wall, .of-luce, .of-tappeto, .of-porta, .of-mon, .of-mail, .of-portatile, .in3d),
+.office.tre .of-guy > :is(.of-body, .of-tazza, .of-note, .of-faldone) {
+  visibility: hidden;
+}

@@ -1733,9 +1733,16 @@ export class ChatController {
     // 4. La pelle dell'ufficio: una di quelle che esistono, o la stanza di legno.
     const skin: Skin = SKINS.includes(p.skin) ? p.skin : 'classico';
 
-    return model === p.model && effort === p.effort && thinking === p.thinking && skin === p.skin
+    // 5. E come la si guarda: acceso o spento, niente vie di mezzo arrivate da fuori.
+    const office3d = p.office3d === true;
+
+    return model === p.model &&
+      effort === p.effort &&
+      thinking === p.thinking &&
+      skin === p.skin &&
+      office3d === p.office3d
       ? p
-      : { ...p, model, effort, thinking, skin };
+      : { ...p, model, effort, thinking, skin, office3d };
   }
 
   /**

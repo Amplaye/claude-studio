@@ -133,6 +133,11 @@ export interface Prefs {
    * reale e nessuno si sposta.
    */
   skin: Skin;
+  /**
+   * L'ufficio visto in 3D invece che dall'alto. Non e' una pelle: e' un altro modo di
+   * guardare la stessa stanza, e le tre pelli ci sono in tutti e due.
+   */
+  office3d: boolean;
 }
 
 /** Le pelli che l'ufficio sa indossare. */
@@ -153,6 +158,7 @@ export const DEFAULT_PREFS: Prefs = {
   autofix: true,
   memoryRecall: true,
   skin: 'classico',
+  office3d: false,
 };
 
 /**

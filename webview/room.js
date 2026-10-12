@@ -1887,6 +1887,13 @@ window.ROOM = (() => {
     get DESKS() {
       return DESKS;
     },
+    /** I muri e il vano della porta, come stanno adesso: li legge la vista in 3D. */
+    get WALLS() {
+      return WALLS;
+    },
+    get VANO() {
+      return VANO;
+    },
     get SGABELLI() {
       return SGABELLI;
     },

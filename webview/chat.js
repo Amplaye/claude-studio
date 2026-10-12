@@ -2063,6 +2063,8 @@
         // La pelle dell'ufficio sta con le altre preferenze: si ricorda fra una
         // finestra e l'altra, e la stanza la indossa anche se non e' ancora montata.
         if (window.OFFICE) window.OFFICE.pelle(prefs.skin);
+        // E la vista: piatta o in 3D. Stessa strada della pelle.
+        if (window.OFFICE) window.OFFICE.vista(prefs.office3d);
         break;
       case 'models':
         models = m.items || [];

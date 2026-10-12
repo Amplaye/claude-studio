@@ -662,10 +662,23 @@ window.OFFICE = (() => {
       true
     );
 
+    /* La vista: piatta dall'alto, o in 3D di fronte. Due bottoni e non un menu: sono
+       due, e si passa dall'una all'altra a colpo d'occhio. Non e' una pelle in piu' —
+       ogni pelle si guarda in tutti e due i modi. */
+    vistaBox = el('div', 'of-vista');
+    vistaBox.setAttribute('role', 'group');
+    for (const v of ['2d', '3d']) {
+      const b = el('button', null, v.toUpperCase());
+      b.type = 'button';
+      b.dataset.vista = v;
+      b.addEventListener('click', () => scegliVista(v === '3d'));
+      vistaBox.append(b);
+    }
+
     // Il nome del posto, chi c'e', la pelle e i consumi. La fila in mezzo si prende
     // lo spazio che avanza ed e' lei a spingere i consumi contro il bordo destro: la
     // pelle sta subito prima, perche' i consumi restano dove l'occhio li cerca.
-    bar.append(title, gente, pelleBtn, uso);
+    bar.append(title, gente, vistaBox, pelleBtn, uso);
 
     // --- il piano ---
     const wrap = el('div', 'of-wrap');
@@ -769,10 +782,117 @@ window.OFFICE = (() => {
       titleText.nodeValue = t('office.title');
       vestiBacheca();
       scriviPelli();
+      vestiVista();
       if (last) render(last);
     });
     vestiBacheca();
     scriviPelli();
+    vestiVista();
+    // La vista scelta puo' essere arrivata prima della stanza: si accende adesso.
+    if (vuole3d) vista3d(true);
+  }
+
+  // ---------- la vista: piatta o in 3D ----------
+  //
+  // Il 3D non e' un secondo ufficio: la stanza piatta resta montata e viva, e sotto
+  // di lei una tela la ridisegna a volumi (webview3d/, in dist/webview/office3d.js).
+  // Quel file pesa — dentro c'e' three.js — e arriva solo quando qualcuno accende la
+  // vista: chi resta sul piatto non lo paga.
+  //
+  // Se non si puo' — niente WebGL, il file non arriva, il contesto si perde per
+  // sempre — si resta (o si torna) sul piatto, e il bottone lo dice: spento, con il
+  // motivo scritto sopra. Una stanza vuota non la deve vedere nessuno.
+
+  let vistaBox;
+  /** Quella voluta, come arriva dalle preferenze. */
+  let vuole3d = false;
+  /** Come sta il motore: '' spento, 'carica', 'acceso', 'rotto'. */
+  let tre = '';
+
+  /** I due bottoni, nella lingua di adesso e nello stato di adesso. */
+  function vestiVista() {
+    if (!vistaBox) return;
+    const rotto = tre === 'rotto';
+    const su3d = tre === 'acceso' || tre === 'carica';
+    vistaBox.setAttribute('aria-label', t('office.view'));
+    for (const b of vistaBox.querySelectorAll('button')) {
+      const e3 = b.dataset.vista === '3d';
+      b.setAttribute('aria-pressed', String(e3 === su3d));
+      b.title = e3 && rotto ? t('office.view.no3d') : t('office.view.' + b.dataset.vista);
+      b.setAttribute('aria-label', b.title);
+      b.disabled = e3 && rotto;
+    }
+    vistaBox.title = rotto ? t('office.view.no3d') : '';
+    // E' questa classe a nascondere i nodi che hanno un gemello a volumi (office.css).
+    root.classList.toggle('tre', tre === 'acceso');
+  }
+
+  /** Non si puo' (o non si puo' piu'): si torna sul piatto e il bottone si spegne. */
+  function rotto3d() {
+    tre = 'rotto';
+    if (window.OFFICE3D) window.OFFICE3D.spegni();
+    vestiVista();
+    fit();
+  }
+
+  function accendi3d() {
+    try {
+      window.OFFICE3D.accendi({ wrap: fitOn, stage, rotto: rotto3d });
+    } catch (e) {
+      console.warn('[ufficio] il 3D non si accende: ' + (e && e.message ? e.message : e));
+      return rotto3d();
+    }
+    tre = 'acceso';
+    vestiVista();
+    fit();
+  }
+
+  /** Mette la vista voluta: accende il motore (caricandolo, la prima volta) o lo spegne. */
+  function vista3d(on) {
+    vuole3d = !!on;
+    if (!root) return;
+    if (!vuole3d) {
+      if (window.OFFICE3D) window.OFFICE3D.spegni();
+      if (tre !== 'rotto') tre = '';
+      vestiVista();
+      return fit();
+    }
+    if (tre) return vestiVista();
+    // Prima di scaricare mezzo mega: questa pagina sa fare WebGL? (three vuole il 2.)
+    let gl = null;
+    try {
+      gl = document.createElement('canvas').getContext('webgl2');
+    } catch {
+      gl = null;
+    }
+    if (!gl) return rotto3d();
+    const molla = gl.getExtension('WEBGL_lose_context');
+    if (molla) molla.loseContext();
+    if (window.OFFICE3D) return accendi3d();
+    if (!root.dataset.office3d) return rotto3d();
+    tre = 'carica';
+    vestiVista();
+    // Il CSP fa passare solo gli script col nonce della pagina: lo si prende da uno
+    // di quelli che ci sono gia'.
+    const s = document.createElement('script');
+    const noto = document.querySelector('script[nonce]');
+    if (noto) s.nonce = noto.nonce || noto.getAttribute('nonce') || '';
+    s.src = new URL(root.dataset.office3d, document.baseURI).href;
+    s.onload = () => {
+      if (tre !== 'carica') return;
+      tre = '';
+      if (!window.OFFICE3D) return rotto3d();
+      if (vuole3d) accendi3d();
+      else vestiVista();
+    };
+    s.onerror = rotto3d;
+    document.head.append(s);
+  }
+
+  /** La scelta e' tua: si vede subito, e la si ricorda con le altre preferenze. */
+  function scegliVista(on) {
+    vista3d(on);
+    send({ cmd: 'setPrefs', value: { office3d: !!on } });
   }
 
   // ---------- la pelle ----------
@@ -860,6 +980,15 @@ window.OFFICE = (() => {
     const largo = fitOn.clientWidth;
     const alto = fitOn.clientHeight;
     if (largo < 2 || alto < 2) return;
+    // In 3D la misura la da' il motore: da quella camera un pixel di pavimento non
+    // e' un pixel di scheda, e la stanza cresce con un conto suo (vedi misura()).
+    if (tre === 'acceso' && window.OFFICE3D) {
+      const m = window.OFFICE3D.misura(largo, alto);
+      if (R.cresci(m.w, m.h) && last) render(last);
+      stage.style.transform = 'scale(' + m.k + ')';
+      window.OFFICE3D.sveglia();
+      return;
+    }
     const k0 = Math.max(0.5, Math.min(12, Math.min(largo / R.W0, alto / R.H0)));
     // La gente sta su coordinate sue — la scrivania, la targhetta — e quelle le
     // sa solo chi disegna le persone: se la stanza si e' mossa, si ridisegna.
@@ -2868,6 +2997,14 @@ window.OFFICE = (() => {
         const nuovo = avviato;
         entrata(chi, ...dove).then(() => {
           if (chi.el.isConnected) window.ROOM.vesti(chi.fig, chi.seme, chi.posa);
+          // La stanza puo' essere cresciuta mentre camminava (una finestra tirata, il
+          // passaggio al 3D): la strada era per il posto di prima, e senza questa
+          // riga restava li' in piedi fino al giro dopo. Il posto vero e' `casa`.
+          if (chi.el.isConnected && chi.casa && !chi.fuori) {
+            chi.el.style.left = chi.casa.x + 'px';
+            chi.el.style.top = chi.casa.y + 'px';
+            chi.el.style.zIndex = chi.casa.y + 24;
+          }
           if (nuovo && chi.el.isConnected) recitaAppena('benvenuto', vicinoA(chi, 170), chi);
         });
       }
@@ -2944,6 +3081,23 @@ window.OFFICE = (() => {
       if (v === pelle) return;
       pelle = v;
       vestiPelle();
+    },
+    /**
+     * La vista, come arriva dalle preferenze: vero = 3D. Vale anche prima che
+     * l'ufficio sia montato. E' anche il gancio dei controlli: OFFICE.vista(true)
+     * accende, OFFICE.vista(false) spegne, OFFICE.in3d dice com'e' adesso.
+     */
+    vista(on) {
+      if (!!on === vuole3d) return;
+      vista3d(on);
+    },
+    /** Il 3D e' acceso davvero adesso? (Non «voluto»: acceso.) */
+    get in3d() {
+      return tre === 'acceso';
+    },
+    /** E perche' no: '' spento, 'carica', 'acceso', 'rotto'. */
+    get stato3d() {
+      return tre;
     },
   };
 })();

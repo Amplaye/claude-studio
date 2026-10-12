@@ -187,6 +187,23 @@ const options = {
   },
 };
 
+// ---- 5. the office in 3D ------------------------------------------------
+// webview3d/ is ES modules plus three.js: one bundle, dist/webview/office3d.js, that
+// the page only loads when somebody turns the 3D view on (see office.js). three is a
+// devDependency on purpose: it ends up inside this file, and the VSIX is packed
+// with --no-dependencies.
+const options3d = {
+  entryPoints: [path.join(root, 'webview3d', 'office3d.js')],
+  bundle: true,
+  outfile: path.join(dist, 'webview', 'office3d.js'),
+  platform: 'browser',
+  target: 'es2022',
+  format: 'iife',
+  sourcemap: watch,
+  minify: !watch,
+  logLevel: 'info',
+};
+
 /**
  * The extension icon is a committed PNG, not a product of this build: it costs a
  * Chromium run and hardly ever changes (`npm run icon`). Here we only check that it
@@ -211,9 +228,11 @@ const made = `${n} Ionicons in the sprite, ${bar.length} in the status bar font`
 if (watch) {
   const ctx = await esbuild.context(options);
   await ctx.watch();
+  await (await esbuild.context(options3d)).watch();
   fs.watch(path.join(root, 'webview'), () => copyWebview());
   console.log(`[claude-studio] watch on — ${made}`);
 } else {
   await esbuild.build(options);
+  await esbuild.build(options3d);
   console.log(`[claude-studio] build ok — ${made}`);
 }

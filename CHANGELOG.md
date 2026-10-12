@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.38.0
+
+- **L'ufficio in 3D.** Nella fascia in cima, accanto alle pelli, c'e' un interruttore
+  «2D | 3D»: lo stesso ufficio visto di fronte e dal basso, a volumi, con le ombre e
+  la luce degli schermi. Non e' un'altra stanza e non sono altre pelli: la gente, le
+  scrivanie, le nuvolette, le targhette e i clic sono quelli di sempre, e le tre pelli
+  — il legno, Notte in città, Bali — ci sono in tutti e due i modi. Il muro di fondo
+  e' una vetrata: il paese di giorno, la citta' di notte, il mare. Chi lavora siede
+  dal lato giusto della scrivania e guarda il davanti del suo schermo. La scelta si
+  ricorda con le altre preferenze; si parte in 2D.
+
+- Il 3D arriva nella pagina solo quando lo accendi, e si ferma quando l'ufficio non si
+  vede. Se sulla macchina non parte (niente WebGL) si resta nella stanza di sempre, e
+  l'interruttore lo dice.
+
 ## 0.37.2
 
 - **Immagini, gif e video si aprono.** Un file che non e' testo — chiesto da Claude o
