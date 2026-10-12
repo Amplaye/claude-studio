@@ -127,18 +127,31 @@ export async function findFiles(q: string, limit = 40): Promise<string[]> {
   return hits.slice(0, limit);
 }
 
-export async function openFile(rel: string, line?: number) {
+/** Apre un file nell'editor. Torna cosa e' andato storto, o niente se si e' aperto. */
+export async function openFile(rel: string, line?: number): Promise<string | undefined> {
   const abs = toUri(rel);
+  const show = { preview: true, viewColumn: vscode.ViewColumn.One };
   try {
     const doc = await vscode.workspace.openTextDocument(abs);
-    const ed = await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.One });
+    const ed = await vscode.window.showTextDocument(doc, show);
     if (typeof line === 'number' && line > 0) {
       const pos = new vscode.Position(Math.max(0, line - 1), 0);
       ed.selection = new vscode.Selection(pos, pos);
       ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
     }
   } catch (e) {
-    void vscode.window.showErrorMessage(`I can't open ${rel}: ${e instanceof Error ? e.message : e}`);
+    try {
+      // C'e', ma come testo non si apre: un'immagine, una gif, un video. L'editor ha
+      // il suo visualizzatore, e `vscode.open` sceglie da solo quello giusto. `stat`
+      // prima, perche' di un file che non esiste `vscode.open` aprirebbe una scheda
+      // vuota invece di dirlo.
+      await vscode.workspace.fs.stat(abs);
+      await vscode.commands.executeCommand('vscode.open', abs, show);
+    } catch {
+      const why = `I can't open ${rel}: ${e instanceof Error ? e.message : e}`;
+      void vscode.window.showErrorMessage(why);
+      return why;
+    }
   }
 }
 

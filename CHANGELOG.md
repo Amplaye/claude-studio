@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.2
+
+- **Immagini, gif e video si aprono.** Un file che non e' testo — chiesto da Claude o
+  cliccato nella chat — finiva in «File seems to be binary and cannot be opened as
+  text». Adesso si apre nel visualizzatore dell'editor. E quando un file non si apre
+  davvero, Claude lo viene a sapere: prima gli si rispondeva «aperto» comunque, e ti
+  diceva di guardare una scheda che non c'era.
+
 ## 0.37.1
 
 - **Studio si apre nell'ufficio.** Aprendolo — dall'icona, dalla scorciatoia o dal

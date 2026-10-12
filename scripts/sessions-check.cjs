@@ -146,6 +146,30 @@ const ctx = {
   await registered.commands.get('claudeStudio.rename')();
   t(inputs.length === 1, 'rename did not ask anything: ' + inputs.length);
 
+  // ---- a file that is not text opens in the editor's own viewer ----
+  // A gif asked for by path ended in "File seems to be binary and cannot be opened as
+  // text": the text door was the only one tried. A file that is not there still says so.
+  const viewed = [];
+  const errors = [];
+  registered.commands.set('vscode.open', (u) => viewed.push(u.fsPath));
+  vscode.window.showErrorMessage = async (m) => void errors.push(m);
+  const asText = vscode.workspace.openTextDocument;
+  vscode.workspace.openTextDocument = async (u) => {
+    if (/\.gif$/.test(u.fsPath)) throw new Error('File seems to be binary and cannot be opened as text');
+    return asText(u);
+  };
+  const gif = path.join(root, 'docs', 'img', 'demo.gif');
+  tabA.webview._onMsg({ cmd: 'openFile', path: gif });
+  await new Promise((r) => setTimeout(r, 50));
+  t(viewed.length === 1 && viewed[0] === gif, 'a gif did not open in the viewer: ' + JSON.stringify(viewed));
+  t(errors.length === 0, 'opening a gif still raised an error: ' + errors.join(' | '));
+  vscode.workspace.fs.stat = async () => {
+    throw new Error('ENOENT');
+  };
+  tabA.webview._onMsg({ cmd: 'openFile', path: path.join(root, 'gone.gif') });
+  await new Promise((r) => setTimeout(r, 50));
+  t(viewed.length === 1 && errors.length === 1, 'a file that is not there did not say so: ' + errors.length);
+
   for (const d of ctx.subscriptions) d.dispose?.();
 
   if (fails.length) {

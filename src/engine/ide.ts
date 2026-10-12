@@ -99,8 +99,10 @@ export function ideServer() {
           line: z.number().optional().describe('line to jump to'),
         },
         async (a) => {
-          await openFile(a.file, a.line);
-          return text(`Opened ${a.file}${a.line ? ':' + a.line : ''}.`);
+          // Se non si e' aperto lo si dice: rispondeva "Opened" anche quando a schermo
+          // c'era l'errore, e Claude ti diceva di guardare un file che non c'era.
+          const failed = await openFile(a.file, a.line);
+          return text(failed ?? `Opened ${a.file}${a.line ? ':' + a.line : ''}.`);
         }
       ),
     ],
