@@ -304,12 +304,80 @@ const said = (panel) =>
 
   for (const d of ctx.subscriptions) d.dispose?.();
 
+  // ---- l'ufficio: il bottone gira la scheda su cui stai, e Studio si apre li' ----
+  //
+  // Il bottone apriva un'altra scheda con una conversazione nuova: ti trovavi
+  // nell'ufficio senza quella su cui stavi lavorando.
+  const view = (p) => p.webview.got.some((m) => m.k === 'view' && m.value === 'office');
+  const strip = (p) => p.webview.got.filter((m) => m.k === 'tabs').pop()?.items ?? [];
+  ctx = startHost();
+  await registered.commands.get('claudeStudio.openTab')();
+  const [desk] = registered.panels;
+  desk.webview._onMsg({ cmd: 'ready' });
+  desk.webview._onMsg({ cmd: 'open', id: ID_A });
+  await settle();
+  desk.webview._onMsg({ cmd: 'openOffice' });
+  await settle();
+  t(registered.panels.length === 1, "il bottone dell'ufficio ha aperto un'altra scheda");
+  t(view(desk), "col bottone la scheda non e' passata all'ufficio");
+  t(desk.webview.state.sid === ID_A, "passando all'ufficio la scheda ha perso la sua conversazione");
+  t(strip(desk).length === 1, "la scheda diventata ufficio non manda la striscia: " + strip(desk).length);
+  // Adesso ospita: il "+" ne apre una qui dentro.
+  desk.webview._onMsg({ cmd: 'newTab' });
+  await settle();
+  t(registered.panels.length === 1 && strip(desk).length === 2, 'nell\'ufficio il "+" non ha aperto qui dentro');
+  // La × sulla conversazione della principale la azzera, non la spegne: e' anche
+  // quella della sidebar. Chiusa la scheda, "apri come scheda" la ritrova viva.
+  const mainKey = strip(desk)[0].key;
+  desk.webview._onMsg({ cmd: 'closeSession', key: mainKey });
+  await settle();
+  t(strip(desk).some((x) => x.key === mainKey), 'la × ha tolto dalla striscia la conversazione della principale');
+  desk.dispose();
+  await registered.commands.get('claudeStudio.openTab')();
+  const again = registered.panels[registered.panels.length - 1];
+  again.webview._onMsg({ cmd: 'ready' });
+  await settle();
+  t(
+    again.webview.got.some((m) => m.k === 'hello' && m.key === mainKey),
+    "chiuso l'ufficio, la conversazione della principale non c'e' piu'"
+  );
+  for (const d of ctx.subscriptions) d.dispose?.();
+
+  // "Apri Claude Studio": nell'ufficio, e la seconda volta una conversazione li' dentro.
+  ctx = startHost();
+  await registered.commands.get('claudeStudio.show')();
+  const [room] = registered.panels;
+  room.webview._onMsg({ cmd: 'ready' });
+  await settle();
+  t(view(room), "Studio non si apre nell'ufficio");
+  await registered.commands.get('claudeStudio.show')();
+  await settle();
+  t(
+    registered.panels.length === 1 && strip(room).length === 2,
+    '"apri" la seconda volta non ha messo la conversazione nuova nell\'ufficio: ' +
+      registered.panels.length + ' schede, ' + strip(room).length + ' in striscia'
+  );
+  for (const d of ctx.subscriptions) d.dispose?.();
+
+  // E dopo un reload l'ufficio che torna per primo resta la scheda principale.
+  ctx = startHost();
+  const sR = { office: true, sid: ID_A, sids: [ID_A, ID_B] };
+  const rR = newPanel('claudeStudio.panel', 'Claude Studio', sR);
+  await registered.serializer.ser.deserializeWebviewPanel(rR, sR);
+  rR.webview._onMsg({ cmd: 'ready' });
+  await settle(600);
+  t(said(rR).includes(SAID_A) && strip(rR).length === 2, "l'ufficio non e' tornato con le sue conversazioni");
+  await registered.commands.get('claudeStudio.openTab')();
+  t(registered.panels.length === 1, "l'ufficio tornato dal reload non e' la scheda principale");
+
+  for (const d of ctx.subscriptions) d.dispose?.();
+
   if (fails.length) {
     console.error('FAILED:\n- ' + fails.join('\n- '));
     process.exit(1);
   }
   console.log(
-    'reload-check ok — the tabs come back on their own conversation, whatever order they wake up in'
+    'reload-check ok — the tabs come back on their own conversation, whatever order they wake up in, and the office is the tab you were on'
   );
   process.exit(0);
 })();

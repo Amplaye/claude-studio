@@ -3462,9 +3462,9 @@
     if (on && window.OFFICE) window.OFFICE.resize();
   }
 
-  // Da dentro l'ufficio il bottone riporta alla chat, che e' dove sei. Da fuori
-  // non gira questa scheda: l'ufficio ha la sua, e chiederla all'estensione e'
-  // anche il modo di ritrovare quella gia' aperta invece di aprirne una seconda.
+  // Da dentro l'ufficio il bottone riporta alla chat, che e' dove sei. Da fuori lo
+  // si chiede all'estensione, che sa se un ufficio c'e' gia': se c'e' ti ci porta,
+  // se no e' questa scheda a diventarlo, con la conversazione che hai davanti.
   $('btnOffice').addEventListener('click', () => {
     if (document.body.classList.contains('inoffice')) return showOffice(false);
     vscode.postMessage({ cmd: 'openOffice' });

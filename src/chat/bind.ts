@@ -156,7 +156,9 @@ export function bindWebview(
         void vscode.commands.executeCommand('claudeStudio.openTab');
         return;
       case 'openOffice':
-        void vscode.commands.executeCommand('claudeStudio.office');
+        // Con la conversazione di questa faccia: se l'ufficio non c'e' ancora, lo
+        // diventa la scheda che la tiene, invece di aprirne una con una sessione nuova.
+        void vscode.commands.executeCommand('claudeStudio.office', chat.key);
         return;
       case 'newTab':
         // In una scheda che tiene piu' conversazioni la nuova nasce qui dentro:

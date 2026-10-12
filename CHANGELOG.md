@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.37.1
+
+- **Studio si apre nell'ufficio.** Aprendolo — dall'icona, dalla scorciatoia o dal
+  comando — la scheda nasce gia' girata sulla pianta, con la sua chat accanto. Chiesto
+  una seconda volta, la conversazione nuova nasce li' dentro invece che in un'altra
+  scheda: l'ufficio resta uno.
+
+- **Il bottone dell'ufficio gira la scheda su cui stai.** Prima ne apriva un'altra, con
+  una conversazione vuota, e quella su cui stavi lavorando restava di la'. Adesso e' la
+  tua scheda a diventare l'ufficio, con la conversazione che avevi davanti. Se un
+  ufficio e' gia' aperto, ti ci porta.
+
+- Nell'ufficio, tornando sulla scheda dopo aver guardato altrove, il «sei qui» finiva
+  sulla conversazione con cui la scheda era nata invece che su quella aperta.
+
 ## 0.37.0
 
 - **Due uffici in piu'.** «Notte in città»: moquette blu, muri scuri col filo al

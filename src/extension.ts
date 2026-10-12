@@ -47,7 +47,8 @@ export function activate(ctx: vscode.ExtensionContext) {
     // reach, but behind its own command.
     // "Apri Claude Studio" apre una conversazione nuova. Chiedere Studio e' chiedere di
     // cominciare qualcosa, non di riavere indietro quello che stavi facendo prima:
-    // quella la ritrovi dalla barra di contesto, dove ci sono tutte.
+    // quella la ritrovi dalla barra di contesto, dove ci sono tutte. E si apre
+    // nell'ufficio: la pianta e' la faccia con cui Studio si presenta.
     vscode.commands.registerCommand('claudeStudio.show', () => ChatPanel.openFresh(ctx, chat, monitor)),
     // "Apri come scheda" invece e' il bottone sulla testata della sidebar, e vuol dire
     // "questa conversazione, li'": porta di la' quella che stai guardando. Aprendone
@@ -107,9 +108,11 @@ export function activate(ctx: vscode.ExtensionContext) {
     ),
     // L'ufficio: le stesse conversazioni del pannello, ma disegnate come gente
     // seduta alle scrivanie. Ha una scheda sua, con dentro la sua chat — e ce n'e'
-    // una sola: se e' gia' aperta, questo comando la riporta davanti.
-    vscode.commands.registerCommand('claudeStudio.office', () =>
-      ChatPanel.openOffice(ctx, monitor)
+    // una sola: se e' gia' aperta, questo comando la riporta davanti. Dal bottone di
+    // una scheda arriva la sua conversazione, e allora l'ufficio e' quella scheda; dai
+    // menu' di VS Code arriva quello che gli pare, e non si usa.
+    vscode.commands.registerCommand('claudeStudio.office', (from?: unknown) =>
+      ChatPanel.openOffice(ctx, monitor, typeof from === 'string' ? from : undefined)
     ),
     vscode.commands.registerCommand('claudeStudio.context.refresh', () => monitor.tick()),
     vscode.commands.registerCommand('claudeStudio.context.diagnose', () => monitor.diagnose()),

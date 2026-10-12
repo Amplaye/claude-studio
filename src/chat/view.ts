@@ -70,7 +70,7 @@ export class ChatView implements vscode.WebviewViewProvider {
   private maybeJumpToTab() {
     const on = vscode.workspace.getConfiguration('claudeStudio').get<boolean>('openAsTab', true);
     if (!on || Date.now() < stayInSidebarUntil) return;
-    if (ChatPanel.exists()) {
+    if (ChatPanel.exists() || ChatPanel.hasOffice()) {
       void vscode.commands.executeCommand('workbench.action.closeSidebar');
       return;
     }

@@ -404,7 +404,10 @@ if (!/nonce="[A-Za-z0-9]{32}"/.test(html)) pageFails.push('nonce missing or too 
   t(panel?.type === 'claudeStudio.panel', 'wrong tab type: ' + panel?.type);
   t(panel?.opts?.retainContextWhenHidden === true, 'the tab loses its content when you hide it');
   t(!!panel?.iconPath, 'the tab has no icon');
-  t(replay[0]?.k === 'hello' && replay[0]?.surface === 'panel', 'the tab does not recognise itself as a tab');
+  // Not `replay[0]` any more: Studio opens in the office, so the strip and the "turn
+  // to the office" are posted while the page is still loading, ahead of the greeting.
+  t(replay.find((m) => m.k === 'hello')?.surface === 'panel', 'the tab does not recognise itself as a tab');
+  t(replay.some((m) => m.k === 'view' && m.value === 'office'), 'Studio did not open in the office');
   t(replay.some((m) => m.k === 'user' && /Read tool on package\.json/.test(m.text)), 'the tab did not pick the history back up');
   t(
     replay.some((m) => m.k === 'block_final' && /claude-studio/.test(m.text || '')),

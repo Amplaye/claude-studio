@@ -607,7 +607,7 @@ export type Cmd =
   // La striscia delle conversazioni di questa scheda: mettiti su quella, o chiudila.
   | { cmd: 'pickSession'; key: string }
   | { cmd: 'closeSession'; key: string }
-  // "Portami all'ufficio": non gira questa scheda, ne chiede una sua.
+  // "Portami all'ufficio": se c'e' gia' ci si va, se no lo diventa questa scheda.
   | { cmd: 'openOffice' }
   // The page has already played its exit animation: here it really closes.
   | { cmd: 'closeTab' }

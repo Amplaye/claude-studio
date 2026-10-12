@@ -53,12 +53,25 @@ export class ChatPanel {
    * quella colonna e' larga quanto diciamo noi.
    *
    * Una sola: se c'e' gia', torna davanti quella.
+   *
+   * `from`: la conversazione della scheda da cui arriva il clic. Se un ufficio non
+   * c'e' ancora, e' quella scheda a diventarlo, con la conversazione che aveva:
+   * aprirne un'altra voleva dire trovarsi nell'ufficio con una sessione vuota in piu'
+   * e quella su cui stavi lasciata di la'.
    */
-  static openOffice(ctx: vscode.ExtensionContext, monitor?: ContextMonitor) {
+  static openOffice(ctx: vscode.ExtensionContext, monitor?: ContextMonitor, from?: string) {
     if (ChatPanel.officeTab) {
       ChatPanel.officeTab.panel.reveal(undefined, false);
       ChatPanel.officeTab.showOffice();
       return ChatPanel.officeTab;
+    }
+    const here = from ? ChatPanel.byKey(from) : undefined;
+    if (here) {
+      here.becomeOffice();
+      // La pagina e' gia' in piedi: una volta basta, e i colpi in ritardo di
+      // `showOffice` ti riporterebbero qui se intanto fossi tornato alla chat.
+      here.post({ k: 'view', value: 'office' });
+      return here;
     }
     const chat = new ChatController(ctx, { primary: false });
     const panel = vscode.window.createWebviewPanel(TYPE, 'Claude Studio', vscode.ViewColumn.Active, {
@@ -72,14 +85,25 @@ export class ChatPanel {
 
   /**
    * Quello che fanno la scorciatoia e il comando "apri": sempre una conversazione
-   * nuova. La prima volta la scheda principale non c'e' ancora e si fa quella —
-   * nasce vuota, che e' gia' il foglio bianco che stai chiedendo. Dalla seconda in
-   * poi `open` si limiterebbe a riportare davanti la scheda di prima, quindi se ne
-   * apre una indipendente.
+   * nuova, e sempre nell'ufficio — Studio si apre li'. La prima volta la scheda
+   * principale non c'e' ancora e si fa quella, gia' girata sulla pianta: nasce
+   * vuota, che e' il foglio bianco che stai chiedendo. Dalla seconda in poi la
+   * conversazione nuova nasce dentro l'ufficio che c'e', non in un'altra scheda.
    */
   static openFresh(ctx: vscode.ExtensionContext, chat: ChatController, monitor?: ContextMonitor) {
-    if (!ChatPanel.primary) return ChatPanel.open(ctx, chat, undefined, monitor);
-    return ChatPanel.openNew(ctx, monitor);
+    const office = ChatPanel.officeTab;
+    if (office) {
+      office.panel.reveal(undefined, false);
+      office.newSession();
+      return office;
+    }
+    // La principale c'e' ma non e' l'ufficio (aperta dalla sidebar, o tornata da un
+    // reload): resta com'e', e l'ufficio nasce accanto con la conversazione nuova.
+    if (ChatPanel.primary) return ChatPanel.openOffice(ctx, monitor);
+    const tab = ChatPanel.open(ctx, chat, undefined, monitor);
+    tab.becomeOffice();
+    tab.showOffice();
+    return tab;
   }
 
   /**
@@ -148,6 +172,11 @@ export class ChatPanel {
     return !!ChatPanel.primary;
   }
 
+  /** C'e' l'ufficio? Per l'icona della barra conta come "Studio e' gia' aperto". */
+  static hasOffice(): boolean {
+    return !!ChatPanel.officeTab;
+  }
+
   /** Is the primary tab on screen? Asked before opening another face onto the same
       conversation: one is enough, and the second is a window you have to close. */
   static isVisible(): boolean {
@@ -181,8 +210,11 @@ export class ChatPanel {
         // scheda qualsiasi con una conversazione sola: le altre restavano sul
         // disco ma la stanza non le conosceva piu'.
         if (st.office === true && !ChatPanel.officeTab) {
-          const own = new ChatController(ctx, { primary: false });
-          const tab = new ChatPanel(panel, ctx, own, monitor, false, true);
+          // Studio si apre nell'ufficio, quindi la principale di solito e' lei: se
+          // torna per prima lo resta, come qualunque altra scheda qui sotto.
+          const first = !ChatPanel.primary;
+          const own = first ? chat : new ChatController(ctx, { primary: false });
+          const tab = new ChatPanel(panel, ctx, own, monitor, first, true);
           tab.showOffice();
           void own.restoreSession(id);
           const sids = Array.isArray(st.sids) ? st.sids : [];
@@ -227,6 +259,12 @@ export class ChatPanel {
   private lastTabs = '';
   /** true = primary tab, false = secondary tab (which has its own). */
   private readonly isPrimary: boolean;
+  /**
+   * La conversazione della principale: e' anche quella della sidebar, e vive quanto
+   * l'estensione. Da quando la principale puo' essere l'ufficio sta in mezzo alle
+   * altre, ma chiudendo la scheda — o lei dalla striscia — non si spegne.
+   */
+  private readonly shared?: ChatController;
   /** Rewrites the label from the conversation's name. */
   private followName: () => void = () => {};
 
@@ -257,38 +295,49 @@ export class ChatPanel {
     for (const ms of [400, 1000]) setTimeout(send, ms);
   }
 
+  /** Questa scheda diventa l'ufficio, con la conversazione che ha davanti. */
+  private becomeOffice() {
+    this.isOffice = true;
+    ChatPanel.officeTab = this;
+    this.followName();
+    this.sendTabs();
+  }
+
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly ctx: vscode.ExtensionContext,
     chat: ChatController,
     monitor: ContextMonitor | undefined,
     isPrimary: boolean,
-    /** La scheda dell'ufficio: si chiama come l'ufficio, e ce n'e' una sola. */
-    private readonly isOffice = false
+    /**
+     * La scheda dell'ufficio: si chiama come l'ufficio, e ce n'e' una sola. Non e'
+     * fissa: una scheda qualunque lo diventa dal suo bottone (`becomeOffice`).
+     */
+    private isOffice = false
   ) {
     this.chat = chat;
     this.sessions.push(chat);
     this.isPrimary = isPrimary;
+    this.shared = isPrimary ? chat : undefined;
     if (isPrimary) ChatPanel.primary = this;
     if (isOffice) ChatPanel.officeTab = this;
     ChatPanel.all.add(this);
     panel.iconPath = vscode.Uri.joinPath(ctx.extensionUri, 'media', 'icon.png');
 
     // Solo l'ufficio ospita: nelle altre schede il "+" continua ad aprire una
-    // scheda nuova, che li' e' quello che vuoi.
-    const host: FaceHost | undefined = isOffice
-      ? {
-          ready: () => {
-            // Quella di prima non l'ha sentita nessuno: si riparte da zero, se no
-            // `sendTabs` la crede gia' consegnata e non la rimanda.
-            this.lastTabs = '';
-            this.sendTabs();
-          },
-          fresh: () => this.newSession(),
-          pick: (key) => this.show(key),
-          close: (key) => this.closeSession(key),
-        }
-      : undefined;
+    // scheda nuova, che li' e' quello che vuoi. Ma chi ospita si decide al momento,
+    // perche' una scheda puo' diventare l'ufficio dopo essere nata.
+    const host: FaceHost = {
+      ready: () => {
+        // Quella di prima non l'ha sentita nessuno: si riparte da zero, se no
+        // `sendTabs` la crede gia' consegnata e non la rimanda.
+        this.lastTabs = '';
+        this.sendTabs();
+      },
+      fresh: () => void (this.isOffice ? this.newSession() : ChatPanel.openNew(ctx, monitor)),
+      pick: (key) => this.show(key),
+      close: (key) => this.closeSession(key),
+    };
     const { surface, listener, swap } = bindWebview(
       panel.webview,
       ctx,
@@ -324,10 +373,12 @@ export class ChatPanel {
     this.named = chat.onTitle(this.followName);
     // La striscia deve dire anche di quelle che stanno dietro: chi lavora, chi ha
     // finito, chi aspetta un permesso. Quelle non passano da onTitle.
-    const roster = isOffice ? owned.onChange(() => this.sendTabs()) : { dispose() {} };
+    const roster = owned.onChange(() => this.sendTabs());
     this.sendTabs();
     const state = panel.onDidChangeViewState(() => {
-      owned.setFace(chat.key, 'panel', panel.active);
+      // Quella che la scheda ha davanti adesso, non quella con cui e' nata:
+      // nell'ufficio sono due cose diverse appena cambi conversazione.
+      owned.setFace(this.chat.key, 'panel', panel.active);
       if (panel.active) this.followName();
       // Back in front after being behind: the numbers had been frozen for a while,
       // and the "refresh" button is gone because this does it by itself.
@@ -342,14 +393,14 @@ export class ChatPanel {
       this.chat.detach(surface);
       // Secondary tabs carry their controller with them: when they die, it dies too.
       // E l'ufficio se ne porta dietro quante ne teneva: sono nate qui.
-      if (!isPrimary) for (const c of this.sessions) c.dispose();
+      for (const c of this.sessions) if (c !== this.shared) c.dispose();
       // La principale no: la sua conversazione vive anche nella chat della sidebar, e
       // chiudere la scheda non e' chiudere la conversazione. Ma se la sidebar non c'e'
       // — ed e' il caso normale, visto che aprendo la scheda la sidebar si chiude da
       // sola — quella conversazione non e' piu' da nessuna parte, e la sua card resta
       // in elenco a dire "sei qui" mentre non c'e' nessun qui. Niente facce, niente
       // card. Riaprendo la scheda torna: la riattacca `readopt`.
-      else if (!this.chat.hasFaces()) owned.end(this.chat.key);
+      if (this.shared && !this.shared.hasFaces()) owned.end(this.shared.key);
       ChatPanel.all.delete(this);
       if (ChatPanel.primary === this) ChatPanel.primary = undefined;
       if (ChatPanel.officeTab === this) ChatPanel.officeTab = undefined;
@@ -403,6 +454,10 @@ export class ChatPanel {
     if (this.sessions.length < 2) return;
     const i = this.sessions.findIndex((c) => c.key === key);
     if (i < 0) return;
+    // Quella della principale non si spegne, si azzera: e' la regola di sempre per
+    // la tua chat (vedi ContextMonitor.close), e spegnerla lascerebbe la sidebar e
+    // i comandi dell'estensione attaccati a una conversazione morta.
+    if (this.sessions[i] === this.shared) return void this.shared.newSession();
     const [gone] = this.sessions.splice(i, 1);
     // Se chiudevi quella che avevi davanti ci si sposta sulla vicina: quella
     // prima, o la prima che resta.
