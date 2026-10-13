@@ -22,9 +22,10 @@
  *     a meta' fotogramma — si spegne tutto e si avverte chi ha acceso: la stanza
  *     piatta e' ancora li' sotto, e una stanza vuota non la vede nessuno.
  */
-import { THREE, Lotto, tela, tramaAlone, materiali, via } from './kit.js';
+import { THREE, Lotto, Tratto, U, qui, parte, tela, tramaAlone, materiali, via } from './kit.js';
 import { costruisci, WL } from './props.js';
 import { specchio } from './mirror.js';
+import { animali } from './pets.js';
 import classico from './skins/classico.js';
 import notte from './skins/notte.js';
 import bali from './skins/bali.js';
@@ -121,9 +122,15 @@ function monta() {
     SV: R.SV,
   };
   const L = new Lotto();
+  // Il lotto a tratto della stanza ferma, e le penne per scriverci (kit.js, «A TRATTO»).
+  const tratto = new Tratto(U);
   const K = {
     THREE,
     L,
+    tratto,
+    toon: M.mat.toon,
+    qui: (x, y, ry, z, sp) => qui(tratto, x, y, ry, z, sp),
+    parte: (fn, ombra) => parte(M.mat.toon, fn, ombra),
     C: S.C,
     S,
     R: M.R,
@@ -154,6 +161,7 @@ function monta() {
   };
   M.B = costruisci(K);
   M.radice.add(L.mesh(M.mat));
+  if (!tratto.vuoto) M.radice.add(tratto.mesh(M.mat.toon));
 
   // --- le luci: una chiave che fa le ombre, un riempimento di fronte perche' le
   //     facce si leggano, e l'ambiente. Il resto lo fanno gli schermi (props.js).
@@ -182,6 +190,7 @@ function monta() {
   M.scena.background = f.tex;
 
   M.specchio.segna();
+  M.animali.stanza();
   inquadra();
 }
 
@@ -299,6 +308,7 @@ function fotogramma(ora) {
       }
     }
     M.specchio.giro(t, dt);
+    M.animali.giro(t, dt);
     M.renderer.render(M.scena, M.camera);
   } catch (e) {
     rompi(e);
@@ -329,6 +339,7 @@ function spegni() {
   cancelAnimationFrame(m.raf);
   clearTimeout(m.attesa);
   m.guardie.forEach((f) => f());
+  if (m.animali) m.animali.via();
   if (m.specchio) m.specchio.smonta();
   try {
     via(m.scena);
@@ -396,6 +407,7 @@ function accendi({ wrap, stage, rotto }) {
   M.scena.add(M.gente);
   try {
     M.specchio = specchio(M);
+    M.animali = animali(M);
     adatta();
     monta();
   } catch (e) {

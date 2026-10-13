@@ -14,6 +14,7 @@
  * I colori arrivano dalla pelle (skins/*.js): qui non c'e' un esadecimale.
  */
 import { THREE, Lotto, T, TAU, clamp, rnd, hash } from './kit.js';
+import { mobili } from './mobili.js';
 
 /** Le altezze: i muri di fianco, il cordolo davanti, i divisori, la porta. */
 export const WL = 50;
@@ -669,13 +670,16 @@ export function costruisci(K) {
   muri();
   divisori();
   porta();
+  // I mobili gia' ridisegnati a tratto (mobili.js): quelli che fa lui, qui non si rifanno.
+  const suoi = mobili(K, B);
   // I tavoli prima degli sgabelli, che gli si tirano sotto.
-  for (const m of R.PROPS) if (m.s === 'meetTable') tavolo(m);
+  for (const m of R.PROPS) if (m.s === 'meetTable' && !suoi.has(m.s)) tavolo(m);
   let piante = 0;
-  B.fatti = new Set();
+  B.fatti = new Set(suoi);
   for (const m of R.PROPS) {
     const fatto =
-      m.s === 'board' ? (bacheca(m), 1)
+      suoi.has(m.s) ? 1
+      : m.s === 'board' ? (bacheca(m), 1)
       : m.s === 'shelfFull' ? (scaffale(m, 'faldoni'), 1)
       : m.s === 'shelfJars' ? (scaffale(m, 'barattoli'), 1)
       : m.s === 'shelfEmpty' ? (scaffale(m, 'tazze'), 1)
@@ -690,7 +694,7 @@ export function costruisci(K) {
     if (fatto) B.fatti.add(m.s);
   }
   for (const m of R.DISEGNATI) {
-    const fatto = m.s === 'cestino' ? (cestino(m), 1) : m.s === 'macchina' ? (macchina(m), 1) : m.s === 'lavandino' ? (lavandino(m), 1) : m.s === 'ghiaia' ? 1 : 0;
+    const fatto = suoi.has(m.s) ? 1 : m.s === 'cestino' ? (cestino(m), 1) : m.s === 'macchina' ? (macchina(m), 1) : m.s === 'lavandino' ? (lavandino(m), 1) : m.s === 'ghiaia' ? 1 : 0;
     if (fatto) B.fatti.add(m.s);
   }
   B.fatti.add('desk');
