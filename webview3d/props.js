@@ -6,46 +6,81 @@
  * di qui e' solo la terza misura: quanto e' alto uno scaffale, quanto e' profondo
  * un tavolo, da che parte guarda uno schermo.
  *
- * Tutto quello che non si muove finisce in un lotto solo (kit.js). Quello che si
- * muove — le ante della porta, le sedie che girano, gli schermi che cambiano stato,
- * i portatili che compaiono — sono pezzi a parte, e a muoverli e' lo specchio
- * (mirror.js), che guarda la stanza piatta e riporta qui quello che vede.
+ * Il guscio — pavimento, vetrata, muri, divisori, porta — e le postazioni sono a
+ * tratto (kit.js, «A TRATTO»): forme tonde, tinte piatte, contorno a inchiostro. E
+ * il guscio non finisce dove finisce la pianta: la vetrata sale oltre il bordo di
+ * sopra della scheda, il pavimento e i due muri di fianco corrono verso chi guarda
+ * oltre quello di sotto, cosi' attorno alla stanza non resta mai un vuoto. Fin dove
+ * devono arrivare lo dice il quadro (`K.Q`, da office3d.js).
+ *
+ * Tutto quello che non si muove finisce in pochi lotti. Quello che si muove — le
+ * ante della porta, le sedie che girano, i portatili che compaiono — sono pezzi a
+ * parte, e a muoverli e' lo specchio (mirror.js), che guarda la stanza piatta e
+ * riporta qui quello che vede.
  *
  * I colori arrivano dalla pelle (skins/*.js): qui non c'e' un esadecimale.
  */
-import { THREE, Lotto, T, TAU, clamp, rnd, hash } from './kit.js';
+import { THREE, Lotto, Tratto, T, TAU, U, SEDILE_M, PIANO_M, qui, penna, senzaFilo, mtx, clamp, rnd, hash } from './kit.js';
 import { mobili } from './mobili.js';
 
-/** Le altezze: i muri di fianco, il cordolo davanti, i divisori, la porta. */
-export const WL = 50;
-export const KH = 5;
-export const PH = 14;
-export const DH = 36;
-/** Il piano di una scrivania e di un tavolo, e il sedile su cui ci si siede. */
+/** Le quote dei mobili a scatole di prima (tavoli, sgabelli, e le persone che ci siedono): se ne vanno con loro. */
 export const PIANO = 11.2;
 export const SEDILE = 3.9;
 
-/* ---- chi siede guarda lo schermo ----
+/** Le altezze del guscio: il davanzale della vetrata, la porta, il traverso, i divisori e i loro pilastrini. */
+const DAVANZALE = 20;
+const PORTA_H = 63;
+const TRAVERSO = 94;
+const DIVISORIO = 21.6;
+const PILASTRO = 29.4;
+/** Quanto e' spesso un divisorio. Nella pianta e' una banda larga una casella: qui se ne tiene l'anima. */
+const SPESSO = 4.2;
+
+/* ---- le postazioni, girate ----
  *
- * La camera sta davanti, a sud. Lo schermo deve farsi vedere da lei, quindi guarda
- * verso sud; e chi ci lavora deve guardare lo schermo, quindi siede dalla parte
- * della camera e da' le spalle a chi guarda. Messi in fila — schiena, schermo —
- * la schiena copre lo schermo e della persona si vede solo la nuca.
+ * La camera sta davanti, a sud. Una scrivania messa dritta — chi siede di spalle,
+ * lo schermo oltre la sua nuca — nasconde tutte e due le cose che contano: la
+ * faccia e lo schermo. Quindi la postazione gira TUTTA, piano, schermo, tastiera,
+ * sedia e chi ci siede, di cinquantasette gradi: nelle due colonne di sinistra chi
+ * lavora guarda in fondo a sinistra e lo schermo guarda a destra verso la camera;
+ * le due di destra sono il loro specchio. Dalla camera si vedono uno schermo di
+ * tre quarti e un profilo.
  *
- * Quindi: il monitor sta a un capo del piano, quello di fuori, girato di
- * trentotto gradi verso la linea di mezzo della stanza; e chi lo guarda siede
- * all'altro capo, sulla sua normale, girato verso di lui. Dalla camera si vedono lo
- * schermo oltre la spalla e una guancia: tre quarti di schiena. La meta' destra
- * della stanza e' lo specchio della sinistra, cosi' ogni schermo guarda il centro.
+ * La stanza piatta di questo giro non sa niente, e chi cammina cammina nelle sue
+ * corsie: trentadue fra una colonna e l'altra, il corridoio fra le due file. Una
+ * postazione girata non deve entrarci. Piano, sedia e chi siede stanno quindi nella
+ * colonna della scrivania piatta `{ x, b }` — da x + 2 a x + 46, mentre i piedi di
+ * chi passa stanno sotto x - 8 o sopra x + 56 — e in quaranta di profondita', da
+ * b - 36 a b + 4, che fra le due file ne lascia trenta. E' per questo che il piano
+ * e' lungo un metro e venti e non uno e quaranta come nell'anteprima: piu' lungo, e
+ * i due spigoli di testa entrano nel corridoio.
+ *
+ * Qui sotto la postazione vista dalla sua sedia, in metri: x a destra di chi siede,
+ * che sta a +z e guarda verso -z. Chi siede, lo schermo e la tastiera stanno su un
+ * asse spostato a destra, e il capo sinistro del piano — quello verso la camera —
+ * resta libero: e' li' che si posa una tazza, e che si sdraia il gatto.
  */
-const PHI = (38 * Math.PI) / 180;
-/** Dove sta il monitor sul piano, dal capo di fuori; e a quanto siede chi lo guarda. */
-const MON = [10.5, 6.2];
-const DISTANZA = 14.5;
+const ALFA = (57 * Math.PI) / 180;
+const LARGO = 1.2;
+const FONDO = 0.62;
+const ASSE = 0.12;
+const SIEDE = 0.54;
+const SCHERMO = -0.17;
+const TASTI = 0.23;
+const LIBERO = [-0.39, 0.02];
+/** Dove sta il centro del piano rispetto alla scrivania piatta `{ x, b }`, nella meta' sinistra: cosi' piano, sedia e chi siede stanno centrati nella colonna. */
+const CENTRO = [20, -16];
+
+/** La tela degli schermi: quattro celle in fila, larghe e alte come uno schermo. */
+const TELA = [512, 128];
+const CELLA = [124, 78];
+const CELLE = { off: 0, on: 1, working: 2, working2: 3 };
+/** Un giro in dieci secondi: tutto quello che si muove da solo sugli schermi torna su se stesso. */
+const W10 = TAU / 10;
 const UBOX = new THREE.BoxGeometry(1, 1, 1);
 
 export function costruisci(K) {
-  const { L, C, S, R } = K;
+  const { L, C, S, R, Q } = K;
   const box = (...a) => L.box(...a);
   const cyl = (...a) => L.cyl(...a);
   const face = (...a) => L.face(...a);
@@ -53,6 +88,23 @@ export function costruisci(K) {
   const THIN = { k: 'thin' };
   const { W, H, WH } = R;
   const B = { banchi: [], posti: [], appesi: [], portatili: [], buste: [], tavoli: [], vetri: [], porta: null, bacheca: null };
+
+  /* Due lotti a tratto. Quello di tutti (`K.tratto`) fa ombra; quello dei muri no: i
+     due di fianco sono alti quanto la scheda, e un muro cosi' che fa ombra la fa su
+     tutta la stanza. Si scrive in metri, con due penne piantate nell'origine della
+     pianta; `blocco` e' per quello che nella pianta ha gia' i suoi estremi. */
+  const muro = new Tratto(U);
+  const pt = K.qui(0, 0);
+  const pm = qui(muro, 0, 0);
+  /** Una scatola per i suoi estremi in pianta (unita' di stanza). Senza `o` e' a spigoli vivi e senza contorno; con `o.r` (metri) e' tonda. */
+  const blocco = (p, x0, y0, x1, y1, z0, z1, c, o) =>
+    (o && o.r != null ? p.box : p.cube)((x1 - x0) / U, (z1 - z0) / U, (y1 - y0) / U, (x0 + x1) / 2 / U, z0 / U, (y0 + y1) / 2 / U, c, o || { filo: 0 });
+  const v3 = new THREE.Vector3();
+  /** Un punto detto in metri davanti a una penna → dove cade nella pianta: [x, y, z]. */
+  const dove = (q, x, y, z) => {
+    v3.set(x, y, z).applyMatrix4(q.m);
+    return [v3.x, v3.z, v3.y];
+  };
   /** Un pezzo che si muove: le sue scatole in un lotto suo, dentro un gruppo. */
   const pezzo = (fn, par = K.radice) => {
     const q = new Lotto();
@@ -76,48 +128,37 @@ export function costruisci(K) {
   // =====================================================================
   //  il pavimento e i muri
   // =====================================================================
+  /* Il pavimento e' un piano solo, dipinto dalla pelle, e corre verso chi guarda fin
+     dove dice il quadro: oltre il bordo di sotto della scheda. Alla pelle si dice
+     una stanza profonda quanto lui, cosi' il salone che dipinge arriva fin li'. */
   function pavimento() {
-    box(8, 8, -7, W - 16, H - 16, 6.95, C.slab);
-    const PPU = 4; // pixel di trama per pixel di stanza
-    const { g, tex } = K.tela((W - 16) * PPU, (H - 16) * PPU);
+    const w = W - 16;
+    const d = Q.lungo - 8;
+    // Quattro pixel di trama per unita' di stanza, finche' la trama ci sta.
+    const PPU = Math.min(4, 4096 / w, 4096 / d);
+    const { g, tex } = K.tela(w * PPU, d * PPU);
     g.setTransform(PPU, 0, 0, PPU, -8 * PPU, -8 * PPU);
     S.pavimento(g, {
       W,
-      H,
+      H: Q.lungo + 8,
       MEZZO: R.MEZZO,
       VANO: R.VANO,
       ghiaia: R.DISEGNATI.filter((m) => m.s === 'ghiaia').map((m) => ({ x: m.x + m.w / 2, y: m.b - m.h / 2, r: m.w / 2 - 1 })),
     });
     tex.needsUpdate = true;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(W - 16, H - 16), new THREE.MeshLambertMaterial({ map: tex }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshToonMaterial({ map: tex, gradientMap: K.toon.gradientMap }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(W / 2, 0, H / 2);
+    m.position.set(W / 2, 0, 8 + d / 2);
     m.receiveShadow = true;
     K.radice.add(m);
   }
 
-  /**
-   * Un vetro: un pezzo della trama `t`, dipinta dalla pelle per tutto il muro, steso
-   * fra (ua, za) e (ub, zb). `posa` lo mette in piedi contro il suo muro. Il muro di
-   * fondo e' una trama sola tagliata in tre vetri — a sinistra della porta, a destra,
-   * e sopra — cosi' la citta' continua dietro lo stipite invece di ricominciare.
-   */
-  function vetro(t, ua, ub, za, zb, posa) {
-    const geo = new THREE.PlaneGeometry(ub - ua, zb - za);
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) {
-      uv.setXY(i, (ua + uv.getX(i) * (ub - ua) - t.u0) / t.w, (za + uv.getY(i) * (zb - za) - t.z0) / t.h);
-    }
-    const m = new THREE.Mesh(geo, t.mat);
-    posa(m, (ua + ub) / 2, (za + zb) / 2);
-    K.radice.add(m);
-  }
-  /** La trama di un muro, o null se da quel lato la pelle non vuole vetro. */
-  function panorama(lato, u0, u1, z0, z1) {
-    const PX = 5;
+  /** La trama di un muro, o null se da quel lato la pelle non vuole vetro. `u` corre lungo il muro, `z` in alto. */
+  function panorama(lato, u0, u1, z0, z1, info) {
+    const PX = Math.min(5, 4096 / (u1 - u0), 4096 / (z1 - z0));
     const t = K.tela((u1 - u0) * PX, (z1 - z0) * PX);
     t.g.scale(PX, PX);
-    const vivo = S.vetrata(t.g, u1 - u0, z1 - z0, lato);
+    const vivo = S.vetrata(t.g, u1 - u0, z1 - z0, lato, info);
     if (vivo === false) {
       t.tex.dispose();
       return null;
@@ -127,138 +168,211 @@ export function costruisci(K) {
     if (typeof vivo === 'function') B.vetri.push({ tex: t.tex, vivo });
     return { mat, u0, z0, w: u1 - u0, h: z1 - z0 };
   }
+  /**
+   * I vetri di un muro: pezzi della trama `t`, ognuno `[ua, ub, za, zb]`, in una
+   * mesh sola. `posa(u, z)` dice dove sta nella stanza un punto del muro; `gira`
+   * rovescia il verso, per il muro che si guarda da est. Il muro di fondo e' una
+   * trama sola tagliata attorno alla porta, cosi' il paese continua dietro lo
+   * stipite invece di ricominciare.
+   */
+  function vetri(t, pezzi, posa, gira) {
+    const p = [];
+    const uv = [];
+    const idx = [];
+    for (const [ua, ub, za, zb] of pezzi) {
+      const b = p.length / 3;
+      for (const [u, z] of [[ua, za], [ub, za], [ub, zb], [ua, zb]]) {
+        p.push(...posa(u, z));
+        const s = (u - t.u0) / t.w;
+        uv.push(gira ? 1 - s : s, (z - t.z0) / t.h);
+      }
+      if (gira) idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
+      else idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    K.radice.add(new THREE.Mesh(geo, t.mat));
+  }
+
+  /* Le nuvole: corsie di cielo una sopra l'altra, appena davanti al vetro e dietro i
+     montanti, che scorrono piano ognuna col suo passo. Le dipinge la pelle
+     (`nuvole`), se ne ha; con le animazioni ridotte restano dove sono. */
+  function nuvole(x0, x1, y) {
+    if (!S.nuvole) return;
+    // La prima a tre metri e quaranta, poi una ogni metro e venti; cinque al massimo,
+    // che in una scheda alta si spartiscono tutta la vetrata.
+    const passo = Math.max(36, (WH - 93) / 5);
+    for (let i = 0, z = 102; z < WH + 9; i++, z += passo) {
+      // Quanto e' lunga la striscia prima di ripetersi: quattro misure, cosi' le corsie non vanno a tempo.
+      const lunga = [219, 153, 261, 183][i % 4];
+      const { g, tex } = K.tela(512, 128);
+      S.nuvole(g, 512, 128, i);
+      tex.needsUpdate = true;
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.repeat.x = (x1 - x0) / lunga;
+      const fase = rnd('nuvole', i);
+      tex.offset.x = fase;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, lunga / 4), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+      m.position.set((x0 + x1) / 2, z, y + 0.1 + i * 0.03);
+      m.renderOrder = 1 + i;
+      K.radice.add(m);
+      K.anima((t) => (tex.offset.x = fase - t / 60));
+    }
+  }
 
   function muri() {
     const [vx, vw] = R.VANO;
-    // --- il muro di fondo: alto, ed e' una vetrata. E' lui il protagonista della
-    //     meta' alta della scheda: da questa camera il pavimento e' una striscia.
-    box(8, 8, 0, vx - 8, 8, WH, C.wall);
-    box(vx + vw, 8, 0, W - 8 - vx - vw, 8, WH, C.wall);
-    box(vx, 8, DH, vw, 8, WH - DH, C.wall);
-    const z0 = 11;
-    const z1 = WH - 5;
-    const n = panorama('n', 20, W - 20, z0, z1);
-    if (n) {
-      const aSud = (m, u, z) => m.position.set(u, z, 16.06);
-      vetro(n, 20, vx - 3, z0, z1, aSud);
-      vetro(n, vx + vw + 3, W - 20, z0, z1, aSud);
-      vetro(n, vx - 3, vx + vw + 3, DH + 6, z1, aSud);
-      // I montanti partono dallo stipite e vanno verso gli angoli: cosi' la porta
-      // sta sempre fra due vetri interi, comunque cresca la stanza.
-      if (S.montanti) {
-        for (let u = vx - 3 - S.montanti; u > 22; u -= S.montanti) box(u - 0.5, 16, z0, 1, 0.7, z1 - z0, C.infisso, THIN);
-        for (let u = vx + vw + 3 + S.montanti; u < W - 22; u += S.montanti) box(u - 0.5, 16, z0, 1, 0.7, z1 - z0, C.infisso, THIN);
-      }
-      for (const u of [vx - 3, vx + vw + 3]) box(u - 0.8, 16, DH, 1.6, 0.9, z1 - DH, C.infisso, THIN);
-      box(vx - 3, 16, DH + 4.4, vw + 6, 0.9, 1.6, C.infisso, THIN);
-      for (const [a, b] of [[16, vx - 3], [vx + vw + 3, W - 16]]) box(a, 16, z0 - 1.2, b - a, 1, 1.2, C.wallHi, THIN);
-    }
-    face(16, vx, 16, 0, 3, C.wallLo);
-    face(vx + vw, W - 16, 16, 0, 3, C.wallLo);
-    filo(8, 16.4, W - 8, 16.4, WH);
+    const x0 = 16;
+    const x1 = W - 16;
+    // Il vetro sta tre unita' dietro la faccia del muro (y = 16, dove si appoggiano i mobili).
+    const yv = 13;
 
-    // --- i due di fianco: bassi, che da qui si guardano di taglio.
-    for (const est of [false, true]) {
-      const x = est ? W - 16 : 8;
-      const xf = est ? W - 16.06 : 16.06;
-      box(x, 16, 0, 8, H - 24, WL, C.wall);
-      const t = panorama(est ? 'e' : 'w', 20, H - 20, 11, WL - 5);
-      if (t) {
-        vetro(t, 20, H - 20, 11, WL - 5, (m, u, z) => {
-          m.rotation.y = est ? -Math.PI / 2 : Math.PI / 2;
-          m.position.set(xf, z, u);
-        });
-        if (S.montanti) for (let u = 20 + S.montanti; u < H - 22; u += S.montanti) box(est ? W - 16.7 : 16, u - 0.5, 11, 0.7, 1, WL - 16, C.infisso, THIN);
-      }
-      box(est ? W - 16.4 : 16, 16, 0, 0.4, H - 24, 3, C.wallLo, THIN);
-      filo(est ? W - 16.4 : 16.4, 16, est ? W - 16.4 : 16.4, H - 8, WL);
+    // --- il muro di fondo e' una vetrata: dal davanzale fin oltre il bordo di sopra
+    //     della scheda. E' lei la protagonista della meta' alta.
+    // I montanti partono dagli stipiti e vanno verso gli angoli: cosi' la porta sta
+    // sempre fra due vetri interi, comunque cresca la stanza.
+    const xs = [];
+    if (S.montanti) {
+      for (let x = vx - 5; x > x0 + S.montanti * 0.35; x -= S.montanti) xs.push(x);
+      for (let x = vx + vw + 5; x < x1 - S.montanti * 0.35; x += S.montanti) xs.push(x);
     }
-    // --- quello davanti e' un cordolo: tagliato, se no nella stanza non si vede.
-    box(16, H - 16, 0, W - 32, 8, KH, C.wall);
-    filo(16, H - 15.6, W - 16, H - 15.6, KH);
+    xs.sort((a, b) => a - b);
+    const bordi = [x0, ...xs, x1];
+    const n = panorama('n', x0, x1, DAVANZALE, WH, {
+      z0: DAVANZALE,
+      cima: Q.cima,
+      vetri: bordi.slice(1).map((x, i) => (x + bordi[i]) / 2 - x0),
+    });
+    if (n) {
+      vetri(n, [[x0, vx, DAVANZALE, WH], [vx + vw, x1, DAVANZALE, WH], [vx, vx + vw, PORTA_H, WH]], (u, z) => [u, z, yv]);
+      for (const x of xs) blocco(pm, x - 1.05, yv + 0.3, x + 1.05, yv + 2.4, DAVANZALE, WH, C.infisso);
+      for (let z = TRAVERSO; z < WH - 20; z += 84) blocco(pm, x0, yv + 0.3, x1, yv + 2.4, z, z + 2.1, C.infisso);
+      nuvole(x0, x1, yv);
+    } else {
+      blocco(pm, x0, 4, vx, yv, DAVANZALE, WH, C.wall);
+      blocco(pm, vx + vw, 4, x1, yv, DAVANZALE, WH, C.wall);
+      blocco(pm, vx, 4, vx + vw, yv, PORTA_H, WH, C.wall);
+    }
+    // Sotto il vetro: lo zoccolo pieno, il suo battiscopa e il davanzale, ai due lati della porta.
+    for (const [a, b] of [[x0, vx - 4], [vx + vw + 4, x1]]) {
+      blocco(pm, a, yv, b, 16, 0, DAVANZALE, C.wall);
+      blocco(pm, a, 16, b, 16.5, 0, 4.2, C.wallLo);
+      blocco(pm, a, yv - 0.3, b, 18.7, DAVANZALE - 0.8, DAVANZALE + 1.3, C.wallHi, { r: 0.02, filo: 0.008 });
+      if (S.filo) filo(a, 18.9, b, 18.9, DAVANZALE + 1.5);
+    }
+
+    // --- i due di fianco: pieni, alti quanto serve perche' chiudano il quadro fino
+    //     in cima e lunghi fin oltre il bordo di sotto. Da qui si guardano di taglio.
+    for (const est of [false, true]) {
+      const xf = est ? x1 : x0;
+      const s = est ? 1 : -1; // da che parte e' il fuori
+      /** Una lastra lungo tutto il muro, da `a` a `b` unita' fuori dalla sua faccia. */
+      const lastra = (a, b, z0, z1, c, y0 = 16, y1 = Q.lungo) => blocco(pm, Math.min(xf + a * s, xf + b * s), y0, Math.max(xf + a * s, xf + b * s), y1, z0, z1, c);
+      lastra(0, 12, 0, Q.alto, C.wall, 4);
+      lastra(-1, 0, 0, 4.2, C.wallLo);
+      lastra(-1.05, 0, 27.6, 29.7, C.wallHi);
+      for (let z = 72; z < Q.alto - 10; z += 84) lastra(-1.05, 0, z, z + 1.5, C.wallLo);
+      // Il montante nell'angolo, dove il muro incontra la vetrata.
+      lastra(-3.6, 0, 0, Q.alto, C.infisso, yv, 16.6);
+      const t = panorama(est ? 'e' : 'w', 20, H - 4, DAVANZALE, TRAVERSO, { z0: DAVANZALE, cima: TRAVERSO, vetri: [] });
+      if (t) {
+        vetri(t, [[20, H - 4, DAVANZALE, TRAVERSO]], (u, z) => [xf - s * 0.15, z, u], !est);
+        if (S.montanti) for (let u = 20 + S.montanti; u < H - 8; u += S.montanti) lastra(-1.2, -0.15, DAVANZALE, TRAVERSO, C.infisso, u - 1, u + 1);
+        if (S.filo) filo(xf - s * 0.6, 16, xf - s * 0.6, H - 4, TRAVERSO + 1);
+      }
+    }
   }
 
   /* I divisori: la sala riunioni, il bar e il muro fra loro e il salone. Nella pianta
      sono bande larghe una casella; qui un muro spesso sedici sarebbe un bancone,
-     quindi se ne tiene l'anima — sei pixel in mezzo alla casella. Casella per
-     casella: un perno al centro e un braccio verso ogni vicina che e' muro, cosi' gli
-     angoli si chiudono e i capi liberi arrivano al bordo della casella (il vano fra
-     due pezzi resta largo quanto nella pianta) senza scrivere la pianta due volte. */
+     quindi se ne tiene l'anima, bassa quanto un parapetto e col suo corrimano. Ogni
+     banda e' una corsa sola, e conta come finisce a ognuno dei due capi: contro il
+     muro di fuori si ferma li'; dentro un'altra corsa le arriva in mezzo, cosi'
+     l'angolo si chiude; e dove non c'e' niente finisce con un pilastrino — sono i
+     due lati di un passaggio, e il vano resta largo quanto nella pianta. */
   function divisori() {
     const fuori = (m) => m.x <= 0 || m.y <= 0 || m.x + m.w >= W || m.y + m.h >= H;
     const dentro = (x, y) => R.WALLS.some((m) => x > m.x && x < m.x + m.w && y > m.y && y < m.y + m.h);
+    const bordo = (x, y) => x < 16 || y < 16 || x > W - 16 || y > H - 16;
+    const pilastro = (x, y) => {
+      blocco(pt, x - 3, y - 3, x + 3, y + 3, 0, PILASTRO, C.wallLo, { r: 0.04 });
+      pt.sph(0.085, x / U, (PILASTRO + 1.8) / U, y / U, C.wallHi);
+    };
     for (const m of R.WALLS) {
       if (fuori(m)) continue;
-      for (let ty = m.y; ty < m.y + m.h - 1; ty += 16) {
-        for (let tx = m.x; tx < m.x + m.w - 1; tx += 16) {
-          const cx = tx + 8;
-          const cy = ty + 8;
-          const v = { n: dentro(cx, cy - 16), s: dentro(cx, cy + 16), w: dentro(cx - 16, cy), e: dentro(cx + 16, cy) };
-          const quante = v.n + v.s + v.w + v.e;
-          // Un capo libero, o un tratto dritto: i bracci vanno lungo la corsa, tutti e due.
-          if (quante <= 2 && !((v.n || v.s) && (v.w || v.e))) {
-            if (v.n || v.s || !quante) v.n = v.s = true;
-            else v.w = v.e = true;
-          }
-          const x0 = v.w ? tx : cx - 3;
-          const x1 = v.e ? tx + 16 : cx + 3;
-          const y0 = v.n ? ty : cy - 3;
-          const y1 = v.s ? ty + 16 : cy + 3;
-          if (v.w || v.e) {
-            box(x0, cy - 3, 0, x1 - x0, 6, PH, C.wall);
-            filo(x0, cy, x1, cy, PH);
-          }
-          if (v.n || v.s) {
-            box(cx - 3, y0, 0, 6, y1 - y0, PH, C.wall);
-            filo(cx, y0, cx, y1, PH);
-          }
-        }
-      }
+      const perX = m.w > m.h;
+      const asse = perX ? m.y + m.h / 2 : m.x + m.w / 2;
+      /** Da (lungo la corsa, di traverso) a un punto della pianta. */
+      const punto = (a, b) => (perX ? [a, b] : [b, a]);
+      // Un capo: `a` e' il bordo dell'ultima casella, `v` da che parte finisce la corsa.
+      const capo = (a, v) => {
+        const oltre = punto(a + v * 8, asse);
+        if (dentro(...oltre)) return bordo(...oltre) ? a : a + v * (8 + SPESSO / 2);
+        // Libero. Se l'ultima casella ha un muro di fianco e' un angolo: la corsa si
+        // ferma al suo centro, dove le arriva l'altra.
+        const [cx, cy] = punto(a - v * 8, asse);
+        const angolo = perX ? dentro(cx, cy - 16) || dentro(cx, cy + 16) : dentro(cx - 16, cy) || dentro(cx + 16, cy);
+        pilastro(...punto(a - v * (angolo ? 8 : 3), asse));
+        return a - v * (angolo ? 8 - SPESSO / 2 : 3);
+      };
+      const a0 = capo(perX ? m.x : m.y, -1);
+      const a1 = capo(perX ? m.x + m.w : m.y + m.h, 1);
+      const m2 = SPESSO / 2;
+      blocco(pt, ...punto(a0, asse - m2), ...punto(a1, asse + m2), 0, DIVISORIO, C.wall, { r: 0.03 });
+      blocco(pt, ...punto(a0 - 0.6, asse - m2 - 0.9), ...punto(a1 + 0.6, asse + m2 + 0.9), DIVISORIO, DIVISORIO + 1.8, C.wallHi, { r: 0.025 });
+      // Le doghe, sulla faccia che guarda la camera.
+      if (perX) for (let x = a0 + 9; x < a1 - 4; x += 18.6) blocco(pt, x - 0.3, asse + m2, x + 0.3, asse + m2 + 0.3, 2.4, DIVISORIO - 2.4, C.wallLo);
+      if (S.filo) filo(...punto(a0, asse), ...punto(a1, asse), DIVISORIO + 2);
     }
   }
 
-  /* La porta: due ante che scorrono dentro il muro, e dietro la cabina di un
-     ascensore — cosi' chi entra arriva da qualche parte, e chi esce non svanisce. */
+  /* La porta: due ante a pannelli che si aprono verso dentro, e dietro la cabina di
+     un ascensore — cosi' chi entra arriva da qualche parte, e chi esce non svanisce.
+     La cabina sta dietro il vetro, e si vede solo dal vano. */
   function porta() {
     const [vx, vw] = R.VANO;
     const m = vx + vw / 2;
-    const st = S.portaAccesa ? GLOW : null;
-    box(vx - 1.6, 16, 0, 1.6, 0.5, DH, C.porta, st);
-    box(vx + vw, 16, 0, 1.6, 0.5, DH, C.porta, st);
-    box(vx - 1.6, 16, DH, vw + 3.2, 0.5, 1.4, C.porta, st);
-    if (S.portaAccesa && S.aloni) {
-      K.alone([vx - 0.8, 16.4, 0], [vx - 0.8, 16.4, DH], 4, C.porta, 0.45 * S.aloni);
-      K.alone([vx + vw + 0.8, 16.4, 0], [vx + vw + 0.8, 16.4, DH], 4, C.porta, 0.45 * S.aloni);
-      K.alone([vx, 16.4, DH + 0.7], [vx + vw, 16.4, DH + 0.7], 4, C.porta, 0.45 * S.aloni);
-    }
-    for (const [x, y, w, d, h, z] of [
-      [vx - 2, -12, vw + 4, 2, DH + 4, 0],
-      [vx - 2, -12, 2, 20, DH + 4, 0],
-      [vx + vw, -12, 2, 20, DH + 4, 0],
-      [vx - 2, -12, vw + 4, 20, 2, DH + 2],
-      [vx - 2, -12, vw + 4, 20, 1, -1],
-    ]) box(x, y, z, w, d, h, C.cabina);
-    const ante = [-1, 1].map((s) => {
-      const g = pezzo((q) => {
-        q.box(0, 0, 0, vw / 2, 2, DH, C.leaf);
-        q.face(0, vw / 2, 2, DH - 3, DH, C.leafHi);
-        q.face(0, vw / 2, 2, 0, 10, C.leafLo);
-      });
-      const x0 = s < 0 ? vx : m;
-      g.position.set(x0, 0, 12.5);
-      return { g, s, x0 };
-    });
-    let luce = null;
+    const alta = PORTA_H + 4;
+    for (const [x0, y0, x1, y1, z0, z1] of [
+      [vx - 6, -16, vx + vw + 6, -14, 0, alta],
+      [vx - 6, -16, vx - 4, 13, 0, alta],
+      [vx + vw + 4, -16, vx + vw + 6, 13, 0, alta],
+      [vx - 6, -16, vx + vw + 6, 13, alta - 2, alta],
+      [vx - 6, -16, vx + vw + 6, 9, -2, 0.05],
+    ]) blocco(pm, x0, y0, x1, y1, z0, z1, C.cabina);
+    // Gli stipiti e l'architrave: legno come gli altri, o una luce (di notte).
     if (S.portaAccesa) {
-      luce = new THREE.PointLight(C.porta, 22, 110, 1.3);
-      luce.position.set(m, 22, 24);
-      K.radice.add(luce);
+      box(vx - 4, 13, 0, 4, 5.4, PORTA_H, C.porta, GLOW);
+      box(vx + vw, 13, 0, 4, 5.4, PORTA_H, C.porta, GLOW);
+      box(vx - 4, 13, PORTA_H, vw + 8, 5.4, 3.6, C.porta, GLOW);
+      if (S.aloni) {
+        K.alone([vx - 2, 18.6, 0], [vx - 2, 18.6, PORTA_H], 5, C.porta, 0.45 * S.aloni);
+        K.alone([vx + vw + 2, 18.6, 0], [vx + vw + 2, 18.6, PORTA_H], 5, C.porta, 0.45 * S.aloni);
+        K.alone([vx, 18.6, PORTA_H + 1.8], [vx + vw, 18.6, PORTA_H + 1.8], 5, C.porta, 0.45 * S.aloni);
+      }
+    } else {
+      for (const x of [vx - 2, vx + vw + 2]) blocco(pt, x - 2, 13.2, x + 2, 18.4, 0, PORTA_H + 1, C.porta, { r: 0.025 });
+      blocco(pt, vx - 5.5, 13, vx + vw + 5.5, 18.8, PORTA_H, PORTA_H + 4.5, C.porta, { r: 0.03 });
     }
+    // Le ante: ognuna e' un pezzo col perno sul suo stipite, e si disegna verso il centro.
+    const w = vw / 2 / U;
+    const ante = [-1, 1].map((s) => {
+      const g = K.parte((p) => {
+        const x = (-s * w) / 2;
+        p.box(w - 0.012, PORTA_H / U - 0.02, 0.07, x, 0, 0, C.leaf, { r: 0.012 });
+        for (const [y, h] of [[0.14, 0.78], [1.06, 0.9]]) p.box(w - 0.14, h, 0.02, x, y, 0.04, C.leafHi, { r: 0.02, filo: 0.006 });
+        p.sph(0.036, -s * (w - 0.07), 1.0, 0.07, C.pomello || C.cream, { filo: 0.008, n: 10 });
+      });
+      g.position.set(s < 0 ? vx : vx + vw, 0, 14.6);
+      K.radice.add(g);
+      return { g, s };
+    });
     B.porta = {
-      /** `u` da 0 (chiusa) a 1 (aperta): le ante spariscono nel muro. */
+      /** `u` da 0 (chiusa) a 1 (aperta): le ante girano sul perno e finiscono contro i fianchi della cabina. */
       apri(u) {
-        for (const a of ante) a.g.position.x = a.x0 + a.s * (vw / 2) * u;
-        if (luce) luce.intensity = 22 + 26 * u;
+        for (const a of ante) a.g.rotation.y = -a.s * u * 1.5;
       },
       /** Dove sta in piedi chi aspetta dentro la cabina, prima di entrare. */
       cabina: [m, 1],
@@ -512,88 +626,274 @@ export function costruisci(K) {
   }
 
   // =====================================================================
+  //  gli schermi
+  // =====================================================================
+  /* Tutti gli schermi sono una mesh sola, che mostra le celle di una tela sola:
+     spento, acceso, e al lavoro in due pagine diverse (una per le scrivanie pari,
+     una per le dispari, che otto schermi a tempo sono un'insegna). Cambiare stato a
+     uno schermo e' dirgli un'altra cella. La tela si ridipinge a ogni fotogramma
+     finche' almeno uno e' acceso; con le animazioni ridotte resta com'e' stata
+     dipinta la prima volta. */
+  const schermi = (() => {
+    const [AW, AH] = TELA;
+    const [CW, CH] = CELLA;
+    const A = K.tela(AW, AH);
+    A.tex.minFilter = THREE.LinearFilter;
+    A.tex.generateMipmaps = false;
+    const g = A.g;
+    const LAV = S.schermi.working;
+    const ON = S.schermi.on;
+    const p = [];
+    const idx = [];
+    let uv = null;
+    let accesi = 0;
+    const riga = (x, y, w, h, c) => {
+      g.fillStyle = c;
+      g.beginPath();
+      g.roundRect(x, y, Math.max(w, h), h, h / 2);
+      g.fill();
+    };
+    /** Una cella si dipinge come fosse 160 x 100, e in coda prende la striscia di riflesso che dice «vetro». */
+    const cella = (k, fn) => {
+      g.save();
+      g.beginPath();
+      g.rect(2 + k * 127, 2, CW, CH);
+      g.clip();
+      g.translate(2 + k * 127, 2);
+      g.scale(CW / 160, CH / 100);
+      fn();
+      g.globalAlpha = 0.13;
+      g.fillStyle = C.cream;
+      g.beginPath();
+      g.moveTo(99, 0);
+      g.lineTo(131, 0);
+      g.lineTo(80, 100);
+      g.lineTo(48, 100);
+      g.fill();
+      g.restore();
+    };
+    function dipingi(t) {
+      cella(CELLE.off, () => {
+        g.fillStyle = C.off;
+        g.fillRect(0, 0, 160, 100);
+      });
+      // Acceso e nessuno che scrive: un salvaschermo, che rimbalza piano.
+      cella(CELLE.on, () => {
+        g.fillStyle = ON[2];
+        g.fillRect(0, 0, 160, 100);
+        for (let i = 5; i >= 0; i--) {
+          const u = t - i * 0.09;
+          g.globalAlpha = i ? 0.55 - i * 0.08 : 1;
+          g.fillStyle = i ? ON[0] : ON[1];
+          g.beginPath();
+          g.roundRect(80 + 56 * Math.sin(W10 * 2 * u) - 15, 50 + 30 * Math.sin(W10 * 3 * u + 1) - 11, 30, 22, 7);
+          g.fill();
+        }
+        g.globalAlpha = 1;
+      });
+      // Al lavoro: una riga di codice al secondo — la si batte, poi la pagina sale.
+      cella(CELLE.working, () => {
+        g.fillStyle = LAV[0];
+        g.fillRect(0, 0, 160, 100);
+        g.fillStyle = LAV[2];
+        g.fillRect(0, 0, 36, 100);
+        for (let i = 0; i < 5; i++) {
+          g.globalAlpha = i === Math.floor(t / 2) % 5 ? 1 : 0.4;
+          riga(6, 10 + i * 17, 24, 7, LAV[1]);
+        }
+        g.globalAlpha = 1;
+        const n = Math.floor(t);
+        const fr = t - n;
+        const su = clamp((fr - 0.8) / 0.2) * 15;
+        for (let j = 0; j <= 6; j++) {
+          const i = (((n - 5 + j) % 10) + 10) % 10;
+          const y = 8 + j * 15 - su;
+          const rientro = [0, 10, 20, 10, 0, 10, 20, 20, 10, 0][i];
+          const larga = 34 + rnd('codice', i) * 62;
+          const q = j === 5 ? Math.min(1, fr / 0.72) : j > 5 ? 0 : 1;
+          if (q <= 0) continue;
+          riga(44 + rientro, y, 16, 7, LAV[2]);
+          riga(64 + rientro, y, (larga - 20) * q, 7, LAV[1]);
+          if (j === 5 && Math.sin(W10 * 25 * t) > -0.2) {
+            g.fillStyle = LAV[1];
+            g.fillRect(64 + rientro + Math.max(7, (larga - 20) * q) + 3, y - 1, 5, 9);
+          }
+        }
+      });
+      // E l'altra pagina: un cruscotto, con le sue colonne che salgono e scendono.
+      cella(CELLE.working2, () => {
+        g.fillStyle = LAV[0];
+        g.fillRect(0, 0, 160, 100);
+        g.fillStyle = LAV[2];
+        g.fillRect(0, 0, 30, 100);
+        for (let i = 0; i < 4; i++) riga(7, 10 + i * 20, 16, 9, LAV[1]);
+        for (let i = 0; i < 6; i++) {
+          const a = 14 + 15 * (1 + Math.sin(W10 * (2 + (i % 2)) * t + i * 1.3));
+          g.fillStyle = i % 2 ? LAV[1] : LAV[2];
+          g.beginPath();
+          g.roundRect(40 + i * 19, 52 - a, 13, a, 3);
+          g.fill();
+        }
+        const viva = Math.floor(t / 2) % 3;
+        for (let i = 0; i < 3; i++) {
+          if (i === viva) {
+            g.globalAlpha = 0.3;
+            riga(38, 59 + i * 13, 116, 11, C.cream);
+            g.globalAlpha = 1;
+          }
+          riga(42, 62 + i * 13, 40 + rnd('voce', i) * 30, 5, LAV[1]);
+          riga(128, 62 + i * 13, 18, 5, LAV[2]);
+        }
+      });
+      A.tex.needsUpdate = true;
+    }
+    return {
+      /**
+       * Uno schermo in piu': `m` porta il suo centro, in metri, dove sta nella stanza;
+       * `rov` se la postazione e' quella allo specchio. Torna il suo numero e la sua
+       * normale in pianta — letta dai vertici della faccia cosi' come si disegna, non
+       * da una formula: e' cosi' che il controllo prende anche uno specchio sbagliato.
+       */
+      aggiungi(m, rov) {
+        const b = p.length / 3;
+        const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => new THREE.Vector3(x * 0.27, y * 0.17, 0).applyMatrix4(m));
+        for (const v of q) p.push(v.x, v.y, v.z);
+        // Uno specchio rovescia il verso della faccia: si rigira qui, una volta.
+        const giro = rov ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3];
+        idx.push(...giro.map((k) => b + k));
+        const n = q[giro[1]].clone().sub(q[giro[0]]).cross(q[giro[2]].clone().sub(q[giro[0]]));
+        const l = Math.hypot(n.x, n.z) || 1;
+        return { k: b / 4, n: [n.x / l, n.z / l] };
+      },
+      /** Finite le scrivanie: la mesh, e la prima mano di tinta. */
+      chiudi() {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+        uv = new THREE.Float32BufferAttribute(new Float32Array((p.length / 3) * 2), 2);
+        geo.setAttribute('uv', uv);
+        geo.setIndex(idx);
+        K.radice.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: A.tex })));
+        dipingi(3.3);
+        K.anima((t) => accesi > 0 && dipingi(t));
+      },
+      /** Lo schermo `k` mostra la cella `quale`. Con lo specchio la pagina si stende al contrario, cosi' si legge dritta. */
+      mostra(k, quale, rov) {
+        const c = CELLE[quale];
+        const [a, b] = [(3 + c * 127) / AW, (1 + c * 127 + CW) / AW];
+        const [u0, u1] = rov ? [b, a] : [a, b];
+        const v0 = 1 - (1 + CH) / AH;
+        const v1 = 1 - 3 / AH;
+        uv.array.set([u0, v0, u1, v0, u1, v1, u0, v1], k * 8);
+        uv.needsUpdate = true;
+      },
+      /** Uno si e' acceso (+1) o spento (-1): finche' il conto e' zero la tela non si ridipinge. */
+      conta(d) {
+        accesi += d;
+      },
+    };
+  })();
+
+  // =====================================================================
+  //  le sedie
+  // =====================================================================
+  /* Otto sedie uguali che girano ognuna per conto suo: una forma sola, disegnata una
+     volta che guarda a sud come le persone (lo schienale sta dietro), e otto copie
+     nella stessa mesh. Chi le gira — lo specchio, a cui la sedia arriva come
+     `posto.sedia` — ha in mano un perno qualunque, con la sua `rotation.y`;
+     `B.sedie()` riporta i perni sulle copie, a ogni fotogramma. Otto mesh a parte
+     erano otto chiamate al disegno, e altre otto per le ombre. */
+  const sedie = (() => {
+    const forma = new Tratto();
+    const p = penna(forma);
+    p.lathe([[0, 0], [0.2, 0], [0.21, 0.015], [0.14, 0.035], [0.04, 0.07], [0.03, 0.25], [0, 0.25]], 0, 0, 0, C.chairLo);
+    p.disc(0.21, 0.08, 0, SEDILE_M - 0.08, 0, C.chair, { b: 0.03 });
+    p.box(0.07, 0.22, 0.04, 0, 0.26, -0.215, C.chairLo, { rx: -0.12, filo: 0.008, r: 0.015 });
+    p.box(0.4, 0.36, 0.07, 0, 0.43, -0.235, C.chair, { r: 0.035, rx: -0.12, seg: 2 });
+    const perni = [];
+    return {
+      nuova(x, y, a) {
+        const o = new THREE.Object3D();
+        o.position.set(x, 0, y);
+        o.rotation.y = a;
+        o.scale.setScalar(U);
+        perni.push(o);
+        return o;
+      },
+      chiudi() {
+        const m = senzaFilo(new THREE.InstancedMesh(forma.geometry(), K.toon, perni.length));
+        // Le copie stanno sparse per il salone: il conto di cosa e' in quadro non vale la pena.
+        m.frustumCulled = false;
+        K.radice.add(m);
+        B.sedie = () => {
+          perni.forEach((o, k) => {
+            o.updateMatrix();
+            m.setMatrixAt(k, o.matrix);
+          });
+          m.instanceMatrix.needsUpdate = true;
+        };
+        B.sedie();
+      },
+    };
+  })();
+
+  // =====================================================================
   //  le scrivanie
   // =====================================================================
   function scrivania(i) {
     const d = R.DESKS[i];
-    const y = d.b - 14;
-    // La meta' destra e' lo specchio della sinistra: il capo «di fuori» e' quello
-    // lontano dalla linea di mezzo, ed e' li' che sta il monitor.
+    // La meta' destra della stanza e' lo specchio della sinistra.
     const mir = d.x + 24 > W / 2;
-    const sx = mir ? -1 : 1;
-    const ox = mir ? d.x + 48 : d.x;
-    const n = [sx * Math.sin(PHI), Math.cos(PHI)];
-    const mon = [ox + sx * MON[0], y + MON[1]];
-    const seat = [mon[0] + n[0] * DISTANZA, mon[1] + n[1] * DISTANZA];
-    const guarda = Math.atan2(-n[0], -n[1]);
+    const q = K.qui(d.x + (mir ? 48 - CENTRO[0] : CENTRO[0]), d.b + CENTRO[1], mir ? -ALFA : ALFA, 0, mir);
 
-    L.con(T(ox, y, 0, 0, mir), () => {
-      box(1, 1, 0, 2.5, 12, 9, C.woodLo);
-      box(32, 1.5, 0, 12.5, 11.5, 9, C.wood);
-      for (const z of [3, 6]) face(32.6, 43.9, 13, z, z + 0.8, C.woodDk);
-      box(44.5, 1, 0, 2.5, 12, 9, C.woodLo);
-      box(0, 0, 9, 48, 14, 2.2, C.woodTop);
-      L.con(T(MON[0], MON[1], 0, PHI), () => {
-        // Il piede, il collo e la cornice; lo schermo e' un pezzo a parte, che cambia.
-        box(-3.5, -2, PIANO, 7, 4, 0.5, C.monLo);
-        box(-1.5, -1.4, PIANO + 0.5, 3, 1.6, 2.4, C.monLo);
-        box(-9, -1, 13.8, 18, 2, 12, C.bezel);
-        // La tastiera, fra lo schermo e chi lo guarda, girata come lui. Corta: di
-        // sbieco su un piano profondo quattordici una tastiera intera sporge.
-        box(-4.5, 3.7, PIANO, 9, 3, 0.5, C.woodDk);
-      });
-    });
+    // --- il piano, i due fianchi, il pannello davanti alle gambe, e la cassettiera
+    //     sotto il capo libero
+    q.slab(LARGO, FONDO, 0.05, 0, PIANO_M - 0.05, 0, C.woodTop, { r: 0.08 });
+    for (const s of [-1, 1]) q.box(0.06, PIANO_M - 0.05, FONDO - 0.12, s * (LARGO / 2 - 0.1), 0, 0, C.wood, { r: 0.025 });
+    q.box(LARGO - 0.26, 0.24, 0.03, 0, 0.22, 0.08 - FONDO / 2, C.woodLo, { r: 0.012, filo: 0 });
+    q.box(0.28, 0.38, 0.44, -0.33, 0.1, -0.03, C.wood, { r: 0.03 });
+    for (const y of [0.31, 0.15]) {
+      q.box(0.22, 0.14, 0.02, -0.33, y, 0.2, C.woodTop, { r: 0.01, filo: 0.006 });
+      q.sph(0.018, -0.33, y + 0.07, 0.218, C.cream, { filo: 0, n: 8 });
+    }
+    // --- il monitor, appena reclinato; la tastiera e il mouse davanti a chi siede
+    q.disc(0.13, 0.022, ASSE, PIANO_M, SCHERMO, C.bezel);
+    q.cyl(0.024, 0.03, 0.16, ASSE, PIANO_M + 0.02, SCHERMO - 0.01, C.bezel, { filo: 0.008, n: 10 });
+    const s = q.at(ASSE, PIANO_M + 0.35, SCHERMO, 0, -0.1);
+    s.box(0.62, 0.42, 0.06, 0, -0.21, 0, C.bezel, { r: 0.03, seg: 2 });
+    const vetro = schermi.aggiungi(s.m.clone().multiply(mtx(0, 0, 0.033)), mir);
+    q.box(0.34, 0.02, 0.12, ASSE, PIANO_M, TASTI, C.tasti || C.cream, { r: 0.008, filo: 0.007 });
+    for (let k = -1; k <= 1; k++) q.cube(0.3, 0.004, 0.024, ASSE, PIANO_M + 0.019, TASTI + k * 0.034, C.stone, { filo: 0 });
+    q.sph(1, ASSE + 0.25, PIANO_M + 0.014, TASTI, C.cream, { s: [0.03, 0.02, 0.045], filo: 0.007, n: 10 });
 
-    // --- lo schermo: spento, acceso, al lavoro. Tre pezzi, e se ne vede uno.
-    const sch = new THREE.Group();
-    sch.position.set(mon[0], 0, mon[1]);
-    sch.rotation.y = sx * PHI;
-    K.radice.add(sch);
-    const a = -7.7;
-    const b = 7.7;
-    const z0 = 15.1;
-    const z1 = 24.5;
-    const yf = 1.02;
-    const pannello = (P) =>
-      pezzo((q) => {
-        if (!P) return q.box(a, yf, z0, b - a, 0.1, z1 - z0, C.off, GLOW);
-        q.box(a, yf, z0, b - a, 0.12, z1 - z0, P[0], GLOW);
-        q.box(a, yf + 0.06, z1 - 2.2, b - a, 0.12, 2.2, P[1], GLOW);
-        q.box(a, yf + 0.06, z0, b - a, 0.12, 2.6, P[2], GLOW);
-      }, sch);
-    const stati = { off: pannello(null), on: pannello(S.schermi.on), working: pannello(S.schermi.working) };
-    // Chi scrive: tre righe che cambiano lunghezza quattro volte al secondo.
-    const righe = [0, 1, 2].map((k) => {
-      const r = new THREE.Mesh(UBOX, K.mat.rigaLavoro);
-      const w = 2.3 + rnd('riga', i, k) * 10;
-      r.scale.set(w, 0.85, 0.12);
-      r.position.set(a + 1.2 + w / 2, z0 + 3.5 + k * 1.75, yf + 0.2);
-      stati.working.add(r);
-      return r;
-    });
-    // E chi aspetta: un cursore che lampeggia.
-    const cursore = new THREE.Mesh(UBOX, K.mat.rigaAccesa);
-    cursore.scale.set(1.9, 1.8, 0.12);
-    cursore.position.set(a + 2.5, z0 + 4.5, yf + 0.2);
-    stati.on.add(cursore);
-    let luce = null;
-    if (S.schermi.luce) {
-      luce = new THREE.PointLight(S.schermi.on[0], 0, 85, 1.25);
-      luce.position.set(0, 20, 7);
-      sch.add(luce);
-    }
-    let alone = null;
-    if (S.aloni) {
-      alone = new THREE.Mesh(
-        K.geoAlone,
-        new THREE.MeshBasicMaterial({ map: K.trama, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })
-      );
-      alone.scale.set(46, 34, 1);
-      alone.quaternion.copy(K.vista.q);
-      alone.position.set(mon[0] + n[0] * 2.5, 19.8, mon[1] + n[1] * 2.5);
-      alone.renderOrder = 5;
-      K.radice.add(alone);
-    }
+    // Dove cade tutto questo nella pianta: lo si chiede alla penna che l'ha
+    // disegnato, cosi' specchio e giro sono gia' dentro e non si rifanno a mano.
+    const [sx, sy] = dove(q, ASSE, 0, SIEDE);
+    const [fx, fy] = dove(q, ASSE, 0, SIEDE - 1);
+    const guarda = Math.atan2(fx - sx, fy - sy);
+    const mon = dove(q, ASSE, 0, SCHERMO).slice(0, 2);
+    const [tx, ty, tz] = dove(q, 0, PIANO_M, 0);
+
+    // --- la sedia: gira con chi ci sta seduto (lo specchio le dice di quanto).
+    const sedia = sedie.nuova(sx, sy, guarda);
+
+    /* La luce che fa lo schermo, nelle pelli che la vogliono: una chiazza sommata,
+       stesa sul piano davanti a lui (`schermi.luce`), e un alone rivolto a chi guarda
+       (`aloni`). Non sono lampade. Una lampada vera si paga a ogni pixel della
+       stanza, e qui sarebbero otto: a tinte piatte, dove non c'e' una scheda grafica
+       la scena si fermava a un fotogramma ogni dieci secondi. */
+    const chiazza = (punto, largo, alto, piana) => {
+      const m = new THREE.Mesh(K.geoAlone, new THREE.MeshBasicMaterial({ map: K.trama, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      m.scale.set(largo, alto, 1);
+      if (piana) m.rotation.x = -Math.PI / 2;
+      else m.quaternion.copy(K.vista.q);
+      m.position.set(punto[0], punto[2], punto[1]);
+      m.renderOrder = 5;
+      K.radice.add(m);
+      return m;
+    };
+    const luce = S.schermi.luce ? chiazza(dove(q, ASSE, PIANO_M + 0.012, 0.06), 52, 52, true) : null;
+    const alone = S.aloni ? chiazza(dove(s, 0, 0, 0.25), 64, 48) : null;
+
     let stato = '';
     const banco = {
       i,
@@ -601,59 +901,42 @@ export function costruisci(K) {
       b: d.b,
       mir,
       mon,
+      /**
+       * Il piano, per chi ci appoggia qualcosa: il centro e l'altezza, da che parte
+       * guarda chi siede (`a`, come `posto.a`), quanto e' largo e profondo, e un
+       * punto sgombro — lontano da schermo e tastiera, dal capo verso la camera —
+       * dove sta una tazza o si sdraia un gatto.
+       */
+      top: { x: tx, y: ty, z: tz, a: guarda, w: LARGO * U, d: FONDO * U, libero: dove(q, LIBERO[0], PIANO_M, LIBERO[1]).slice(0, 2) },
       /** La targhetta sta sopra lo schermo solo se dietro non c'e' un'altra fila a cui finirebbe addosso. */
       sopra: !R.DESKS.some((o) => o.b < d.b - 1 && d.b - o.b < 90),
-      /** La normale vera dello schermo, letta dal pezzo che c'e' e non dalla formula. */
-      get normale() {
-        return [Math.sin(sch.rotation.y), Math.cos(sch.rotation.y)];
-      },
+      /** La normale vera dello schermo, in pianta: quella del vetro che c'e'. */
+      normale: vetro.n,
       /** `s`: 'off' | 'on' | 'working' — quello che dice la classe del monitor piatto. */
       accendi(s) {
         if (s === stato) return;
+        schermi.conta((s !== 'off') - (stato !== '' && stato !== 'off'));
         stato = s;
-        for (const k of Object.keys(stati)) stati[k].visible = k === s;
+        schermi.mostra(vetro.k, s === 'working' && i % 2 ? 'working2' : s, mir);
         const P = S.schermi[s];
-        if (luce) {
-          luce.intensity = P ? S.schermi.luce : 0;
-          if (P) luce.color.set(P[0]);
-        }
-        if (alone) {
-          alone.visible = !!P;
-          if (P) alone.material.color.set(P[0]).multiplyScalar(0.34 * S.aloni);
+        for (const [m, forza] of [[luce, S.schermi.luce / 90], [alone, 0.34 * S.aloni]]) {
+          if (!m) continue;
+          m.visible = !!P;
+          if (P) m.material.color.set(P[0]).multiplyScalar(forza);
         }
       },
     };
-    banco.accendi('off');
-    K.anima((t) => {
-      if (stato === 'working') {
-        righe.forEach((r, k) => {
-          const w = 2.3 + rnd('riga', i, k, Math.floor(t * 4) % 8) * 10;
-          r.scale.x = w;
-          r.position.x = a + 1.2 + w / 2;
-        });
-      }
-      cursore.visible = Math.floor(t * 2) % 2 === 1;
-      if (luce && stato !== 'off') luce.intensity = S.schermi.luce * (1 + 0.18 * Math.sin(TAU * (t / 2 + i * 0.37)));
-    });
+    // Uno schermo acceso non fa una luce ferma: trema appena, ognuno col suo tempo.
+    if (luce) K.anima((t) => (luce.material.opacity = 0.85 + 0.15 * Math.sin(TAU * (t / 2 + i * 0.37))));
 
-    // --- la sedia: gira con chi ci sta seduto (lo specchio le dice di quanto).
-    const sedia = pezzo((q) => {
-      q.box(-3, -0.6, 0, 6, 1.2, 0.6, C.chairLo);
-      q.box(-0.6, -3, 0, 1.2, 6, 0.6, C.chairLo);
-      q.box(-1, -1, 0, 2, 2, SEDILE - 1.3, C.chairLo);
-      q.box(-4.3, -4, SEDILE - 1.3, 8.6, 8, 1.3, C.chair);
-      q.box(-4.3, -5.4, SEDILE, 8.6, 1.4, 7.6, C.chair);
-    });
-    sedia.position.set(seat[0], 0, seat[1]);
-    sedia.rotation.y = guarda;
-    const posto = { tipo: 'banco', i, p2: [d.x + 24, d.b + 16], x: seat[0], y: seat[1], a: guarda, sedia };
+    const posto = { tipo: 'banco', i, p2: [d.x + 24, d.b + 16], x: sx, y: sy, a: guarda, sedia };
     banco.posto = posto;
 
     /* Il controllo, lasciato qui apposta: chi siede a questa scrivania guarda lo
        schermo, e gli sta davanti. Letto dai pezzi montati — l'angolo del posto, la
-       rotazione vera dello schermo — e non dai numeri di qui sopra: e' cosi' che
-       prende anche uno specchio sbagliato. Nella prima anteprima sedevano tutti dalla
-       parte opposta, a fissare il retro del proprio monitor. */
+       normale del vetro cosi' come si disegna — e non dai numeri di qui sopra: e'
+       cosi' che prende anche uno specchio sbagliato. Nella prima anteprima sedevano
+       tutti dalla parte opposta, a fissare il retro del proprio monitor. */
     const nn = banco.normale;
     const punto = Math.sin(posto.a) * nn[0] + Math.cos(posto.a) * nn[1];
     const davanti = (posto.x - mon[0]) * nn[0] + (posto.y - mon[1]) * nn[1];
@@ -699,11 +982,23 @@ export function costruisci(K) {
   }
   B.fatti.add('desk');
   R.DESKS.forEach((_, i) => scrivania(i));
+  schermi.chiudi();
+  sedie.chiudi();
+  for (const b of B.banchi) b.accendi('off');
+  K.radice.add(muro.mesh(K.toon, false));
 
-  // Le buste: otto, quante ne tiene in aria la stanza piatta (MAX_BUSTE in room.js).
+  /* Le buste: otto, quante ne tiene in aria la stanza piatta (MAX_BUSTE in room.js).
+     Una busta disegnata una volta — il corpo, il contorno, le due pieghe del lembo —
+     e otto mesh che la mostrano, ognuna col suo materiale: e' li' che lo specchio
+     mette il colore del suo genere e quanto si vede. Guardano sempre la camera. */
+  const busta = new Tratto();
+  const pb = penna(busta);
+  pb.box(0.32, 0.21, 0.035, 0, -0.105, 0, C.carta, { r: 0.012, filo: 0.012 });
+  for (const s of [-1, 1]) pb.cube(0.19, 0.014, 0.006, s * 0.08, 0.045, 0.02, C.ink, { filo: 0, rz: s * 0.58 });
+  const formaBusta = busta.geometry();
   for (let i = 0; i < 8; i++) {
-    const m = new THREE.Mesh(UBOX, new THREE.MeshBasicMaterial({ transparent: true }));
-    m.scale.set(5.2, 3.6, 0.5);
+    const m = new THREE.Mesh(formaBusta, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true }));
+    m.scale.setScalar(U);
     m.quaternion.copy(K.vista.q);
     m.visible = false;
     K.radice.add(m);

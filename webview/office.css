@@ -1432,3 +1432,76 @@ body.inoffice.linguette .top #btnNew {
 .office.tre .of-guy > :is(.of-body, .of-tazza, .of-note, .of-faldone) {
   visibility: hidden;
 }
+
+/* ---- le targhette, in 3D ----
+   Nella stanza piatta sono cartellini a pixel, larghi quanto una scrivania. Qui la
+   stanza e' un disegno a tratto e il cartellino lo diventa anche lui: una pillola
+   color crema col bordo a inchiostro, larga quanto il nome che porta, e una codina
+   che indica di chi e' — in giu' se sta sopra il suo schermo, in su se sta per terra
+   davanti alla sua postazione. Da che parte lo scrive lo specchio in `data-tre`
+   (webview3d/mirror.js), che e' anche quello che la mette al suo posto: qui non c'e'
+   una posizione. Le misure sono in pixel di stanza, e lo specchio le ingrandisce. */
+.office.tre .of-plate {
+  --tre-filo: #3a2030;
+  width: max-content;
+  min-width: 30px;
+  max-width: 84px;
+  margin-left: 0;
+  padding: 2px 5px 3px;
+  border-radius: 4px;
+  background: #fff8ea;
+  color: #3a2030;
+  box-shadow:
+    inset 0 0 0 0.9px var(--tre-filo),
+    0 1.4px 0 var(--tre-filo);
+}
+.office.tre .of-plate::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -2.4px;
+  width: 4.4px;
+  height: 4.4px;
+  margin-left: -2.2px;
+  background: inherit;
+  /* Mezzo quadrato girato: i due lati col filo sono quelli che sporgono. */
+  box-shadow: 0.9px 0.9px 0 var(--tre-filo);
+  transform: rotate(45deg);
+}
+.office.tre .of-plate[data-tre='sotto']::after {
+  bottom: auto;
+  top: -2.4px;
+  box-shadow: -0.9px -0.9px 0 var(--tre-filo);
+}
+.office.tre .of-plate .of-name {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.office.tre .of-plate .of-bar2 {
+  height: 2.2px;
+  margin-top: 1.4px;
+  border-radius: 2px;
+  background: #e6dccb;
+  box-shadow: 0 0 0 0.6px var(--tre-filo);
+}
+/* Quella che stai guardando, e quella che ti aspetta: il filo cambia colore, la
+   forma resta. (Le regole di sopra vincerebbero su quelle di tutti i giorni.) */
+.office.tre .of-plate.focused {
+  --tre-filo: var(--claude-1);
+  box-shadow:
+    inset 0 0 0 1.2px var(--tre-filo),
+    0 1.4px 0 var(--tre-filo);
+}
+.office.tre .of-plate.asking {
+  animation: of-plate-chiede-tre 1s steps(1) infinite;
+}
+@keyframes of-plate-chiede-tre {
+  0%,
+  60% {
+    --tre-filo: var(--of-clay);
+  }
+  61%,
+  100% {
+    --tre-filo: #3a2030;
+  }
+}

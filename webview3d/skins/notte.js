@@ -18,9 +18,14 @@
  *               vanno dati tutti (l'elenco e' qui sotto: una voce che manca e' un
  *               mobile nero). `vasi` sono i sei vasi nell'ordine delle piante di
  *               room.js, `verde` quattro verdi dal piu' scuro, `faldoni` i dorsi.
+ *               Due sono facoltative, e chi non le da' le ha color `cream`: `tasti`
+ *               (la tastiera) e `pomello` (quello della porta).
  *
  *     schermi   { on: [corpo, luce, ombra], working: [corpo, luce, ombra],
  *                 luce: quanta luce fa uno schermo acceso sulla scrivania (0 = niente) }
+ *               Le tre tinte sono quelle della pagina che lo schermo mostra. La luce
+ *               e' una chiazza sommata sul piano, non una lampada: una lampada vera
+ *               si paga a ogni pixel della stanza, e sarebbero otto.
  *
  *     filo      Il colore del filo al neon in cima ai muri, o null: allora al suo
  *               posto c'e' un cordolo di C.wallHi.
@@ -32,23 +37,49 @@
  *
  *     luci      { ambiente: [colore, forza], chiave: [colore, forza, [x, y, z]],
  *                 riempi: [colore, forza] } — la chiave e' quella che fa le ombre, e
- *               [x, y, z] e' da dove viene rispetto al centro della stanza (pianta).
+ *               [x, y, z] e' da che parte viene rispetto al centro della stanza
+ *               (pianta: x a est, y verso chi guarda, z in alto). Conta la
+ *               direzione, non la lunghezza. Il guscio e le postazioni sono a tinte
+ *               piatte: l'ambiente e' il colore delle ombre, e ogni luce in piu' e'
+ *               una fila di gradini in piu' — un riempimento a forza 0 non si accende.
  *
  *     sfondo(g, w, h)
- *               Dipinge quello che sta attorno alla stanza, su una tela w x h.
+ *               Dipinge quello che sta dietro la stanza, su una tela w x h. La
+ *               stanza riempie la scheda, quindi si vede solo nel fotogramma in cui
+ *               la scheda ha cambiato misura e la stanza non ancora.
  *
  *     pavimento(g, R)
  *               Dipinge il pavimento. `g` e' gia' in pixel di stanza. R = { W, H,
  *               MEZZO (la riga dove finiscono le due stanze di sopra), VANO: [x, w]
  *               la soglia della porta, ghiaia: [{ x, y, r }] attorno alla fontanella }.
+ *               `H` qui e' fin dove arriva il pavimento, non la stanza: corre verso
+ *               chi guarda oltre il bordo di sotto della scheda, e il salone va
+ *               dipinto fin li'.
  *
- *     vetrata(g, w, h, lato)
- *               Dipinge un muro, in pixel di stanza: `lato` e' 'n' per quello di
- *               fondo — il protagonista della meta' alta — e 'w' / 'e' per i due
- *               di fianco. Tornare `false` vuol dire «da questo lato niente vetro».
+ *     vetrata(g, w, h, lato, info)
+ *               Dipinge un vetro, in pixel di stanza: `lato` e' 'n' per il muro di
+ *               fondo — il protagonista della meta' alta: va dal davanzale fin
+ *               oltre il bordo di sopra della scheda, e in una scheda alta e' alto
+ *               parecchi metri — e 'w' / 'e' per i due di fianco, dove il vetro e'
+ *               una fascia dal davanzale al traverso. Tornare `false` vuol dire «da
+ *               questo lato niente vetro»: il muro resta pieno.
  *               Puo' tornare una funzione `(giro) => bool`: il motore la chiama una
  *               volta al secondo (mai con le animazioni ridotte) e ridisegna la
  *               trama se torna true. E' cosi' che le finestre si accendono.
+ *               `info` e' per chi vuole dipingere a misura vera invece che in parti
+ *               di `h`, e si puo' ignorare: { z0: quanto sta sopra il pavimento il
+ *               bordo di sotto, cima: a che altezza la scheda taglia il vetro (piu'
+ *               su non si vede), vetri: [x] il centro di ogni vetro fra due
+ *               montanti, da sinistra } — tutto in unita' di stanza (kit.js: U ne fa
+ *               un metro).
+ *
+ *     nuvole(g, w, h, i)
+ *               Facoltativa. Dipinge una striscia di cielo con le sue nuvole su una
+ *               tela trasparente di w x h PIXEL, che si ripete di fianco: il motore
+ *               ne stende qualcuna contro la vetrata di fondo, dietro i montanti,
+ *               in corsie una sopra l'altra, e le fa scorrere piano — mai con le
+ *               animazioni ridotte. `i` e' il numero della corsia. Chi non la da'
+ *               ha il cielo che ha dipinto in `vetrata`, fermo.
  *
  *     extra(K)  I mobili che ha solo questa pelle. K e' la cassetta dei costruttori:
  *               K.box / K.cyl / K.face scrivono nella stanza ferma (vedi kit.js),
@@ -57,6 +88,12 @@
  *               tela nuova, K.R la pianta (DESKS, PROPS, W, H, WH…), K.anima(fn) una
  *               funzione chiamata a ogni fotogramma con il tempo in secondi — mai
  *               con le animazioni ridotte — e K.scena la scena di three.
+ *               Per chi disegna a tratto come il resto della stanza (kit.js, «A
+ *               TRATTO»): K.qui(x, y, ry, z, specchio) e' una penna piantata in un
+ *               punto della pianta, che scrive in metri nella stanza ferma, e
+ *               K.parte(fn) un pezzo che si muove. K.Q e' il quadro: `cima` e `giu`
+ *               dove la scheda taglia la vetrata e il pavimento, `lungo` e `alto`
+ *               fin dove arrivano il pavimento e i due muri di fianco.
  *   }
  * =====================================================================
  *

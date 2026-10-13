@@ -23,7 +23,6 @@
 import { THREE, U, clamp, ease, lerp, giro as corto } from './kit.js';
 import { persona, ALTA } from './people.js';
 import { nuovo, ingressi, sposta, atteggia, siediSubito, SBRACCIO, ACCANTO, LIBRO_DOPO } from './gesti.js';
-import { PIANO } from './props.js';
 
 /** I nodi del palco che hanno un gemello a volumi, o che sono solo contenitori. */
 const SALTA = /(^|\s)(of-floor|of-wall|of-luce|of-tappeto|of-porta|of-mon|of-mail|of-nobody|of-crowd|of-bacheche|of-portatili|of-tazze|in3d)(\s|$)/;
@@ -433,9 +432,10 @@ export function specchio(M) {
     /* Le buste. Sono le sole cose che non restano il loro nodo: volano lungo un
        `offset-path`, e quello si compone con `translate` e `scale` in un modo che
        non si raddrizza (la scala moltiplica anche il tragitto, e il nodo gira con
-       la curva). Quindi qui la busta e' una scatola: i capi si leggono dal sentiero
-       scritto addosso al nodo, e a che punto e' lo dice `offset-distance` mentre
-       l'animazione gira. La campata la rifa' la stanza, in altezza vera. */
+       la curva). Quindi qui la busta e' un pezzo disegnato: i capi si leggono dal
+       sentiero scritto addosso al nodo, e a che punto e' lo dice `offset-distance`
+       mentre l'animazione gira. La campata la rifa' la stanza, in altezza vera, e in
+       volo la busta dondola un poco. */
     const buste = stage.querySelectorAll('.of-mail');
     M.B.buste.forEach((m, i) => {
       const n = buste[i];
@@ -450,16 +450,20 @@ export function specchio(M) {
       }
       const cs = getComputedStyle(n);
       const w = clamp((parseFloat(cs.offsetDistance) || 0) / 100);
-      m.position.set(lerp(s.a.x, s.b.x, w), lerp(s.a.z, s.b.z, w) + Math.sin(Math.PI * w) * 26, lerp(s.a.y, s.b.y, w));
+      m.position.set(lerp(s.a.x, s.b.x, w), lerp(s.a.z, s.b.z, w) + Math.sin(Math.PI * w) * 44, lerp(s.a.y, s.b.y, w));
+      m.quaternion.copy(M.vista.q);
+      if (!M.calmo) m.rotateZ(0.22 * Math.sin(w * 9 + i));
       m.material.color.set(s.c);
       m.material.opacity = parseFloat(cs.opacity);
     });
   }
 
+  /** Le mani di chi sta in piedi: da li' parte, e li' arriva, quello che vola. */
+  const MANI = 22;
   /** Un punto «a mezz'aria» della stanza piatta: sulla faccia di un mobile del muro, o all'altezza delle mani. */
   function aria(x, y) {
     const m = appeso(x, y);
-    return m ? { x, y: m.yf, z: m.fz(m.b - y) } : { x, y: y + 12, z: 12 };
+    return m ? { x, y: m.yf, z: m.fz(m.b - y) } : { x, y: y + 12, z: MANI };
   }
   const appeso = (x, y) => M.B.appesi.find((m) => x >= m.x0 && x <= m.x1 && y >= m.y0 && y < m.b - 0.5);
 
@@ -475,34 +479,62 @@ export function specchio(M) {
     if (!w && !h) return;
     const x = l + w / 2;
     const y = t + h;
-    // Appeso a un mobile del muro: sulla sua faccia. Su una scrivania: sul piano, dal
-    // capo libero (quello lontano dal monitor). Tutto il resto: in piedi per terra.
+    // Appeso a un mobile del muro: sulla sua faccia. Su una scrivania: sul piano, nel
+    // punto sgombro che la scrivania stessa indica — la postazione e' girata, e il
+    // posto che la cosa ha nella stanza piatta cadrebbe sotto lo schermo; due cose
+    // sullo stesso piano si mettono in fila verso il fondo. Il resto: in piedi per terra.
     const m = appeso(x, y);
     let p;
     if (m) p = proietta(x, m.yf, m.fz(m.b - y));
     else {
       const b = M.B.banchi.find((d) => x >= d.x && x <= d.x + R.SW && y > d.b - R.SH && y <= d.b);
       if (b) {
-        const lu = 33 + 12 * (1 - (x - b.x) / R.SW);
-        p = proietta(b.mir ? b.x + R.SW - lu : b.x + lu, b.b - 5, PIANO);
+        const T = b.top;
+        const k = ((x - b.x) / R.SW - 0.5) * 0.45 * T.d;
+        p = proietta(T.libero[0] + Math.sin(T.a) * k, T.libero[1] + Math.cos(T.a) * k, T.z);
       } else p = proietta(x, y, 0);
     }
     metti(el, l, t, w, h, p.x, p.y, p.s, 'giu');
   }
 
+  /** Quanto sta sopra il piano la cima di uno schermo, in unita' di stanza. */
+  const SCHERMO_ALTO = 19;
+  /** Quanto resta fra una targhetta e la cosa che indica, in pixel di scheda: e' il posto della sua codina. */
+  const CODINA = 7;
+
   function nodi() {
-    // --- le targhette. Sulla scrivania, come nella stanza piatta — ma con la camera
-    //     cosi' bassa fra una fila e l'altra non c'e' il posto di un nome: quella
-    //     della fila dietro sta sopra lo schermo, quella della fila davanti per terra
-    //     ai piedi di chi siede. Ognuna accanto al suo banco, nessuna sopra una persona.
+    // --- le targhette. Sono della scrivania, come nella stanza piatta — ma con la
+    //     camera cosi' bassa fra una fila e l'altra non c'e' il posto di un nome:
+    //     quella della fila dietro sta sopra il suo schermo, quella della fila davanti
+    //     per terra davanti alla sua postazione. Ognuna accanto al suo banco, nessuna
+    //     sopra la testa di chi siede, e tutte dentro la scheda. Chi non ha una
+    //     scrivania (siede a un tavolo) la porta sopra la testa, dov'e' adesso.
     for (const el of stage.querySelectorAll('.of-plate')) {
       if (el.hidden) continue;
       const pl = parseFloat(el.style.left);
       const pt = parseFloat(el.style.top);
       const b = M.B.banchi.find((d) => Math.abs(pl - (d.x + R.SW / 2)) < 1 && Math.abs(pt - (d.b - R.SH - 20)) < 1);
-      const p = b ? (b.sopra ? proietta(b.x + R.SW / 2, b.b - 8, 31) : proietta(b.x + R.SW / 2, b.b + 17, 0)) : proietta(pl, pt + 44, ALTA + 4);
-      // Mai sotto i dieci pixel di scritta: una targhetta che non si legge e' un rettangolo.
-      metti(el, el.offsetLeft, el.offsetTop, el.offsetWidth, el.offsetHeight, p.x, p.y, Math.max(p.s, 10.5 / 6), b && !b.sopra ? 'su' : 'giu');
+      const sotto = !!b && !b.sopra;
+      let p;
+      if (sotto) p = proietta(b.x + R.SW / 2, b.b + 9, 0);
+      else if (b) p = proietta(b.mon[0], b.mon[1], b.top.z + SCHERMO_ALTO);
+      else {
+        const P = vivi.get(el.nextElementSibling);
+        p = P && P.alta ? proietta(P.x, P.y, P.alta + 4) : proietta(pl, pt + 44, ALTA + 4);
+      }
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      // La scritta fra i dieci e i quattordici pixel, qualunque sia la scheda: sotto
+      // non si legge, sopra la targhetta copre la scrivania di cui parla. Ma mai piu'
+      // larga del passo fra due scrivanie (ottanta): in una scheda piccola due nomi
+      // piccoli si leggono meglio di due nomi uno sull'altro.
+      const s = clamp(p.s * 0.68, Math.min(1.75, (74 * p.s) / w), 2.3);
+      const x = clamp(p.x, (w * s) / 2 + 4, M.largo - (w * s) / 2 - 4);
+      const y = sotto ? clamp(p.y + CODINA, 4, M.alto - h * s - 4) : clamp(p.y - CODINA, h * s + 4, M.alto - 4);
+      // Da che parte sta la codina lo decide il foglio di stile (office.css), che lo legge da qui.
+      const verso = sotto ? 'sotto' : 'sopra';
+      if (el.dataset.tre !== verso) el.dataset.tre = verso;
+      metti(el, el.offsetLeft, el.offsetTop, w, h, x, y, s, sotto ? 'su' : 'giu');
     }
     // --- il bottone della bacheca, steso sulla bacheca vera
     const k = stage.querySelector('.of-kanban');
