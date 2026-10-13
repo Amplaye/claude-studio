@@ -30,8 +30,8 @@
  * respiro, le dita sui tasti, lo sguardo che gira — e resta quello che succede
  * davvero: camminare, sedersi, prendere una tazza.
  */
-import { U, PIANO_M, TAU, clamp, ease, lerp, giro as corto, hash, rnd, smooth, pulse } from './kit.js';
-import { ANCA, SEDUTO, COSCIA, STINCO, SUOLA, SPALLA, COLLO } from './people.js';
+import { U, TAU, clamp, ease, lerp, giro as corto, hash, rnd, smooth, pulse } from './kit.js';
+import { ANCA, SEDUTO, COSCIA, STINCO, SUOLA, SPALLA, COLLO, OMERO, AVAMBRACCIO } from './people.js';
 
 // ---------------------------------------------------------------------
 //  le misure
@@ -46,20 +46,32 @@ const RITARDO = 0.14;
 const DAVANTI = 0.34 * U;
 /** Di quanto gira la sedia verso chi arriva. */
 const DI_LATO = 1.75;
-/** A quanto dal fronte di un mobile ci si ferma per usarlo, e a quanto da una pianta o dal cestino. */
-export const SBRACCIO = 0.3 * U;
-export const ACCANTO = 0.48 * U;
+/** A quanto ci si ferma dal fronte di uno scaffale per usarlo, da quello di un bancone, e dall'orlo di una pianta o del cestino. */
+export const SBRACCIO = 0.26 * U;
+export const AL_BANCONE = 0.2 * U;
+export const ACCANTO = 0.27 * U;
+/** E di quanto ci si mette di fianco a quello che si tocca, invece che davanti: chi guarda sta alle spalle. */
+export const DI_FIANCO = 0.33 * U;
 /** I piedi: quanto sono larghi, quanta parte del ciclo stanno a terra, e sotto che velocita' non e' un passo. */
 const LARGO = 0.085 * U;
 const A_TERRA = 0.62;
 const LENTO = 9;
 const FUORI_POSTO = 0.06 * U;
-/** Dove stanno le cose sul piano davanti a chi siede: di traverso e in avanti, dal centro del sedile. */
-const TASTI = 0.31;
-const TAZZA_SUA = [0.3, 0.38];
-const FOGLIO_POSATO = [-0.33, 0.45];
 /** Dalla mano alla base della tazza che regge. */
-const PRESA = [0, -0.04, 0.066];
+const PRESA = [0, -0.045, 0.075];
+/** Fin dove arriva una mano dalla spalla, col gomito appena piegato. */
+const BRACCIO = OMERO + AVAMBRACCIO - 0.015;
+/**
+ * Il giro del caffe', in secondi da quando comincia il gesto: quando la tazza sta
+ * sotto il becco invece che in mano, e quando la macchina versa. Lo specchio accende
+ * la tazza e il getto della macchina su questi stessi tempi (mirror.js).
+ */
+export const CAFFE = { sotto: [0.5, 2.15], versa: [1.05, 1.9] };
+/** Dopo quanto la mano allungata verso la rastrelliera ha la tazza: fino a li' resta sul ripiano. */
+export const PRESA_DOPO = 0.34;
+/** Quanto ci si mette a posare sul piano la tazza che ci si e' portati, e a riprenderla per tornare al bar. */
+const POSA_IN = 0.55;
+export const RIPRENDE_IN = 0.35;
 /** Dopo quanto lavoro si tira fuori il libro. */
 export const LIBRO_DOPO = 10 * 60 * 1000;
 
@@ -96,6 +108,9 @@ for (let i = CAPO; i < CAPO + 3; i++) SVELTA[i] = 10;
 for (let i = MANO; i < MANO + 6; i++) SVELTA[i] = 12;
 for (let i = UMORE; i <= SY; i++) SVELTA[i] = 14;
 for (let i = K_TAZZA; i <= K_GETTO; i++) SVELTA[i] = 16;
+// La tazza del bar non sfuma: passa dalla mano al ripiano, al becco, al lavandino, alla
+// scrivania, e in quei posti c'e' la sua gemella della stanza che si accende nello stesso istante.
+SVELTA[K_TAZZA] = 400;
 SVELTA[IN_MANO_SUA] = SVELTA[IN_MANO_FOGLIO] = 11;
 SVELTA[LEGGE] = 3.4;
 SVELTA[VOCE] = 26;
@@ -144,7 +159,15 @@ export function nuovo(fig, x, y) {
     m: new Float64Array(N * 2),
     primo: true,
     suaDove: null,
+    manoSua: 1,
     mano: 0,
+    /** La tazza del bar fra la mano e il piano della scrivania: la regge ancora anche se la stanza piatta l'ha gia' posata, la sta riprendendo, ce l'ha in mano (vedi atteggia). */
+    regge: false,
+    reggeT: 0,
+    riprende: 0,
+    beve: false,
+    avevaTazza: false,
+    avevaPiena: false,
   };
 }
 
@@ -206,6 +229,11 @@ export function ingressi() {
     tazza: false,
     foglio: false,
     faldone: false,
+    /** Quante tazze porta (chi le ha appena lavate, piu' d'una), e con che mano: quella dalla parte dove la posa sulla sua scrivania. */
+    tazze: 0,
+    manoTazza: 1,
+    /** Sulla sua scrivania c'e' la tazza che si e' portato dal bar. */
+    piena: false,
     // --- a cosa bada: un punto della stanza [x, y, z] in unita', o null
     guarda: null,
     /** L'animale che gli chiede attenzione: { x, y, z, forza } di pets.js, o null. */
@@ -223,6 +251,25 @@ function lato(q, x, y) {
   const dy = y - q.y;
   const p = (s) => dx * Math.sin(q.a + s * DI_LATO) + dy * Math.cos(q.a + s * DI_LATO);
   return p(1) >= p(-1) ? 1 : -1;
+}
+
+/**
+ * La strada dritta da un punto all'altro taglia il piano della scrivania `t`
+ * (`banco.top`)? Le postazioni sono girate, e uno spigolo sporge verso la corsia: chi
+ * punta dritto al fianco della sedia da lontano ci passa attraverso con le gambe.
+ * Si guarda il piano allargato di mezza persona.
+ */
+function taglia(x0, y0, x1, y1, t) {
+  if (!t || !t.w) return false;
+  const s = Math.sin(t.a);
+  const c = Math.cos(t.a);
+  const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 3);
+  for (let i = 0; i <= n; i++) {
+    const dx = x0 + ((x1 - x0) * i) / (n || 1) - t.x;
+    const dy = y0 + ((y1 - y0) * i) / (n || 1) - t.y;
+    if (Math.abs(dx * c - dy * s) < t.w / 2 + 4.5 && Math.abs(dx * s + dy * c) < t.d / 2 + 4.5) return true;
+  }
+  return false;
 }
 
 /** La stanza si e' spostata sotto i piedi (una finestra tirata): ci si sposta con lei, senza un passo. */
@@ -291,7 +338,8 @@ export function sposta(P, I, dt, daUltimo = dt) {
       P.sedia = P.a;
       P.vel = 0;
       inPosto = true;
-    } else if (q === s && Math.hypot(I.fx - s.p2[0], I.fy - s.p2[1]) < VICINO) {
+      // (Finche' la strada dritta taglia lo spigolo della scrivania si resta dietro al gemello piatto, che gira al largo.)
+    } else if (q === s && Math.hypot(I.fx - s.p2[0], I.fy - s.p2[1]) < VICINO && (I.fermo || !taglia(P.x, P.y, Sx, Sy, s.top))) {
       gx = Sx;
       gy = Sy;
       fronte = aL;
@@ -354,7 +402,11 @@ function passi(P, dt) {
   const seduto = P.sit >= 1;
   const cammina = v > LENTO && P.sit <= 0;
   // Piu' si va svelti piu' il passo e' lungo, ma meno della velocita': anche la cadenza sale.
-  const lungo = clamp(0.44 * Math.sqrt(v / PASSO), 0.26, 0.66) * U;
+  // Il primo passo e' corto: chi parte ha un piede sotto di se', non mezzo passo avanti,
+  // e quello che resta a terra finirebbe un metro indietro. Il passo si allunga camminando.
+  if (!cammina || !P.andava) P.falcata = 0.26 * U;
+  else P.falcata += (clamp(0.44 * Math.sqrt(v / PASSO), 0.26, 0.66) * U - P.falcata) * Math.min(1, dt * 2.6);
+  const lungo = P.falcata;
   // Chi parte da fermo comincia alzando un piede, non a meta' di un passo gia' fatto.
   if (cammina && !P.andava) P.passo = A_TERRA * TAU;
   else if (cammina) P.passo += ((v * dt) / lungo) * Math.PI;
@@ -491,11 +543,17 @@ function locale(P, wx, wy, h, out = LOC) {
   out[2] = dx * s + dy * c;
   return out;
 }
-/** Un punto davanti a chi siede al posto `q` — `x` di traverso, `z` in avanti, in metri — visto dalla figura. */
-function sulBanco(P, q, x, h, z, out = LOC) {
+/**
+ * Un punto del piano davanti a chi siede al posto `q`, visto dalla figura. `p` e'
+ * uno dei posti che il piano dice di se' (`q.top`: i tasti, la tazza, il foglio),
+ * spostato di `x` di traverso e `z` in avanti nel verso della sedia, `h` metri
+ * sopra il piano. Chi siede non sa a memoria dove stanno le cose: glielo dice la
+ * scrivania, ed e' per questo che le mani cadono sui tasti anche nella meta' a specchio.
+ */
+function sulPiano(P, q, p, x, h, z, out = LOC) {
   const s = Math.sin(q.a);
   const c = Math.cos(q.a);
-  return locale(P, q.x + (x * c + z * s) * U, q.y + (-x * s + z * c) * U, h, out);
+  return locale(P, p[0] + (x * c + z * s) * U, p[1] + (-x * s + z * c) * U, q.top.z / U + h, out);
 }
 const mano = (k, x, y, z) => {
   T[MANO + 3 * k] = x;
@@ -515,6 +573,10 @@ const versoMano = (k, x, y, z, w) => {
 };
 const A = [0, 0, 0];
 const B = [0, 0, 0];
+/** Dove sta quello che si tocca davanti a un mobile, visto dalla figura: la cosa, e la seconda (il bottone, il ripiano di sotto). */
+const M1 = [0, 0, 0];
+const M2 = [0, 0, 0];
+const IMPILATE = ['tazza2', 'tazza3', 'tazza4'];
 /** Le mani che in questo fotogramma stanno su una cosa della stanza (la bestia), e non seguono il corpo. */
 const FISSA = [0, 0];
 /** Dove sta il libro adesso, davanti a chi legge. */
@@ -593,25 +655,45 @@ export function atteggia(P, I, t, dt) {
   }
 
   // --- cosa ha in mano, e con quale mano
+  /* La tazza del bar sul piano di una scrivania la disegna la stanza (`banco.tazza`),
+     e quando la stanza piatta ce la posa il suo gemello e' appena arrivato al posto:
+     qui lui e' ancora in piedi accanto alla sedia. Quindi la regge finche' non e'
+     seduto e girato, e la posa lui; e quando riparte per il bar prima allunga la mano
+     e la riprende. `P.beve` dice allo specchio che e' in mano sua e sul piano non
+     c'e'; `P.riprende` che sul piano c'e' ancora un attimo. */
+  if (!I.piena || I.tazza) P.regge = false;
+  else if (P.avevaTazza && P.sit < 1) (P.regge = true), (P.reggeT = 0);
+  if (I.tazza && P.avevaPiena && !P.avevaTazza && q && P.sit > 0.5) P.riprende = RIPRENDE_IN;
+  P.avevaTazza = I.tazza;
+  P.avevaPiena = I.piena;
+  P.beve = P.regge;
+  const riprende = P.riprende > 0;
+  if (riprende) P.riprende -= dt;
   const suaInMano = o.tazza && !P.suaDove && !I.tazza;
-  const tazzaInMano = I.tazza || suaInMano;
-  const mF = tazzaInMano ? 0 : 1; // il foglio sta nella mano che la tazza lascia libera
-  let kTazza = I.tazza ? 1 : 0;
+  // La mano della tazza e' quella dalla parte dove la si posa: a destra nelle scrivanie di sinistra, a sinistra nelle loro gemelle.
+  const mT = I.faldone || suaInMano ? 1 : I.manoTazza;
+  const lT = mT ? 1 : -1;
+  const delBar = (I.tazza && !riprende) || P.regge;
+  const tazzaInMano = delBar || suaInMano;
+  const mF = tazzaInMano ? 1 - mT : 1; // il foglio sta nella mano che la tazza lascia libera
+  let kTazza = delBar ? 1 : 0;
   let kFoglio = I.foglio ? 1 : 0;
-  let foglioInMano = 1;
+  let carteInMano = 1;
   let kTelefono = 0;
   let kAnnaffia = 0;
   let kGetto = 0;
   let inclina = 0;
   let suaPresa = suaInMano ? 1 : 0;
-  let occupata0 = I.faldone;
-  let occupata1 = tazzaInMano;
-  if (I.foglio) mF ? (occupata1 = true) : (occupata0 = true);
+  // Seduti, foglio e faldone stanno sul piano: le mani sono libere.
+  const carteGiu = !!q && e > 0.9;
+  let occupata0 = (I.faldone && !carteGiu) || (tazzaInMano && !mT);
+  let occupata1 = tazzaInMano && !!mT;
+  if (I.foglio && !carteGiu) mF ? (occupata1 = true) : (occupata0 = true);
   if (inPiedi > 0.5) {
     // La tazza si porta ferma davanti, che non si rovesci; il foglio un po' piu' giu'; il faldone sotto il braccio.
     if (tazzaInMano) {
-      mano(1, 0.19, ay + 0.27, 0.2);
-      gomito(1, 0.6, -0.5, -0.6);
+      mano(mT, lT * 0.19, ay + 0.27, 0.2);
+      gomito(mT, lT * 0.6, -0.5, -0.6);
     }
     if (I.foglio) {
       const l = mF ? 1 : -1;
@@ -626,6 +708,28 @@ export function atteggia(P, I, t, dt) {
   // Dove sta la testa, per portarci una mano o una tazza.
   const testaY = () => ay + COLLO * Math.cos(tx);
   const testaZ = () => az + COLLO * Math.sin(tx);
+  /**
+   * Porta la mano `k` su un punto visto dalla figura, e il corpo quanto serve perche'
+   * ci arrivi: le ginocchia se e' in basso (fino a `giu` metri), poi la schiena (fino
+   * a `china` radianti). E' quello che mette la mano SULLA cosa — la tazza sul
+   * ripiano, il bottone — a qualunque altezza l'abbia messa chi ha disegnato il mobile.
+   */
+  const arriva = (k, x, y, z, w, giu, china) => {
+    const l = k ? 1 : -1;
+    const c = clamp(ay + SPALLA[1] - 0.2 - y, 0, giu);
+    let p = 0;
+    for (; p < china; p += 0.05) {
+      if (Math.hypot(x - l * SPALLA[0], y - (ay - c + SPALLA[1] * Math.cos(tx + p)), z - az - SPALLA[1] * Math.sin(tx + p)) < BRACCIO) break;
+    }
+    accuccia = Math.max(accuccia, c * w);
+    tx += p * w;
+    versoMano(k, x, y, z, w);
+  };
+  /** Gira la testa verso un punto visto dalla figura. */
+  const occhiSu = (p, w) => {
+    cy = lerp(cy, 0.7 * clamp(Math.atan2(p[0], Math.max(0.1, p[2])), -0.9, 0.9), w);
+    cx = lerp(cx, clamp(Math.atan2(testaY() + 0.215 - p[1], Math.max(0.2, Math.hypot(p[0], p[2]))), -0.45, 0.7) - tx * 0.6, w);
+  };
 
   // ====================================================================
   //  al banco: battere, fermarsi a pensare, leggere
@@ -633,13 +737,10 @@ export function atteggia(P, I, t, dt) {
   const lib = m[2 * LEGGE];
   let legge = 0;
   if (q && alBanco > 0.5) {
-    // La sua tazza sta sul piano, a destra della tastiera: e' li' anche quando lui e' al bar.
-    if (o.tazza && P.sit >= 1 && P.gira >= 1) {
-      const s = Math.sin(q.a);
-      const c = Math.cos(q.a);
-      P.suaDove = [q.x + (TAZZA_SUA[0] * c + TAZZA_SUA[1] * s) * U, q.y + (-TAZZA_SUA[0] * s + TAZZA_SUA[1] * c) * U];
-    }
-    if (I.foglio) foglioInMano = 0;
+    const top = q.top;
+    // La sua tazza sta sul piano, accanto alla tastiera: e' li' anche quando lui e' al bar.
+    if (o.tazza && top.tazza && P.sit >= 1 && P.gira >= 1) P.suaDove = [top.tazza[0], top.tazza[1], top.z, top.manico || 0];
+    carteInMano = 0;
     const scrive = I.fa === 'digita' || I.fa === 'legge';
     if (scrive) {
       tx = 0.07;
@@ -650,7 +751,7 @@ export function atteggia(P, I, t, dt) {
         const l = k ? 1 : -1;
         const vx = vivo ? 0.034 * Math.sin(1.7 * t + f + k * 2.1) + 0.018 * Math.sin(3.3 * t + 2 * f + k) : 0;
         const vz = vivo ? 0.012 * Math.sin(2.3 * t + f * 3 + k * 1.3) : 0;
-        sulBanco(P, q, l * 0.085 + vx, PIANO_M + 0.062, TASTI + vz, A);
+        sulPiano(P, q, top.tasti, l * 0.085 + vx, 0.062, vz, A);
         mano(k, A[0], A[1], A[2]);
         gomito(k, l * 0.9, -0.5, -0.35);
       }
@@ -666,8 +767,15 @@ export function atteggia(P, I, t, dt) {
         }
       }
     }
+    if (P.regge && top.tazza) {
+      // Seduto: posa la tazza che si e' portato dal bar, e da li' in poi sta sul piano.
+      P.reggeT += dt;
+      sulPiano(P, q, top.tazza, 0, 0, 0, B);
+      versoMano(mT, B[0] - PRESA[0], B[1] - PRESA[1], B[2] - PRESA[2], smooth(0, POSA_IN - 0.12, P.reggeT));
+      if (P.reggeT > POSA_IN) (P.regge = P.beve = false), (kTazza = 0);
+    }
     // --- le pause: chi ha Claude che macina ne fa poche, chi sta fra un turno e l'altro di piu'
-    const pausa = vivo && I.fa === 'digita' && !I.animale ? ogniTanto(P, t, lerp(9, 15, I.ritmo), 3, lerp(0.8, 0.45, I.ritmo), 'pausa', 0.55) : null;
+    const pausa = vivo && I.fa === 'digita' && !I.animale && !P.regge ? ogniTanto(P, t, lerp(9, 15, I.ritmo), 3, lerp(0.8, 0.45, I.ritmo), 'pausa', 0.55) : null;
     if (pausa) {
       const w = pausa.w;
       const cosa = Math.floor(pausa.r * 5);
@@ -677,17 +785,19 @@ export function atteggia(P, I, t, dt) {
         cx += 0.26 * w;
         chiusi = w;
         umore = lerp(umore, -0.5, w);
-      } else if (cosa === 0 && o.tazza && P.suaDove) {
-        // Un sorso dalla sua tazza: la prende dal piano, beve, la rimette dov'era.
+      } else if (cosa === 0 && top.tazza && (I.piena || (o.tazza && P.suaDove))) {
+        // Un sorso: prende la tazza dal piano — la sua, o quella che si e' portato dal bar —, beve, la rimette dov'era.
         const u = pausa.u;
-        locale(P, P.suaDove[0], P.suaDove[1], PIANO_M, B);
+        sulPiano(P, q, top.tazza, 0, 0, 0, B);
         const pr = smooth(0.04, 0.2, u) * (1 - smooth(0.82, 0.96, u));
         const su = smooth(0.24, 0.42, u) * (1 - smooth(0.66, 0.82, u));
-        A[0] = lerp(B[0] - PRESA[0], 0.035, su);
+        A[0] = lerp(B[0] - PRESA[0], lT * 0.035, su);
         A[1] = lerp(B[1] - PRESA[1], testaY() + 0.07, su);
         A[2] = lerp(B[2] - PRESA[2], testaZ() + 0.15, su);
-        versoMano(1, A[0], A[1], A[2], pr);
-        suaPresa = u > 0.2 && u < 0.84 ? 1 : 0;
+        versoMano(mT, A[0], A[1], A[2], pr);
+        const presa = u > 0.2 && u < 0.84;
+        if (I.piena) (P.beve = presa), (kTazza = presa ? 1 : 0);
+        else suaPresa = presa ? 1 : 0;
         inclina = 0.55 * su;
         cx -= 0.12 * su;
         tx -= 0.06 * su;
@@ -764,7 +874,7 @@ export function atteggia(P, I, t, dt) {
     }
   } else if (e > 0.9) {
     // Seduto ma non al lavoro: girato verso qualcuno, o fermo da un pezzo.
-    if (I.foglio && q) foglioInMano = 0;
+    if (q) carteInMano = 0;
     if (I.ferma) {
       // Scivolato sulla sedia, lo sguardo che gira, ogni tanto il telefono.
       tx = -0.17;
@@ -790,54 +900,70 @@ export function atteggia(P, I, t, dt) {
   // ====================================================================
   //  in piedi: i gesti davanti ai mobili, e le soste
   // ====================================================================
+  if (riprende && q && q.top.tazza) {
+    // Riparte per il bar: prima la mano va alla tazza, che e' ancora sul piano.
+    sulPiano(P, q, q.top.tazza, 0, 0, 0, B);
+    versoMano(mT, B[0] - PRESA[0], B[1] - PRESA[1], B[2] - PRESA[2], 1);
+  }
   if (inPiedi > 0.5 && I.gesto) {
     const u = t - I.gestoDa;
-    const spalla = ay + SPALLA[1];
-    const dove = I.sosta ? I.sosta.nome : '';
     const g = I.gesto;
+    const S = I.sosta;
+    /* Quello che si tocca sta dove l'ha messo chi ha disegnato il mobile, e lo dice
+       la sosta (`p`, `p2`: mirror.js). Senza un mobile davanti il gesto si fa lo
+       stesso, a memoria: una mensola all'altezza del petto. */
+    if (S && S.p) locale(P, S.p[0], S.p[1], S.p[2] / U, M1);
+    else (M1[0] = 0), (M1[1] = 0.98), (M1[2] = 0.33);
+    if (S && S.p2) locale(P, S.p2[0], S.p2[1], S.p2[2] / U, M2);
+    else (M2[0] = M1[0]), (M2[1] = M1[1] - 0.4), (M2[2] = M1[2]);
+    // Davanti a uno scaffale ci si accuccia e ci si china poco, che la testa non ci entri; su un bancone ci si china e basta.
+    const basso = !!S && S.alto === false;
+    const giu = basso ? 0.04 : 0.13;
+    const china = basso ? 0.5 : 0.4;
     if (g === 'prende' || g === 'posa' || g === 'stacca' || g === 'appende' || g === 'faldone') {
-      // Allungare una mano e tenerla li': la cosa compare o sparisce quando la stanza piatta la da' o la toglie.
-      const k = g === 'faldone' ? 0 : g === 'stacca' || g === 'appende' ? mF : 1;
+      // Allungare una mano fin li' e tenercela: la cosa compare o sparisce quando la stanza piatta la da' o la toglie.
+      const k = g === 'faldone' ? 0 : g === 'stacca' || g === 'appende' ? mF : mT;
       const l = k ? 1 : -1;
-      const alto = g === 'posa' && dove.startsWith('lavandino') ? 0.84 : g === 'stacca' || g === 'appende' ? 1.14 : 1.02;
       const w = smooth(0, 0.32, u);
-      versoMano(k, l * 0.06, alto, 0.31, w);
+      // Chi prende o posa una tazza la tiene per il fianco: la mano sta un palmo prima.
+      const t0 = g === 'prende' || g === 'posa' ? 1 : 0;
+      arriva(k, M1[0] - t0 * PRESA[0], M1[1] - t0 * PRESA[1], M1[2] - (t0 ? PRESA[2] : 0.03), w, giu, china);
       gomito(k, l * 0.7, -0.6, -0.3);
-      if (g === 'faldone') versoMano(1, 0.13, 0.96, 0.28, w);
-      tx += 0.1 * w;
-      cx = lerp(cx, alto > 1.1 ? -0.1 : 0.16, w);
-      cy = lerp(cy, -l * 0.12, w);
+      if (g === 'faldone') arriva(1, M1[0] + 0.12, M1[1] - 0.05, M1[2] - 0.03, w, giu, china);
+      occhiSu(M1, w);
+      // La tazza e' in mano da quando la mano ci e' arrivata: fino a li' sta sul ripiano (lo specchio la tiene accesa).
+      if (g === 'prende' && u > PRESA_DOPO) kTazza = 1;
     } else if (g === 'caffe') {
-      // La tazza sotto il becco, il bottone, l'attesa a guardarla scendere, e la si riprende.
+      // La tazza sotto il becco, il bottone con l'altra mano, l'attesa a guardarla riempirsi, e la si riprende.
       const posa = smooth(0, 0.45, u) * (1 - smooth(0.55, 0.75, u));
       const preme = smooth(0.6, 0.85, u) * (1 - smooth(1.05, 1.3, u));
-      const riprende = smooth(1.85, 2.2, u);
-      versoMano(1, 0.2, 0.86, 0.2, smooth(0.5, 0.9, u));
-      versoMano(1, 0.03, 0.9, 0.31, Math.max(posa, riprende));
-      versoMano(1, 0.14, 1.12, 0.3 + 0.03 * pulse(u, 0.82, 1.08, 0.1), preme);
-      gomito(1, 0.7, -0.6, -0.3);
+      const riprendi = smooth(1.85, 2.2, u);
+      // Tutto con la mano della tazza, che e' quella dalla parte della macchina: la posa, preme, e fra una cosa e l'altra si appoggia al bordo del bancone.
+      versoMano(mT, lT * 0.2, M1[1] + 0.02, M1[2] - 0.07, smooth(0.5, 0.9, u));
+      gomito(mT, lT * 0.7, -0.6, -0.3);
+      arriva(mT, M1[0] - PRESA[0], M1[1] - PRESA[1], M1[2] - PRESA[2], Math.max(posa, riprendi), giu, china);
+      arriva(mT, M2[0], M2[1], M2[2] - 0.05 + 0.02 * pulse(u, 0.82, 1.08, 0.1), preme, giu, china);
       // In mezzo la tazza e' sulla macchina, non in mano.
-      if (u > 0.5 && u < 2.15) kTazza = 0;
-      tx += 0.1 * Math.max(posa, preme, riprende);
-      cx = lerp(cx, 0.3, smooth(0, 0.4, u));
-      cy = lerp(cy, -0.1, preme);
-      if (vivo && u > 1.2 && u < 1.9) {
-        // Aspettando: il peso su un piede, le dita che tamburellano sul piano.
+      if (u > CAFFE.sotto[0] && u < CAFFE.sotto[1]) kTazza = 0;
+      occhiSu(M1, smooth(0, 0.4, u));
+      if (vivo && u > 1.3 && u < 1.85) {
+        // Aspettando: il peso su un piede, le dita che tamburellano sul bordo.
         ax += 0.02 * Math.sin(3 * u);
-        T[MANO + 4] += 0.012 * Math.max(0, Math.sin(19 * u));
+        T[MANO + 3 * mT + 1] += 0.012 * Math.max(0, Math.sin(19 * u));
       }
     } else if (g === 'lava') {
-      // Tutte e due le mani nel lavandino a strofinare; ogni tazza finisce con una scrollata.
+      // Tutte e due le mani nella vasca, a strofinare la tazza sotto il rubinetto; ognuna finisce con una scrollata.
       const w = smooth(0, 0.35, u);
       const giro = u % 2.4;
       const scrolla = smooth(1.9, 2.05, giro) * (1 - smooth(2.3, 2.4, giro));
       for (let k = 0; k < 2; k++) {
         const l = k ? 1 : -1;
-        versoMano(k, l * 0.07, 0.83 + 0.09 * scrolla, 0.29, w);
+        arriva(k, M1[0] + l * 0.075 - lT * 0.03, M1[1] + 0.05 + 0.09 * scrolla, M1[2] - 0.085, w, giu, china);
         gomito(k, l * 0.9, -0.5, -0.2);
       }
-      tx += 0.24 * w;
-      cx = lerp(cx, 0.38, w);
+      // Quella che lava ce l'ha fra le mani (lo specchio la toglie dalla vasca).
+      if (u > 0.3) kTazza = 1;
+      occhiSu(M1, w);
     } else if (g === 'broncio') {
       // Nessuna tazza da nessuna parte: le spalle giu', le mani aperte, la testa che dice di no.
       const w = smooth(0, 0.3, u) * (1 - smooth(1.2, 1.6, u));
@@ -853,10 +979,11 @@ export function atteggia(P, I, t, dt) {
       umore = lerp(umore, -1, smooth(0, 0.2, u));
       ciglia = -0.8 * w;
     } else if (g === 'annaffia') {
-      // L'annaffiatoio sulla pianta: si inclina, versa, si rialza.
+      // L'annaffiatoio sopra la pianta — il becco sporge un quarto di metro oltre la mano —: si inclina, versa, si rialza.
       const w = smooth(0, 0.5, u);
       const versa = smooth(0.7, 1.2, u) * (1 - smooth(3.5, 4, u));
-      versoMano(1, 0.1 + (vivo ? 0.05 * Math.sin(1.3 * u) : 0) * versa, lerp(0.86, 0.95, versa), 0.26, w);
+      const sopra = S && S.p ? Math.max(0.86, M1[1] + 0.5) : 0.86;
+      versoMano(1, (S && S.p ? M1[0] : 0.1) + (vivo ? 0.05 * Math.sin(1.3 * u) : 0) * versa, sopra + 0.09 * versa, S && S.p ? Math.max(0.18, M1[2] - 0.26) : 0.26, w);
       gomito(1, 0.7, -0.6, -0.3);
       kAnnaffia = w * (1 - smooth(4.1, 4.45, u));
       inclina = 0.62 * versa;
@@ -870,38 +997,46 @@ export function atteggia(P, I, t, dt) {
       const w = smooth(0, 0.4, u) * (1 - smooth(2.8, 3.2, u));
       const due = smooth(0.95, 1.25, u);
       const sotto = smooth(1.9, 2.25, u);
-      versoMano(1, lerp(lerp(-0.07, 0.13, due), 0.03, sotto), lerp(1.04, 0.66, sotto), 0.3, w);
+      A[0] = lerp(lerp(M1[0] - 0.07, M1[0] + 0.13, due), M2[0] + 0.03, sotto);
+      A[1] = lerp(M1[1], M2[1], sotto);
+      A[2] = M1[2];
+      arriva(1, A[0], A[1], A[2], w, giu, china);
       gomito(1, 0.7, -0.6, -0.3);
-      accuccia = 0.12 * sotto * w;
-      tx += (0.08 + 0.28 * sotto) * w;
-      cx = lerp(cx, lerp(-0.12, 0.3, sotto), w);
-      cy = lerp(cy, lerp(0.15, -0.15, due), w);
+      occhiSu(A, w);
       ciglia = 0.5 * w;
     } else if (g === 'bacheca') {
       // Si legge la bacheca col dito: un foglietto, poi un altro.
       const w = smooth(0, 0.4, u) * (1 - smooth(3.5, 4, u));
       const due = smooth(1.5, 1.9, u);
       const tocca = vivo ? 0.02 * Math.max(0, Math.sin(7 * u)) : 0;
-      versoMano(1, lerp(-0.05, 0.16, due), lerp(1.2, 1.06, due), 0.29 + tocca, w);
+      A[0] = M1[0] + lerp(-0.05, 0.16, due);
+      A[1] = M1[1] + lerp(0, -0.14, due);
+      A[2] = M1[2] - 0.05 + tocca;
+      arriva(1, A[0], A[1], A[2], w, giu, china);
       gomito(1, 0.7, -0.6, -0.3);
       if (!occupata0) {
         versoMano(0, -0.2, ay + 0.03, 0.04, w);
         gomito(0, -0.9, -0.2, -0.5);
       }
-      tx += 0.06 * w;
-      cx = lerp(cx, lerp(-0.14, 0.02, due), w);
-      cy = lerp(cy, lerp(0.14, -0.2, due), w);
+      occhiSu(A, w);
     } else if (g === 'cestino') {
-      // La carta sopra il cestino, la si lascia cadere, e ci si spolvera le mani.
+      // La carta sopra il cestino — proprio sopra, che ci cada dentro —, la si lascia, e ci si spolvera le mani.
       const w = smooth(0, 0.35, u);
       const lascia = smooth(0.85, 1.05, u);
       const batte = smooth(1.15, 1.4, u) * (1 - smooth(2.1, 2.5, u));
-      versoMano(1, 0.05, lerp(0.64, ay + 0.24, lascia), 0.29, w * (1 - 0.6 * smooth(1.2, 1.6, u)));
+      const su = S && S.p ? 1 : 0;
+      arriva(
+        1,
+        lerp(su ? M1[0] : 0.05, 0.05, lascia),
+        lerp(su ? M1[1] + 0.26 : 0.64, ay + 0.24, lascia),
+        lerp(su ? M1[2] - 0.07 : 0.29, 0.27, lascia),
+        w * (1 - 0.6 * smooth(1.2, 1.6, u)),
+        0.1 * (1 - lascia),
+        0.45 * (1 - lascia)
+      );
       gomito(1, 0.7, -0.6, -0.3);
       if (!I.foglio) kFoglio = w * (1 - lascia);
       for (let k = 0; k < 2; k++) versoMano(k, (k ? 1 : -1) * (0.07 - (vivo ? 0.035 * Math.max(0, Math.sin(13 * u)) : 0)), ay + 0.27, 0.25, batte);
-      accuccia = 0.1 * w * (1 - lascia);
-      tx += 0.3 * w * (1 - lascia);
       cx = lerp(cx, 0.32, w * (1 - batte));
     }
   } else if (inPiedi > 0.5 && fermo > 0.6 && !q) {
@@ -965,7 +1100,7 @@ export function atteggia(P, I, t, dt) {
       }
       const sorso = tazzaInMano ? ogniTanto(P, t, 8, 2.6, 0.85, 'sorso', 0.85) : null;
       if (sorso) {
-        versoMano(1, 0.035, testaY() + 0.07, testaZ() + 0.15, sorso.w);
+        versoMano(mT, lT * 0.035, testaY() + 0.07, testaZ() + 0.15, sorso.w);
         inclina = 0.55 * smooth(0.5, 1, sorso.w);
         cx = lerp(cx, -0.12, sorso.w);
         cy *= 1 - sorso.w;
@@ -1050,8 +1185,9 @@ export function atteggia(P, I, t, dt) {
     const sp = ay + SPALLA[1];
     const manca = Math.max(0, Math.hypot(A[0] - l * SPALLA[0], A[1] - sp, A[2]) - 0.33);
     const sotto = Math.max(0, sp - 0.3 - A[1]);
-    accuccia = Math.max(accuccia, clamp(sotto * 0.7, 0, 0.2) * w * inPiedi);
-    tx += clamp(manca * 1.3 + sotto * 0.4, 0, 0.55) * w * clamp(A[2] * 4 + 0.4);
+    // Per un cane basso ci si china, non ci si mette in ginocchio: le ginocchia appena, e la schiena fa il resto.
+    accuccia = Math.max(accuccia, clamp(sotto * 0.3, 0, 0.09) * w * inPiedi);
+    tx += clamp(manca * 1.3 + sotto * 1.1, 0, 0.85) * w * clamp(A[2] * 4 + 0.4);
     tz += clamp(-A[0] * 1.3, -0.4, 0.4) * w * clamp(manca * 5);
     const liscia = vivo ? Math.sin(4.2 * t + f) : 0;
     versoMano(k, A[0] + 0.03 * liscia * w, A[1] + 0.012 * Math.abs(liscia), A[2] - 0.045 * liscia * w, clamp(w * 1.3));
@@ -1102,7 +1238,7 @@ export function atteggia(P, I, t, dt) {
   T[SX] = sx;
   T[SY] = sy;
   T[K_TAZZA] = kTazza;
-  T[K_SUA] = o.tazza && !I.tazza ? 1 : 0;
+  T[K_SUA] = o.tazza && !I.tazza && !I.piena && !P.regge ? 1 : 0;
   T[K_FOGLIO] = kFoglio;
   T[K_FALDONE] = I.faldone ? 1 : 0;
   T[K_LIBRO] = smooth(0.03, 0.3, lib);
@@ -1110,7 +1246,7 @@ export function atteggia(P, I, t, dt) {
   T[K_ANNAFFIA] = kAnnaffia;
   T[K_GETTO] = kGetto;
   T[IN_MANO_SUA] = suaPresa;
-  T[IN_MANO_FOGLIO] = foglioInMano;
+  T[IN_MANO_FOGLIO] = carteInMano;
   T[INCLINA] = inclina;
   T[LEGGE] = legge;
   T[VOCE] = voce;
@@ -1144,7 +1280,7 @@ export function atteggia(P, I, t, dt) {
       // Le dita: a raffiche, una mano e poi l'altra. Solo se le mani sono davvero sui tasti.
       const raffica = 0.5 + 0.5 * Math.sin(1.9 * t + f) > 0.25 ? 1 : 0.15;
       for (let k = 0; k < 2; k++) {
-        sulBanco(P, q, 0, PIANO_M + 0.062, TASTI, A);
+        sulPiano(P, q, q.top.tasti, 0, 0.062, 0, A);
         if (Math.abs(p.mani[k][1] - A[1]) < 0.03) p.mani[k][1] -= 0.014 * raffica * Math.max(0, Math.sin((23 + 5 * I.ritmo) * t + k * Math.PI + f));
       }
     }
@@ -1180,27 +1316,43 @@ export function atteggia(P, I, t, dt) {
   // ====================================================================
   const h0 = fig.mani[0];
   const h1 = fig.mani[1];
+  const hT = fig.mani[mT];
   const piega = m[2 * INCLINA];
-  fig.tieni('tazza', m[2 * K_TAZZA], h1.x + PRESA[0], h1.y + PRESA[1], h1.z + PRESA[2], -piega, 0, 0);
+  // Al suo posto la tazza in mano gira come quella posata sul piano: fra l'una e l'altra non c'e' uno scatto.
+  const manico = q && q.top.manico != null && P.sit >= 1 ? q.top.manico - P.a : 0;
+  const kT = m[2 * K_TAZZA];
+  fig.tieni('tazza', kT, hT.x + PRESA[0], hT.y + PRESA[1], hT.z + PRESA[2], -piega, manico, 0);
+  // Chi le ha appena lavate ne riporta piu' d'una, impilate.
+  for (let i = 0; i < 3; i++) fig.tieni(IMPILATE[i], I.tazze > i + 1 ? kT : 0, hT.x + PRESA[0], hT.y + PRESA[1], hT.z + PRESA[2], 0, 0, 0);
   if (o.tazza) {
     const w = clamp(m[2 * IN_MANO_SUA]);
-    if (P.suaDove) locale(P, P.suaDove[0], P.suaDove[1], PIANO_M, B);
+    const hS = fig.mani[P.manoSua];
+    const sd = P.suaDove;
+    if (sd) locale(P, sd[0], sd[1], sd[2] / U, B);
     else B[0] = B[1] = B[2] = 0;
-    fig.tieni('sua', m[2 * K_SUA], lerp(B[0], h1.x + PRESA[0], w), lerp(B[1], h1.y + PRESA[1], w), lerp(B[2], h1.z + PRESA[2], w), -piega * w, P.suaDove ? (q ? q.a : 0) - P.a + 0.6 : 0, 0);
+    fig.tieni('sua', m[2 * K_SUA], lerp(B[0], hS.x + PRESA[0], w), lerp(B[1], hS.y + PRESA[1], w), lerp(B[2], hS.z + PRESA[2], w), -piega * w, sd ? sd[3] - P.a : 0, 0);
+    // Posata, la prossima volta la prende la mano dalla sua parte.
+    if (w < 0.03) P.manoSua = mT;
   }
+  // Foglio e faldone: in mano, o posati sul piano oltre il mouse mentre si sta seduti.
+  const giu = clamp(m[2 * IN_MANO_FOGLIO]);
+  const posati = q && q.top.foglio && giu < 0.99;
+  const gira = q ? q.a - P.a : 0;
   if (m[2 * K_FOGLIO] > 0.02) {
-    // Il foglio: in mano, o posato sul piano accanto alla tastiera mentre si lavora.
     const h = mF ? h1 : h0;
-    const w = clamp(m[2 * IN_MANO_FOGLIO]);
-    if (q && w < 0.99) sulBanco(P, q, FOGLIO_POSATO[0], PIANO_M + 0.004, FOGLIO_POSATO[1], B);
-    else {
-      B[0] = h.x;
-      B[1] = h.y;
-      B[2] = h.z;
-    }
-    fig.tieni('foglio', m[2 * K_FOGLIO], lerp(B[0], h.x, w), lerp(B[1], h.y + 0.03, w), lerp(B[2], h.z + 0.07, w), -0.75 * w, lerp(q ? q.a - P.a + 0.25 : 0, 0, w), 0);
+    if (posati) sulPiano(P, q, q.top.foglio, 0, 0.004 + (I.faldone ? 0.07 : 0), 0, B);
+    else (B[0] = h.x), (B[1] = h.y), (B[2] = h.z);
+    fig.tieni('foglio', m[2 * K_FOGLIO], lerp(B[0], h.x, giu), lerp(B[1], h.y + 0.03, giu), lerp(B[2], h.z + 0.07, giu), -0.75 * giu, lerp(gira + 0.25, 0, giu), 0);
   } else fig.tieni('foglio', 0);
-  fig.tieni('faldone', m[2 * K_FALDONE], h0.x + 0.035, h0.y - 0.02, h0.z - 0.03, 0.1, 0, 0);
+  if (m[2 * K_FALDONE] > 0.02) {
+    // In mano sta in piedi sotto il braccio; sul piano e' sdraiato sul dorso, lungo la scrivania.
+    if (posati) {
+      sulPiano(P, q, q.top.foglio, 0, 0.035, 0, B);
+      B[0] += 0.13 * Math.cos(gira);
+      B[2] -= 0.13 * Math.sin(gira);
+    } else (B[0] = h0.x + 0.035), (B[1] = h0.y - 0.02), (B[2] = h0.z - 0.03);
+    fig.tieni('faldone', m[2 * K_FALDONE], lerp(B[0], h0.x + 0.035, giu), lerp(B[1], h0.y - 0.02, giu), lerp(B[2], h0.z - 0.03, giu), 0.1 * giu, gira * (1 - giu), (Math.PI / 2) * (1 - giu));
+  } else fig.tieni('faldone', 0);
   if (m[2 * K_LIBRO] > 0.02) {
     // Il libro sta fra le due mani, aperto verso la faccia: non segue la mano che gira pagina.
     fig.tieni('libro', m[2 * K_LIBRO], 0, LIBRO[1], LIBRO[2], lerp(-0.25, -0.95, ease(lib)), 0, 0);

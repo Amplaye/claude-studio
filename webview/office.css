@@ -1415,8 +1415,11 @@ body.inoffice.linguette .top #btnNew {
 
 /* La tela del 3D sta sotto il palco e riempie il riquadro. Il palco resta montato
    sopra di lei: quello che ha un gemello a volumi si nasconde, e tutto il resto —
-   bottoni, targhette, nuvolette, aloni, foglietti, tazze — resta dov'e' nel
-   documento e lo sposta lo specchio (webview3d/mirror.js).
+   bottoni, targhette, nuvolette, aloni, foglietti — resta dov'e' nel documento e lo
+   sposta lo specchio (webview3d/mirror.js). Fra i nascosti ci sono le tazze, tutte:
+   sulla rastrelliera, nel lavandino, in mano e sulle scrivanie di la' ci sono quelle
+   vere, e lo specchio ne accende quante ne conta qui. E la carta che vola nel
+   cestino: di la' la butta chi sta davanti al cestino, con la sua mano.
 
    visibility e non display: le pelli accendono le loro cose con display
    (skins.css viene dopo e vincerebbe), e un nodo tolto dal flusso perderebbe le
@@ -1428,8 +1431,8 @@ body.inoffice.linguette .top #btnNew {
   height: 100%;
   display: block;
 }
-.office.tre .of-stage :is(.of-floor, .of-wall, .of-luce, .of-tappeto, .of-porta, .of-mon, .of-mail, .of-portatile, .in3d),
-.office.tre .of-guy > :is(.of-body, .of-tazza, .of-note, .of-faldone) {
+.office.tre .of-stage :is(.of-floor, .of-wall, .of-luce, .of-tappeto, .of-porta, .of-mon, .of-mail, .of-portatile, .of-tazza, .of-fx.cestino, .in3d),
+.office.tre .of-guy > :is(.of-body, .of-note, .of-faldone) {
   visibility: hidden;
 }
 
@@ -1472,6 +1475,14 @@ body.inoffice.linguette .top #btnNew {
   bottom: auto;
   top: -2.4px;
   box-shadow: -0.9px -0.9px 0 var(--tre-filo);
+}
+/* Nelle altre due pelli la targhetta ha il filo della pelle (skins.css, che viene dopo
+   e vince): la codina prende lo stesso, se no resta l'unico pezzo a inchiostro. */
+.office.tre .of-stage[data-skin='notte'] .of-plate:not(.focused) {
+  --tre-filo: var(--neon);
+}
+.office.tre .of-stage[data-skin='bali'] .of-plate:not(.focused) {
+  --tre-filo: #1d8f95;
 }
 .office.tre .of-plate .of-name {
   font-weight: 800;

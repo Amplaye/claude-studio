@@ -14,7 +14,13 @@
  * un `translate` e uno `scale` calcolati dalla proiezione, e il bottone finisce
  * esatto sulla sua figura — clic, fuoco, tastiera, scheda e domande funzionano
  * come prima, senza lanciare un raggio. Chi ha un gemello a volumi (pavimento,
- * muri, mobili, corpi, monitor…) lo nasconde office3d.css.
+ * muri, mobili, corpi, monitor, tazze…) lo nasconde office.css.
+ *
+ * Il bar e' il caso piu' fitto. La stanza piatta tiene il conto delle tazze e dice
+ * addosso a ognuno cosa sta facendo (`data-gesto`); qui le tazze sono quelle vere
+ * della rastrelliera, del lavandino e delle scrivanie (`M.B.bar`, `banco.tazza`), e
+ * lo specchio ne accende quante ne conta di la': la macchina versa mentre qualcuno
+ * si fa il caffe', il rubinetto scorre mentre qualcuno lava.
  *
  * La regola per tutto il resto: quello che sta nel palco e che qui non si conosce
  * resta un cartoncino in piedi al suo posto. Cosi' niente sparisce in silenzio, e
@@ -22,10 +28,10 @@
  */
 import { THREE, U, clamp, ease, lerp, giro as corto } from './kit.js';
 import { persona, ALTA } from './people.js';
-import { nuovo, ingressi, sposta, atteggia, siediSubito, SBRACCIO, ACCANTO, LIBRO_DOPO } from './gesti.js';
+import { nuovo, ingressi, sposta, atteggia, siediSubito, SBRACCIO, AL_BANCONE, ACCANTO, DI_FIANCO, LIBRO_DOPO, PRESA_DOPO, CAFFE } from './gesti.js';
 
 /** I nodi del palco che hanno un gemello a volumi, o che sono solo contenitori. */
-const SALTA = /(^|\s)(of-floor|of-wall|of-luce|of-tappeto|of-porta|of-mon|of-mail|of-nobody|of-crowd|of-bacheche|of-portatili|of-tazze|in3d)(\s|$)/;
+const SALTA = /(^|\s)(of-floor|of-wall|of-luce|of-tappeto|of-porta|of-mon|of-mail|of-nobody|of-crowd|of-bacheche|of-portatili|of-tazze|of-tazza|in3d)(\s|$)/;
 /** Le buste, per classe: gli stessi colori di room.css. */
 const BUSTE = [
   ['ko', '#f2b3a6'],
@@ -132,10 +138,12 @@ export function specchio(M) {
 
   /**
    * Dove ci si mette davvero per usare un mobile. La stanza piatta ferma la gente a
-   * una spanna da tutto — sotto lo scaffale, accanto alla pianta — e da li' un braccio
-   * non arriva: qui si va fino a un braccio dal fronte del mobile, girati verso di
-   * lui. I punti sono le destinazioni di room.js, riconosciute per nome; il mobile e'
-   * quello che la stanza a volumi ha messo li' (`appesi`, `interessi`).
+   * una spanna da tutto — un metro sotto lo scaffale, accanto alla pianta — e da li'
+   * un braccio non arriva: qui si va fino a un braccio dal fronte del mobile, girati
+   * verso di lui. I punti sono le destinazioni di room.js, riconosciute per nome; il
+   * mobile e' quello che la stanza a volumi ha messo li' (`appesi`, `interessi`), ed
+   * e' lui a dire dove comincia e dove sta quello che si tocca: `p` (e `p2`) sono
+   * i punti della stanza, [x, y, z] in unita', dove vanno le mani.
    */
   const soste = new Map();
   let sosteDi = null;
@@ -159,17 +167,18 @@ export function specchio(M) {
       let c = null;
       let quanto = 36;
       for (const q of M.B.interessi) {
-        const dd = Math.hypot(q[0] - d[0], q[1] - d[1]);
-        if (dd < quanto) {
+        const dd = Math.hypot(q.x - d[0], q.y - d[1]);
+        if (dd < quanto && q.tipo === (tipo === 'cestino' ? 'cestino' : 'pianta')) {
           quanto = dd;
           c = q;
         }
       }
       if (!c) return null;
-      const k = Math.min(quanto, tipo === 'cestino' ? 0.4 * U : ACCANTO) / (quanto || 1);
-      const x = c[0] + (d[0] - c[0]) * k;
-      const y = c[1] + (d[1] - c[1]) * k;
-      return { nome, x, y, a: Math.atan2(c[0] - x, c[1] - y) };
+      // A un passo dal suo orlo, dalla parte da cui si arriva.
+      const k = Math.min(quanto, c.r + ACCANTO) / (quanto || 1);
+      const x = c.x + (d[0] - c.x) * k;
+      const y = c.y + (d[1] - c.y) * k;
+      return { nome, tipo, x, y, a: Math.atan2(c.x - x, c.y - y), alto: false, p: [c.x, c.y, c.z], p2: null };
     }
     if (!['rastrelliera', 'macchina', 'lavandino', 'archivio', 'bacheca', 'dispensa'].includes(tipo)) return null;
     // Il mobile contro il muro che ha davanti: quello che gli sta sopra, il piu' vicino di traverso.
@@ -182,7 +191,97 @@ export function specchio(M) {
       m = a;
     }
     if (!m) return null;
-    return { nome, x: clamp(d[0], Math.min(m.x0 + 6, m.x1), Math.max(m.x1 - 6, m.x0)), y: Math.min(d[1], m.yf + SBRACCIO), a: Math.PI };
+    // Davanti a un bancone ci si sta addosso; davanti a uno scaffale a un braccio, che
+    // chi si china a guardarci dentro non ci sbatta la testa.
+    const x = clamp(d[0], Math.min(m.x0 + 8, m.x1), Math.max(m.x1 - 8, m.x0));
+    const S = { nome, tipo, x, y: Math.min(d[1], m.fronte + (m.alto ? SBRACCIO : AL_BANCONE)), a: Math.PI, alto: m.alto, p: null, p2: null };
+    if (tipo === 'rastrelliera') S.p = tazzaDiTurno();
+    const bar = M.B.bar;
+    const tb = M.B.bacheca;
+    const punto = (q) => [q.x, q.y, q.z];
+    if (tipo === 'macchina' && bar.macchina) (S.p = punto(bar.macchina)), (S.p2 = punto(bar.macchina.bottone));
+    else if (tipo === 'lavandino' && bar.lavandino) S.p = punto(bar.lavandino);
+    // I foglietti stanno nella meta' alta dell'ardesia: si toccano a un metro e venticinque.
+    else if (tipo === 'bacheca' && tb) S.p = [x, tb.y, 1.25 * U];
+    else if (m.mani) {
+      S.p = [x, m.fronte - 0.1 * U, m.mani[0]];
+      if (m.mani[1]) S.p2 = [x, m.fronte - 0.1 * U, m.mani[1]];
+    }
+    // (Alla rastrelliera il punto e' la tazza che tocca adesso: lo si scrive a ogni giro.)
+    return S;
+  }
+
+  /**
+   * La sosta di UNA persona davanti a un mobile del muro: non piantata davanti a
+   * quello che tocca, ma di fianco. La camera le sta alle spalle: chi si mette dritto
+   * davanti alla macchina la copre tutta, e il caffe' che scende non lo vede nessuno.
+   * Si mette dalla parte della mano che lavora, cosi' la cosa le resta davanti alla
+   * spalla e fra lei e chi guarda non c'e' niente; al lavandino, dove le mani sono
+   * due, di sbieco verso la vasca.
+   */
+  function diFianco(P, I, S) {
+    if (!S.p || S.tipo === 'annaffia' || S.tipo === 'cestino') return S;
+    const mia = Object.assign(P.sosta || (P.sosta = {}), S);
+    if (S.tipo === 'lavandino') {
+      mia.x = S.p[0] - 0.75 * DI_FIANCO;
+      mia.a = Math.atan2(S.p[0] - mia.x, S.p[1] - mia.y);
+      return mia;
+    }
+    // Tazza e caffe' con la mano della tazza, il faldone con la sinistra, il resto con la destra (gesti.js).
+    const destra = S.tipo === 'archivio' ? 0 : S.tipo === 'rastrelliera' || S.tipo === 'macchina' ? I.manoTazza : 1;
+    mia.x = clamp(S.p[0] + (destra ? DI_FIANCO : -DI_FIANCO), 24, R.W - 24);
+    return mia;
+  }
+
+  // ---------------------------------------------------------------------
+  //  il bar: le tazze si contano di la' e si vedono di qua
+  // ---------------------------------------------------------------------
+  /** Quante tazze conta la stanza piatta: pulite sulla rastrelliera, sporche nel lavandino, e su quali scrivanie ce n'e' una piena. */
+  const conto = { pulite: 0, sporche: 0, piene: new Set() };
+  function conta() {
+    conto.pulite = stage.querySelectorAll('.of-tazze:not(.of-sporche) .of-tazza').length;
+    conto.sporche = stage.querySelectorAll('.of-sporche .of-tazza').length;
+    conto.piene.clear();
+    // La stanza piatta la posa a venti pixel dal posto di chi siede (`posa` in room.js): da li' si risale alla scrivania.
+    for (const n of stage.querySelectorAll('.of-tazza.piena')) {
+      const q = sedile((parseFloat(n.style.left) || 0) - 12, (parseFloat(n.style.top) || 0) + 30);
+      if (q && q.tipo === 'banco') conto.piene.add(q.i);
+    }
+  }
+  /** La tazza della rastrelliera che tocca adesso: quella che si prende, o il posto dove si rimette. Il suo piede, in unita'. */
+  function tazzaDiTurno() {
+    const g = M.B.bar.tazze[Math.min(conto.pulite, M.B.bar.tazze.length - 1)];
+    return g ? [g.position.x, g.position.z, g.position.y] : null;
+  }
+  function bar(t) {
+    const b = M.B.bar;
+    let prende = 0;
+    let lava = 0;
+    let caffe = Infinity;
+    const inMano = new Set();
+    const riprese = new Set();
+    for (const P of vivi.values()) {
+      const I = P.I;
+      const u = t - I.gestoDa;
+      // Chi allunga la mano non l'ha ancora presa: resta sul ripiano finche' non ci arriva.
+      if (I.gesto === 'prende' && u < PRESA_DOPO) prende = 1;
+      else if (I.gesto === 'lava' && u > 0.3) lava = 1;
+      else if (I.gesto === 'caffe') caffe = Math.min(caffe, u);
+      // E sulla scrivania: chi l'ha in mano (la sta posando, o beve), e chi la sta riprendendo per tornare al bar.
+      if (P.beve) inMano.add(P.casa);
+      if (P.riprende > 0) riprese.add(P.casa);
+    }
+    b.tazze.forEach((g, i) => (g.visible = i < conto.pulite + prende));
+    if (b.lavandino) {
+      // Quella che si sta lavando e' fra le mani, non piu' nella vasca.
+      b.lavandino.sporche.forEach((g, i) => (g.visible = i < conto.sporche - lava));
+      b.lavandino.acqua.visible = !!lava;
+    }
+    if (b.macchina) {
+      b.macchina.tazza.visible = caffe > CAFFE.sotto[0] && caffe < CAFFE.sotto[1];
+      b.macchina.getto.visible = caffe > CAFFE.versa[0] && caffe < CAFFE.versa[1];
+    }
+    for (const d of M.B.banchi) d.tazza.visible = (conto.piene.has(d.i) && !inMano.has(d.i)) || riprese.has(d.i);
   }
 
   /**
@@ -247,6 +346,15 @@ export function specchio(M) {
       I.fermo = vel <= 3 && Math.hypot(fx - I.tx, fy - I.ty) < 1.5;
       I.posto = sedile(I.tx, I.ty);
       I.sosta = I.posto ? null : sosta(I.tx, I.ty);
+      if (I.sosta && I.sosta.tipo === 'rastrelliera') I.sosta.p = tazzaDiTurno();
+      // La sua scrivania e' l'ultima a cui e' andato a sedersi. Se sopra c'e' la tazza che
+      // si e' portato dal bar, e' da quella che beve; e la tazza la porta con la mano
+      // dalla parte dove li' la posa, che nella meta' a specchio e' l'altra.
+      if (I.posto && I.posto.tipo === 'banco') P.casa = I.posto.i;
+      const casa = P.casa == null ? null : M.B.banchi[P.casa];
+      I.piena = !!casa && conto.piene.has(casa.i);
+      I.manoTazza = casa && casa.mir ? 0 : 1;
+      if (I.sosta) I.sosta = diFianco(P, I, I.sosta);
       I.soglia = cl.contains('soglia');
       I.cabina = cab;
       I.passo = cl.contains('archivio') ? 2 : 1;
@@ -254,6 +362,7 @@ export function specchio(M) {
 
       // Cosa ha addosso: e' il modo in cui la stanza piatta dice cosa sta facendo.
       I.parla = I.tazza = I.foglio = I.faldone = false;
+      I.tazze = 0;
       let annaffia = false;
       for (const c of el.children) {
         const k = c.className;
@@ -261,7 +370,11 @@ export function specchio(M) {
         if (k.includes('of-say')) {
           I.parla = true;
           ritocca(c, P.rimpicciolisce || 1, (k.includes(' sx') ? '100% ' : '0 ') + (k.includes('sotto') ? '0' : '100%'));
-        } else if (k.includes('of-tazza')) I.tazza = true;
+        } else if (k.includes('of-tazza')) {
+          I.tazza = true;
+          // Chi le ha appena lavate ne riporta piu' d'una (`data-n`).
+          I.tazze = Number(c.dataset.n) || 1;
+        }
         else if (k.includes('of-note')) I.foglio = true;
         else if (k.includes('of-faldone')) I.faldone = true;
         else if (k.includes('of-annaffia')) {
@@ -285,6 +398,9 @@ export function specchio(M) {
       I.gesto = el.dataset.gesto || (annaffia ? 'annaffia' : '');
       if (I.gesto !== P.gestoEra) {
         P.gestoEra = I.gesto;
+        I.gestoDa = t;
+      } else if (I.gesto && I.sosta && Math.hypot(P.x - I.sosta.x, P.y - I.sosta.y) > 5) {
+        // Il gemello piatto e' arrivato un metro prima: il gesto comincia quando ci arriva la figura.
         I.gestoDa = t;
       }
       P.scena = el.dataset.scena || '';
@@ -552,7 +668,7 @@ export function specchio(M) {
       if (typeof c !== 'string' || SALTA.test(c) || el === k) continue;
       cartoncino(el);
     }
-    for (const sel of ['.of-bacheche', '.of-tazze', '.of-crowd']) {
+    for (const sel of ['.of-bacheche', '.of-crowd']) {
       const box = stage.querySelector(sel);
       if (!box) continue;
       for (const el of box.children) {
@@ -560,6 +676,42 @@ export function specchio(M) {
         if (typeof c !== 'string' || c.includes('of-guy') || c.includes('of-plate')) continue;
         cartoncino(el);
       }
+    }
+    scansa();
+  }
+
+  /**
+   * Una nuvoletta non copre un nome. Nella stanza piatta le targhette stanno sulle
+   * scrivanie e le nuvolette sopra le teste, e non si incontrano; qui la targhetta
+   * della fila dietro sta sopra lo schermo, cioe' accanto alla testa di chi ci siede,
+   * e quando lui parla le due finiscono una sull'altra. La nuvoletta che ci cade si
+   * alza (o si abbassa) di quanto basta. Si misura sullo schermo, a cose gia' messe
+   * al loro posto, e solo finche' qualcuno sta parlando.
+   */
+  const scansate = new WeakMap();
+  function scansa() {
+    const voci = stage.querySelectorAll('.of-guy > .of-say');
+    if (!voci.length) return;
+    const targhe = [];
+    for (const n of stage.querySelectorAll('.of-plate')) if (!n.hidden) targhe.push(n.getBoundingClientRect());
+    const tetto = M.wrap.getBoundingClientRect().top;
+    for (const n of voci) {
+      const P = vivi.get(n.parentElement);
+      if (!P || !P.px) continue;
+      const era = scansate.get(n) || 0;
+      const r = n.getBoundingClientRect();
+      const su = r.top - era;
+      const giu = r.bottom - era;
+      let dy = 0;
+      for (const b of targhe) {
+        if (r.right < b.left + 1 || r.left > b.right - 1 || giu + dy < b.top - 2 || su + dy > b.bottom + 2) continue;
+        // Dalla parte dove sta gia', se sopra c'e' posto; se no di sotto.
+        dy = su + giu <= b.top + b.bottom && b.top - 3 - (giu - su) > tetto + 2 ? b.top - 3 - giu : b.bottom + 3 - su;
+      }
+      if (Math.abs(dy - era) < 0.5) continue;
+      scansate.set(n, dy);
+      // Il bottone e' ingrandito quanto la figura: uno spostamento suo vale tanti pixel di scheda quanto lei e' alta su ventiquattro.
+      n.style.translate = dy ? '0 ' + (dy / (P.px / 24)).toFixed(1) + 'px' : '';
     }
   }
 
@@ -580,8 +732,23 @@ export function specchio(M) {
     giro(t, dt) {
       misuraPalco();
       stanza(t, dt);
+      conta();
       persone(t, dt);
+      bar(t);
       nodi();
+    },
+    /** Quello che del bar si vede adesso, per i controlli: le tazze accese sulla rastrelliera, nel lavandino e sulle scrivanie, il getto, l'acqua. */
+    bar() {
+      const b = M.B.bar;
+      const accese = (l) => l.filter((g) => g.visible).length;
+      return {
+        pulite: accese(b.tazze),
+        sporche: b.lavandino ? accese(b.lavandino.sporche) : 0,
+        piene: M.B.banchi.filter((d) => d.tazza.visible).map((d) => d.i),
+        getto: !!b.macchina && b.macchina.getto.visible,
+        sotto: !!b.macchina && b.macchina.tazza.visible,
+        acqua: !!b.lavandino && b.lavandino.acqua.visible,
+      };
     },
     /** Fuori dal giro: un nodo appena nato va messo a posto prima che lo si veda. */
     sistema() {
@@ -591,7 +758,7 @@ export function specchio(M) {
     smonta() {
       for (const [el, P] of [...vivi]) muore(el, P);
       // Quello che il bottone si porta addosso torna alla misura e al posto che gli da' il foglio di stile.
-      for (const n of stage.querySelectorAll('.of-guy > *')) n.style.scale = n.style.transformOrigin = n.style.visibility = '';
+      for (const n of stage.querySelectorAll('.of-guy > *')) n.style.scale = n.style.translate = n.style.transformOrigin = n.style.visibility = '';
       for (const el of toccati) {
         el.style.translate = '';
         el.style.scale = '';

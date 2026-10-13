@@ -11,7 +11,6 @@
  * vuole (x, z, y): la conversione sta in `box` e in `T`, e in nessun altro posto.
  */
 import * as THREE from 'three';
-import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const TAU = Math.PI * 2;
@@ -309,10 +308,69 @@ const tenuta = (chiave, fai) => {
 };
 const v2 = (pts) => pts.map((p) => new THREE.Vector2(Math.max(p[0], 0), p[1]));
 
-/* Una scatola dagli spigoli tondi a due faccette per quarto di giro: un terzo dei
-   triangoli di RoundedBoxGeometry. Le normali sono lisce, quindi sotto le tinte
-   piatte lo spigolo si legge tondo lo stesso. */
+/* Una scatola dagli spigoli smussati, fatta a mano: sei facce, dodici smussi, otto
+   angoli — quarantaquattro triangoli, un quinto di RoundedBoxGeometry. Le normali
+   sono quelle delle facce, e lungo lo smusso sfumano dall'una all'altra: sotto le
+   tinte piatte lo spigolo si legge tondo. Va bene finche' il raggio e' di un paio di
+   pixel, cioe' quasi sempre; piu' largo si vedrebbe la faccetta, e allora si chiede
+   `seg` 2 e si prende quella tonda qui sotto. Di scatole nella stanza ce ne sono
+   trecento, e ognuna si disegna tre volte: il corpo, il contorno e l'ombra. */
 function scatola(w, h, d, r) {
+  const m = [w / 2, h / 2, d / 2];
+  r = Math.min(r, m[0], m[1], m[2]);
+  const p = [];
+  const n = [];
+  const idx = [];
+  // Per ogni angolo tre vertici, uno per ognuna delle facce che ci arrivano.
+  const v = (asse, s) => ((s[0] > 0 ? 4 : 0) + (s[1] > 0 ? 2 : 0) + (s[2] > 0 ? 1 : 0)) * 3 + asse;
+  for (let c = 0; c < 8; c++) {
+    const s = [c & 4 ? 1 : -1, c & 2 ? 1 : -1, c & 1 ? 1 : -1];
+    for (let a = 0; a < 3; a++) {
+      for (let k = 0; k < 3; k++) {
+        p.push(s[k] * (k === a ? m[k] : m[k] - r));
+        n.push(k === a ? s[k] : 0);
+      }
+    }
+  }
+  const A = new THREE.Vector3();
+  const B = new THREE.Vector3();
+  const C = new THREE.Vector3();
+  // Il verso giusto si legge dalla forma: la faccia guarda via dal centro.
+  const tri = (a, b, c) => {
+    A.fromArray(p, a * 3);
+    B.fromArray(p, b * 3).sub(A);
+    C.fromArray(p, c * 3).sub(A);
+    B.cross(C).dot(A) >= 0 ? idx.push(a, b, c) : idx.push(a, c, b);
+  };
+  const quad = (a, b, c, e) => (tri(a, b, c), tri(a, c, e));
+  for (let a = 0; a < 3; a++) {
+    const b = (a + 1) % 3;
+    const c = (a + 2) % 3;
+    for (const sa of [-1, 1]) {
+      const s = (sb, sc) => {
+        const q = [0, 0, 0];
+        q[a] = sa;
+        q[b] = sb;
+        q[c] = sc;
+        return q;
+      };
+      // la faccia, e i due smussi che la legano alle due facce dell'asse dopo
+      quad(v(a, s(-1, -1)), v(a, s(1, -1)), v(a, s(1, 1)), v(a, s(-1, 1)));
+      for (const sb of [-1, 1]) quad(v(a, s(sb, -1)), v(a, s(sb, 1)), v(b, s(sb, 1)), v(b, s(sb, -1)));
+    }
+  }
+  for (let c = 0; c < 8; c++) tri(c * 3, c * 3 + 1, c * 3 + 2);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+/* E quella dagli spigoli tondi, a due faccette per quarto di giro: centootto
+   triangoli, per i pezzi dove lo spigolo e' largo abbastanza da vedersi — uno
+   schienale, il corpo della macchina del caffe', la cornice di uno schermo. */
+function tonda(w, h, d, r) {
   const g = new THREE.BoxGeometry(1, 1, 1, 3, 3, 3).toNonIndexed();
   const P = g.attributes.position;
   const N = g.attributes.normal;
@@ -330,20 +388,23 @@ function scatola(w, h, d, r) {
 
 /** Le forme, in metri. Sono condivise e tenute in memoria: non si buttano e non si modificano. */
 export const G = {
-  box: (w, h, d, r = 0.03, seg = 1) => tenuta(`box${[w, h, d, r, seg]}`, () => (seg > 1 ? new RoundedBoxGeometry(w, h, d, seg, r) : scatola(w, h, d, r))),
+  box: (w, h, d, r = 0.03, seg = 1) => tenuta(`box${[w, h, d, r, seg]}`, () => (seg > 1 ? tonda(w, h, d, r) : scatola(w, h, d, r))),
   cube: (w, h, d) => tenuta(`cube${[w, h, d]}`, () => new THREE.BoxGeometry(w, h, d)),
-  cyl: (r1, r2, h, n = 18) => tenuta(`cyl${[r1, r2, h, n]}`, () => new THREE.CylinderGeometry(r1, r2, h, n)),
-  sph: (r = 1, n = 14) => tenuta(`sph${[r, n]}`, () => new THREE.SphereGeometry(r, n, Math.max(6, Math.round(n * 0.7)))),
-  cap: (r, len, n = 10) => tenuta(`cap${[r, len, n]}`, () => new THREE.CapsuleGeometry(r, len, 4, n)),
-  torus: (R, r, arc = TAU, n = 14) => tenuta(`tor${[R, r, arc, n]}`, () => new THREE.TorusGeometry(R, r, 6, n, arc)),
+  cyl: (r1, r2, h, n = 12) => tenuta(`cyl${[r1, r2, h, n]}`, () => new THREE.CylinderGeometry(r1, r2, h, n)),
+  // Quanti spicchi: la sfera piu' grande della stanza e' una testa, trenta pixel a
+  // misura vera, e con dodici lati il suo profilo sbaglia di mezzo pixel. Di piu' si pagano e non si vedono.
+  sph: (r = 1, n = 12) => tenuta(`sph${[r, n]}`, () => new THREE.SphereGeometry(r, n, Math.max(5, Math.round(n * 0.6)))),
+  cap: (r, len, n = 8) => tenuta(`cap${[r, len, n]}`, () => new THREE.CapsuleGeometry(r, len, 3, n)),
+  // Un tubo sottile (un manico, una montatura) ha quattro lati: e' largo un pixel.
+  torus: (R, r, arc = TAU, n = 12) => tenuta(`tor${[R, r, arc, n]}`, () => new THREE.TorusGeometry(R, r, r < 0.015 ? 4 : 6, n, arc)),
   /** Un profilo fatto girare attorno alla verticale. `crease`: tiene vivi gli spigoli invece di arrotondarli. */
-  lathe: (pts, n = 16, crease = 0) =>
+  lathe: (pts, n = 12, crease = 0) =>
     tenuta(`lat${pts}|${n}|${crease}`, () => {
       const g = new THREE.LatheGeometry(v2(pts), n);
       return crease ? toCreasedNormals(g, crease) : g;
     }),
   /** Una lastra tonda con un filo di smusso, la base a y = 0. */
-  disc: (r, h, b = 0.015, n = 20) => G.lathe([[0, 0], [r - b, 0], [r, b], [r, h - b], [r - b, h], [0, h]], n, 0.6),
+  disc: (r, h, b = 0.015, n = 14) => G.lathe([[0, 0], [r - b, 0], [r, b], [r, h - b], [r - b, h], [0, h]], n, 0.6),
   /** Un rettangolo dagli angoli tondi visto da sopra, estruso: piani di scrivania, panche. La base a y = 0. */
   slab: (w, d, h, r = 0.08, b = 0.012) =>
     tenuta(`slab${[w, d, h, r, b]}`, () => {
@@ -360,7 +421,8 @@ export const G = {
       s.absarc(-x + q, z - q, q, Math.PI / 2, Math.PI);
       s.lineTo(-x, -z + q);
       s.absarc(-x + q, -z + q, q, Math.PI, Math.PI * 1.5);
-      const g = new THREE.ExtrudeGeometry(s, { depth: h - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 2, curveSegments: 5 });
+      // Tre tratti per angolo e uno per lo smusso: l'angolo di un piano e' sei pixel, lo smusso uno.
+      const g = new THREE.ExtrudeGeometry(s, { depth: h - 2 * b, bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 1, curveSegments: 3 });
       g.rotateX(-Math.PI / 2);
       g.translate(0, b, 0);
       return toCreasedNormals(g, 0.7);
@@ -480,11 +542,11 @@ export function penna(L, m0 = new THREE.Matrix4()) {
     box: (w, h, d, x, y, z, c, o = {}) => put(G.box(w, h, d, o.r == null ? 0.03 : o.r, o.seg || ((o.r || 0) > 0.045 ? 2 : 1)), c, x, y + h / 2, z, o),
     cube: (w, h, d, x, y, z, c, o = {}) => put(G.cube(w, h, d), c, x, y + h / 2, z, o),
     slab: (w, d, h, x, y, z, c, o = {}) => put(G.slab(w, d, h, o.r == null ? 0.08 : o.r, o.b || 0.012), c, x, y, z, o),
-    disc: (r, h, x, y, z, c, o = {}) => put(G.disc(r, h, o.b || 0.015, o.n || 20), c, x, y, z, o),
-    cyl: (r1, r2, h, x, y, z, c, o = {}) => put(G.cyl(r1, r2, h, o.n || 18), c, x, y + h / 2, z, o),
-    sph: (r, x, y, z, c, o = {}) => put(G.sph(1, o.n || 14), c, x, y, z, { ...o, s: (o.s || [1, 1, 1]).map((k) => k * r) }),
-    cap: (r, len, x, y, z, c, o = {}) => put(G.cap(r, len, o.n || 10), c, x, y, z, o),
-    lathe: (pts, x, y, z, c, o = {}) => put(G.lathe(pts, o.n || 16, o.crease || 0), c, x, y, z, o),
+    disc: (r, h, x, y, z, c, o = {}) => put(G.disc(r, h, o.b || 0.015, o.n || 14), c, x, y, z, o),
+    cyl: (r1, r2, h, x, y, z, c, o = {}) => put(G.cyl(r1, r2, h, o.n || 12), c, x, y + h / 2, z, o),
+    sph: (r, x, y, z, c, o = {}) => put(G.sph(1, o.n || 12), c, x, y, z, { ...o, s: (o.s || [1, 1, 1]).map((k) => k * r) }),
+    cap: (r, len, x, y, z, c, o = {}) => put(G.cap(r, len, o.n || 8), c, x, y, z, o),
+    lathe: (pts, x, y, z, c, o = {}) => put(G.lathe(pts, o.n || 12, o.crease || 0), c, x, y, z, o),
     /** Un'altra penna, spostata e girata rispetto a questa. */
     at: (x, y, z, ry = 0, rx = 0) => penna(L, m0.clone().multiply(mtx(x, y, z, rx, ry, 0))),
   };
@@ -512,6 +574,20 @@ export function parte(materiale, fn, ombra = true) {
   if (!L.vuoto) g.add(L.mesh(materiale, ombra));
   g.scale.setScalar(U);
   return g;
+}
+
+/* La tazza del bar. E' una sola forma, perche' e' una sola tazza: quella che sta
+   sulla rastrelliera e' quella che uno si ritrova in mano, che posa sulla scrivania
+   e che poi finisce nel lavandino. Il manico verso +x; `dentro` e' quello che ci si
+   vede guardandola da sopra, `segno` il bordo di caffe' di quella da lavare. Chi la
+   mette in scena la ingrandisce di TAZZA: a questa distanza una tazza vera e' sei pixel. */
+export const TAZZA = 1.2;
+const COCCIO = [[0, 0], [0.034, 0], [0.043, 0.012], [0.046, 0.09], [0, 0.09]];
+export function tazza(p, c, dentro, segno) {
+  p.lathe(COCCIO, 0, 0, 0, c, { n: 10, filo: 0.008 });
+  p.put(G.torus(0.024, 0.008, TAU, 8), c, 0.05, 0.048, 0, { filo: 0.006 });
+  p.cyl(0.037, 0.037, 0.004, 0, 0.088, 0, dentro, { filo: 0, n: 10 });
+  if (segno) p.cyl(0.0468, 0.0462, 0.014, 0, 0.066, 0, segno, { filo: 0, n: 10 });
 }
 
 // ---- le tinte piatte: tre toni. Sotto il primo gradino la luce chiave non da'

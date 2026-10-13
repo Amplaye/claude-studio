@@ -18,7 +18,7 @@
  * Qui c'e' il corpo. Cosa fa lo decide gesti.js, e dove sta lo specchio (mirror.js),
  * che lo legge dalla stanza piatta.
  */
-import { THREE, Tratto, penna, G, toon, U, SEDILE_M, TAU, rnd, clamp } from './kit.js';
+import { THREE, Tratto, penna, G, toon, tazza, TAZZA, U, SEDILE_M, TAU, rnd, clamp } from './kit.js';
 
 /** Le misure del corpo, in metri. L'anca in piedi sta un dito sotto la gamba tesa: un ginocchio mai dritto del tutto non scatta. */
 export const ANCA = 0.69;
@@ -42,17 +42,31 @@ const NERO = '#241b14';
 const CUFFIE = '#3c4633';
 const CREMA = '#f2ede2';
 
+const rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+/** Quanto distano due tinte, da 0 a 441. */
+const distano = (a, b) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]));
+
 /** I tratti di npc.js, coi nomi che servono qui. */
 function aspetto(seme) {
   const t = window.NPC.traits(seme);
+  let [topHi, top, topLo] = t.tessuto.toni;
+  /* Una camicia color pesca, avorio o sabbia addosso a una pelle chiara e' — a tinte
+     piatte, a questa distanza — un torso nudo: nello sprite piatto le separava il
+     contorno, qui si fondono. Quando le due tinte si confondono la camicia scende di
+     un tono: la sua ombra fa da corpo, e il corpo da luce. Resta la stessa camicia.
+     (Il bianco no: e' piu' chiaro di qualunque pelle, e si legge.) */
+  if (Math.min(...rgb(top)) < 230 && distano(top, t.pelle.toni[1]) < 52) {
+    [topHi, top] = [top, topLo];
+    topLo = '#' + new THREE.Color(top).multiplyScalar(0.62).getHexString();
+  }
   return {
     skin: t.pelle.toni[1],
     skinHi: t.pelle.toni[0],
     hair: t.capelli.toni[1],
     hairLo: t.capelli.toni[2],
-    top: t.tessuto.toni[1],
-    topHi: t.tessuto.toni[0],
-    topLo: t.tessuto.toni[2],
+    top,
+    topHi,
+    topLo,
     sotto: t.sotto.toni[1],
     acc: t.accento.toni[1],
     pants: t.pantaloni.toni[1],
@@ -75,7 +89,7 @@ function aspetto(seme) {
 function testa(p, o) {
   const s = o.skin;
   const h = o.hair;
-  p.sph(0.2, 0, 0.2, 0, s, { s: [1, 0.96, 0.98], n: 18 });
+  p.sph(0.2, 0, 0.2, 0, s, { s: [1, 0.96, 0.98], n: 14 });
   for (const k of [-1, 1]) p.sph(0.045, k * 0.195, 0.185, 0, s, { s: [0.6, 1, 0.8], filo: 0.01, n: 8 });
   p.sph(0.024, 0, 0.17, 0.197, s, { filo: 0.008, n: 8 });
   const rosa = new THREE.Color(s).lerp(new THREE.Color('#ee5f7c'), 0.38);
@@ -83,7 +97,7 @@ function testa(p, o) {
 
   // I capelli. E' la sagoma che si riconosce da lontano, e la nuca e' quello che si
   // vede di piu': chi lavora da' le spalle alla camera.
-  const calotta = (r, dy, dz) => p.sph(r, 0, 0.2 + dy, dz, h, { n: 16 });
+  const calotta = (r, dy, dz) => p.sph(r, 0, 0.2 + dy, dz, h, { n: 14 });
   if (o.taglio === 'caschetto') {
     calotta(0.222, 0.04, -0.035);
     p.sph(1, 0, 0.35, 0.11, h, { s: [0.172, 0.062, 0.09], rx: -0.35 });
@@ -168,7 +182,7 @@ function petto(y) {
 function busto(p, o, kx, kz) {
   const zf = (y) => petto(y) * 0.82 * kz;
   p.sph(1, 0, 0.01, 0, o.pants, { s: [0.168 * (1 + (kx - 1) * 0.7), 0.115, 0.128 * (1 + (kz - 1) * 0.6)] });
-  p.lathe(PROFILO, 0, 0, 0, o.top, { s: [1.12 * kx, 1, 0.82 * kz], n: 16 });
+  p.lathe(PROFILO, 0, 0, 0, o.top, { s: [1.12 * kx, 1, 0.82 * kz], n: 14 });
   p.cyl(0.05, 0.055, 0.07, 0, 0.4, 0, o.skin, { filo: 0, n: 10 });
   // Un pezzo steso sul petto: mezzo dentro e mezzo fuori, cosi' segue la curva e il filo lo contorna.
   const su = (w, h, y, x, c, d = 0.018, filo = 0.007) => p.sph(1, x, y, zf(y) - d * 0.35, c, { s: [w, h, d], n: 10, filo });
@@ -210,12 +224,14 @@ function busto(p, o, kx, kz) {
    o posata sulla scrivania senza cambiare padrone. Ognuno ha l'origine dove lo si
    appoggia. */
 const COSE = {
-  /** Una di quelle del bar: il manico verso +x. */
+  /** Una di quelle del bar, la stessa che sta sulla rastrelliera (kit.js): il manico verso +x. */
   tazza(p) {
-    p.lathe([[0, 0], [0.034, 0], [0.043, 0.012], [0.046, 0.09], [0, 0.09]], 0, 0, 0, CREMA, { n: 12, filo: 0.008 });
-    p.put(G.torus(0.024, 0.008, TAU, 10), CREMA, 0.05, 0.048, 0, { filo: 0.006 });
-    p.cyl(0.037, 0.037, 0.004, 0, 0.088, 0, '#5a3520', { filo: 0, n: 12 });
+    tazza(p, CREMA, '#5a3520');
   },
+  /** Le altre, per chi ne riporta piu' d'una dopo averle lavate: vuote, infilate una nell'altra, ognuna un po' girata. */
+  tazza2: (p) => tazza(p.at(0, 0.034, 0, 0.9), CREMA, '#d8d2c6'),
+  tazza3: (p) => tazza(p.at(0, 0.068, 0, 2.1), CREMA, '#d8d2c6'),
+  tazza4: (p) => tazza(p.at(0, 0.102, 0, 3.4), CREMA, '#d8d2c6'),
   foglio(p) {
     p.cube(0.12, 0.006, 0.15, 0, 0, 0, '#9ecbf0', { filo: 0.006 });
     for (const z of [-0.04, -0.01, 0.02]) p.cube(0.08, 0.002, 0.008, -0.005, 0.006, z, '#5f93c4', { filo: 0 });
@@ -235,7 +251,7 @@ const COSE = {
   /** La tazza che uno si e' portato da casa: e' sua, con la fascia del suo accento, e vive sulla sua scrivania. */
   sua(p, o) {
     COSE.tazza(p);
-    p.cyl(0.0465, 0.0465, 0.022, 0, 0.04, 0, o.acc, { filo: 0, n: 12 });
+    p.cyl(0.0465, 0.0465, 0.022, 0, 0.04, 0, o.acc, { filo: 0, n: 10 });
   },
   /** Lo schermo in su, il lato lungo lungo z. */
   telefono(p) {
@@ -255,6 +271,9 @@ const COSE = {
     for (const y of [-0.06, -0.15]) p.sph(0.014, 0, y, 0, '#8fd0f2', { filo: 0, n: 6 });
   },
 };
+
+/** Le tazze sono un filo piu' grandi del vero, come quelle della stanza. */
+const GRANDE = { tazza: TAZZA, tazza2: TAZZA, tazza3: TAZZA, tazza4: TAZZA, sua: TAZZA };
 
 const GIU = new THREE.Vector3(0, -1, 0);
 const _n = new THREE.Vector3();
@@ -306,10 +325,11 @@ export function persona(seme, mat) {
     genitore.add(n);
     return n;
   };
-  const pezzo = (genitore, fn) => {
+  /** `ombra`: se il pezzo fa ombra. Gli occhi, la bocca e quello che si tiene in mano no: sono cose di pochi pixel, e ognuna sarebbe un disegno in piu' a ogni fotogramma. */
+  const pezzo = (genitore, fn, ombra = true) => {
     const L = new Tratto();
     fn(penna(L));
-    const m = L.mesh(suo);
+    const m = L.mesh(suo, ombra);
     genitore.add(m);
     return m;
   };
@@ -331,15 +351,15 @@ export function persona(seme, mat) {
       p.sph(1, k * 0.078, 0, 0.18, NERO, { s: [0.027, 0.04, 0.016], filo: 0, n: 10 });
       p.sph(0.009, k * 0.078 + 0.009, 0.015, 0.194, '#ffffff', { filo: 0, n: 6 });
     }
-  });
+  }, false);
   const ciglia = pezzo(nodo(head, 0, 0.285, 0), (p) => {
     for (const k of [-1, 1]) p.cap(0.008, 0.045, k * 0.078, 0, 0.166, o.hair, { rz: Math.PI / 2 + k * 0.15, filo: 0, n: 6 });
-  });
+  }, false);
   // La bocca: un arco che sorride (rovesciato e' un broncio), e un tondo scuro quando parla.
   const zb = o.barba === 'piena' || o.barba === 'corta' ? 0.203 : 0.181;
   const rb = o.barba === 'piena' || o.barba === 'corta' ? 0.2 : 0.5;
-  const bocca = pezzo(nodo(head, 0, 0.128, zb), (p) => p.put(G.torus(0.034, 0.008, Math.PI, 8), o.bocca, 0, 0, 0, { rz: Math.PI, rx: rb, filo: 0 }));
-  const voce = pezzo(nodo(head, 0, 0.112, zb + 0.004), (p) => p.sph(1, 0, 0, 0, '#5a1f1a', { s: [0.03, 0.024, 0.01], filo: 0, n: 8 }));
+  const bocca = pezzo(nodo(head, 0, 0.128, zb), (p) => p.put(G.torus(0.034, 0.008, Math.PI, 8), o.bocca, 0, 0, 0, { rz: Math.PI, rx: rb, filo: 0 }), false);
+  const voce = pezzo(nodo(head, 0, 0.112, zb + 0.004), (p) => p.sph(1, 0, 0, 0, '#5a1f1a', { s: [0.03, 0.024, 0.01], filo: 0, n: 8 }), false);
   voce.visible = false;
 
   const maniche = o.vestito === 'polo';
@@ -372,7 +392,7 @@ export function persona(seme, mat) {
     let n = cose[nome];
     if (!n) {
       n = cose[nome] = nodo(g);
-      pezzo(n, (p) => COSE[nome](p, o));
+      pezzo(n, (p) => COSE[nome](p, o), false);
       n.visible = false;
     }
     return n;
@@ -450,16 +470,21 @@ export function persona(seme, mat) {
       n.visible = true;
       n.position.set(x, y, z);
       n.rotation.set(rx, ry, rz);
-      n.scale.setScalar(Math.min(1, k));
+      n.scale.setScalar(Math.min(1, k) * (GRANDE[nome] || 1));
     },
     /** La cima dei capelli adesso, in unita' di stanza: il bottone arriva fin li'. */
     get alta() {
       return (hips.position.y + CIMA) * U;
     },
-    /** Sbiadita, come chi e' fermo da un pezzo: `k` da 1 (viva) a 0.5. Scura e slavata insieme, come un disegno al sole. */
+    /**
+     * Spenta, come chi e' fermo da un pezzo: `k` da 1 (viva) a 0.5. Un velo d'ombra e
+     * un filo di grigio, non di piu': deve restare una persona coi suoi colori. (Il
+     * grigio si somma in luce lineare: a un terzo, come prima, la sbiancava fino a
+     * farne un fantasma.)
+     */
     tinta(k) {
-      suo.color.setScalar(0.5 + k * 0.5);
-      suo.emissive.setScalar((1 - k) * 0.34);
+      suo.color.setScalar(0.66 + k * 0.34);
+      suo.emissive.setScalar((1 - k) * 0.045);
     },
     via() {
       g.traverse((n) => n.geometry && n.geometry.dispose());

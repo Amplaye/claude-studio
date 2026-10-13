@@ -57,12 +57,6 @@ const PAUSA_PERSONA = 240;
 const PAUSA_BANCO = 100;
 const SONNO_BANCO = [70, 130];
 
-/* Le quote della stanza a scatole, per quando una scrivania non dice ancora il suo
-   piano (`banco.top`): si tolgono quando la stanza nuova e' dentro. */
-const PIANO_VECCHIO = 11.2;
-const SEDILE_VECCHIO = 3.9;
-const pianoVecchio = (b) => ({ x: b.x + 24, y: b.b - 7, z: PIANO_VECCHIO, a: Math.PI, w: 48, d: 14, libero: [b.mir ? b.x + 11 : b.x + 37, b.b - 7], vecchio: true });
-
 /** Un punto della pianta nelle misure del piano `t`: [di traverso, in profondita'] dal suo centro. */
 const sulPiano = (t, x, y) => [(x - t.x) * Math.cos(t.a) - (y - t.y) * Math.sin(t.a), (x - t.x) * Math.sin(t.a) + (y - t.y) * Math.cos(t.a)];
 const dalPiano = (t, u, v) => [t.x + u * Math.cos(t.a) + v * Math.sin(t.a), t.y - u * Math.sin(t.a) + v * Math.cos(t.a)];
@@ -81,10 +75,8 @@ export function leggi(ROOM, R, B, sedile) {
   const H = ROOM.H;
   const gc = Math.ceil(W / CELLA);
   const gr = Math.ceil(H / CELLA);
-  const banchi = (B.banchi || []).map((b, i) => {
-    const top = b.top || pianoVecchio(b);
-    return { i, top, sedia: b.posto ? { x: b.posto.x, y: b.posto.y, z: top.vecchio ? SEDILE_VECCHIO : sedile } : null };
-  });
+  // Il piano di ogni scrivania lo dice lei (`banco.top`, props.js): `a` e' da che parte guarda chi siede, `w` di traverso e `d` lungo lo sguardo.
+  const banchi = (B.banchi || []).map((b, i) => ({ i, top: b.top, sedia: b.posto ? { x: b.posto.x, y: b.posto.y, z: sedile, a: b.posto.a } : null }));
   const sedie = (B.posti || []).map((q) => [q.x, q.y]);
   const [vx, vw] = R.VANO;
   const occ = new Uint8Array(gc * gr);
@@ -827,8 +819,14 @@ export function cervelli(opz = {}) {
       const s = b.sedia;
       let scala = null;
       if (s && !seduti.has(b.i) && !genteVicina(s.x, s.y, 50) && caso() < 0.5) {
-        for (let k = 0; k < 8 && !scala; k++) {
-          const an = (k / 8) * TAU + caso();
+        /* Da dove ci salta: di fianco, mai da dietro — li' c'e' lo schienale, e il salto
+           ci passerebbe attraverso. Attorno a una sedia il posto libero e' poco (davanti
+           ha la scrivania, e la stanza piatta ci tiene la sua): si fa il giro a passi
+           fitti partendo da un punto a caso, e ci si ferma al primo che va. */
+        const da = caso() * TAU;
+        for (let k = 0; k < 24 && !scala; k++) {
+          const an = da + (k / 24) * TAU;
+          if (Math.cos(an - s.a) < -0.25) continue;
           const x = s.x + Math.sin(an) * 14;
           const y = s.y + Math.cos(an) * 14;
           if (libero(x, y) && Math.hypot(x - d.x, y - d.y) < 50) scala = [x, y];

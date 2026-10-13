@@ -21,7 +21,7 @@
  * e' lo specchio — qui si costruiscono, si mettono al loro posto e si muovono
  * finche' sono accesi.
  */
-import { THREE, G, Tratto, qui, mtx, senzaFilo, TAU, U, SEDILE_M, PIANO_M, clamp, rnd, hash } from './kit.js';
+import { THREE, G, Tratto, qui, mtx, senzaFilo, tazza, TAZZA, TAU, U, SEDILE_M, PIANO_M, clamp, rnd, hash } from './kit.js';
 
 /** La faccia del muro di fondo, in unita' di stanza: i mobili alti ci stanno appoggiati. */
 const MURO = 16;
@@ -29,8 +29,6 @@ const MURO = 16;
 const FONDO_TAVOLO = 14;
 /** A quanto dal bordo del tavolo sta il centro di uno sgabello: il sedile sfiora il piano, e le mani ci arrivano. */
 const SOTTO = 8;
-/** Le tazze sono un filo piu' grandi del vero: a questa distanza una tazza vera e' sei pixel. */
-const TAZZA = 1.2;
 /** Quanti punti tondi si muovono al massimo: le gocce della fontanella e la spia. */
 const PUNTI = 36;
 
@@ -39,7 +37,6 @@ const PIANTE = { vasoAloe: 'aloe', vasoFiori: 'fiori', plantPurple: 'cespo', pla
 
 // I profili che si fanno girare: scritti una volta, cosi' la forma si calcola una volta.
 const VASO = [[0, 0], [0.13, 0], [0.17, 0.26], [0.19, 0.3], [0.15, 0.3], [0, 0.28]];
-const COCCIO = [[0, 0], [0.034, 0], [0.043, 0.012], [0.046, 0.09], [0, 0.09]];
 const BARATTOLO = [[0, 0], [0.07, 0], [0.085, 0.03], [0.085, 0.15], [0.055, 0.18], [0.055, 0.2], [0, 0.2]];
 const GAMBA = [[0, 0], [0.16, 0], [0.17, 0.02], [0.06, 0.06], [0.045, 0.24], [0, 0.24]];
 const SECCHIO = [[0, 0], [0.125, 0], [0.135, 0.02], [0.165, 0.33], [0.175, 0.36], [0.15, 0.36], [0.125, 0.06], [0, 0.06]];
@@ -73,17 +70,24 @@ export function mobili(K, B) {
   const tondo = new THREE.IcosahedronGeometry(1, 1);
   // Quello che la tavolozza non ha: il caffe' e' la terra dei vasi, il dentro di una
   // tazza pulita la sua ceramica in ombra, e quello di una sporca le due cose insieme.
-  const caffe = C.soil;
+  const caffe = C.caffe || C.soil;
   const pulita = fra(C.cream, C.chairLo, 0.22);
   const sporca = fra(C.cream, C.soil, 0.55);
   B.bar = { tazze: [], macchina: null, lavandino: null };
+  /** Quello a cui si avvicina chi si ferma in piedi li' accanto: le piante e il cestino, con l'orlo dove arrivano le mani. */
+  B.interessi = [];
 
   /* Ognuno dice anche dove va a finire, sulla sua faccia, una cosa che nella stanza
      piatta gli sta appesa sopra — un foglietto, una busta, la luce della dispensa.
      `fz` porta da «quanti pixel sopra il bordo di sotto del ritaglio» all'altezza
      vera, in unita': i ritagli sono disegnati alti perche' si vede anche il sopra, e
-     la proporzione non e' la stessa per tutti. */
-  const appeso = (m, h2, yf, fz) => B.appesi.push({ x0: m.x, x1: m.x + (m.w || SV[m.s].w), y0: m.b - h2, b: m.b, yf, fz });
+     la proporzione non e' la stessa per tutti.
+
+     E dice dove comincia: `fronte` e' quanto sporge dal muro, in metri — e' davanti
+     a quello che si ferma chi lo usa. `o` e' quello che ci cercano le mani, in
+     unita' di stanza: `alto: false` se e' un bancone (ci si sta piu' addosso, che la
+     testa non ci sbatte), `mani` le quote a cui sta la roba che si tocca. */
+  const appeso = (m, h2, yf, fz, fronte, o) => B.appesi.push({ s: m.s, x0: m.x, x1: m.x + (m.w || SV[m.s].w), y0: m.b - h2, b: m.b, yf, fz, fronte: MURO + fronte * U, alto: true, ...o });
   const largo = (m) => (m.w || SV[m.s].w) / U;
   /** Una penna piantata contro il muro di fondo, a meta' del mobile. */
   const alMuro = (m) => K.qui(m.x + (m.w || SV[m.s].w) / 2, MURO);
@@ -103,17 +107,9 @@ export function mobili(K, B) {
   // =====================================================================
   //  le cose piccole che tornano: tazze, libri, piante
   // =====================================================================
-  /** Una tazza, il manico a destra. `dentro` e' quello che ci si vede guardandola da sopra. */
-  function tazza(q, c, dentro) {
-    q.lathe(COCCIO, 0, 0, 0, c, { n: 10, filo: 0.008 });
-    q.put(G.torus(0.024, 0.008, TAU, 8), c, 0.05, 0.048, 0, { filo: 0.006 });
-    q.cyl(0.037, 0.037, 0.004, 0, 0.088, 0, dentro, { filo: 0, n: 10 });
-    // Quella da lavare ha il segno del caffe' sotto l'orlo: da fuori e' l'unica cosa che la distingue.
-    if (dentro === sporca) q.cyl(0.0468, 0.0462, 0.014, 0, 0.066, 0, sporca, { filo: 0, n: 10 });
-  }
-  /** Una tazza che lo specchio accende e spegne: un pezzo suo, girata di `ry` e piegata di `rx`. */
+  /** Una tazza che lo specchio accende e spegne: un pezzo suo, girata di `ry` e piegata di `rx`. Quella da lavare ha il segno del caffe' sotto l'orlo: da fuori e' l'unica cosa che la distingue. */
   function tazzaVera(q, x, y, z, dentro, ry = 0, rx = 0) {
-    const g = pezzo(q, x, y, z, (p) => tazza(p.at(0, 0, 0, ry, rx), C.cream, dentro));
+    const g = pezzo(q, x, y, z, (p) => tazza(p.at(0, 0, 0, ry, rx), C.cream, dentro, dentro === sporca ? sporca : null));
     g.scale.multiplyScalar(TAZZA);
     return g;
   }
@@ -196,7 +192,7 @@ export function mobili(K, B) {
       }
     });
     pianta(q.at(0.2, 1.78, 0.22), 'cespo', 4, C.vasi[4 % C.vasi.length], 0.5);
-    appeso(m, SV[m.s].h, MURO + 0.26 * U, (dy) => 1.3 * dy);
+    appeso(m, SV[m.s].h, MURO + 0.26 * U, (dy) => 1.3 * dy, 0.42, { mani: [(ys[2] + 0.2) * U] });
   }
 
   /** Dove si appoggia la roba nella dispensa e nella rastrelliera, che sono lo stesso mobile: in metri da terra. */
@@ -213,14 +209,15 @@ export function mobili(K, B) {
     q.box(0.36, 0.24, 0.26, -0.2, ys[0], 0.22, C.cream, { r: 0.03 });
     [0.12, 0.31].forEach((x, i) => libro(q, 0.16, 0.26 + i * 0.05, 0.26, x, ys[0], 0.22, C.faldoni[(i + 3) % C.faldoni.length]));
     pianta(q.at(-0.22, 1.53, 0.2), 'lingua', 2, C.vasi[1 % C.vasi.length], 0.5);
-    appeso(m, SV[m.s].h, MURO + 0.22 * U, (dy) => 1.38 * dy + 0.24);
+    appeso(m, SV[m.s].h, MURO + 0.22 * U, (dy) => 1.38 * dy + 0.24, 0.4, { mani: [(ys[2] + 0.12) * U, (ys[1] + 0.12) * U] });
   }
 
   /* La rastrelliera: gli stessi ripiani, vuoti apposta. Le tazze che ci stanno sono
      quelle che ci sono davvero — quattro pezzi, e lo specchio ne fa vedere quante ne
      conta la stanza piatta. Stanno dove le mette lei (SCAFFALI0 in room.js: due per
      ripiano, a 4 e a 13 dal bordo sinistro del ritaglio, coi piedi a 22 e a 12 sopra
-     il suo bordo di sotto), e `fz` porta quelle due righe sui due ripiani di sopra. */
+     il suo bordo di sotto), e `fz` porta quelle due righe sui due ripiani di sopra.
+     Stanno sul bordo del ripiano, non in fondo: e' li' che arriva una mano. */
   function rastrelliera(m) {
     const q = alMuro(m);
     const w = largo(m);
@@ -231,9 +228,9 @@ export function mobili(K, B) {
     q.box(0.3, 0.2, 0.24, -0.2, ys[0], 0.22, C.jar, { r: 0.03 });
     const fz = (dy) => 1.38 * dy + 0.24;
     for (const [dy, dx] of [[22, 6.5], [22, 15.5], [12, 6.5], [12, 15.5]]) {
-      B.bar.tazze.push(tazzaVera(q, dx / U - w / 2, fz(dy) / U, 0.22, pulita, 0.5));
+      B.bar.tazze.push(tazzaVera(q, dx / U - w / 2, fz(dy) / U, 0.31, pulita, 0.5));
     }
-    appeso(m, SV[m.s].h, MURO + 0.22 * U, fz);
+    appeso(m, SV[m.s].h, MURO + 0.22 * U, fz, 0.4);
   }
 
   function armadio(m) {
@@ -248,7 +245,7 @@ export function mobili(K, B) {
     }
     [0, 1, 2].forEach((k) => libro(q, 0.34, 0.06, 0.26, -0.18, 1.15 + k * 0.06, 0.23, C.faldoni[(k + 1) % C.faldoni.length], { ry: 0.2 - 0.18 * k }));
     pianta(q.at(0.24, 1.15, 0.23), 'fiori', 7, C.vasi[3 % C.vasi.length], 0.55);
-    appeso(m, SV[m.s].h, MURO + 0.46 * U + 0.3, (dy) => 0.84 * dy);
+    appeso(m, SV[m.s].h, MURO + 0.46 * U + 0.3, (dy) => 0.84 * dy, 0.47, { alto: false });
   }
 
   /* La lavagna. Il bottone della bacheca ci si stende sopra (`B.bacheca`) e i
@@ -273,7 +270,7 @@ export function mobili(K, B) {
     });
     gesso(0.14 - w / 2, w / 2 - 0.36, 1.08);
     const yf = MURO + 0.271 * U;
-    appeso(m, SV[m.s].h, yf + 0.3, (dy) => dy + 26);
+    appeso(m, SV[m.s].h, yf + 0.3, (dy) => dy + 26, 0.39);
     B.bacheca = { x0: m.x, x1: m.x + SV[m.s].w, z0: 0.86 * U, z1: 1.92 * U, y: yf + 0.1 };
   }
 
@@ -342,8 +339,9 @@ export function mobili(K, B) {
     };
     versa(0.4);
     K.anima((t) => getto.visible && versa(t));
-    B.bar.macchina = { ...inPianta(a, ...posto), tazza: sotto, getto };
-    appeso(m, m.h, MURO + 0.51 * U + 0.3, (dy) => 0.96 * dy);
+    /* Dove si appoggia la tazza (`x, y, z`) e dove sta il bottone: e' li' che vanno le mani di chi se lo fa. */
+    B.bar.macchina = { ...inPianta(a, ...posto), bottone: inPianta(a, 0.17, 0.365, 0.2), tazza: sotto, getto };
+    appeso(m, m.h, MURO + 0.51 * U + 0.3, (dy) => 0.96 * dy, 0.54, { alto: false });
   }
 
   /* Il lavandino: un mobiletto con sopra una vasca di ceramica e un rubinetto a collo
@@ -396,8 +394,9 @@ export function mobili(K, B) {
       g.visible = false;
       return g;
     });
-    B.bar.lavandino = { ...inPianta(q, 0, fondo + 0.035, cz), acqua, sporche };
-    appeso(m, m.h, MURO + 0.455 * U + 0.3, (dy) => 0.83 * dy);
+    /* Il centro della vasca all'altezza del bordo (`x, y, z`): e' li' sopra che si lava e che si posa. */
+    B.bar.lavandino = { ...inPianta(q, 0, SOPRA + 0.115, cz), acqua, sporche };
+    appeso(m, m.h, MURO + 0.455 * U + 0.3, (dy) => 0.83 * dy, 0.475, { alto: false });
   }
 
   // =====================================================================
@@ -478,22 +477,35 @@ export function mobili(K, B) {
     const a = Math.atan2(ux, uy);
     const q = K.qui(x, y);
     q.lathe(GAMBA, 0, 0, 0, C.woodLo, { n: 12 });
-    q.disc(0.19, 0.07, 0, SEDILE_M - 0.095, 0, C.woodTop, { b: 0.025, n: 16 });
-    q.disc(0.15, 0.03, 0, SEDILE_M - 0.03, 0, C.woodHi, { b: 0.012, filo: 0, n: 16 });
+    q.disc(0.19, 0.07, 0, SEDILE_M - 0.095, 0, C.woodTop, { b: 0.025 });
+    q.disc(0.15, 0.03, 0, SEDILE_M - 0.03, 0, C.woodHi, { b: 0.012, filo: 0 });
     // Il portatile: un pezzo suo, e lo accende lo specchio quando nella stanza
     // piatta ce n'e' uno a quel posto.
     const lap = portatile();
-    const D = SOTTO + 4.4;
+    const D = SOTTO + 3.6;
     lap.position.set(x + ux * D, PIANO_M * U, y + uy * D);
     lap.rotation.y = a;
     lap.visible = false;
     K.radice.add(lap);
-    B.posti.push({ tipo: 'sgabello', p2: [cx, m.b], x, y, a, lap });
+    /* Il piano davanti a chi siede, come quello di una scrivania (`top` in props.js):
+       i tasti sono quelli del portatile, e un foglio si posa dove il tavolo ne ha il
+       posto — di fianco, o oltre il portatile per chi sta a capotavola. */
+    const oltre = (d, t) => [x + ux * d - uy * t, y + uy * d + ux * t];
+    const top = {
+      z: PIANO_M * U,
+      tasti: oltre(D - 0.02 * U, 0),
+      // La tazza a destra di chi siede e il foglio a sinistra; a capotavola il piano e' stretto, e stanno oltre il portatile.
+      tazza: ux ? oltre(D + 6.5, -4.2) : oltre(D - 1.5, -8.5),
+      foglio: ux ? oltre(D + 7.5, 3.4) : oltre(D - 1, 8.5),
+      manico: a + 2.4,
+    };
+    B.posti.push({ tipo: 'sgabello', p2: [cx, m.b], x, y, a, lap, top });
   }
 
   /** Il cestino: un secchio tondo, col buio dentro, una palla di carta e un foglio che spunta. Due palle uguali erano due occhi. */
   function cestino(m) {
     const q = K.qui(m.x + 6, m.b - 5);
+    B.interessi.push({ tipo: 'cestino', x: m.x + 6, y: m.b - 5, z: 0.36 * U, r: 0.175 * U });
     q.lathe(SECCHIO, 0, 0, 0, C.bezel, { n: 14 });
     q.disc(0.148, 0.01, 0, 0.3, 0, C.off, { filo: 0, n: 14, b: 0.003 });
     q.sph(0.07, -0.045, 0.33, 0.02, C.carta, { filo: 0.007, n: 6 });
@@ -505,6 +517,7 @@ export function mobili(K, B) {
     const w = SV[m.s].w;
     // Il vaso e' largo quanto il suo ritaglio: da li' viene la taglia di tutta la pianta.
     const k = clamp(w / U / 0.42, 0.8, 1.3);
+    B.interessi.push({ tipo: 'pianta', x: m.x + w / 2, y: m.b - 6, z: 0.3 * k * U, r: 0.19 * k * U });
     pianta(K.qui(m.x + w / 2, m.b - 6), PIANTE[m.s], quale * 5 + 1, C.vasi[quale % C.vasi.length], k);
   }
 
@@ -616,7 +629,19 @@ export function mobili(K, B) {
     K.anima(vento);
   }
 
-  // --- i punti tondi che si muovono: le gocce e la spia, una mesh a istanze
+  /* Una tazza piena fuma: due sbuffi che salgono dal punto (x, y, z) della pianta
+     finche' `quando()` dice di si'. Sono punti come le gocce, nella stessa mesh. */
+  const bianco = new THREE.Color(C.steam);
+  B.fuma = (x, y, z, quando) =>
+    accesi.push((t, punto) => {
+      if (!quando()) return;
+      for (let j = 0; j < 2; j++) {
+        const u = (t * 0.45 + j / 2 + x * 0.013) % 1;
+        punto(_v.set(x + Math.sin(u * 6 + j * 2 + x) * 0.5, z + 2 + u * 7, y), 0.006 + 0.02 * Math.sin(Math.PI * u), bianco);
+      }
+    });
+
+  // --- i punti tondi che si muovono: le gocce, la spia e il fumo, una mesh a istanze
   if (accesi.length) {
     const punti = new THREE.InstancedMesh(tondo, new THREE.MeshBasicMaterial(), PUNTI);
     punti.frustumCulled = false;

@@ -20,12 +20,8 @@
  *
  * I colori arrivano dalla pelle (skins/*.js): qui non c'e' un esadecimale.
  */
-import { THREE, Lotto, Tratto, T, TAU, U, SEDILE_M, PIANO_M, qui, penna, senzaFilo, mtx, clamp, rnd, hash } from './kit.js';
+import { THREE, Tratto, TAU, U, SEDILE_M, PIANO_M, qui, penna, senzaFilo, tazza, TAZZA, mtx, clamp, rnd } from './kit.js';
 import { mobili } from './mobili.js';
-
-/** Le quote dei mobili a scatole di prima (tavoli, sgabelli, e le persone che ci siedono): se ne vanno con loro. */
-export const PIANO = 11.2;
-export const SEDILE = 3.9;
 
 /** Le altezze del guscio: il davanzale della vetrata, la porta, il traverso, i divisori e i loro pilastrini. */
 const DAVANZALE = 20;
@@ -58,7 +54,9 @@ const SPESSO = 4.2;
  * Qui sotto la postazione vista dalla sua sedia, in metri: x a destra di chi siede,
  * che sta a +z e guarda verso -z. Chi siede, lo schermo e la tastiera stanno su un
  * asse spostato a destra, e il capo sinistro del piano — quello verso la camera —
- * resta libero: e' li' che si posa una tazza, e che si sdraia il gatto.
+ * resta libero: e' li' che si posa una tazza, e che si sdraia il gatto. La tazza sta
+ * fra la tastiera e il gatto, dove arriva una mano senza alzarsi; il foglio dall'altra
+ * parte, oltre il mouse. Chi siede non li cerca a memoria: glieli dice il piano (`top`).
  */
 const ALFA = (57 * Math.PI) / 180;
 const LARGO = 1.2;
@@ -68,6 +66,8 @@ const SIEDE = 0.54;
 const SCHERMO = -0.17;
 const TASTI = 0.23;
 const LIBERO = [-0.39, 0.02];
+const POSA_TAZZA = [-0.19, 0.21];
+const POSA_FOGLIO = [0.46, 0.08];
 /** Dove sta il centro del piano rispetto alla scrivania piatta `{ x, b }`, nella meta' sinistra: cosi' piano, sedia e chi siede stanno centrati nella colonna. */
 const CENTRO = [20, -16];
 
@@ -77,15 +77,12 @@ const CELLA = [124, 78];
 const CELLE = { off: 0, on: 1, working: 2, working2: 3 };
 /** Un giro in dieci secondi: tutto quello che si muove da solo sugli schermi torna su se stesso. */
 const W10 = TAU / 10;
-const UBOX = new THREE.BoxGeometry(1, 1, 1);
 
 export function costruisci(K) {
   const { L, C, S, R, Q } = K;
+  // Le scatole di prima: restano per il neon e per la porta accesa, che sono delle pelli di notte.
   const box = (...a) => L.box(...a);
-  const cyl = (...a) => L.cyl(...a);
-  const face = (...a) => L.face(...a);
   const GLOW = { k: 'glow' };
-  const THIN = { k: 'thin' };
   const { W, H, WH } = R;
   const B = { banchi: [], posti: [], appesi: [], portatili: [], buste: [], tavoli: [], vetri: [], porta: null, bacheca: null };
 
@@ -105,15 +102,6 @@ export function costruisci(K) {
     v3.set(x, y, z).applyMatrix4(q.m);
     return [v3.x, v3.z, v3.y];
   };
-  /** Un pezzo che si muove: le sue scatole in un lotto suo, dentro un gruppo. */
-  const pezzo = (fn, par = K.radice) => {
-    const q = new Lotto();
-    fn(q);
-    const g = q.mesh(K.mat);
-    par.add(g);
-    return g;
-  };
-
   /* Il filo in cima a un muro. Di notte e' un neon col suo alone; nelle pelli di
      giorno e' un cordolo chiaro, che e' quello che fa un muro basso alla luce. */
   const filo = (x0, y0, x1, y1, z) => {
@@ -380,252 +368,6 @@ export function costruisci(K) {
   }
 
   // =====================================================================
-  //  i mobili contro il muro di fondo
-  // =====================================================================
-  /* Ognuno dice anche dove va a finire, sulla sua faccia, una cosa che nella stanza
-     piatta gli sta appesa sopra — un foglietto, una tazza, il riflesso di chi legge.
-     `fz` porta da «quanti pixel sopra il bordo di sotto del ritaglio» all'altezza
-     vera: i ritagli sono disegnati alti perche' si vede anche il sopra, e la
-     proporzione non e' la stessa per tutti. */
-  const appeso = (m, h2, yf, fz) => B.appesi.push({ x0: m.x, x1: m.x + (m.w || R.SV[m.s].w), y0: m.b - h2, b: m.b, yf, fz });
-
-  function scaffale(m, cosa) {
-    const x = m.x;
-    const y = 16;
-    const w = 28;
-    const d = 11;
-    const h = 30;
-    box(x, y, 0, w, 2, h, C.woodDk);
-    box(x, y, 0, 2, d, h, C.wood);
-    box(x + w - 2, y, 0, 2, d, h, C.wood);
-    box(x, y, h - 2, w, d, 2, C.wood);
-    box(x, y, 0, w, d, 2, C.wood);
-    for (let k = 0; k < 3; k++) {
-      const zb = 2 + k * 9;
-      if (k) box(x + 2, y + 2, zb - 1, w - 4, d - 2, 1, C.wood);
-      if (cosa === 'faldoni') {
-        for (let i = 0, bx = x + 3; bx < x + w - 4.6; i++) {
-          const bw = 2 + rnd('bw', k, i) * 1.4;
-          box(bx, y + 4, zb, bw - 0.4, 6, 5 + rnd('bh', k, i) * 2.5, C.faldoni[hash('bc', k, i) % C.faldoni.length]);
-          bx += bw;
-        }
-      }
-      if (cosa === 'barattoli') {
-        for (let i = 0; i < 3; i++) {
-          const bx = x + 4 + i * 7.5;
-          box(bx, y + 4.5, zb, 5, 5, 4.3, C.jar);
-          box(bx, y + 4.5, zb + 4.3, 5, 5, 1.2, C.jarHi);
-        }
-      }
-      // La rastrelliera resta vuota: le tazze che ci stanno sono quelle vere, e le
-      // mette la stanza piatta (lo specchio le appoggia sui ripiani).
-    }
-    appeso(m, R.SV[m.s].h, y + 6.5, (dy) => 0.9 * dy + 0.2);
-  }
-  function armadio(m) {
-    const x = m.x;
-    const w = 26;
-    const h = 30;
-    const yf = 27;
-    const c = x + w / 2;
-    box(x, 16, 0, w, 11, h, C.wood);
-    face(c - 0.4, c + 0.4, yf, 2, h - 2, C.woodDk);
-    face(x + 1.4, x + w - 1.4, yf, 0, 1.6, C.woodDk);
-    box(c - 3.2, yf, 13, 1.2, 0.7, 4, C.woodHi);
-    box(c + 2, yf, 13, 1.2, 0.7, 4, C.woodHi);
-    appeso(m, R.SV[m.s].h, yf + 0.3, (dy) => 0.75 * dy);
-  }
-  function bacheca(m) {
-    const x = m.x;
-    box(x + 2, 16.5, 0, 2, 2, 12, C.woodLo);
-    box(x + 40, 16.5, 0, 2, 2, 12, C.woodLo);
-    box(x, 16, 12, 44, 3, 28, C.wood);
-    face(x + 2, x + 42, 19, 14, 38, C.woodDk);
-    appeso(m, R.SV[m.s].h, 19.4, (dy) => dy + 5);
-    B.bacheca = { x0: x, x1: x + 44, z0: 12, z1: 40, y: 19.2 };
-  }
-  /** Tre sbuffi che salgono, ognuno per due secondi. Fermi, con le animazioni ridotte. */
-  function vapore(cx, cy, z, seme) {
-    const P = [0, 1, 2].map(() => {
-      const m = new THREE.Mesh(UBOX, new THREE.MeshBasicMaterial({ color: C.steam, transparent: true, depthWrite: false }));
-      K.radice.add(m);
-      return m;
-    });
-    const metti = (t) =>
-      P.forEach((p, k) => {
-        const u = (t / 2 + k / 3 + seme) % 1;
-        p.position.set(cx + Math.sin(u * 7 + k) * 1.2, z + u * 9, cy + Math.cos(u * 5 + k) * 0.5);
-        p.material.opacity = 0.7 * Math.sin(Math.PI * u) * (1 - u * 0.5);
-        p.scale.setScalar(1.3 * (1 + u * 1.2));
-      });
-    metti(0.4);
-    K.anima(metti);
-  }
-  function macchina(m) {
-    const x = m.x;
-    const y = 16;
-    const w = 24;
-    const d = 12;
-    const h = 30;
-    const yf = y + d;
-    box(x, y, 0, w, d, 8, C.mach);
-    box(x, y, 19, w, d, h - 19, C.mach);
-    box(x, y, 8, w, 5, 11, C.machLo);
-    box(x, y, 8, 3.5, d, 11, C.mach);
-    box(x + 18, y, 8, 6, d, 11, C.mach);
-    box(x + 5, y + 2, h, 14, 8, 5, C.machLo);
-    face(x + 4, x + 17, yf, 21.5, 25, C.machHi);
-    box(x + 8.5, y + 6.5, 8, 4.5, 4.5, 4, C.cream);
-    box(x + 19.5, yf, 21.8, 2.6, 0.4, 2.8, C.spia, GLOW);
-    if (S.aloni) {
-      K.alone([x + 20.8, yf + 0.6, 23.2], [x + 20.8, yf + 0.6, 23.2], 6, C.spia, 0.6 * S.aloni);
-      const l = new THREE.PointLight(C.spia, 14, 40, 1.3);
-      l.position.set(x + 20, 23, yf + 5);
-      K.radice.add(l);
-    }
-    vapore(x + 10.7, yf - 2.5, 12.5, 0);
-    appeso(m, m.h, yf + 0.3, (dy) => 0.75 * dy);
-  }
-  function lavandino(m) {
-    const x = m.x;
-    const y = 16;
-    const w = 18;
-    const d = 11;
-    const h = 15;
-    const yf = y + d;
-    box(x, y, 0, w, d, h, C.wood);
-    face(x + w / 2 - 0.4, x + w / 2 + 0.4, yf, 2, h - 2.5, C.woodDk);
-    box(x + 2.5, y + 3, h, w - 5, d - 5, 0.25, C.woodDk, THIN);
-    box(x + w / 2 - 1, y + 0.6, h, 2, 2, 5, C.steel);
-    box(x + w / 2 - 1, y + 2.6, h + 3.6, 2, 3, 1.4, C.steel);
-    appeso(m, m.h, yf + 0.3, (dy) => 0.75 * dy);
-  }
-
-  // =====================================================================
-  //  quello che sta in mezzo alle stanze
-  // =====================================================================
-  /** Il tavolo delle riunioni e quello del bar sono lo stesso mobile. */
-  function tavolo(m) {
-    const x = m.x;
-    const y = m.b - 14;
-    for (const [lx, ly] of [[x + 1.5, y + 1.5], [x + 44, y + 1.5], [x + 1.5, y + 10], [x + 44, y + 10]]) box(lx, ly, 0, 2.5, 2.5, 9, C.woodLo);
-    box(x, y, 9, 48, 14, 2.2, C.woodTop);
-    B.tavoli.push({ x, y, w: 48, d: 14 });
-  }
-  /* Lo sgabello. Nella stanza piatta sta a una spanna dal tavolo, e li' seduti le
-     mani non arrivano al piano: qui lo si tira sotto fino a dove ci si lavora
-     davvero. Chi ci si siede guarda il tavolo, e il portatile gli sta davanti. */
-  function sgabello(m) {
-    const cx = m.x + 7;
-    const cy = m.b - 5;
-    let v = null;
-    for (const t of B.tavoli) {
-      const px = clamp(cx, t.x, t.x + t.w);
-      const py = clamp(cy, t.y, t.y + t.d);
-      const d = Math.hypot(px - cx, py - cy);
-      if (d > 0.01 && d < 30 && (!v || d < v.d)) v = { d, ux: (px - cx) / d, uy: (py - cy) / d };
-    }
-    const tira = v ? Math.max(0, v.d - 7.5) : 0;
-    const x = cx + (v ? v.ux * tira : 0);
-    const y = cy + (v ? v.uy * tira : 0);
-    const a = v ? Math.atan2(v.ux, v.uy) : 0;
-    cyl(x, y, 0, 1.8, SEDILE - 1.3, C.woodLo);
-    cyl(x, y, SEDILE - 1.3, 5.2, 1.3, C.wood);
-    // Il portatile: chiuso in un pezzo suo, e lo accende lo specchio quando nella
-    // stanza piatta ce n'e' uno a quel posto.
-    const lap = pezzo((q) => {
-      q.box(-3.2, -2.5, 0, 6.4, 5, 0.6, C.bezel);
-      // Lo schermo sta dalla parte lontana e guarda chi siede, appena reclinato.
-      q.con(T(0, 2.5, 0.5).multiply(new THREE.Matrix4().makeRotationX(0.25)), () => {
-        q.box(-3.2, -0.3, 0, 6.4, 0.6, 4.6, C.bezel);
-        q.box(-2.7, -0.42, 0.5, 5.4, 0.12, 3.6, S.schermi.on[0], GLOW);
-      });
-    });
-    lap.position.set(x + Math.sin(a) * 9.6, PIANO, y + Math.cos(a) * 9.6);
-    lap.rotation.y = a;
-    lap.visible = false;
-    B.posti.push({ tipo: 'sgabello', p2: [cx, m.b], x, y, a, lap });
-  }
-  function cestino(m) {
-    box(m.x + 1, m.b - 9, 0, 10, 8, 10, C.bezel);
-    box(m.x + 2.3, m.b - 7.7, 10, 7.4, 5.4, 0.2, C.off, THIN);
-    box(m.x + 4, m.b - 6.5, 10, 3.2, 3, 1.6, C.carta);
-  }
-  /** Sei piante e sei sagome, come nella stanza piatta: `quale` e' il suo posto nell'elenco. */
-  const PIANTE = { vasoAloe: 'alta', vasoFiori: 'fiori', plantPurple: 'cespo', plantBlue: 'cespo', vasoFoglie: 'felce', vasoErba: 'alta' };
-  function pianta(m, quale) {
-    const d = R.SV[m.s];
-    const cx = m.x + d.w / 2;
-    const cy = m.b - 6;
-    const tipo = PIANTE[m.s];
-    cyl(cx, cy, 0, 4.6, 6, C.vasi[quale % C.vasi.length]);
-    cyl(cx, cy, 6, 3.6, 0.2, C.soil, THIN);
-    const r = (k, i) => rnd(m.s, k, i);
-    const F = [];
-    if (tipo === 'cespo') for (let i = 0; i < 10; i++) {
-      const a = r('a', i) * TAU, q = r('r', i) * 4.2, s = 3 + r('s', i) * 2.6;
-      F.push([cx + Math.cos(a) * q - s / 2, cy + Math.sin(a) * q - s / 2, 6.5 + r('z', i) * 9, s, s, i % 4]);
-    }
-    if (tipo === 'alta') for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * TAU, q = i ? 2.6 : 0;
-      F.push([cx + Math.cos(a) * q - 0.9, cy + Math.sin(a) * q - 0.9, 6, 1.8, i ? 7 + r('h', i) * 8 : 17, i % 4]);
-    }
-    if (tipo === 'felce') for (let i = 0; i < 12; i++) {
-      const a = r('a', i) * TAU, q = 1.5 + r('r', i) * 5.5, s = 2.4 + r('s', i) * 1.6;
-      F.push([cx + Math.cos(a) * q - s / 2, cy + Math.sin(a) * q - s / 2, 6.5 + (7 - q) * 0.9 * r('z', i), s, s * 0.7, i % 4]);
-    }
-    if (tipo === 'fiori') for (let i = 0; i < 8; i++) {
-      const a = r('a', i) * TAU, q = r('r', i) * 3, s = 2.4 + r('s', i) * 1.6;
-      F.push([cx + Math.cos(a) * q - s / 2, cy + Math.sin(a) * q - s / 2, 6.5 + r('z', i) * 8, s, s, i < 3 ? 9 : i % 3]);
-    }
-    for (const [x, y, z, s, h, gi] of F) box(x, y, z, s, s, h, gi === 9 ? C.fiore : C.verde[gi]);
-  }
-  /** La fontanella in mezzo all'atrio: l'unica cosa che si muove anche a stanza vuota. */
-  function fontana(m) {
-    const cx = m.x + 8;
-    const cy = m.b - 6;
-    const [lo, mid, hi] = C.acqua;
-    cyl(cx, cy, 0, 5, 2, C.stone);
-    cyl(cx, cy, 2, 2.6, 7, C.stoneLo);
-    cyl(cx, cy, 9, 6.6, 3, C.stone);
-    cyl(cx, cy, 12, 5.3, 0.25, lo, GLOW);
-    cyl(cx, cy, 12.4, 0.9, 0.15, hi, GLOW);
-    const disco = new THREE.CylinderGeometry(1, 1, 0.12, 14);
-    const onde = [0, 1].map(() => {
-      const o = new THREE.Mesh(disco, new THREE.MeshBasicMaterial({ color: mid, transparent: true, depthWrite: false }));
-      o.position.set(cx, 12.32, cy);
-      K.radice.add(o);
-      return o;
-    });
-    const matGetto = new THREE.MeshBasicMaterial({ color: hi });
-    const getto = [0, 1, 2].map(() => {
-      const o = new THREE.Mesh(UBOX, matGetto);
-      o.scale.setScalar(0.9);
-      K.radice.add(o);
-      return o;
-    });
-    let luce = null;
-    if (S.aloni) {
-      K.alone([cx, cy, 13], [cx, cy, 13], 13, mid, 0.42 * S.aloni);
-      luce = new THREE.PointLight(mid, 30, 90, 1.3);
-      luce.position.set(cx, 17, cy);
-      K.radice.add(luce);
-    }
-    const metti = (t) => {
-      onde.forEach((o, i) => {
-        const u = (t * 1.5 + i / 2) % 1;
-        const q = 1 + u * 4.2;
-        o.scale.set(q, 1, q);
-        o.material.opacity = 1 - u;
-      });
-      getto.forEach((o, i) => o.position.set(cx, 13.45 + i * 1.3 + (Math.floor(t * 6) % 3 === i ? 0.9 : 0), cy));
-      if (luce) luce.intensity = 30 + 4 * Math.sin(TAU * t * 1.5);
-    };
-    metti(0.2);
-    K.anima(metti);
-  }
-
-  // =====================================================================
   //  gli schermi
   // =====================================================================
   /* Tutti gli schermi sono una mesh sola, che mostra le celle di una tela sola:
@@ -872,6 +614,19 @@ export function costruisci(K) {
     const guarda = Math.atan2(fx - sx, fy - sy);
     const mon = dove(q, ASSE, 0, SCHERMO).slice(0, 2);
     const [tx, ty, tz] = dove(q, 0, PIANO_M, 0);
+    const sulPiano = (p) => dove(q, p[0], PIANO_M, p[1]).slice(0, 2);
+    const posaTazza = sulPiano(POSA_TAZZA);
+
+    // --- la tazza che chi siede qui si e' portato dal bar: un pezzo spento, e lo
+    //     accende lo specchio quando nella stanza piatta ce n'e' una su questa scrivania.
+    // Il manico verso la mano che la prende: e' da quella parte che sta chi siede.
+    const manico = guarda + (mir ? 0.9 : 2.2);
+    const tazzaBar = K.parte((p) => tazza(p.at(0, 0, 0, manico), C.cream, C.caffe || C.soil), false);
+    tazzaBar.scale.multiplyScalar(TAZZA);
+    tazzaBar.position.set(posaTazza[0], tz, posaTazza[1]);
+    tazzaBar.visible = false;
+    K.radice.add(tazzaBar);
+    if (B.fuma) B.fuma(posaTazza[0], posaTazza[1], tz + 0.09 * TAZZA * U, () => tazzaBar.visible);
 
     // --- la sedia: gira con chi ci sta seduto (lo specchio le dice di quanto).
     const sedia = sedie.nuova(sx, sy, guarda);
@@ -903,11 +658,16 @@ export function costruisci(K) {
       mon,
       /**
        * Il piano, per chi ci appoggia qualcosa: il centro e l'altezza, da che parte
-       * guarda chi siede (`a`, come `posto.a`), quanto e' largo e profondo, e un
-       * punto sgombro — lontano da schermo e tastiera, dal capo verso la camera —
-       * dove sta una tazza o si sdraia un gatto.
+       * guarda chi siede (`a`, come `posto.a`), quanto e' largo di traverso (`w`) e
+       * profondo lungo lo sguardo (`d`), e i suoi posti, tutti [x, y] di pianta:
+       * `libero` il capo sgombro verso la camera, dove si sdraia il gatto e si
+       * appoggia quello che non ha un posto suo; `tasti` il centro della tastiera;
+       * `tazza` e `foglio` dove chi siede posa l'una e l'altro, e `manico` da che
+       * parte gira il manico della tazza posata (l'angolo attorno alla verticale).
        */
-      top: { x: tx, y: ty, z: tz, a: guarda, w: LARGO * U, d: FONDO * U, libero: dove(q, LIBERO[0], PIANO_M, LIBERO[1]).slice(0, 2) },
+      top: { x: tx, y: ty, z: tz, a: guarda, w: LARGO * U, d: FONDO * U, libero: sulPiano(LIBERO), tasti: sulPiano([ASSE, TASTI]), tazza: posaTazza, foglio: sulPiano(POSA_FOGLIO), manico },
+      /** La tazza del bar posata qui: la accende lo specchio. */
+      tazza: tazzaBar,
       /** La targhetta sta sopra lo schermo solo se dietro non c'e' un'altra fila a cui finirebbe addosso. */
       sopra: !R.DESKS.some((o) => o.b < d.b - 1 && d.b - o.b < 90),
       /** La normale vera dello schermo, in pianta: quella del vetro che c'e'. */
@@ -929,7 +689,7 @@ export function costruisci(K) {
     // Uno schermo acceso non fa una luce ferma: trema appena, ognuno col suo tempo.
     if (luce) K.anima((t) => (luce.material.opacity = 0.85 + 0.15 * Math.sin(TAU * (t / 2 + i * 0.37))));
 
-    const posto = { tipo: 'banco', i, p2: [d.x + 24, d.b + 16], x: sx, y: sy, a: guarda, sedia };
+    const posto = { tipo: 'banco', i, p2: [d.x + 24, d.b + 16], x: sx, y: sy, a: guarda, sedia, top: banco.top };
     banco.posto = posto;
 
     /* Il controllo, lasciato qui apposta: chi siede a questa scrivania guarda lo
@@ -953,34 +713,11 @@ export function costruisci(K) {
   muri();
   divisori();
   porta();
-  // I mobili gia' ridisegnati a tratto (mobili.js): quelli che fa lui, qui non si rifanno.
-  const suoi = mobili(K, B);
-  // I tavoli prima degli sgabelli, che gli si tirano sotto.
-  for (const m of R.PROPS) if (m.s === 'meetTable' && !suoi.has(m.s)) tavolo(m);
-  let piante = 0;
-  B.fatti = new Set(suoi);
-  for (const m of R.PROPS) {
-    const fatto =
-      suoi.has(m.s) ? 1
-      : m.s === 'board' ? (bacheca(m), 1)
-      : m.s === 'shelfFull' ? (scaffale(m, 'faldoni'), 1)
-      : m.s === 'shelfJars' ? (scaffale(m, 'barattoli'), 1)
-      : m.s === 'shelfEmpty' ? (scaffale(m, 'tazze'), 1)
-      : m.s === 'cabinet' ? (armadio(m), 1)
-      : m.s === 'meetTable' ? 1
-      : m.s === 'stoolRound' ? (sgabello(m), 1)
-      : PIANTE[m.s] ? (pianta(m, piante++), 1)
-      : m.s.startsWith('fontana') ? (fontana(m), 1)
-      : 0;
-    // Un mobile che qui non si sa costruire resta quello piatto, in piedi al suo
-    // posto: meglio un ritaglio fra i volumi che un buco nella stanza.
-    if (fatto) B.fatti.add(m.s);
-  }
-  for (const m of R.DISEGNATI) {
-    const fatto = suoi.has(m.s) ? 1 : m.s === 'cestino' ? (cestino(m), 1) : m.s === 'macchina' ? (macchina(m), 1) : m.s === 'lavandino' ? (lavandino(m), 1) : m.s === 'ghiaia' ? 1 : 0;
-    if (fatto) B.fatti.add(m.s);
-  }
-  B.fatti.add('desk');
+  /* I mobili li fa mobili.js, e dice quali: il gemello piatto di quelli si nasconde.
+     Un mobile che non sa fare resta il suo ritaglio, in piedi al suo posto — meglio un
+     ritaglio fra i volumi che un buco nella stanza. La ghiaia dell'atrio l'ha gia'
+     dipinta il pavimento, e le scrivanie si fanno qui sotto. */
+  B.fatti = mobili(K, B).add('ghiaia').add('desk');
   R.DESKS.forEach((_, i) => scrivania(i));
   schermi.chiudi();
   sedie.chiudi();
@@ -1005,11 +742,7 @@ export function costruisci(K) {
     B.buste.push(m);
   }
 
-  // Verso cosa si gira chi si ferma in piedi li' accanto: le piante, il cestino.
-  B.interessi = R.PROPS.filter((m) => PIANTE[m.s])
-    .map((m) => [m.x + R.SV[m.s].w / 2, m.b - 6])
-    .concat(R.DISEGNATI.filter((m) => m.s === 'cestino').map((m) => [m.x + 6, m.b - 5]));
-  // E quale sgabello ha davanti quale portatile: la stanza piatta li mette per
+  // Quale sgabello ha davanti quale portatile: la stanza piatta li mette per
   // coordinate (`lap`), e da quelle si risale al posto.
   B.portatili = new Map();
   for (const g of R.SGABELLI) {

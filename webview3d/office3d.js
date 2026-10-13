@@ -492,11 +492,28 @@ window.OFFICE3D = {
    * vere, quelle sedute a lavorare adesso. `x`, `b`, `top` e `posto` sono l'ingombro
    * della postazione nella pianta: servono a controllare che chi cammina nelle
    * corsie della stanza piatta non ci passi dentro.
+   *
+   * `mani` e' di chi sta battendo, a una scrivania o a un tavolo: per ogni mano,
+   * quanto dista dal centro della sua tastiera e quanto sta sopra il piano, in metri.
+   * E' il controllo che le mani stiano sui tasti veri e non dove li ricordava chi ha
+   * disegnato la gente.
    */
   verifica() {
     if (!M) return null;
     const punto = (a, n) => Math.sin(a) * n[0] + Math.cos(a) * n[1];
+    const mani = (P) => {
+      const s = Math.sin(P.a);
+      const c = Math.cos(P.a);
+      const t = P.posto.top;
+      return P.fig.mani.map((m) => [
+        +(Math.hypot(P.x + (m.x * c + m.z * s) * U - t.tasti[0], P.y + (-m.x * s + m.z * c) * U - t.tasti[1]) / U).toFixed(3),
+        +(m.y - t.z / U).toFixed(3),
+      ]);
+    };
     return {
+      mani: [...M.specchio.vivi.values()]
+        .filter((P) => P.posto && P.sit >= 1 && P.gira >= 1 && P.cam === 0 && P.I.fa === 'digita')
+        .map((P) => ({ posto: M.B.posti.indexOf(P.posto), tipo: P.posto.tipo, mani: mani(P) })),
       banchi: M.B.banchi.map((b) => ({
         i: b.i,
         punto: punto(b.posto.a, b.normale),
@@ -507,7 +524,7 @@ window.OFFICE3D = {
         posto: [b.posto.x, b.posto.y],
       })),
       seduti: [...M.specchio.vivi.values()]
-        .filter((P) => P.posto && P.posto.tipo === 'banco' && P.sit >= 1 && P.cam === 0)
+        .filter((P) => P.posto && P.posto.tipo === 'banco' && P.sit >= 1 && P.gira >= 1 && P.cam === 0)
         .map((P) => ({ i: P.posto.i, punto: punto(P.a, M.B.banchi[P.posto.i].normale) })),
     };
   },
@@ -520,6 +537,43 @@ window.OFFICE3D = {
     if (!M) return;
     if (M.scena.background && M.scena.background.dispose) M.scena.background.dispose();
     M.scena.background = new THREE.Color(colore);
+  },
+  /** Dove cade nella scheda un punto della stanza (unita', `z` in alto), in pixel: per chi deve ritagliare uno scatto attorno a una cosa. */
+  punto(x, y, z = 0) {
+    return M ? M.specchio.proietta(x, y, z) : null;
+  },
+  /**
+   * Quanto pesa la scena, pezzo per pezzo: le mesh che si vedono adesso e i loro
+   * triangoli, per la stanza, per la gente e per le bestie. `ombra` sono i triangoli
+   * che il giro delle ombre ridisegna (i corpi, senza i contorni). E' il conto che
+   * tiene d'occhio quanto costa un fotogramma su una scheda grafica integrata.
+   */
+  costo() {
+    if (!M) return null;
+    const conta = (radice, salta) => {
+      const r = { mesh: 0, triangoli: 0, ombra: 0 };
+      const giu = (o) => {
+        if (!o.visible || o === salta) return;
+        if (o.isMesh && o.geometry) {
+          const g = o.geometry;
+          const n = (o.isInstancedMesh ? o.count : 1) / 3;
+          r.mesh++;
+          r.triangoli += Math.round((g.index ? g.index.count : g.attributes.position.count) * n);
+          if (o.castShadow) r.ombra += Math.round((g.userData.corpo == null ? (g.index ? g.index.count : g.attributes.position.count) : g.userData.corpo) * n);
+        }
+        o.children.forEach(giu);
+      };
+      giu(radice);
+      return r;
+    };
+    const gente = [...M.specchio.vivi.values()].map((P) => conta(P.fig.g));
+    const tutti = conta(M.gente);
+    const somma = (k) => gente.reduce((n, g) => n + g[k], 0);
+    return {
+      stanza: conta(M.radice),
+      gente: { quanti: gente.length, mesh: somma('mesh'), triangoli: somma('triangoli'), ombra: somma('ombra') },
+      animali: { mesh: tutti.mesh - somma('mesh'), triangoli: tutti.triangoli - somma('triangoli'), ombra: tutti.ombra - somma('ombra') },
+    };
   },
   /** Com'e' messa la scena adesso, in pixel di scheda: lo leggono i controlli. */
   stato() {
@@ -542,6 +596,8 @@ window.OFFICE3D = {
       // `giu` (dove finisce il pavimento) oltre `alto`. `larga` e' il pavimento fra i
       // due muri sul bordo di sotto; piu' su il quadro lo chiudono i muri stessi.
       stanza: { su: ((1 - e.hi) / 2) * M.alto, giu: ((1 - e.lo) / 2) * M.alto, larga: e.x * M.largo },
+      // Il bar com'e' di qua: quante tazze si vedono sulla rastrelliera, nel lavandino e su quali scrivanie, se la macchina versa, se il rubinetto scorre.
+      bar: M.specchio.bar(),
       gente: [...M.specchio.vivi].map(([el, P]) => ({
         nome: el.getAttribute('aria-label') || '',
         x: P.sx,

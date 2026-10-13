@@ -296,7 +296,7 @@
     "icon": "node scripts/make-icon.mjs",
     "tips": "node scripts/build-tips.mjs",
     "preview": "node build.mjs && node scripts/preview.mjs",
-    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/dialoghi-check.mjs && node scripts/office-check.mjs && node scripts/lang-check.mjs && node scripts/sessions-check.cjs && node scripts/reload-check.cjs && node scripts/tasks-check.cjs && node scripts/tips-check.mjs && node scripts/menu-check.mjs && node scripts/pages-ui-check.mjs",
+    "ui-check": "node build.mjs && node scripts/preview.mjs && node scripts/ui-check.mjs && node scripts/context-check.mjs && node scripts/dialoghi-check.mjs && node scripts/office-check.mjs && node scripts/office3d-check.mjs && node scripts/lang-check.mjs && node scripts/sessions-check.cjs && node scripts/reload-check.cjs && node scripts/tasks-check.cjs && node scripts/tips-check.mjs && node scripts/menu-check.mjs && node scripts/pages-ui-check.mjs",
     "smoke": "node scripts/smoke-engine.mjs",
     "tasks-live": "node build.mjs && node scripts/tasks-check.cjs --live",
     "data-check": "node build.mjs && node scripts/data-check.cjs",
