@@ -265,6 +265,13 @@ async function rebuilds() {
     check('a newer SDK goes into node_modules only', inst?.args.includes('--no-save'), inst && 'npm ' + inst.args.join(' '));
     check('the build carries the pre-release version', pack?.version === '9.9.10-sdk.0.3.999', pack?.version);
     check('and it gets installed', installed.length === 1 && /9\.9\.10-sdk\.0\.3\.999/.test(said ?? ''), said);
+    // The Marketplace refuses that version: left as claude-studio.vsix, it is the file
+    // a release uploads.
+    check(
+      'under a name of its own, not the one a release uploads',
+      /claude-studio-local\.vsix$/.test(installed[0] ?? '') && !fs.existsSync(path.join(repo, 'claude-studio.vsix')),
+      installed[0]
+    );
     check('the source is left as git has it', untouched(), status());
   }
 
@@ -305,7 +312,11 @@ async function rebuilds() {
   {
     const { said, calls } = await once('9.9.8');
     const pack = calls.find((c) => c.args[0] === 'run');
-    const ok = !calls.some((c) => c.args[0] === 'install') && pack?.version === '9.9.9' && installed.length === 1;
+    const ok =
+      !calls.some((c) => c.args[0] === 'install') &&
+      pack?.version === '9.9.9' &&
+      installed.length === 1 &&
+      /claude-studio\.vsix$/.test(installed[0]);
     check('a higher version from git: built as it is, nothing written', ok && untouched(), said);
   }
 }

@@ -406,10 +406,18 @@ export async function updateExtension(ctx: vscode.ExtensionContext, auto: boolea
     log(`build failed:\n${built.out}`);
     return;
   }
-  const vsix = path.join(root, 'claude-studio.vsix');
+  let vsix = path.join(root, 'claude-studio.vsix');
   if (!fs.existsSync(vsix)) {
     log(`the build did not produce ${vsix}`);
     return;
+  }
+  if (sdk) {
+    // A build made for a newer SDK carries a version the Marketplace refuses
+    // (`0.38.1-sdk.0.3.296`), and it had landed on the very file a release uploads:
+    // it went to the store by mistake. It gets a name of its own.
+    const local = path.join(root, 'claude-studio-local.vsix');
+    fs.renameSync(vsix, local);
+    vsix = local;
   }
   await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(vsix));
   log(`installed ${version}.`);

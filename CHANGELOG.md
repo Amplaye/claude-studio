@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.38.1
+
+- Agent SDK 0.3.296.
+
+- Per chi sviluppa Studio: il pacchetto che l'aggiornamento automatico ricostruisce per
+  un SDK nuovo ha una versione sua (`0.38.1-sdk.0.3.296`) che il Marketplace rifiuta, e
+  finiva in `claude-studio.vsix` — lo stesso file che un rilascio carica sullo store.
+  Adesso si chiama `claude-studio-local.vsix`, e quello del rilascio non lo tocca nessuno.
+
 ## 0.38.0
 
 - **L'ufficio in 3D.** Nella fascia in cima, accanto alle pelli, c'e' un interruttore
