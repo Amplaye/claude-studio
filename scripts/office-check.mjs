@@ -1582,22 +1582,25 @@ await page.emulateMedia({ reducedMotion: null });
 
 // ---- le tazze ----
 //
-// Quattro, e sono quelle: girano fra la rastrelliera, la mano di chi le porta e
-// la scrivania di chi se l'e' riportata indietro, ma sono sempre quattro. E'
-// l'unica cosa che rende il bar un posto invece che un'animazione — quando
-// finiscono, la rastrelliera e' vuota davvero e chi arriva torna a mani vuote.
+// Quattro, e sono quelle: girano fra la rastrelliera, la mano di chi le porta,
+// la scrivania di chi se l'e' riportata indietro e il lavandino dove restano
+// sporche, ma sono sempre quattro. E' l'unica cosa che rende il bar un posto
+// invece che un'animazione — quando finiscono, la rastrelliera e' vuota davvero,
+// e chi arriva lava quelle del lavandino o torna a mani vuote. In mano se ne
+// possono avere piu' d'una (chi le ha appena lavate): quante, lo dice `data-n`.
 //
 // Il conto e' anche l'unico modo in cui questa scena si rompe in silenzio: una
 // tazza persa non si vede finche' non sono finite tutte, e a quel punto e'
 // finito il caffe' in un ufficio dove nessuno ha bevuto niente. Qui si guarda
 // alla fine di tutto, quando la stanza ha gia' avuto un minuto per girare.
 const tazze = await page.evaluate(() => ({
-  scaffale: document.querySelectorAll('.of-tazze .of-tazza').length,
-  mano: document.querySelectorAll('.of-tazza.addosso').length,
+  scaffale: document.querySelectorAll('.of-tazze:not(.of-sporche) .of-tazza').length,
+  lavandino: document.querySelectorAll('.of-sporche .of-tazza').length,
+  mano: [...document.querySelectorAll('.of-tazza.addosso')].reduce((n, e) => n + (Number(e.dataset.n) || 1), 0),
   scrivania: document.querySelectorAll('.of-tazza.piena').length,
 }));
 t(
-  tazze.scaffale + tazze.mano + tazze.scrivania === 4,
+  tazze.scaffale + tazze.lavandino + tazze.mano + tazze.scrivania === 4,
   'le tazze non sono piu\' quattro: ' + JSON.stringify(tazze)
 );
 

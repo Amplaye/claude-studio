@@ -72,7 +72,7 @@ window.ROOM = (() => {
      il disegno e non cambia mai, e ricalcola() ne ricava queste — le stesse cose
      ai posti che occupano davvero. Tutto il resto della stanza legge queste, e
      non si accorge di niente quando la stanza cresce. */
-  let WALLS, PROPS, DISEGNATI, DESKS, SGABELLI, BACHECHE, BAR, SCAFFALI;
+  let WALLS, PROPS, DISEGNATI, DESKS, SGABELLI, BACHECHE, BAR, SCAFFALI, SPORCHE;
   let METE, COMMISSIONI, DESTINAZIONI, INGRESSO, VANO, PORTA, ARCHIVIO;
 
   const SV = window.SV;
@@ -457,13 +457,15 @@ window.ROOM = (() => {
    * Quattro tazze, e sono quelle. Chi va a prendersi un caffe' ne prende una
    * dalla rastrelliera, la porta alla macchina, e da li' torna alla scrivania
    * dove la tazza resta a fumare accanto al monitor. Al giro dopo se la riporta
-   * al bar: sei volte su dieci la ricarica e basta, quattro la lava e la
-   * rimette a posto.
+   * al bar: sei volte su dieci la ricarica e basta, quattro la lascia sporca nel
+   * lavandino.
    *
    * Il conto e' l'unica cosa che rende la scena una scena e non un'animazione:
-   * quando le tazze finiscono, la rastrelliera e' vuota davvero e chi arriva
-   * torna indietro a mani vuote. E' quello a far leggere il bar come un posto
-   * invece che come un mobile.
+   * quando le tazze finiscono, la rastrelliera e' vuota davvero. Chi arriva e non
+   * ne trova lava quelle che stanno nel lavandino e le rimette a posto — nessuno
+   * lava una tazza finche' ce n'e' una pulita — e se nel lavandino non ce ne sono
+   * (sono tutte in giro sulle scrivanie) torna indietro a mani vuote. E' quello a
+   * far leggere il bar come un posto invece che come un mobile.
    */
   const MAX_TAZZE = 4;
   const BAR0 = { rastrelliera: [302, 60], macchina: [330, 60], lavandino: [356, 60] };
@@ -473,6 +475,13 @@ window.ROOM = (() => {
     [301, 22],
     [292, 32],
     [301, 32],
+  ];
+  /** E dove stanno quelle sporche: sul bordo del lavandino, ai due lati del rubinetto, una sull'altra. */
+  const SPORCHE0 = [
+    [348, 26],
+    [360, 26],
+    [348, 22],
+    [360, 22],
   ];
   /** Presa, erogazione, lavaggio, deposito, il broncio di chi non ne trova, e il faldone sfilato dallo scaffale. */
   const TEMPI = { prende: 800, fa: 2600, lava: 2400, posa: 600, broncio: 1600, faldone: 900 };
@@ -812,6 +821,7 @@ window.ROOM = (() => {
     };
     BAR = Object.fromEntries(Object.entries(BAR0).map(([k, v]) => [k, pt(v)]));
     SCAFFALI = SCAFFALI0.map(pt);
+    SPORCHE = SPORCHE0.map(pt);
     METE = Object.fromEntries(Object.entries(METE0).map(([k, v]) => [k, pt(v)]));
     COMMISSIONI = COMMISSIONI0.map((c) => ({
       ...c,
@@ -1048,6 +1058,10 @@ window.ROOM = (() => {
     rastrelliera = el('div', 'of-tazze');
     depth(rastrelliera, 49);
     stage.append(rastrelliera);
+    // E quelle sporche, sul bordo del lavandino finche' qualcuno non resta senza.
+    lavello = el('div', 'of-tazze of-sporche');
+    depth(lavello, 49);
+    stage.append(lavello);
     disegnaTazze();
 
     scrivanie = DESKS.map((d) => {
@@ -1543,19 +1557,39 @@ window.ROOM = (() => {
   /** Il palco, per le cose che non stanno addosso a nessuno: le tazze. */
   let palco;
   let rastrelliera;
+  let lavello;
   let tazzePulite = MAX_TAZZE;
+  let tazzeSporche = 0;
 
   function disegnaTazze() {
     if (!rastrelliera) return;
-    rastrelliera.replaceChildren(
-      ...SCAFFALI.slice(0, tazzePulite).map(([x, y]) => {
-        const n = el('i', 'of-tazza');
-        n.style.left = x + 'px';
-        n.style.top = y + 'px';
-        return n;
-      })
-    );
+    const metti = (dove, posti, quante, classe) =>
+      dove.replaceChildren(
+        ...posti.slice(0, quante).map(([x, y]) => {
+          const n = el('i', classe);
+          n.style.left = x + 'px';
+          n.style.top = y + 'px';
+          return n;
+        })
+      );
+    metti(rastrelliera, SCAFFALI, tazzePulite, 'of-tazza');
+    metti(lavello, SPORCHE, tazzeSporche, 'of-tazza sporca');
   }
+
+  /**
+   * Un gesto al bar. Lo si dice addosso alla persona finche' dura: chi la guarda
+   * da un'altra vista — il 3D — sa cosa sta facendo con le mani, e non solo che
+   * e' ferma davanti a un mobile. `prende` una tazza dalla rastrelliera, fa il
+   * `caffe`, `lava`, `posa`, e il `broncio` di chi non ne trova.
+   */
+  async function gesto(chi, quale, ms) {
+    chi.el.dataset.gesto = quale;
+    await attesa(ms);
+    if (chi.el.dataset.gesto === quale) delete chi.el.dataset.gesto;
+  }
+
+  /** Quante ne ha in mano: una, di solito. Di piu' solo chi le ha appena lavate e le riporta. */
+  const inMano = (chi) => (chi.tazza ? Number(chi.tazza.dataset.n) || 1 : 0);
 
   /** Se la prende in mano. */
   function prendi(chi) {
@@ -1581,8 +1615,9 @@ window.ROOM = (() => {
    *
    * Chi ci arriva con la tazza in mano l'ha portata dalla scrivania: sei volte
    * su dieci la ricarica e basta — che e' quello che si fa davvero — e quattro
-   * la lava e la rimette a posto. Chi ci arriva a mani vuote e non ne ha una che
-   * lo aspetta alla scrivania, tre volte su quattro se ne prende una.
+   * la lascia nel lavandino. Chi ci arriva a mani vuote e non ne ha una che lo
+   * aspetta alla scrivania, tre volte su quattro se ne prende una: e se la
+   * rastrelliera e' vuota, prima lava quelle del lavandino (vedi `lava`).
    *
    * ponytail: i tragitti di qui dentro non si fermano se Claude riparte. Sono
    * dieci secondi al massimo, e una corsa interrotta a meta' lascia una tazza
@@ -1593,20 +1628,17 @@ window.ROOM = (() => {
       if (Math.random() < 0.6) {
         if (await vai(chi, ...BAR.macchina, true)) {
           parla(chi, caso(AL_BAR.ricarica));
-          await attesa(TEMPI.fa);
+          await gesto(chi, 'caffe', TEMPI.fa);
         }
         return;
       }
       if (await vai(chi, ...BAR.lavandino, true)) {
-        parla(chi, caso(AL_BAR.lava));
-        await attesa(TEMPI.lava);
-      }
-      if (await vai(chi, ...BAR.rastrelliera, true)) {
-        await attesa(TEMPI.posa);
+        await gesto(chi, 'posa', TEMPI.posa);
+        // Puo' non averla piu': se nel frattempo se n'e' andato, `congeda` l'ha gia' rimessa nel conto.
         if (chi.tazza) {
           chi.tazza.remove();
           chi.tazza = null;
-          tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
+          tazzeSporche++;
           disegnaTazze();
         }
       }
@@ -1616,14 +1648,10 @@ window.ROOM = (() => {
     if (!(await vai(chi, ...BAR.rastrelliera, true))) return;
     // La rastrelliera vuota e' vuota davvero: e' il conto a farla vuota, e sono
     // le stesse quattro tazze che girano da mezz'ora.
-    if (tazzePulite <= 0) {
-      parla(chi, caso(AL_BAR.vuoto));
-      await attesa(TEMPI.broncio);
-      return;
-    }
+    if (tazzePulite <= 0 && !(await lava(chi))) return;
     tazzePulite--;
     disegnaTazze();
-    await attesa(TEMPI.prende);
+    await gesto(chi, 'prende', TEMPI.prende);
     if (!chi.el.isConnected) {
       tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
       disegnaTazze();
@@ -1632,8 +1660,44 @@ window.ROOM = (() => {
     prendi(chi);
     if (await vai(chi, ...BAR.macchina, true)) {
       parla(chi, caso(AL_BAR.prende));
-      await attesa(TEMPI.fa);
+      await gesto(chi, 'caffe', TEMPI.fa);
     }
+  }
+
+  /**
+   * La rastrelliera e' vuota. Se nel lavandino ce ne sono, le lava tutte, una
+   * alla volta, e le rimette a posto; se non ce ne sono — sono in giro sulle
+   * scrivanie — resta senza. Torna true se adesso una tazza pulita c'e'.
+   */
+  async function lava(chi) {
+    if (tazzeSporche <= 0) {
+      parla(chi, caso(AL_BAR.vuoto));
+      await gesto(chi, 'broncio', TEMPI.broncio);
+      return false;
+    }
+    if (!(await vai(chi, ...BAR.lavandino, true))) return false;
+    parla(chi, caso(AL_BAR.lava));
+    let lavate = 0;
+    while (tazzeSporche > 0 && chi.el.isConnected) {
+      await gesto(chi, 'lava', TEMPI.lava);
+      tazzeSporche--;
+      lavate++;
+      disegnaTazze();
+    }
+    if (!lavate) return false;
+    // Lavate, le ha in mano tutte: il conto le segue li' finche' non le posa.
+    prendi(chi);
+    chi.tazza.dataset.n = lavate;
+    if (await vai(chi, ...BAR.rastrelliera, true)) await gesto(chi, 'posa', TEMPI.posa);
+    // Tornano nel conto anche se alla rastrelliera non ci e' arrivato: una tazza
+    // lavata e persa per strada e' una tazza in meno per sempre. Se invece se n'e'
+    // andato del tutto, in mano non ha piu' niente: ce le ha gia' rimesse `congeda`.
+    const tornano = inMano(chi);
+    if (chi.tazza) chi.tazza.remove();
+    chi.tazza = null;
+    tazzePulite = Math.min(MAX_TAZZE, tazzePulite + tornano);
+    disegnaTazze();
+    return chi.el.isConnected && tazzePulite > 0;
   }
 
   async function giro(chi, meta) {
@@ -1943,12 +2007,13 @@ window.ROOM = (() => {
       // Il faldone non ha un conto da tenere: torna in archivio e basta.
       riponi(chi);
       if (!chi.tazza && !chi.tazzaFerma) return;
+      const sue = inMano(chi) + (chi.tazzaFerma ? 1 : 0);
       if (chi.tazza) chi.tazza.remove();
       if (chi.tazzaFerma) chi.tazzaFerma.remove();
       chi.tazza = null;
       chi.tazzaFerma = null;
-      if (tazzePulite >= MAX_TAZZE) console.warn('[ufficio] tazza di troppo: il conto e\' andato alla deriva');
-      tazzePulite = Math.min(MAX_TAZZE, tazzePulite + 1);
+      if (tazzePulite + tazzeSporche + sue > MAX_TAZZE) console.warn('[ufficio] tazza di troppo: il conto e\' andato alla deriva');
+      tazzePulite = Math.min(MAX_TAZZE - tazzeSporche, tazzePulite + sue);
       disegnaTazze();
     },
     cammino,

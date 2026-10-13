@@ -753,6 +753,11 @@
     opacity: 0;
   }
 }
+/* Sporca, sul bordo del lavandino: la stessa tazza, spenta. Resta li' finche'
+   qualcuno non trova la rastrelliera vuota e le lava tutte. */
+.of-tazza.sporca {
+  filter: brightness(0.8) saturate(0.6);
+}
 /* In mano: sul fianco, all'altezza della mano. */
 .of-tazza.addosso {
   left: 12px;
