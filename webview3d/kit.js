@@ -277,7 +277,11 @@ export function via(radice) {
  * tornano sulla pianta di room.js.
  *
  * Quello che sta sopra questa riga (Lotto, materiali) e' la cassetta delle scatole
- * di prima: resta finche' l'ultimo mobile non e' ridisegnato, poi si toglie.
+ * di prima. Di scatole non ne disegna piu' nessuno: resta per i bagliori (`alone`),
+ * che la stanza e i mobili accendono solo se una pelle chiede `aloni` — e oggi non
+ * li chiede nessuna delle tre.
+ * ponytail: se gli aloni non tornano, si tolgono Lotto, `K.box/cyl/face/alone` in
+ * office3d.js e i rami `S.aloni` di props.js e mobili.js, tutti insieme.
  */
 export const U = 30;
 export const INK = '#3a2030';

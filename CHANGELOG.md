@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.39.0
+
+- **L'ufficio in 3D, ridisegnato.** Quello a scatole sembrava un videogioco a cubetti:
+  adesso e' un'illustrazione che si muove — forme tonde, tinte piatte, un contorno a
+  inchiostro, e dietro la vetrata un paesaggio da libro illustrato (il paese, la citta'
+  di notte, il mare di Bali). Riempie tutta la scheda, senza bordi attorno alla stanza,
+  a qualunque misura. Le scrivanie sono girate, quattro verso sinistra e quattro verso
+  destra, e chi lavora guarda sempre il davanti del suo schermo. Le tre pelli ci sono
+  tutte e tre, e la gente e' la stessa della stanza piatta: stessi capelli, stessa
+  barba, stessi occhiali, stessa camicia.
+
+- **La gente fa le cose per davvero.** Al bar prende la tazza dalla rastrelliera, la
+  mette sotto il beccuccio, preme, aspetta e la riprende mentre la macchina versa.
+  Annaffia, indica i foglietti sulla bacheca, sfila un faldone, butta la carta; in due
+  si parlano guardandosi, e chi ascolta annuisce. Ci si siede e ci si alza girando la
+  sedia, si cammina coi piedi che non scivolano. Chi lavora allo stesso compito da piu'
+  di dieci minuti si appoggia allo schienale e legge un libro, con un'occhiata allo
+  schermo ogni tanto.
+
+- **Le tazze si lavano.** Chi riporta la tazza al bar e non la ricarica la lascia nel
+  lavandino. Quando sulla rastrelliera non ce n'e' piu' una, chi arriva lava quelle del
+  lavandino, le rimette a posto e poi si fa il caffe'; se sono tutte in giro sulle
+  scrivanie, torna a mani vuote come prima. Vale anche nella stanza piatta.
+
+- **Un gatto e un cane.** Girano per l'ufficio senza uno scopo. Il gatto sale sulle
+  scrivanie e ci dorme, o si strofina a chi ci lavora; il cane annusa, segue qualcuno per
+  due passi, va a chiedere le coccole — e chi le riceve si gira e lo accarezza — o dorme
+  per terra. Stanno fermi piu' o meno meta' del tempo, non chiedono mai in due insieme e
+  mai a chi sta parlando o ti sta aspettando. Ci sono solo in 3D.
+
 ## 0.38.1
 
 - Agent SDK 0.3.296.
