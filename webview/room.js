@@ -1365,7 +1365,10 @@ window.ROOM = (() => {
       vesti(chi.fig, chi.seme, 'cammina');
       if (await viaggio(chi.el, ...ARCHIVIO, SVELTO)) {
         vesti(chi.fig, chi.seme, 'fermo');
+        // Detto addosso all'elemento: la vista in 3D lo legge, e allunga la mano allo scaffale.
+        chi.el.dataset.gesto = 'faldone';
         await attesa(TEMPI.faldone);
+        delete chi.el.dataset.gesto;
         if (!chi.el.isConnected) return false;
         prendiFaldone(chi);
         vesti(chi.fig, chi.seme, 'cammina');
@@ -1490,7 +1493,12 @@ window.ROOM = (() => {
     if (chi.some((c) => !c || !c.el || !c.el.isConnected || c.inDialogo)) return false;
     dialoghi++;
     const scena = ++scene;
-    chi.forEach((c) => (c.inDialogo = true));
+    // Chi c'e' dentro lo porta scritto addosso per tutta la scena, non solo mentre
+    // parla: la vista in 3D lo legge per girare l'uno verso l'altro anche chi ascolta.
+    chi.forEach((c) => {
+      c.inDialogo = true;
+      c.el.dataset.scena = String(scena);
+    });
     try {
       for (const b of battute) {
         let ms = 0;
@@ -1506,7 +1514,10 @@ window.ROOM = (() => {
       }
       return true;
     } finally {
-      chi.forEach((c) => (c.inDialogo = false));
+      chi.forEach((c) => {
+        c.inDialogo = false;
+        delete c.el.dataset.scena;
+      });
       dialoghi--;
     }
   }
@@ -1824,7 +1835,11 @@ window.ROOM = (() => {
       vesti(chi.fig, chi.seme, 'fermo');
       parla(chi, caso([].concat(c.dice)));
       fx = effetto(chi, c);
+      // Quale commissione sta facendo, detto addosso all'elemento finche' la fa: e' il
+      // gesto che la vista in 3D gli fa fare (annaffia, dispensa, bacheca, cestino).
+      chi.el.dataset.gesto = c.k;
       await pausa(chi, c.durata);
+      delete chi.el.dataset.gesto;
       vesti(chi.fig, chi.seme, 'cammina');
     }
     if (fx) fx.remove();

@@ -1366,7 +1366,10 @@ window.OFFICE = (() => {
         // il foglietto va a prenderselo — che e' anche il motivo per cui la
         // bacheca sta nella stanza in cima e non sopra le scrivanie.
         if (!(await entrata(chi, ...window.ROOM.BACHECHE.muro.posto))) return;
+        // Il gesto, detto addosso all'elemento finche' dura: lo legge la vista in 3D.
+        chi.el.dataset.gesto = 'stacca';
         await attesa(GESTO);
+        delete chi.el.dataset.gesto;
         // Da qui in poi il foglietto e' suo: sta appeso addosso e cammina con
         // lui. E finche' ce l'ha in mano dalla bacheca sparisce — se no lo stesso
         // foglio sarebbe appeso al muro e in mano a qualcuno nello stesso momento.
@@ -1416,7 +1419,9 @@ window.OFFICE = (() => {
     window.ROOM.riponi(chi);
     window.ROOM.vesti(chi.fig, chi.seme, 'cammina');
     if (await window.ROOM.viaggio(chi.el, ...window.ROOM.BACHECHE.muro.posto)) {
+      chi.el.dataset.gesto = 'appende';
       await attesa(GESTO);
+      delete chi.el.dataset.gesto;
       // Il foglio si posa qui, e da qui in poi e' del muro. Portarlo in mano fino
       // alla porta voleva dire lo stesso foglio appeso e in mano a qualcuno nello
       // stesso momento — che e' l'unico modo in cui questa bacheca conta due
@@ -2092,6 +2097,17 @@ window.OFFICE = (() => {
   function paintStaff() {
     const voluti = volutiStaff();
 
+    // Da quando lavora ogni conversazione, detto addosso alla sua persona finche'
+    // lavora (`data-da`, in millisecondi): la vista in 3D lo legge, e chi e' sullo
+    // stesso lavoro da piu' di dieci minuti tira fuori un libro. E' il piu' vecchio dei
+    // due orologi che ci sono gia': il turno visto cominciare da qui (`da`) e il passo
+    // in corso sul quadro — che vale anche per chi era gia' al lavoro aprendo l'ufficio.
+    for (const [id, capo] of people) {
+      const passo = capo.busy && board[id] && board[id].busy && board[id].activeSince;
+      if (capo.busy && capo.da != null) capo.el.dataset.da = String(passo ? Math.min(capo.da, passo) : capo.da);
+      else delete capo.el.dataset.da;
+    }
+
     // Chi ha finito se ne va — ma per la porta, non svanendo: e' l'unica cosa che
     // fa vedere che un sub-agent e' finito invece che sparito.
     //
@@ -2145,6 +2161,10 @@ window.OFFICE = (() => {
       chi.tipo = passo ? '' : it.type || '';
       chi.el.title = capo.pname.textContent + ' · ' + cosa;
       chi.el.setAttribute('aria-label', chi.el.title);
+      // E da quando lavora un aiutante: e' il suo orologio, quello della sua scheda. Chi
+      // porta un passo no — quello e' il lavoro della conversazione, e il libro e' del capo.
+      if (!passo && it.since) chi.el.dataset.da = String(it.since);
+      else delete chi.el.dataset.da;
     }
 
     // E gli schermi delle scrivanie che non sono di nessun capo: acceso se ci si e'

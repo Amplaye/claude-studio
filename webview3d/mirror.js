@@ -20,8 +20,9 @@
  * resta un cartoncino in piedi al suo posto. Cosi' niente sparisce in silenzio, e
  * quello che verra' aggiunto alla stanza si vede anche di qua.
  */
-import { THREE, clamp, ease, lerp, giro as corto } from './kit.js';
-import { persona, ALTA, ALTA_SEDUTA } from './people.js';
+import { THREE, U, clamp, ease, lerp, giro as corto } from './kit.js';
+import { persona, ALTA } from './people.js';
+import { nuovo, ingressi, sposta, atteggia, siediSubito, SBRACCIO, ACCANTO, LIBRO_DOPO } from './gesti.js';
 import { PIANO } from './props.js';
 
 /** I nodi del palco che hanno un gemello a volumi, o che sono solo contenitori. */
@@ -95,57 +96,130 @@ export function specchio(M) {
   // ---------------------------------------------------------------------
   //  le persone
   // ---------------------------------------------------------------------
+  /** Il posto a sedere che sta sul punto (x, y) della stanza piatta, se ce n'e' uno. */
+  const sedile = (x, y) => M.B.posti.find((q) => Math.abs(q.p2[0] - x) < 2.5 && Math.abs(q.p2[1] - y) < 2.5) || null;
+
   function nasce(el, seme, fx, fy) {
     const fig = persona(seme, M.mat);
     M.gente.add(fig.g);
-    const P = {
-      fig,
-      fx,
-      fy,
-      a: 0,
-      sit: 0,
-      amp: 0,
-      passo: 0,
-      cam: 0,
-      digita: 0,
-      saluta: 0,
-      tinta: 1,
-      // Chi nasce sulla soglia sta dentro la cabina finche' la porta non si apre.
-      porta: el.classList.contains('soglia') ? 1 : 0,
-      posto: null,
-      fase: Math.random() * 6.28,
-      fermoDa: -9,
-      occhiata: 0,
-      prossima: 3 + Math.random() * 9,
-    };
+    // Chi nasce sulla soglia sta dentro la cabina finche' la porta non si apre.
+    const soglia = el.classList.contains('soglia');
+    const cab = M.B.porta.cabina;
+    const P = nuovo(fig, soglia ? cab[0] : fx, soglia ? cab[1] : fy);
+    P.fx = fx;
+    P.fy = fy;
+    P.porta = soglia ? 1 : 0;
+    P.I = ingressi();
+    P.tinta = 1;
+    P.gestoEra = '';
+    P.occhiata = 0;
+    P.prossima = 0;
+    P.bada = null;
+    P.badaFino = 0;
+    P.badaPoi = 0;
+    P.addio = 0;
+    // Chi e' gia' seduto quando si accende il 3D e' gia' seduto: non ci si risiede.
+    const q = soglia ? null : sedile((parseFloat(el.style.left) || 0) + 8, (parseFloat(el.style.top) || 0) + 24);
+    if (q && Math.hypot(fx - q.p2[0], fy - q.p2[1]) < 1.5) siediSubito(P, q);
     vivi.set(el, P);
     return P;
   }
   function muore(el, P) {
+    P.morta = true;
     M.gente.remove(P.fig.g);
     P.fig.via();
     vivi.delete(el);
   }
 
-  /** Verso cosa si gira chi sta fermo in piedi: la pianta che annaffia, il mobile che usa. */
-  function interesse(x, y) {
-    let meglio = null;
-    let quanto = 26;
-    for (const q of M.B.interessi) {
-      const d = Math.hypot(q[0] - x, q[1] - y);
-      if (d < quanto) {
-        quanto = d;
-        meglio = q;
-      }
+  /**
+   * Dove ci si mette davvero per usare un mobile. La stanza piatta ferma la gente a
+   * una spanna da tutto — sotto lo scaffale, accanto alla pianta — e da li' un braccio
+   * non arriva: qui si va fino a un braccio dal fronte del mobile, girati verso di
+   * lui. I punti sono le destinazioni di room.js, riconosciute per nome; il mobile e'
+   * quello che la stanza a volumi ha messo li' (`appesi`, `interessi`).
+   */
+  const soste = new Map();
+  let sosteDi = null;
+  function sosta(tx, ty) {
+    if (sosteDi !== M.B) {
+      soste.clear();
+      sosteDi = M.B;
     }
-    if (meglio) return Math.atan2(meglio[0] - x, meglio[1] - y);
-    // Contro il muro di fondo si guarda il muro: e' li' che stanno la bacheca, gli
-    // scaffali, la macchina del caffe'.
-    return y < 70 ? Math.PI : null;
+    const D = R.DESTINAZIONI;
+    for (const nome in D) {
+      const d = D[nome];
+      if (Math.abs(d[0] - tx) > 1.5 || Math.abs(d[1] - ty) > 1.5) continue;
+      if (!soste.has(nome)) soste.set(nome, interesse(nome, d));
+      return soste.get(nome);
+    }
+    return null;
   }
+  function interesse(nome, d) {
+    const tipo = nome.replace(/\d+$/, '');
+    if (tipo === 'annaffia' || tipo === 'cestino') {
+      let c = null;
+      let quanto = 36;
+      for (const q of M.B.interessi) {
+        const dd = Math.hypot(q[0] - d[0], q[1] - d[1]);
+        if (dd < quanto) {
+          quanto = dd;
+          c = q;
+        }
+      }
+      if (!c) return null;
+      const k = Math.min(quanto, tipo === 'cestino' ? 0.4 * U : ACCANTO) / (quanto || 1);
+      const x = c[0] + (d[0] - c[0]) * k;
+      const y = c[1] + (d[1] - c[1]) * k;
+      return { nome, x, y, a: Math.atan2(c[0] - x, c[1] - y) };
+    }
+    if (!['rastrelliera', 'macchina', 'lavandino', 'archivio', 'bacheca', 'dispensa'].includes(tipo)) return null;
+    // Il mobile contro il muro che ha davanti: quello che gli sta sopra, il piu' vicino di traverso.
+    let m = null;
+    let quanto = 40;
+    for (const a of M.B.appesi) {
+      const dx = Math.max(a.x0 - d[0], 0, d[0] - a.x1);
+      if (a.b > d[1] || d[1] - a.b > 40 || dx >= quanto) continue;
+      quanto = dx;
+      m = a;
+    }
+    if (!m) return null;
+    return { nome, x: clamp(d[0], Math.min(m.x0 + 6, m.x1), Math.max(m.x1 - 6, m.x0)), y: Math.min(d[1], m.yf + SBRACCIO), a: Math.PI };
+  }
+
+  /**
+   * Quello che il bottone si porta addosso — la nuvoletta, i puntini, l'alone — cresce
+   * con lui, e il bottone adesso e' alto quanto una figura quasi doppia di prima: lo
+   * si riporta alla misura che aveva, appeso al suo angolo. L'annaffiatoio piatto si
+   * nasconde: qui ce n'e' uno vero in mano.
+   */
+  const figli = new WeakMap();
+  function ritocca(n, k, origine) {
+    const s = k.toFixed(3);
+    if (figli.get(n) === s) return;
+    figli.set(n, s);
+    n.style.scale = s;
+    n.style.transformOrigin = origine;
+  }
+
+  /** L'ora dell'ultimo giro, per sapere quanto e' passato davvero. */
+  let ultimo = 0;
 
   function persone(t, dt) {
     const visti = new Set();
+    const calmo = !!M.calmo;
+    const cab = M.B.porta.cabina;
+    const ora = Date.now();
+    /* Il motore non da' mai piu' di un decimo di secondo a fotogramma, ma su una
+       macchina lenta fra un fotogramma e l'altro ne passa di piu' — e la stanza piatta
+       intanto e' andata avanti. Chi la segue fa allora piu' passi corti in un giro
+       solo: se no resterebbe indietro di mezza stanza, a camminare al rallentatore. */
+    const vero = ultimo ? clamp(t - ultimo, dt, 1) : dt;
+    ultimo = t;
+    const volte = Math.min(10, Math.ceil(vero / 0.07));
+    /** Chi sta parlando con chi: le persone di una stessa scena (`data-scena`, room.js). */
+    const scene = new Map();
+
+    // --- primo giro: si legge la stanza piatta. E' tutto qui quello che si sa di ognuno.
     for (const el of stage.querySelectorAll('.of-guy')) {
       const body = el.querySelector('.of-body');
       const seme = body && body.dataset.seme;
@@ -159,135 +233,182 @@ export function specchio(M) {
       if (P && P.fig.seme !== seme) muore(el, P), (P = null);
       if (!P) P = nasce(el, seme, fx, fy);
       visti.add(el);
+      P.el = el;
+      P.l = l;
+      P.tp = tp;
       const cl = el.classList;
+      const I = P.I;
 
-      // --- quanto si e' mosso, e dove sta andando
-      const vx = (fx - P.fx) / dt;
-      const vy = (fy - P.fy) / dt;
-      const vel = Math.hypot(vx, vy);
-      P.fx = fx;
-      P.fy = fy;
-      const cammina = vel > 3;
-      const tx = (parseFloat(el.style.left) || 0) + 8;
-      const ty = (parseFloat(el.style.top) || 0) + 24;
-      const arrivato = Math.hypot(fx - tx, fy - ty) < 1.5;
+      // Quanto si e' mosso, e dove sta andando: la meta del tratto la scrive room.js nello stile.
+      const vel = Math.hypot(fx - P.fx, fy - P.fy) / vero;
+      I.fx = fx;
+      I.fy = fy;
+      I.tx = (parseFloat(el.style.left) || 0) + 8;
+      I.ty = (parseFloat(el.style.top) || 0) + 24;
+      I.fermo = vel <= 3 && Math.hypot(fx - I.tx, fy - I.ty) < 1.5;
+      I.posto = sedile(I.tx, I.ty);
+      I.sosta = I.posto ? null : sosta(I.tx, I.ty);
+      I.soglia = cl.contains('soglia');
+      I.cabina = cab;
+      I.passo = cl.contains('archivio') ? 2 : 1;
+      I.calmo = calmo;
 
-      // --- cosa ha addosso: e' il modo in cui la stanza piatta dice cosa sta facendo
-      let parla = false;
-      let tazza = false;
-      let foglio = false;
-      let faldone = false;
+      // Cosa ha addosso: e' il modo in cui la stanza piatta dice cosa sta facendo.
+      I.parla = I.tazza = I.foglio = I.faldone = false;
+      let annaffia = false;
       for (const c of el.children) {
         const k = c.className;
         if (typeof k !== 'string') continue;
-        if (k.includes('of-say')) parla = true;
-        else if (k.includes('of-tazza')) tazza = true;
-        else if (k.includes('of-note')) foglio = true;
-        else if (k.includes('of-faldone')) faldone = true;
+        if (k.includes('of-say')) {
+          I.parla = true;
+          ritocca(c, P.rimpicciolisce || 1, (k.includes(' sx') ? '100% ' : '0 ') + (k.includes('sotto') ? '0' : '100%'));
+        } else if (k.includes('of-tazza')) I.tazza = true;
+        else if (k.includes('of-note')) I.foglio = true;
+        else if (k.includes('of-faldone')) I.faldone = true;
+        else if (k.includes('of-annaffia')) {
+          annaffia = true;
+          c.style.visibility = 'hidden';
+        } else if (k.includes('of-bubble')) ritocca(c, P.rimpicciolisce || 1, '0 0');
+        else if (k.includes('of-crunch')) ritocca(c, P.rimpicciolisce || 1, '100% 0');
+        else if (k.includes('of-ring')) ritocca(c, (P.rimpicciolisce || 1) * 1.15, '50% 50%');
       }
-      const chiede = cl.contains('asking');
+      const busy = cl.contains('busy');
+      I.ferma = !busy && !cl.contains('recent') && !cl.contains('done');
+      I.chiede = cl.contains('asking');
+      I.festa = cl.contains('festa');
+      I.stretta = cl.contains('crunch');
+      I.ritmo = busy ? 1 : cl.contains('recent') ? 0.55 : 0.35;
+      // Al suo posto lavora chi ha la posa di chi lavora; e chi lavora da piu' di dieci
+      // minuti (`data-da`, office.js) si e' messo a leggere.
+      I.fa = body.dataset.posa === 'digita' ? 'digita' : '';
+      if (I.fa && busy && el.dataset.da && ora - el.dataset.da > LIBRO_DOPO) I.fa = 'legge';
+      // Il gesto che la stanza piatta gli ha messo addosso, e da quando.
+      I.gesto = el.dataset.gesto || (annaffia ? 'annaffia' : '');
+      if (I.gesto !== P.gestoEra) {
+        P.gestoEra = I.gesto;
+        I.gestoDa = t;
+      }
+      P.scena = el.dataset.scena || '';
+      if (P.scena) scene.has(P.scena) ? scene.get(P.scena).push(P) : scene.set(P.scena, [P]);
+    }
 
-      // --- seduto: quando e' fermo sul posto di una scrivania o di uno sgabello.
-      //     Il posto piatto e quello a volumi non coincidono (qui ci si siede di
-      //     sbieco, verso lo schermo): ci si scivola sopra mentre ci si siede.
-      let posto = null;
-      if (arrivato && !cammina) posto = M.B.posti.find((q) => Math.abs(q.p2[0] - tx) < 2.5 && Math.abs(q.p2[1] - ty) < 2.5) || null;
-      if (posto) P.posto = posto;
-      P.sit = verso(P.sit, posto ? 1 : 0, dt * 4);
-      if (P.sit <= 0) P.posto = null;
-      const q = P.posto;
-      const u = ease(P.sit);
-      let x = q ? lerp(fx, q.x, u) : fx;
-      let y = q ? lerp(fy, q.y, u) : fy;
-
-      // --- sulla soglia: dentro la cabina, e da li' fuori quando la porta si apre
-      P.porta = verso(P.porta, cl.contains('soglia') ? 1 : 0, dt * 3.5);
-      if (P.porta > 0) {
-        const e = ease(P.porta);
-        x = lerp(x, M.B.porta.cabina[0], e);
-        y = lerp(y, M.B.porta.cabina[1], e);
+    // --- secondo giro: ognuno bada a qualcosa, si sposta, si mette in posa, e si porta dietro il suo bottone
+    for (const [el, P] of vivi) {
+      const I = P.I;
+      // Uscito dalla porta: il bottone non c'e' piu', ma lui finisce di entrare in cabina.
+      if (!visti.has(el)) {
+        if (!I.soglia || !P.visibile || (P.addio = P.addio || t) < t - 2.5) {
+          muore(el, P);
+          continue;
+        }
+        I.fermo = true;
+        I.guarda = I.animale = null;
+        I.parla = I.chiede = false;
+      } else {
+        // A cosa bada: a chi gli parla, a te se ti aspetta, alla bestia che lo chiama, a chi gli passa accanto.
+        const compagni = P.scena ? scene.get(P.scena) : null;
+        let altro = null;
+        if (compagni) for (const Q of compagni) if (Q !== P && (!altro || Q.I.parla)) altro = Q;
+        I.ascolta = !!altro && !I.parla;
+        const aTe = I.chiede || (I.parla && !altro);
+        if (!calmo && P.sit >= 1 && !I.ferma && I.ritmo < 1 && t > P.prossima) {
+          // Chi non ha Claude che macina ogni tanto alza gli occhi verso di te: e' il momento in cui gli si vede la faccia.
+          if (P.prossima) P.occhiata = t + 1.6 + Math.random() * 1.4;
+          P.prossima = t + 8 + Math.random() * 12;
+        }
+        const occhiata = t < P.occhiata && !altro;
+        const att = M.animali && M.animali.attenzioni ? M.animali.attenzioni.get(P) : null;
+        I.animale = att && att.forza > 0.01 && !I.chiede && !I.parla && !altro ? att : null;
+        if (!calmo && !altro && !aTe && !I.animale && P.amp < 0.2 && t > P.badaPoi) {
+          let chi = null;
+          let quanto = 58;
+          for (const Q of vivi.values()) {
+            if (Q === P || Q.amp < 0.6 || !Q.visibile) continue;
+            const d = Math.hypot(Q.x - P.x, Q.y - P.y);
+            if (d < quanto && Math.abs(corto(P.a, Math.atan2(Q.x - P.x, Q.y - P.y))) < 1.9) {
+              quanto = d;
+              chi = Q;
+            }
+          }
+          if (chi) {
+            // Chi sta battendo fitto alza la testa una volta su tre.
+            P.bada = I.ritmo >= 1 && I.fa && Math.random() < 0.65 ? null : chi;
+            P.badaFino = t + 1.1 + 1.3 * Math.random();
+            P.badaPoi = P.badaFino + 4 + 7 * Math.random();
+          }
+        }
+        if (P.bada && (t > P.badaFino || P.bada.morta || altro || aTe)) P.bada = null;
+        const Q = altro || P.bada;
+        I.guarda = Q ? [Q.x, Q.y, (Q.alta || ALTA) - 7] : aTe || occhiata ? [P.x, P.y + 300, (P.alta || ALTA) + 70] : null;
+        // Seduto, verso chi gli parla (o verso di te) gira anche la sedia.
+        P.verso = altro ? Math.atan2(altro.x - P.x, altro.y - P.y) : 0;
+        // E chi legge gira un po' la sedia, come si fa per mettersi comodi: e' anche cosi' che da qui si vede il libro.
+        P.cam = verso(P.cam, aTe || (altro && I.parla) ? 1 : altro ? 0.7 : occhiata ? 0.55 : I.fa === 'legge' ? 0.4 : 0, vero * 2.2);
+        // In piedi e fermo, da che parte sta girato: verso chi gli parla, verso di te, verso chi ha seduto accanto.
+        I.fronte = altro ? P.verso : aTe ? 0 : daFermo(P);
       }
 
-      // --- da che parte guarda
-      // Chi parla, o ti aspetta, si gira verso di te. E chi non ha niente da fare
-      // ogni tanto da' un'occhiata: e' il momento in cui gli si vede la faccia.
-      if (!M.calmo && q && !cl.contains('busy') && t > P.prossima) {
-        P.occhiata = t + 1.6 + Math.random() * 1.4;
-        P.prossima = P.occhiata + 6 + Math.random() * 10;
-      }
-      P.cam = verso(P.cam, parla || chiede ? 1 : t < P.occhiata ? 0.55 : 0, dt * 2.2);
-      let a = P.a;
-      let capo = 0;
-      if (cammina) {
-        a = Math.atan2(vx, vy);
-        P.fermoDa = t;
-      } else if (q && P.sit > 0.3) {
-        // Seduto guarda lo schermo; per girarsi verso la camera gira la sedia per
-        // due terzi e la testa per il resto, che e' come ci si gira davvero.
-        const d = corto(q.a, 0);
-        a = q.a + d * 0.62 * ease(P.cam);
-        capo = d * 0.33 * ease(Math.min(1, P.cam * 1.6));
-      } else if (P.porta > 0.05) a = 0;
-      else if (t - P.fermoDa > 0.5) {
-        const i = parla || chiede ? null : interesse(fx, fy);
-        a = i == null ? Math.sin(P.fase) * 0.3 : i;
-      }
-      P.a += corto(P.a, a) * Math.min(1, dt * (cammina ? 12 : 5));
-
-      // --- la posa
-      if (cammina) P.passo += (Math.PI * vel * dt) / 12.5;
-      P.amp = verso(P.amp, cammina ? 1 : 0, dt * 6);
-      P.digita = verso(P.digita, q && P.sit > 0.6 && body.dataset.posa === 'digita' && P.cam < 0.25 ? 1 : 0, dt * 5);
-      P.saluta = verso(P.saluta, chiede ? 1 : 0, dt * 3);
-      // Il saltello della festa, con lo stesso tempo di quello piatto (office.css).
-      const f = (t % 1.8) / 1.8;
-      const salto = cl.contains('festa') && f > 0.58 && f < 0.84 ? Math.sin(((f - 0.58) / 0.26) * Math.PI) * 3.5 : 0;
+      // La stanza rimontata ha sedie nuove al posto delle vecchie: la sua e' quella allo stesso posto.
+      if (P.posto && !M.B.posti.includes(P.posto)) P.posto = M.B.posti[P.postoN] || null;
+      for (let i = 0; i < volte; i++) sposta(P, I, vero / volte, vero);
+      P.postoN = P.posto ? M.B.posti.indexOf(P.posto) : -1;
+      atteggia(P, I, t, vero);
       // Ferma da un pezzo: sbiadita, come la sua gemella piatta.
-      const ferma = !cl.contains('busy') && !cl.contains('recent') && !cl.contains('done');
-      P.tinta = verso(P.tinta, ferma ? 0.5 : 1, dt * 2);
-
+      const tinta = verso(P.tinta, I.ferma ? 0.5 : 1, vero * 2);
+      if (tinta !== P.tinta || !P.alta) P.fig.tinta((P.tinta = tinta));
       const fig = P.fig;
-      fig.g.position.set(x, 0, y);
+      fig.g.position.set(P.x, 0, P.y);
       fig.g.rotation.y = P.a;
-      fig.g.visible = P.porta < 0.97;
-      fig.tinta(P.tinta);
-      fig.posa({
-        sit: u,
-        passo: P.passo,
-        amp: P.amp,
-        digita: P.digita,
-        batte: Math.floor(t * 6 + P.fase) & 1,
-        saluta: P.saluta,
-        onda: t * 5,
-        testa: capo,
-        china: -0.22 * ease(P.cam),
-        salto,
-        fiato: M.calmo ? 0 : 0.12 * Math.sin(t * 1.9 + P.fase),
-        tazza,
-        foglio,
-        faldone,
-      });
-      P.x = x;
-      P.y = y;
-      P.alta = lerp(ALTA, ALTA_SEDUTA, u) + salto;
+      fig.g.visible = P.visibile;
+      P.alta = fig.alta;
+      if (!visti.has(el)) continue;
 
       // --- e il suo bottone, esatto sulla figura: i piedi sui piedi, la testa sulla testa
-      const piedi = proietta(x, y, 0);
-      const cima = proietta(x, y, P.alta);
+      const piedi = proietta(P.x, P.y, 0);
+      const cima = proietta(P.x, P.y, P.alta);
       P.px = Math.max(1, piedi.y - cima.y);
       P.sx = piedi.x;
       P.sy = piedi.y;
-      metti(el, l, tp, 16, 24, piedi.x, piedi.y, P.px / 24, 'giu');
+      metti(el, P.l, P.tp, 16, 24, piedi.x, piedi.y, P.px / 24, 'giu');
+      // Quanto vanno rimpiccioliti i suoi figli per restare grandi com'erano: la figura
+      // di prima era alta ventiquattro unita' e spicci, vista da trenta gradi.
+      P.rimpicciolisce = clamp((0.88 * piedi.s * 24) / P.px, 0.3, 1);
     }
-    for (const [el, P] of vivi) if (!visti.has(el)) muore(el, P);
 
-    // Le sedie girano con chi ci sta seduto, e tornano dritte quando si alza.
+    // Le sedie girano verso chi arriva e con chi ci sta seduto, e tornano dritte quando si alza.
     for (const q of M.B.posti) {
       if (!q.sedia) continue;
       let a = q.a;
-      for (const P of vivi.values()) if (P.posto === q && P.sit > 0.5) a = P.a;
-      q.sedia.rotation.y += corto(q.sedia.rotation.y, a) * Math.min(1, dt * 8);
+      let k = 8;
+      for (const P of vivi.values()) {
+        if (P.posto !== q || P.sedia == null) continue;
+        a = P.sedia;
+        if (P.sit > 0) k = 40;
+      }
+      q.sedia.rotation.y += corto(q.sedia.rotation.y, a) * Math.min(1, vero * k);
     }
+  }
+
+  /** Da che parte sta girato chi e' fermo in piedi senza niente da fare: verso chi ha seduto accanto, o un po' verso chi gli sta vicino — ma sempre con la faccia a chi guarda. */
+  function daFermo(P) {
+    let seduto = null;
+    let vicino = null;
+    let qs = 62;
+    let qv = 62;
+    for (const Q of vivi.values()) {
+      if (Q === P || !Q.visibile) continue;
+      const d = Math.hypot(Q.x - P.x, Q.y - P.y);
+      if (Q.sit >= 1 && d < qs) {
+        qs = d;
+        seduto = Q;
+      } else if (Q.sit <= 0 && d < qv) {
+        qv = d;
+        vicino = Q;
+      }
+    }
+    if (seduto && P.I.fa) return Math.atan2(seduto.x - P.x, seduto.y - P.y);
+    if (vicino) return 0.55 * Math.sign(vicino.x - P.x || 1);
+    return (P.n - 0.5) * 0.7;
   }
 
   // ---------------------------------------------------------------------
@@ -437,6 +558,8 @@ export function specchio(M) {
     },
     smonta() {
       for (const [el, P] of [...vivi]) muore(el, P);
+      // Quello che il bottone si porta addosso torna alla misura e al posto che gli da' il foglio di stile.
+      for (const n of stage.querySelectorAll('.of-guy > *')) n.style.scale = n.style.transformOrigin = n.style.visibility = '';
       for (const el of toccati) {
         el.style.translate = '';
         el.style.scale = '';

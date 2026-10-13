@@ -56,6 +56,14 @@ const stub = `<script>
         card({ id: 'release-022', name: 'Release 0.22', pct: 55, recent: true }),
       ],
     } }, '*'), 140);
+    // E il quadro delle task della prima: e' sullo stesso passo da dodici minuti. Nella
+    // vista in 3D chi lavora da piu' di dieci legge un libro, e senza questo non lo si
+    // vedrebbe mai; e chi porta il passo entra dalla porta e le si siede accanto.
+    setTimeout(() => postMessage({ k: 'tasks', d: { 'ufficio-palette': {
+      items: [{ id: '1', content: 'Ridisegnare la gente', activeForm: 'Ridisegnando la gente', status: 'in_progress' }],
+      done: 0, total: 1, active: 0, busy: true, doing: '',
+      activeSince: Date.now() - 12 * 60000, expectedMs: 20 * 60000,
+    } } }, '*'), 220);
   });
 </script>`;
 

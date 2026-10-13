@@ -1,225 +1,468 @@
 /* Claude Studio — l'ufficio in 3D: le persone.
  *
- * Poche scatole per uno, ma con una testa che vale la pena guardare: un taglio di
- * capelli, gli occhi, la barba, gli occhiali. E sono le stesse persone della stanza
+ * Tonde, con la testa grossa e niente a forma di cubo: una testa con la faccia
+ * disegnata, un busto tornito, capsule per braccia e gambe, e un filo d'inchiostro
+ * attorno a ogni pezzo (kit.js, «A TRATTO»). E sono le stesse persone della stanza
  * piatta: i tratti escono da `window.NPC.traits(seme)`, lo stesso generatore che
- * disegna lo sprite — stessa pelle, stessi capelli, stessa camicia, stesse cuffie.
- * Chi passa dal piatto al 3D ritrova la sua gente, non un altro turno.
+ * disegna lo sprite — pelle, taglio, barba, occhiali, cuffie, stazza, vestito,
+ * cravatta, tesserino. Chi passa dal piatto al 3D ritrova la sua gente.
  *
- * Costruita che guarda a sud (verso la camera): u di traverso alle spalle, v in
- * avanti. Braccia e gambe pendono da perni — spalla e gomito, anca e ginocchio —
- * cosi' la stessa figura cammina, si siede e batte a macchina: non ce ne sono due,
- * una in piedi e una seduta, da scambiare quando arriva alla sedia.
+ * Costruita in METRI che guarda verso +z (a sud, verso la camera), dentro un gruppo
+ * scalato di U: fuori di qui e' alta una cinquantina di unita' di stanza. Una figura
+ * sola fa tutto: pende da quattro perni per parte — spalla e gomito, anca e
+ * ginocchio — e non la si mette in posa per angoli ma per PUNTI: dove stanno le
+ * mani, dove poggiano i piedi. Gli angoli li trova lei (due ossa e un triangolo).
+ * E' quello che tiene i piedi per terra mentre il bacino scende sulla sedia, e le
+ * mani sulla tastiera mentre la schiena si appoggia.
  *
- * Qui c'e' il corpo e le sue pose. Dove sta, da che parte guarda e cosa sta
- * facendo lo decide lo specchio (mirror.js), che lo legge dalla stanza piatta.
+ * Qui c'e' il corpo. Cosa fa lo decide gesti.js, e dove sta lo specchio (mirror.js),
+ * che lo legge dalla stanza piatta.
  */
-import { THREE, Lotto, lerp } from './kit.js';
-import { SEDILE } from './props.js';
+import { THREE, Tratto, penna, G, toon, U, SEDILE_M, TAU, rnd, clamp } from './kit.js';
 
-/** In piedi le gambe sono alte otto; seduti il perno dell'anca sta sul sedile. */
-const ANCA = 8;
-const ANCA_SEDUTO = SEDILE + 1.6;
-/** Quanto e' alta la figura, dai piedi alla cima dei capelli: serve a chi le mette addosso il bottone. */
-export const ALTA = 24.4;
-export const ALTA_SEDUTA = ANCA_SEDUTO + 8 + 8.4;
+/** Le misure del corpo, in metri. L'anca in piedi sta un dito sotto la gamba tesa: un ginocchio mai dritto del tutto non scatta. */
+export const ANCA = 0.69;
+export const COSCIA = 0.3;
+export const STINCO = 0.33;
+/** Dalla caviglia alla suola. */
+export const SUOLA = 0.07;
+export const OMERO = 0.18;
+export const AVAMBRACCIO = 0.2;
+export const SPALLA = [0.178, 0.345];
+export const COLLO = 0.44;
+/** Seduti: la coscia e' appoggiata sul sedile, e la suola arriva giusta a terra. */
+export const SEDUTO = SEDILE_M + 0.07;
+/** Dall'anca alla cima dei capelli. */
+const CIMA = COLLO + 0.46;
+/** Quanto e' alta la figura in unita' di stanza, in piedi e seduta: serve a chi le mette addosso il bottone e la targhetta. */
+export const ALTA = (ANCA + CIMA) * U;
+export const ALTA_SEDUTA = (SEDUTO + CIMA) * U;
 
-const INK = '#1f1810';
+const NERO = '#241b14';
+const CUFFIE = '#3c4633';
+const CREMA = '#f2ede2';
 
-/** I tratti di npc.js, detti nei pochi pezzi che una figura a scatole sa portare. */
+/** I tratti di npc.js, coi nomi che servono qui. */
 function aspetto(seme) {
   const t = window.NPC.traits(seme);
-  const giacca = t.vestito === 'giacca' || t.vestito === 'cardigan';
   return {
     skin: t.pelle.toni[1],
+    skinHi: t.pelle.toni[0],
     hair: t.capelli.toni[1],
-    shirt: t.tessuto.toni[1],
+    hairLo: t.capelli.toni[2],
+    top: t.tessuto.toni[1],
+    topHi: t.tessuto.toni[0],
+    topLo: t.tessuto.toni[2],
     sotto: t.sotto.toni[1],
-    accento: t.accento.toni[1],
+    acc: t.accento.toni[1],
     pants: t.pantaloni.toni[1],
     shoes: t.scarpe.toni[1],
     taglio: t.taglio,
-    barba: t.barba === 'piena' || t.barba === 'corta' || t.barba === 'pizzetto',
-    baffi: t.barba === 'baffi' || t.barba === 'pizzetto',
+    barba: t.barba,
+    stoppia: t.stoppia,
+    bocca: t.bocca,
     occhiali: t.occhiali,
     cuffie: t.accessorio === 'cuffie',
-    robusta: t.corporatura === 'robusta',
-    giacca,
+    badge: t.accessorio === 'badge',
+    tazza: t.accessorio === 'tazza',
+    vestito: t.vestito,
     cravatta: t.cravatta,
-    // La polo ha le maniche corte: e' l'unico vestito che lascia vedere l'avambraccio.
-    maniche: t.vestito === 'polo',
+    robusta: t.corporatura === 'robusta',
   };
 }
 
-function testa(q, A) {
-  const s = A.skin;
-  const h = A.hair;
-  const lungo = A.taglio === 'caschetto';
-  const calvo = A.taglio === 'calvo';
-  const ricci = A.taglio === 'ricci';
-  q.box(-3.6, -3.2, 0, 7.2, 6.4, 6.4, s);
-  q.box(-2.4, 3.2, 2.5, 1.3, 0.25, 1.6, INK, { k: 'thin' });
-  q.box(1.1, 3.2, 2.5, 1.3, 0.25, 1.6, INK, { k: 'thin' });
-  // I capelli: la cima, la nuca, i due lati e la frangia. E' la nuca quella che si
-  // vede di piu' — chi lavora da' le spalle alla camera.
-  if (!calvo) {
-    if (A.taglio === 'stempiato') q.box(-3.9, -3.5, 5.5, 7.8, 5, 1.7, h);
-    else if (ricci) q.box(-4.3, -3.9, 5.2, 8.6, 7.8, 2.6, h);
-    else q.box(-3.9, -3.5, 5.5, 7.8, 7, 1.7, h);
+/** La testa: il perno e' il collo, la faccia guarda +z. Occhi, sopracciglia e bocca sono pezzi a parte, perche' si muovono. */
+function testa(p, o) {
+  const s = o.skin;
+  const h = o.hair;
+  p.sph(0.2, 0, 0.2, 0, s, { s: [1, 0.96, 0.98], n: 18 });
+  for (const k of [-1, 1]) p.sph(0.045, k * 0.195, 0.185, 0, s, { s: [0.6, 1, 0.8], filo: 0.01, n: 8 });
+  p.sph(0.024, 0, 0.17, 0.197, s, { filo: 0.008, n: 8 });
+  const rosa = new THREE.Color(s).lerp(new THREE.Color('#ee5f7c'), 0.38);
+  for (const k of [-1, 1]) p.sph(0.036, k * 0.118, 0.135, 0.146, rosa, { s: [1, 0.8, 0.4], filo: 0, n: 8 });
+
+  // I capelli. E' la sagoma che si riconosce da lontano, e la nuca e' quello che si
+  // vede di piu': chi lavora da' le spalle alla camera.
+  const calotta = (r, dy, dz) => p.sph(r, 0, 0.2 + dy, dz, h, { n: 16 });
+  if (o.taglio === 'caschetto') {
+    calotta(0.222, 0.04, -0.035);
+    p.sph(1, 0, 0.35, 0.11, h, { s: [0.172, 0.062, 0.09], rx: -0.35 });
+    for (const k of [-1, 1]) p.sph(1, k * 0.178, 0.12, -0.03, h, { s: [0.075, 0.17, 0.125] });
+    p.sph(1, 0, 0.1, -0.13, h, { s: [0.19, 0.19, 0.11] });
+  } else if (o.taglio === 'chignon') {
+    calotta(0.216, 0.036, -0.032);
+    p.sph(0.098, 0, 0.45, -0.09, h, { n: 12 });
+    p.sph(1, -0.05, 0.362, 0.1, h, { s: [0.12, 0.05, 0.08], rz: 0.3 });
+  } else if (o.taglio === 'ricci') {
+    calotta(0.206, 0.03, -0.03);
+    for (let i = 0; i < 14; i++) {
+      const a = i * 2.4;
+      const e = 0.15 + 1.2 * rnd('riccio', i);
+      const x = 0.175 * Math.cos(e) * Math.cos(a);
+      const y = 0.235 + 0.175 * Math.sin(e);
+      const z = -0.03 + 0.175 * Math.cos(e) * Math.sin(a);
+      if (z > 0.06 && y < 0.34) continue; // non sulla faccia
+      p.sph(0.08 + 0.025 * rnd('r', i), x, y, z, h, { n: 8 });
+    }
+  } else if (o.taglio === 'coda') {
+    calotta(0.214, 0.035, -0.03);
+    p.sph(1, 0.02, 0.362, 0.105, h, { s: [0.15, 0.05, 0.085], rz: -0.15 });
+    p.sph(0.05, 0, 0.3, -0.225, o.acc, { n: 8 }); // l'elastico
+    p.sph(1, 0, 0.17, -0.27, h, { s: [0.07, 0.16, 0.075], rx: -0.25 });
+  } else if (o.taglio === 'riga') {
+    calotta(0.214, 0.035, -0.03);
+    // La scriminatura da una parte: un ciuffo grande pettinato di la', uno piccolo di qua.
+    p.sph(1, 0.055, 0.372, 0.09, h, { s: [0.15, 0.058, 0.1], rz: -0.3, ry: -0.2 });
+    p.sph(1, -0.125, 0.352, 0.075, h, { s: [0.062, 0.05, 0.085], rz: 0.55 });
+    p.cap(0.007, 0.15, -0.078, 0.43, -0.03, o.hairLo, { rx: Math.PI / 2 - 0.22, filo: 0, n: 6 });
+  } else if (o.taglio === 'stempiato') {
+    // Piu' indietro e piu' bassa: la fronte e' alta, e ai lati restano le tempie.
+    calotta(0.207, 0.014, -0.062);
+    for (const k of [-1, 1]) p.sph(1, k * 0.168, 0.255, -0.005, h, { s: [0.055, 0.085, 0.11] });
+  } else if (o.taglio === 'calvo') {
+    // Una corona: dietro le orecchie, la nuca, e il lucido in cima.
+    for (const k of [-1, 1]) p.sph(1, k * 0.158, 0.2, -0.085, h, { s: [0.052, 0.085, 0.1] });
+    p.sph(1, 0, 0.165, -0.155, h, { s: [0.16, 0.1, 0.07] });
+    p.sph(1, -0.055, 0.385, 0.03, o.skinHi, { s: [0.055, 0.012, 0.035], rz: 0.25, filo: 0, n: 8 });
+  } else {
+    calotta(0.214, 0.035, -0.03);
+    p.sph(1, 0.04, 0.395, 0.07, h, { s: [0.13, 0.06, 0.1], rz: -0.2 });
   }
-  const nuca = lungo ? -3 : calvo ? 2.4 : 1.2;
-  q.box(-3.9, -3.6, nuca, 7.8, 1.9, (calvo ? 4.4 : 5.6) - nuca, h);
-  for (const u of [-3.95, 3.15]) {
-    if (lungo) q.box(u, -3.2, -2.4, 0.8, 5.4, 7.9, h);
-    else q.box(u, -3.2, calvo ? 2.4 : 3, 0.8, ricci ? 5.4 : 4.4, calvo ? 2 : 2.5, h);
+
+  // La barba: piena e' del colore dei capelli, corta e' una stoppia — la pelle con sotto il pelo.
+  if (o.barba === 'piena') p.sph(1, 0, 0.115, 0.045, h, { s: [0.17, 0.12, 0.157] });
+  if (o.barba === 'corta') p.sph(1, 0, 0.125, 0.04, o.stoppia, { s: [0.176, 0.105, 0.162], filo: 0.006 });
+  if (o.barba === 'piena' || o.barba === 'baffi' || o.barba === 'pizzetto') p.cap(0.017, 0.07, 0, 0.158, 0.2, h, { rz: Math.PI / 2, n: 8, filo: 0.008 });
+  if (o.barba === 'pizzetto') p.sph(1, 0, 0.062, 0.168, h, { s: [0.04, 0.045, 0.035], n: 8, filo: 0.008 });
+
+  if (o.occhiali) {
+    for (const k of [-1, 1]) {
+      p.put(G.torus(0.047, 0.007), NERO, k * 0.08, 0.215, 0.196, { filo: 0 });
+      p.cap(0.005, 0.13, k * 0.168, 0.222, 0.105, NERO, { rx: Math.PI / 2, ry: k * -0.3, filo: 0, n: 5 });
+    }
+    p.cube(0.07, 0.01, 0.008, 0, 0.215, 0.2, NERO, { filo: 0 });
   }
-  if (!calvo && A.taglio !== 'stempiato') q.box(-3.6, 2.9, 4.5, A.taglio === 'riga' ? 6 : A.taglio === 'corto' ? 4.6 : 7.2, 0.55, 1.1, h);
-  if (A.taglio === 'chignon') q.box(-1.7, -5, 5.2, 3.4, 2.6, 3.2, h);
-  if (A.taglio === 'coda') q.box(-1, -5.4, 0.2, 2, 1.8, 4.8, h);
-  if (A.barba) q.box(-3.75, 1.4, 0, 7.5, 2.05, 2, h);
-  if (A.baffi) q.box(-1.8, 3.2, 1.5, 3.6, 0.3, 0.7, h, { k: 'thin' });
-  if (A.occhiali) {
-    q.box(-3.3, 3.25, 2.1, 6.6, 0.3, 0.5, INK, { k: 'thin' });
-    for (const u of [-3.1, 0.5]) q.box(u, 3.3, 2.1, 2.6, 0.3, 2.4, '#9fd8ff', { k: 'glow' });
+  if (o.cuffie) {
+    // L'archetto passa sopra i capelli, qualunque taglio ci sia sotto.
+    const r = o.taglio === 'ricci' || o.taglio === 'chignon' ? 0.262 : 0.24;
+    p.put(G.torus(r, 0.016, Math.PI, 14), CUFFIE, 0, 0.19, -0.02, { filo: 0.008 });
+    for (const k of [-1, 1]) p.sph(1, k * (r - 0.012), 0.185, -0.015, CUFFIE, { s: [0.04, 0.075, 0.062], n: 10 });
+    p.cap(0.006, 0.15, -0.2, 0.112, 0.085, CUFFIE, { rx: Math.PI / 2 - 0.55, ry: 0.35, filo: 0, n: 5 });
+    p.sph(0.02, -0.165, 0.08, 0.158, '#768a61', { n: 8, filo: 0.006 });
   }
-  if (A.cuffie) {
-    q.box(-4.4, -0.8, 7, 8.8, 1.6, 0.8, INK);
-    for (const u of [-4.7, 3.6]) q.box(u, -1.6, 1.6, 1.1, 3.2, 3.6, INK);
+}
+
+/* Il profilo del busto (raggio a ogni quota): serve a sapere dove sta il petto, per
+   appoggiarci sopra il colletto, la cravatta, il tesserino. */
+const PROFILO = [[0, 0.04], [0.13, 0.04], [0.15, 0.1], [0.155, 0.22], [0.14, 0.32], [0.1, 0.385], [0.055, 0.425], [0, 0.435]];
+function petto(y) {
+  for (let i = 2; i < PROFILO.length; i++) {
+    const [r0, y0] = PROFILO[i - 1];
+    const [r1, y1] = PROFILO[i];
+    if (y <= y1) return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0 || 1);
   }
+  return 0.05;
+}
+
+/** Il busto: il bacino nei pantaloni, il torso nel vestito, il collo — e sopra, quello che dice che vestito e'. */
+function busto(p, o, kx, kz) {
+  const zf = (y) => petto(y) * 0.82 * kz;
+  p.sph(1, 0, 0.01, 0, o.pants, { s: [0.168 * (1 + (kx - 1) * 0.7), 0.115, 0.128 * (1 + (kz - 1) * 0.6)] });
+  p.lathe(PROFILO, 0, 0, 0, o.top, { s: [1.12 * kx, 1, 0.82 * kz], n: 16 });
+  p.cyl(0.05, 0.055, 0.07, 0, 0.4, 0, o.skin, { filo: 0, n: 10 });
+  // Un pezzo steso sul petto: mezzo dentro e mezzo fuori, cosi' segue la curva e il filo lo contorna.
+  const su = (w, h, y, x, c, d = 0.018, filo = 0.007) => p.sph(1, x, y, zf(y) - d * 0.35, c, { s: [w, h, d], n: 10, filo });
+  const v = o.vestito;
+  if (v === 'cardigan') {
+    // Aperto davanti sulla camicia di sotto, coi bottoni dell'accento.
+    su(0.036, 0.16, 0.225, 0, o.sotto, 0.02);
+    for (const y of [0.14, 0.24]) p.sph(0.011, 0.052, y, zf(y) + 0.004, o.acc, { n: 6, filo: 0.005 });
+  } else if (v === 'giacca') {
+    // La camicia a V fra i risvolti.
+    su(0.046, 0.085, 0.3, 0, o.sotto, 0.011);
+    for (const k of [-1, 1]) p.box(0.048, 0.15, 0.01, k * 0.06, 0.2, zf(0.27) - 0.003, k < 0 ? o.topHi : o.topLo, { rz: k * 0.42, rx: -0.26, r: 0.005, filo: 0.006 });
+  } else if (v === 'maglione') {
+    // Il collo a coste.
+    p.put(G.torus(0.066, 0.02, TAU, 12), o.topLo, 0, 0.405, 0, { rx: Math.PI / 2, filo: 0.007 });
+  } else {
+    // Camicia e polo: le due punte del colletto.
+    for (const k of [-1, 1]) p.sph(1, k * 0.045, 0.385, zf(0.385) + 0.006, o.topHi, { s: [0.036, 0.026, 0.016], rz: k * -0.5, n: 8, filo: 0.006 });
+    if (v === 'polo') p.cube(0.012, 0.07, 0.006, 0, 0.3, zf(0.33), o.topLo, { filo: 0 });
+    else if (!o.cravatta) for (const y of [0.13, 0.22, 0.31]) p.sph(0.008, 0, y, zf(y) + 0.002, o.topLo, { n: 6, filo: 0 });
+  }
+  if (o.cravatta) {
+    const lunga = v === 'giacca' ? 0.12 : 0.2;
+    p.sph(0.02, 0, 0.375, zf(0.375) + 0.004, o.acc, { n: 8, filo: 0.006 });
+    su(0.024, lunga / 2, 0.365 - lunga / 2, 0, o.acc, 0.014, 0.006);
+  }
+  if (o.badge) {
+    // Il cordino dal collo e il tesserino in mezzo al petto.
+    for (const k of [-1, 1]) p.cap(0.006, 0.17, k * 0.04, 0.3, zf(0.3) - 0.002, o.acc, { rz: k * 0.27, rx: -0.42, filo: 0, n: 5 });
+    p.box(0.075, 0.055, 0.01, 0, 0.165, zf(0.19) + 0.001, CREMA, { r: 0.005, filo: 0.006 });
+    p.cube(0.045, 0.008, 0.004, 0, 0.19, zf(0.19) + 0.007, '#8a8272', { filo: 0 });
+  }
+  // La cintura: senza, la figura e' una tunica.
+  p.cyl(0.14, 0.14, 0.028, 0, 0.038, 0, '#2a2119', { s: [1.12 * kx, 1, 0.82 * kz], filo: 0, n: 14 });
+}
+
+/* Quello che si tiene in mano. Non sono appesi alla mano ma alla figura: chi li
+   regge sa dove sta la mano (gesti.js), e cosi' la stessa tazza puo' stare in mano
+   o posata sulla scrivania senza cambiare padrone. Ognuno ha l'origine dove lo si
+   appoggia. */
+const COSE = {
+  /** Una di quelle del bar: il manico verso +x. */
+  tazza(p) {
+    p.lathe([[0, 0], [0.034, 0], [0.043, 0.012], [0.046, 0.09], [0, 0.09]], 0, 0, 0, CREMA, { n: 12, filo: 0.008 });
+    p.put(G.torus(0.024, 0.008, TAU, 10), CREMA, 0.05, 0.048, 0, { filo: 0.006 });
+    p.cyl(0.037, 0.037, 0.004, 0, 0.088, 0, '#5a3520', { filo: 0, n: 12 });
+  },
+  foglio(p) {
+    p.cube(0.12, 0.006, 0.15, 0, 0, 0, '#9ecbf0', { filo: 0.006 });
+    for (const z of [-0.04, -0.01, 0.02]) p.cube(0.08, 0.002, 0.008, -0.005, 0.006, z, '#5f93c4', { filo: 0 });
+  },
+  faldone(p) {
+    p.box(0.07, 0.26, 0.2, 0, 0, 0, '#2f4f7a', { r: 0.012 });
+    p.cube(0.074, 0.07, 0.1, 0, 0.1, 0, CREMA, { filo: 0 });
+  },
+  /** Aperto, le pagine in su: il dorso corre lungo z. */
+  libro(p, o) {
+    for (const k of [-1, 1]) {
+      p.cube(0.142, 0.012, 0.21, k * 0.069, -0.005, 0, o.acc, { rz: k * 0.2, filo: 0.007 });
+      p.cube(0.13, 0.018, 0.195, k * 0.067, 0.009, 0, '#fff8ea', { rz: k * 0.2, filo: 0.005 });
+      for (const z of [-0.06, -0.03, 0, 0.03, 0.06]) p.cube(0.09, 0.002, 0.008, k * 0.069, 0.0265, z, '#b8a890', { rz: k * 0.2, filo: 0 });
+    }
+  },
+  /** La tazza che uno si e' portato da casa: e' sua, con la fascia del suo accento, e vive sulla sua scrivania. */
+  sua(p, o) {
+    COSE.tazza(p);
+    p.cyl(0.0465, 0.0465, 0.022, 0, 0.04, 0, o.acc, { filo: 0, n: 12 });
+  },
+  /** Lo schermo in su, il lato lungo lungo z. */
+  telefono(p) {
+    p.box(0.065, 0.012, 0.125, 0, 0, 0, '#2e2430', { r: 0.005, filo: 0.006 });
+    p.cube(0.053, 0.002, 0.105, 0, 0.012, 0, '#9fd8ff', { filo: 0 });
+  },
+  /** Il becco verso +z. */
+  annaffiatoio(p) {
+    p.cyl(0.06, 0.065, 0.11, 0, 0, 0, '#9aa7b0', { n: 12 });
+    p.cap(0.014, 0.14, 0, 0.085, 0.11, '#9aa7b0', { rx: 0.95, filo: 0.006, n: 6 });
+    p.sph(0.026, 0, 0.128, 0.168, '#7d8a93', { s: [1, 0.6, 1], n: 8, filo: 0.006 });
+    p.put(G.torus(0.045, 0.01, Math.PI, 10), '#7d8a93', 0, 0.06, -0.06, { ry: Math.PI / 2, rz: -Math.PI / 2, filo: 0.006 });
+  },
+  /** L'acqua che scende dal becco: l'origine e' in cima. */
+  getto(p) {
+    p.cap(0.008, 0.2, 0, -0.1, 0, '#5bb7e8', { filo: 0, n: 5 });
+    for (const y of [-0.06, -0.15]) p.sph(0.014, 0, y, 0, '#8fd0f2', { filo: 0, n: 6 });
+  },
+};
+
+const GIU = new THREE.Vector3(0, -1, 0);
+const _n = new THREE.Vector3();
+const _p = new THREE.Vector3();
+const _su = new THREE.Vector3();
+const _gi = new THREE.Vector3();
+const _t = new THREE.Vector3();
+const _g = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+const _mh = new THREE.Matrix4();
+const _mt = new THREE.Matrix4();
+const _ih = new THREE.Matrix4();
+const _it = new THREE.Matrix4();
+
+/**
+ * Due ossa verso un punto. `T` e' il bersaglio visto dal perno di sopra, nello spazio
+ * del genitore; `palo` da che parte si piega la giuntura (il gomito all'indietro, il
+ * ginocchio in avanti). Le ossa pendono lungo -y. Quello che e' troppo lontano si
+ * raggiunge a braccio teso; `fine`, se c'e', riceve dove arriva davvero la punta.
+ */
+function dueOssa(sup, inf, a, b, T, palo, fine) {
+  const d0 = T.length() || 1e-6;
+  _n.copy(T).multiplyScalar(1 / d0);
+  const d = clamp(d0, Math.abs(a - b) + 0.002, a + b - 0.002);
+  const cosA = clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1);
+  const sinA = Math.sqrt(1 - cosA * cosA);
+  _p.copy(palo).addScaledVector(_n, -palo.dot(_n));
+  if (_p.lengthSq() < 1e-8) _p.set(_n.y, -_n.x, 0.001);
+  _p.normalize();
+  _su.copy(_n).multiplyScalar(cosA).addScaledVector(_p, sinA);
+  _gi.copy(_n).multiplyScalar(d).addScaledVector(_su, -a).normalize();
+  if (fine) fine.copy(sup.position).addScaledVector(_su, a).addScaledVector(_gi, b);
+  sup.quaternion.setFromUnitVectors(GIU, _su);
+  _q.copy(sup.quaternion).invert();
+  inf.quaternion.setFromUnitVectors(GIU, _gi.applyQuaternion(_q));
 }
 
 /**
- * Una persona. `mat` sono i materiali della scena: il suo, quello che prende le
- * luci, se lo fa lei — cosi' sbiadirla quando e' ferma da un pezzo e' un colore su
- * un materiale, non una figura da ricostruire.
+ * Una persona. Il suo materiale se lo fa lei — cosi' sbiadirla quando e' ferma da un
+ * pezzo e' un colore su un materiale, non una figura da ricostruire. `mat` sono i
+ * materiali della scena: non le servono piu', ma chi la chiama li passa da sempre.
  */
 export function persona(seme, mat) {
-  const A = aspetto(seme);
-  const suo = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const M = { lit: suo, thin: suo, glow: mat.glow };
-  const pezzo = (par, fn) => {
-    const q = new Lotto();
-    fn(q);
-    const g = q.mesh(M);
-    par.add(g);
-    return g;
+  const o = aspetto(seme);
+  const suo = toon();
+  const nodo = (genitore, x = 0, y = 0, z = 0) => {
+    const n = new THREE.Group();
+    n.position.set(x, y, z);
+    genitore.add(n);
+    return n;
   };
-  const perno = (par, x, y, z) => {
-    const g = new THREE.Group();
-    g.position.set(x, y, z);
-    par.add(g);
-    return g;
+  const pezzo = (genitore, fn) => {
+    const L = new Tratto();
+    fn(penna(L));
+    const m = L.mesh(suo);
+    genitore.add(m);
+    return m;
   };
+  const kx = o.robusta ? 1.14 : 1;
+  const kz = o.robusta ? 1.3 : 1;
+  const kr = o.robusta ? 1.1 : 1;
+
   const g = new THREE.Group();
-  const corpo = perno(g, 0, ANCA, 0);
-  const larga = A.robusta ? 0.7 : 0;
-
-  // Il busto scende un pelo sotto l'anca: in piedi e' la camicia fuori dai
-  // pantaloni, seduti e' quello che chiude il vuoto fra la schiena e il sedile.
-  pezzo(corpo, (q) => {
-    q.box(-4 - larga, -2, -1.6, 8 + 2 * larga, 4, 9.6, A.shirt);
-    if (A.giacca) q.box(-1.3, 2, 1, 2.6, 0.25, 7, A.sotto, { k: 'thin' });
-    if (A.cravatta) q.box(-0.55, 2.05, 1.6, 1.1, 0.3, 6.2, A.accento, { k: 'thin' });
+  g.scale.setScalar(U);
+  const hips = nodo(g, 0, ANCA, 0);
+  const torso = nodo(hips);
+  hips.rotation.order = torso.rotation.order = 'YXZ';
+  const tronco = pezzo(torso, (p) => busto(p, o, kx, kz));
+  const head = nodo(torso, 0, COLLO, 0);
+  head.rotation.order = 'YXZ';
+  pezzo(head, (p) => testa(p, o));
+  const occhi = pezzo(nodo(head, 0, 0.215, 0), (p) => {
+    for (const k of [-1, 1]) {
+      p.sph(1, k * 0.078, 0, 0.18, NERO, { s: [0.027, 0.04, 0.016], filo: 0, n: 10 });
+      p.sph(0.009, k * 0.078 + 0.009, 0.015, 0.194, '#ffffff', { filo: 0, n: 6 });
+    }
   });
-  const capo = perno(corpo, 0, 8, 0);
-  // Una testa un po' troppo grande per il corpo: e' la faccia che deve leggersi.
-  pezzo(capo, (q) => q.con(new THREE.Matrix4().makeScale(1.15, 1.15, 1.15), () => testa(q, A)));
+  const ciglia = pezzo(nodo(head, 0, 0.285, 0), (p) => {
+    for (const k of [-1, 1]) p.cap(0.008, 0.045, k * 0.078, 0, 0.166, o.hair, { rz: Math.PI / 2 + k * 0.15, filo: 0, n: 6 });
+  });
+  // La bocca: un arco che sorride (rovesciato e' un broncio), e un tondo scuro quando parla.
+  const zb = o.barba === 'piena' || o.barba === 'corta' ? 0.203 : 0.181;
+  const rb = o.barba === 'piena' || o.barba === 'corta' ? 0.2 : 0.5;
+  const bocca = pezzo(nodo(head, 0, 0.128, zb), (p) => p.put(G.torus(0.034, 0.008, Math.PI, 8), o.bocca, 0, 0, 0, { rz: Math.PI, rx: rb, filo: 0 }));
+  const voce = pezzo(nodo(head, 0, 0.112, zb + 0.004), (p) => p.sph(1, 0, 0, 0, '#5a1f1a', { s: [0.03, 0.024, 0.01], filo: 0, n: 8 }));
+  voce.visible = false;
 
-  const braccia = [-1, 1].map((s) => {
-    const spalla = perno(corpo, s * (4.8 + larga), 7.6, 0);
-    pezzo(spalla, (q) => q.box(-0.8, -1.5, -4, 1.6, 3, 4, A.shirt));
-    const gomito = perno(spalla, 0, -4, 0);
-    pezzo(gomito, (q) => {
-      q.box(-0.8, -1.5, -4.4, 1.6, 3, 4.4, A.maniche ? A.skin : A.shirt);
-      q.box(-0.8, -1.5, -5.7, 1.6, 3, 1.3, A.skin);
+  const maniche = o.vestito === 'polo';
+  const polso = o.vestito === 'giacca' ? o.sotto : o.vestito === 'maglione' || o.vestito === 'cardigan' ? o.topLo : o.topHi;
+  const braccia = [-1, 1].map((k) => {
+    const spalla = nodo(torso, k * SPALLA[0] * (o.robusta ? 1.1 : 1), SPALLA[1], 0);
+    pezzo(spalla, (p) => p.cap(0.052 * kr, OMERO, 0, -OMERO / 2, 0, o.top));
+    const gomito = nodo(spalla, 0, -OMERO, 0);
+    pezzo(gomito, (p) => {
+      p.cap(0.046 * kr, 0.15, 0, -0.085, 0, maniche ? o.skin : o.top);
+      if (!maniche) p.put(G.torus(0.044 * kr, 0.012, TAU, 10), polso, 0, -0.158, 0, { rx: Math.PI / 2, filo: 0.006 });
+      p.sph(0.056, 0, -AVAMBRACCIO, 0, o.skin, { n: 10 });
     });
     return { spalla, gomito };
   });
-  const gambe = [-1, 1].map((s) => {
-    const anca = perno(corpo, s * 1.75, 0, 0);
-    pezzo(anca, (q) => q.box(-1.45, -1.6, -4, 2.9, 3.2, 4, A.pants));
-    const ginocchio = perno(anca, 0, -4, 0);
-    const stinco = pezzo(ginocchio, (q) => {
-      q.box(-1.45, -1.6, -2.7, 2.9, 3.2, 2.7, A.pants);
-      q.box(-1.45, -1.6, -4, 2.9, 4.4, 1.3, A.shoes);
+  const gambe = [-1, 1].map((k) => {
+    const anca = nodo(hips, k * 0.082, 0, 0);
+    pezzo(anca, (p) => p.cap(0.072 * kr, COSCIA, 0, -COSCIA / 2, 0, o.pants));
+    const ginocchio = nodo(anca, 0, -COSCIA, 0);
+    pezzo(ginocchio, (p) => {
+      p.cap(0.06 * kr, 0.28, 0, -0.14, 0, o.pants);
+      p.sph(1, 0, -0.345, 0.045, o.shoes, { s: [0.075, 0.055, 0.125], n: 10 });
     });
-    return { anca, ginocchio, stinco };
+    return { anca, ginocchio };
   });
 
-  /* Quello che si porta in mano. Nella stanza piatta sono tre pixel appesi alla
-     figura; qui stanno nella mano vera, e si accendono quando lo specchio vede il
-     loro gemello piatto addosso alla persona. La tazza e il foglietto nella destra,
-     il faldone sotto il braccio sinistro. */
-  const tazza = pezzo(braccia[1].gomito, (q) => {
-    q.box(-1.3, 1.5, -6.3, 2.6, 3, 2.6, '#f2ede2');
-    q.box(-1.3, 2.2, -6.3, 2.6, 0.7, 2.6, '#e8c14d', { k: 'thin' });
-  });
-  const foglio = pezzo(braccia[1].gomito, (q) => q.box(-2, 1.5, -6.6, 4, 4, 0.4, '#9ecbf0', { k: 'glow' }));
-  const faldone = pezzo(braccia[0].gomito, (q) => {
-    q.box(-2.2, -2.4, -7.4, 1.4, 4.8, 6, '#2f4f7a');
-    q.box(-2.25, -1, -5.6, 0.2, 2, 2.2, '#f2ede2', { k: 'thin' });
-  });
-  tazza.visible = foglio.visible = faldone.visible = false;
+  // Le cose nascono solo quando servono la prima volta: quasi nessuno annaffia.
+  const cose = {};
+  const cosa = (nome) => {
+    let n = cose[nome];
+    if (!n) {
+      n = cose[nome] = nodo(g);
+      pezzo(n, (p) => COSE[nome](p, o));
+      n.visible = false;
+    }
+    return n;
+  };
+
+  /** Dove sono arrivate davvero le mani dopo l'ultima posa, in metri nello spazio della figura. */
+  const mani = [new THREE.Vector3(), new THREE.Vector3()];
 
   return {
     g,
     seme,
+    /** I tratti che servono a chi la muove: se ha una tazza sua, se e' di stazza. */
+    tratti: o,
+    mani,
+    /** I perni, per chi deve misurare dove sono finiti davvero (i controlli). */
+    ossa: { hips, torso, head, braccia, gambe },
     /**
-     * Mette la figura in posa. Tutto arriva gia' ammorbidito da chi chiama:
-     *   sit 0..1 in piedi → seduto · passo, amp la fase e l'ampiezza della camminata
-     *   digita 0..1 le mani sulla tastiera · batte quale mano e' giu' adesso
-     *   saluta 0..1 il braccio alzato di chi ti aspetta · onda la sua fase
-     *   testa, china il capo: di lato e in giu' · salto il saltello della festa
+     * Mette la figura in posa. Tutto in metri, nello spazio della figura (x di
+     * traverso, y in alto, z in avanti), e gia' ammorbidito da chi chiama:
+     *   anca [x, y, z] dove sta il bacino · bacino, busto, capo [rx, ry, rz] come girano
+     *   (il busto rispetto al bacino, il capo rispetto al busto)
+     *   mani [[x, y, z], [x, y, z]] e gomiti: dove vanno le mani, e da che parte piega il gomito
+     *   piedi [[x, y, z], …] dove poggiano le suole
+     *   fiato il respiro · chiusi, sx, sy gli occhi · ciglia quanto si alzano
+     *   umore -1 broncio … 1 sorriso · voce 0..1 la bocca che parla
      */
     posa(p) {
-      const sit = p.sit;
-      const in_piedi = 1 - sit;
-      const s = Math.sin(p.passo) * p.amp * in_piedi;
-      corpo.position.y = lerp(ANCA, ANCA_SEDUTO, sit) + Math.abs(Math.cos(p.passo)) * 0.7 * p.amp * in_piedi + (p.salto || 0) + (p.fiato || 0);
-      gambe.forEach((l, k) => {
-        const v = k ? -s : s;
-        l.anca.rotation.x = -sit * (Math.PI / 2) + v * 0.6;
-        // Seduti lo stinco torna in verticale, e si allunga fino a terra: e' il solo
-        // trucco di questa figura, e sta sotto la scrivania.
-        l.ginocchio.rotation.x = sit * (Math.PI / 2) + Math.max(0, -v) * 0.5;
-        l.stinco.scale.y = 1 + 0.375 * sit;
-      });
-      const tiene = p.tazza || p.foglio;
-      braccia.forEach((b, k) => {
-        const v = k ? s : -s;
-        // Appese e a tempo di passo; poi, in ordine: sedute sulle ginocchia, sulla
-        // tastiera, piegate a reggere qualcosa, e alzate a chiamarti.
-        let alto = v * 0.5 - 0.3 * sit;
-        let basso = -0.12 - 0.95 * sit;
-        alto = lerp(alto, -0.7, p.digita);
-        basso = lerp(basso, -1.32 + (p.batte === k ? 0.14 : 0), p.digita);
-        let fuori = 0;
-        if (k === 1 && tiene) {
-          alto = -0.28;
-          basso = -1.32;
-        }
-        if (k === 0 && p.faldone) basso = -0.3;
-        if (p.saluta && k === (tiene ? 0 : 1)) {
-          alto = lerp(alto, -2.7, p.saluta);
-          basso = lerp(basso, -0.3, p.saluta);
-          fuori = 0.22 * Math.sin(p.onda) * p.saluta;
-        }
-        b.spalla.rotation.x = alto;
-        b.spalla.rotation.z = fuori;
-        b.gomito.rotation.x = basso;
-      });
-      capo.rotation.y = p.testa || 0;
-      capo.rotation.x = p.china || 0;
-      tazza.visible = !!p.tazza;
-      foglio.visible = !!p.foglio && !p.tazza;
-      faldone.visible = !!p.faldone;
+      hips.position.set(p.anca[0], p.anca[1], p.anca[2]);
+      hips.rotation.set(p.bacino[0], p.bacino[1], p.bacino[2]);
+      torso.rotation.set(p.busto[0], p.busto[1], p.busto[2]);
+      head.rotation.set(p.capo[0], p.capo[1], p.capo[2]);
+      const f = p.fiato || 0;
+      tronco.scale.set(1 + 0.012 * f, 1 + 0.02 * f, 1 + 0.035 * f);
+      hips.updateMatrix();
+      torso.updateMatrix();
+      _mh.copy(hips.matrix);
+      _mt.multiplyMatrices(hips.matrix, torso.matrix);
+      _ih.copy(_mh).invert();
+      _it.copy(_mt).invert();
+      for (let k = 0; k < 2; k++) {
+        const l = gambe[k];
+        const s = p.piedi[k];
+        _t.set(s[0], s[1] + SUOLA, s[2]).applyMatrix4(_ih).sub(l.anca.position);
+        _g.set(k ? 0.1 : -0.1, 0, 1);
+        dueOssa(l.anca, l.ginocchio, COSCIA, STINCO, _t, _g);
+        const b = braccia[k];
+        const m = p.mani[k];
+        const e = p.gomiti[k];
+        _t.set(m[0], m[1], m[2]).applyMatrix4(_it).sub(b.spalla.position);
+        _g.set(e[0], e[1], e[2]).transformDirection(_it);
+        dueOssa(b.spalla, b.gomito, OMERO, AVAMBRACCIO, _t, _g, mani[k]);
+        mani[k].applyMatrix4(_mt);
+      }
+      occhi.scale.y = 1 - 0.9 * clamp(p.chiusi || 0);
+      occhi.position.x = 0.012 * (p.sx || 0);
+      occhi.position.y = -0.01 * (p.sy || 0);
+      ciglia.position.y = 0.02 * (p.ciglia || 0);
+      const parla = (p.voce || 0) > 0.03;
+      voce.visible = parla;
+      bocca.visible = !parla;
+      if (parla) voce.scale.set(0.8 + 0.3 * p.voce, 0.35 + 0.9 * p.voce, 1);
+      else {
+        const u = p.umore == null ? 1 : p.umore;
+        // Mai a zero: una bocca schiacciata del tutto sparisce.
+        bocca.scale.set(1, Math.abs(u) < 0.14 ? (u < 0 ? -0.14 : 0.14) : u, 1);
+      }
     },
-    /** Sbiadita, come chi e' fermo da un pezzo: `k` da 1 (viva) in giu'. */
+    /** Una cosa in mano (o posata): `k` 0..1 quanto c'e', poi dove e come gira, nello spazio della figura. */
+    tieni(nome, k, x, y, z, rx = 0, ry = 0, rz = 0) {
+      if (k < 0.02) {
+        if (cose[nome]) cose[nome].visible = false;
+        return;
+      }
+      const n = cosa(nome);
+      n.visible = true;
+      n.position.set(x, y, z);
+      n.rotation.set(rx, ry, rz);
+      n.scale.setScalar(Math.min(1, k));
+    },
+    /** La cima dei capelli adesso, in unita' di stanza: il bottone arriva fin li'. */
+    get alta() {
+      return (hips.position.y + CIMA) * U;
+    },
+    /** Sbiadita, come chi e' fermo da un pezzo: `k` da 1 (viva) a 0.5. Scura e slavata insieme, come un disegno al sole. */
     tinta(k) {
-      suo.color.setScalar(k);
+      suo.color.setScalar(0.5 + k * 0.5);
+      suo.emissive.setScalar((1 - k) * 0.34);
     },
     via() {
-      g.traverse((o) => o.geometry && o.geometry.dispose());
+      g.traverse((n) => n.geometry && n.geometry.dispose());
       suo.dispose();
     },
   };
