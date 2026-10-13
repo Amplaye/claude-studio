@@ -81,218 +81,332 @@
  *               animazioni ridotte. `i` e' il numero della corsia. Chi non la da'
  *               ha il cielo che ha dipinto in `vetrata`, fermo.
  *
- *     extra(K)  I mobili che ha solo questa pelle. K e' la cassetta dei costruttori:
- *               K.box / K.cyl / K.face scrivono nella stanza ferma (vedi kit.js),
- *               K.alone(a, b, raggio, colore, forza) un bagliore, K.decalco(trama,
- *               x, y, w, d, z, opzioni) una cosa stesa per terra, K.tela(w, h) una
- *               tela nuova, K.R la pianta (DESKS, PROPS, W, H, WH…), K.anima(fn) una
- *               funzione chiamata a ogni fotogramma con il tempo in secondi — mai
- *               con le animazioni ridotte — e K.scena la scena di three.
- *               Per chi disegna a tratto come il resto della stanza (kit.js, «A
+ *     extra(K)  Quello che ha solo questa pelle. K e' la cassetta dei costruttori,
+ *               e si disegna a tratto come il resto della stanza (kit.js, «A
  *               TRATTO»): K.qui(x, y, ry, z, specchio) e' una penna piantata in un
  *               punto della pianta, che scrive in metri nella stanza ferma, e
- *               K.parte(fn) un pezzo che si muove. K.Q e' il quadro: `cima` e `giu`
- *               dove la scheda taglia la vetrata e il pavimento, `lungo` e `alto`
- *               fin dove arrivano il pavimento e i due muri di fianco.
+ *               K.parte(fn) un pezzo che si muove. Poi: K.decalco(trama, x, y, w,
+ *               d, z, opzioni) una cosa stesa per terra — con `somma` e' una luce
+ *               che si aggiunge a quella che c'e' —, K.tela(w, h) una tela nuova,
+ *               K.R la pianta (DESKS, PROPS, W, H, WH…), K.anima(fn) una funzione
+ *               chiamata a ogni fotogramma con il tempo in secondi — mai con le
+ *               animazioni ridotte — e K.scena la scena di three. K.Q e' il
+ *               quadro: `cima` e `giu` dove la scheda taglia la vetrata e il
+ *               pavimento, `lungo` e `alto` fin dove arrivano il pavimento e i due
+ *               muri di fianco.
  *   }
  * =====================================================================
  *
- * Questa e' la pelle approvata: blocchi scuri, il filo al neon che respira, gli
- * schermi che fanno luce e la citta' accesa dietro le vetrate.
+ * Qui e' notte, e come le altre due e' un libro illustrato: tinte piatte, forme
+ * tonde, il contorno a inchiostro. L'inchiostro e' scuro e caldo, e su un mobile
+ * scuro sparirebbe: quindi niente nella stanza e' scuro quanto lui. Il buio lo fa
+ * il colore — blu e viola dappertutto — non il nero, e i mobili si staccano dal
+ * pavimento perche' sono piu' chiari di lui. Dietro la vetrata la citta': tre file
+ * di palazzi, le finestre accese, la luna e qualche nuvola che passa.
+ *
+ * Calma apposta. Una notte animata — il neon che pulsa, lo skyline fitto, gli aloni
+ * grandi — e' gia' stata bocciata una volta: qui il filo al neon sta fermo, la
+ * citta' non lampeggia, di aloni non ce ne sono, e di suo si muovono solo le nuvole.
  */
-import { rnd, TAU } from '../kit.js';
+import { rnd, TAU, U } from '../kit.js';
 
 const C = {
   // la stanza
-  slab: '#11132a', vuoto: '#05060f',
-  wall: '#2a2f4d', wallHi: '#3b4170', wallLo: '#1d2140', infisso: '#232846',
+  slab: '#141736', vuoto: '#0a0b20',
+  wall: '#3d4375', wallHi: '#59619f', wallLo: '#2b305c', infisso: '#4a5189',
   // i mobili
-  wood: '#474c7e', woodTop: '#636aa8', woodHi: '#8a93cf', woodLo: '#343861', woodDk: '#22254a',
-  chair: '#2d3157', chairLo: '#1c1f3a',
-  leaf: '#2f3358', leafHi: '#4a5080', leafLo: '#22254a', porta: '#39e58c', cabina: '#14162a',
+  wood: '#5b63a6', woodTop: '#757ec2', woodHi: '#9aa4e4', woodLo: '#434a82', woodDk: '#262b56',
+  chair: '#6d5899', chairLo: '#4b3d72',
+  leaf: '#4d5590', leafHi: '#6871b2', leafLo: '#353b6c', porta: '#39e58c', cabina: '#11132e', pomello: '#ffd36b',
   // il computer
-  off: '#0b0c18', bezel: '#2f3352', monLo: '#1a1c34', ink: '#090a14',
+  off: '#11132c', bezel: '#383d6c', monLo: '#23274c', ink: '#2a2440', tasti: '#c3c9f2',
   // il bar, la fontanella, le piante
-  cream: '#e8e4dc', steel: '#9aa3c7', carta: '#cfd3e6',
-  mach: '#33334a', machHi: '#4b4b66', machLo: '#1f1f30', spia: '#ff9a3c',
-  jar: '#3f7fd8', jarHi: '#9cc4ff',
-  stone: '#6b72a3', stoneLo: '#4b5182', soil: '#191a2c', steam: '#cfd6ff',
+  cream: '#e4e6f6', steel: '#9aa3c7', carta: '#d6daf0',
+  mach: '#34365a', machHi: '#50537c', machLo: '#1f2140', spia: '#ff9a3c',
+  jar: '#3f8fe0', jarHi: '#9cc4ff',
+  stone: '#737aae', stoneLo: '#525990', soil: '#1c1d36', steam: '#cfd6ff',
   acqua: ['#1d86b0', '#3fd8f2', '#b8fbff'],
-  verde: ['#235a47', '#2c6e54', '#368a63', '#44a070'], fiore: '#ff6ad5',
-  vasi: ['#4b5182', '#3f6fc0', '#6b4fa0', '#3f6fc0', '#7a4a58', '#6b4fa0'],
-  faldoni: ['#3fb8d0', '#c552a8', '#7f88c4', '#e8e4dc', '#ffd36b', '#4a5fb0'],
+  verde: ['#1f6a56', '#2a8468', '#38a07a', '#52bd8c'], fiore: '#ff6ad5',
+  vasi: ['#59619f', '#3f7fd8', '#7a5ab8', '#2f9fb8', '#8a5270', '#7a5ab8'],
+  faldoni: ['#3fb8d0', '#c552a8', '#7f88c4', '#e4e6f6', '#ffd36b', '#4a5fb0'],
 };
 
-// ---- il pavimento (skins.css: moquette a quadrotte nel salone, cemento lucido di sopra)
-const F = { floor: '#1b1e33', floor2: '#20243d', sand: '#262a42', sandHi: '#2d3251', sandJo: '#1a1d31', gravel: '#2b3050', gravelHi: '#454b74' };
+// ---- il pavimento (skins.css: cemento lucido di sopra, moquette a quadrotte nel salone)
+const F = {
+  fuga: '#272c58', lastre: ['#3d4378', '#394072', '#41487e', '#3b4175'], luce: 'rgba(170,190,255,0.16)',
+  giunto: '#1d2148', quadrotte: ['#2b305f', '#2f3566', '#282d5a', '#31376a'], pelo: 'rgba(150,165,255,0.08)',
+  ghiaia: '#4a5189', ghiaiaHi: '#6a72ad',
+};
 
 function pavimento(g, R) {
   const r = (x, y, w, h, c) => {
     g.fillStyle = c;
     g.fillRect(x, y, w, h);
   };
-  r(0, 0, R.W, R.H, F.sandJo);
-  // Le due stanze e il corridoio: lastre di cemento scuro, con le loro fughe.
-  for (let y = 16; y < R.MEZZO; y += 32) {
-    for (let x = 16; x < R.W - 16; x += 32) {
-      r(x + 0.4, y + 0.4, 31.2, Math.min(32, R.MEZZO - y) - 0.8, rnd('lastra', x, y) < 0.22 ? F.sandHi : F.sand);
+  /** Piastrelle quadrate dagli angoli tondi, contate dalla linea di mezzo: allargando la stanza se ne aggiungono ai lati e nessuna cambia tinta. */
+  const piastrelle = (y0, y1, lato, tinte, raggio, sopra) => {
+    for (let y = y0, j = 0; y < y1; y += lato, j++) {
+      for (let x = R.W / 2 - Math.ceil(R.W / 2 / lato) * lato; x < R.W; x += lato) {
+        const i = Math.round((x - R.W / 2) / lato);
+        g.fillStyle = tinte[(i & 1) + 2 * (j & 1)];
+        g.beginPath();
+        g.roundRect(x + 0.4, y + 0.4, lato - 0.8, Math.min(lato, y1 - y) - 0.8, raggio);
+        g.fill();
+        sopra(x, y, i, j);
+      }
     }
-  }
-  // Il salone: quadrotte di moquette, una su due un filo piu' chiara.
-  for (let y = R.MEZZO, j = 0; y < R.H - 8; y += 16, j++) {
-    for (let x = 16, i = 0; x < R.W - 8; x += 16, i++) r(x, y, 16, 16, (i + j) & 1 ? F.floor : F.floor2);
-  }
+  };
+  // Le due stanze e il corridoio: lastre di cemento lucido, con un filo di luce in testa.
+  r(0, 0, R.W, R.MEZZO, F.fuga);
+  piastrelle(16, R.MEZZO, 24, F.lastre, 1, (x, y) => r(x + 1.2, y + 1.2, 21.6, 0.55, F.luce));
+  // Il salone: quadrotte di moquette da un metro, e su ognuna qualche trattino di pelo.
+  r(0, R.MEZZO, R.W, R.H - R.MEZZO, F.giunto);
+  piastrelle(R.MEZZO, R.H, 32, F.quadrotte, 1.8, (x, y, i, j) => {
+    for (let k = 0; k < 4; k++) r(x + 3 + rnd('px', i, j, k) * 20, y + 4 + rnd('py', i, j, k) * 24, 3 + rnd('pw', i, k) * 4, 0.4, F.pelo);
+  });
   r(R.VANO[0], 8, R.VANO[1], 8, C.vuoto);
   for (const q of R.ghiaia) {
-    g.fillStyle = F.gravel;
+    g.fillStyle = F.ghiaia;
     g.beginPath();
     g.arc(q.x, q.y, q.r, 0, TAU);
     g.fill();
     for (let i = 0; i < 60; i++) {
       const a = rnd('ga', i) * TAU;
       const d = Math.sqrt(rnd('gr', i)) * (q.r - 1);
-      r(q.x + Math.cos(a) * d - 0.4, q.y + Math.sin(a) * d - 0.4, 0.8, 0.8, F.gravelHi);
+      r(q.x + Math.cos(a) * d - 0.4, q.y + Math.sin(a) * d - 0.4, 0.8, 0.8, F.ghiaiaHi);
     }
   }
 }
 
-/* ---- la citta' dalle vetrate ----
+/* ---- la citta' dalla vetrata ----
  *
- * Il muro di fondo e' alto apposta: visto da qui il pavimento si schiaccia in una
- * striscia, e la meta' alta della scheda e' della citta'. Due file di palazzi — una
- * lontana e spenta, una vicina con le finestre accese — sotto un cielo con le sue
- * stelle e la luna. Tutto dal seme: allargando la scheda la citta' si allunga, non
- * si rimescola.
+ * Come il paese della stanza di legno (skins/classico.js), si dipinge in METRI dal
+ * pavimento e con la x contata dalla linea di mezzo: i tetti non passano mai i
+ * quattro metri, tutto quello che la vetrata guadagna in altezza e' cielo, e
+ * allargando la scheda la citta' si scopre ai lati senza rimescolarsi.
  *
- * Le finestre accese portano il loro alone gia' dipinto (una passata sfocata
- * sommata sopra): e' il bagliore della citta', e non costa niente a ogni fotogramma.
+ * Tre file di palazzi, piu' scure venendo avanti, ognuna coi suoi tetti — a punta,
+ * a gradoni, tondi, con la cisterna o l'antenna. Le finestre sono poche e grandi:
+ * una citta' che dorme, non un'insegna. E sta ferma: una finestra che si accende e'
+ * tutta la trama da rimandare alla scheda grafica, per una cosa che a questa misura
+ * non si nota. I montanti e le nuvole li mette il motore.
  */
-const CIELO = ['#0b1038', '#141b52', '#222d78'];
-const PALAZZI = ['#141a3a', '#192043', '#10152f', '#171d3f', '#121834', '#1a2146', '#111630'];
-const LUME = ['#ffd36b', '#ffd36b', '#ffd36b', '#ffb85c', '#b8fbff'];
+const CIELO = ['#0d1140', '#1b2163', '#3d4199'];
+const PALAZZI = ['#30367f', '#252a6a', '#191d52'];
+const LUME = ['#ffd77a', '#ffd77a', '#ffc46b', '#ffd77a', '#fff1c4', '#ffc46b', '#8fe6ff'];
+/** Da dove si cominciano a contare i palazzi: piu' a sinistra di qualunque stanza. */
+const LONTANO = -40;
 
-function vetrata(g, w, h, lato) {
-  const cielo = g.createLinearGradient(0, 0, 0, h);
+function vetrata(g, w, h, lato, info = {}) {
+  if (lato !== 'n') return false;
+  const z0 = (info.z0 || 0) / U;
+  const X = w / U / 2;
+  const alto = z0 + h / U;
+  // Dove la scheda taglia la vetrata: la luna sta un metro sotto, cosi' si vede
+  // sempre — meno, in una scheda larga, dove un metro sotto ci sono gia' i tetti.
+  const cima = info.cima ? info.cima / U : alto - 0.5;
+  const luna = [0.42 * Math.min(X, 6.2), cima - Math.min(1, Math.max(0.4, (cima - 3.13) * 0.6))];
+  g.save();
+  g.translate(w / 2, h);
+  g.scale(U, -U);
+  g.translate(0, -z0);
+
+  // Il cielo: fondo in alto, e sopra i tetti il chiarore della citta'.
+  const cielo = g.createLinearGradient(0, 6.5, 0, 2.2);
   cielo.addColorStop(0, CIELO[0]);
   cielo.addColorStop(0.55, CIELO[1]);
   cielo.addColorStop(1, CIELO[2]);
   g.fillStyle = cielo;
-  g.fillRect(0, 0, w, h);
-  for (let i = 0; i < w * 0.35; i++) {
-    g.fillStyle = rnd(lato, 'sc', i) < 0.2 ? '#ffffff' : '#cfe8ff';
-    g.globalAlpha = 0.35 + rnd(lato, 'sa', i) * 0.65;
-    const s = rnd(lato, 'ss', i) < 0.15 ? 0.8 : 0.45;
-    g.fillRect(rnd(lato, 'sx', i) * w, rnd(lato, 'sy', i) * h * 0.62, s, s);
-  }
-  g.globalAlpha = 1;
-  if (lato === 'n') {
-    // La luna, a un terzo del muro: un disco e la sua ombra, che e' piu' luna di un cerchio.
-    const mx = w * 0.72;
-    const my = h * 0.2;
-    const alone = g.createRadialGradient(mx, my, 2, mx, my, 26);
-    alone.addColorStop(0, 'rgba(190,215,255,0.35)');
-    alone.addColorStop(1, 'rgba(190,215,255,0)');
-    g.fillStyle = alone;
-    g.fillRect(mx - 26, my - 26, 52, 52);
-    g.fillStyle = '#e9f1ff';
+  g.fillRect(-X, z0, 2 * X, alto - z0);
+  const disco = (x, y, r, c) => {
+    g.fillStyle = c;
     g.beginPath();
-    g.arc(mx, my, 6.5, 0, TAU);
+    g.arc(x, y, r, 0, TAU);
     g.fill();
-    g.fillStyle = CIELO[0];
-    g.beginPath();
-    g.arc(mx + 3.2, my - 1.6, 5.6, 0, TAU);
-    g.fill();
-  }
-  // La fila lontana: sagome basse, appena piu' chiare del cielo.
-  for (let x = -4, i = 0; x < w; i++) {
-    const bw = 9 + rnd(lato, 'lw', i) * 12;
-    const bh = h * (0.2 + rnd(lato, 'lh', i) * 0.22);
-    g.fillStyle = '#1b2460';
-    g.fillRect(x, h - bh, bw, bh);
-    x += bw;
-  }
-  // La fila vicina, con le finestre: ognuna e' un rettangolo che si puo' accendere.
-  const finestre = [];
-  for (let x = -3, i = 0; x < w; i++) {
-    const bw = 12 + rnd(lato, 'w', i) * 15;
-    const alto = rnd(lato, 'torre', i) < 0.16;
-    const bh = h * (alto ? 0.62 + rnd(lato, 'h', i) * 0.2 : 0.26 + rnd(lato, 'h', i) * 0.3);
-    const col = PALAZZI[i % PALAZZI.length];
-    g.fillStyle = col;
-    g.fillRect(x, h - bh, bw, bh);
-    // Lo spigolo che prende la luce della luna, e l'antenna sulle torri.
-    g.fillStyle = 'rgba(140,160,255,0.16)';
-    g.fillRect(x, h - bh, 0.6, bh);
-    if (alto) {
-      g.fillStyle = col;
-      g.fillRect(x + bw / 2 - 0.3, h - bh - 7, 0.6, 7);
-      finestre.push({ x: x + bw / 2 - 0.6, y: h - bh - 8, w: 1.2, h: 1.2, c: '#ff5a6a', col: CIELO[1], spia: true, on: true });
-    }
-    for (let fy = h - bh + 2.5; fy < h - 2.5; fy += 3.4) {
-      for (let fx = x + 1.6; fx < x + bw - 2; fx += 2.9) {
-        const k = rnd(lato, 'f', i, fx | 0, fy | 0);
-        if (k > 0.42) continue;
-        finestre.push({ x: fx, y: fy, w: 1.5, h: 1.9, c: LUME[((k * 97) | 0) % LUME.length], col, on: k < 0.3 });
+  };
+  // Le stelle: al piu' una per casella di mezzo metro, e una su dieci a quattro punte.
+  for (let i = Math.floor(-X / 0.55); i <= X / 0.55; i++) {
+    for (let j = 5; j * 0.55 < alto; j++) {
+      const k = rnd('stella', i, j);
+      if (k > 0.5) continue;
+      const x = (i + rnd('sx', i, j)) * 0.55;
+      const y = (j + rnd('sy', i, j)) * 0.55;
+      g.globalAlpha = Math.min(1, (y - 2.6) / 1.4) * (0.45 + k);
+      if (k > 0.05) disco(x, y, 0.011 + 0.03 * k, k < 0.2 ? '#ffffff' : '#c9d6ff');
+      else {
+        g.fillStyle = '#ffffff';
+        g.beginPath();
+        for (let p = 0; p < 8; p++) g.lineTo(x + Math.cos((p * TAU) / 8) * (p % 2 ? 0.014 : 0.07), y + Math.sin((p * TAU) / 8) * (p % 2 ? 0.014 : 0.07));
+        g.fill();
       }
     }
-    x += bw + (rnd(lato, 'vuoto', i) < 0.2 ? 3 : 0);
   }
-  const accendi = (f) => {
-    g.fillStyle = f.on ? f.c : f.col;
-    g.fillRect(f.x, f.y, f.w, f.h);
-  };
-  finestre.forEach(accendi);
-  // Il bagliore: le sole finestre accese, sfocate e sommate sopra.
+  g.globalAlpha = 1;
+  // La luna: due cerchi di chiarore a tinta piatta, e la falce — due archi, non un disco con un'ombra sopra.
+  disco(luna[0], luna[1], 0.8, 'rgba(170,190,255,0.08)');
+  disco(luna[0], luna[1], 0.52, 'rgba(170,190,255,0.1)');
+  const fi = Math.acos(0.17 / 0.6);
   g.save();
-  g.globalCompositeOperation = 'lighter';
-  g.filter = 'blur(1.6px)';
-  g.globalAlpha = 0.75;
-  for (const f of finestre) {
-    if (!f.on) continue;
-    g.fillStyle = f.c;
-    g.fillRect(f.x - 0.5, f.y - 0.5, f.w + 1, f.h + 1);
+  g.translate(luna[0], luna[1]);
+  g.rotate(0.6);
+  g.fillStyle = '#fff4cf';
+  g.beginPath();
+  g.arc(0, 0, 0.3, fi, TAU - fi);
+  g.arc(0.17, 0, 0.3, Math.PI + fi, Math.PI - fi, true);
+  g.fill();
+  g.restore();
+
+  /** Una fila di palazzi spalla a spalla, contati da LONTANO: `fn(x, largo, i)` per quelli che cadono nel muro. */
+  const fila = (seme, stretto, gioco, fn) => {
+    for (let x = LONTANO, i = 0; x < X; i++) {
+      const largo = stretto + rnd(seme, i) * gioco;
+      if (x + largo > -X) fn(x, largo, i);
+      x += largo;
+    }
+  };
+  /**
+   * Un palazzo: il corpo, il suo tetto, lo spigolo che prende la luna e le finestre.
+   * `f` = [larga, alta, passo in x, passo in y] di una finestra, `accese` quante su una.
+   */
+  const palazzo = (seme, x, largo, tetto, c, i, f, accese) => {
+    const m = x + largo / 2;
+    const r = (a, b, lw, lh) => g.fillRect(a, b, lw, lh);
+    g.fillStyle = c;
+    r(x, 0, largo + 0.01, tetto);
+    const t = rnd(seme, 'tetto', i);
+    if (t < 0.16) {
+      g.beginPath();
+      g.moveTo(x, tetto);
+      g.lineTo(m, tetto + largo * 0.36);
+      g.lineTo(x + largo, tetto);
+      g.fill();
+    } else if (t < 0.34) {
+      r(x + largo * 0.16, tetto, largo * 0.68, 0.13);
+      r(x + largo * 0.33, tetto + 0.13, largo * 0.34, 0.11);
+    } else if (t < 0.46) {
+      g.beginPath();
+      g.arc(m, tetto, largo * 0.42, 0, Math.PI);
+      g.fill();
+    } else if (t < 0.6) {
+      // La cisterna dell'acqua, sulle sue due gambe e col suo cappello.
+      const cx = x + largo * 0.3;
+      r(cx - 0.07, tetto, 0.02, 0.09);
+      r(cx + 0.05, tetto, 0.02, 0.09);
+      r(cx - 0.09, tetto + 0.08, 0.18, 0.14);
+      g.beginPath();
+      g.moveTo(cx - 0.11, tetto + 0.22);
+      g.lineTo(cx, tetto + 0.3);
+      g.lineTo(cx + 0.11, tetto + 0.22);
+      g.fill();
+    } else if (t < 0.72) {
+      r(m - 0.012, tetto, 0.024, 0.34);
+      r(m - 0.06, tetto + 0.2, 0.12, 0.016);
+      disco(m, tetto + 0.35, 0.022, '#ff6a7a');
+    } else r(x - 0.02, tetto, largo + 0.04, 0.035);
+    g.fillStyle = 'rgba(150,170,255,0.13)';
+    r(x + largo - 0.035, 0, 0.035, tetto);
+    const n = Math.floor((largo - 0.1) / f[2]);
+    const sveglio = accese * (0.25 + 1.5 * rnd(seme, 'sveglio', i));
+    for (let y = tetto - 0.09 - f[1], j = 0; y > 0.6; y -= f[3], j++) {
+      for (let k = 0; k < n; k++) {
+        const q = rnd(seme, 'f', i, j, k);
+        g.fillStyle = q < sveglio ? LUME[Math.floor(q * 977) % LUME.length] : 'rgba(150,165,255,0.07)';
+        r(m - ((n - 1) * f[2]) / 2 - f[0] / 2 + k * f[2], y, f[0], f[1]);
+      }
+    }
+  };
+  fila('lontani', 0.42, 0.5, (x, largo, i) => palazzo('lontani', x, largo, 2.55 + rnd('la', i) * 0.75, PALAZZI[0], i, [0.035, 0.05, 0.11, 0.17], 0.07));
+  fila('mezzo', 0.55, 0.6, (x, largo, i) => palazzo('mezzo', x, largo, 2.05 + rnd('ma', i) * 0.7 + (i % 5 === 2 ? 0.45 : 0), PALAZZI[1], i, [0.055, 0.075, 0.14, 0.2], 0.16));
+  fila('vicini', 0.7, 0.75, (x, largo, i) => palazzo('vicini', x, largo, 1.5 + rnd('va', i) * 0.75, PALAZZI[2], i, [0.08, 0.11, 0.19, 0.25], 0.24));
+  // Il vetro: due strisce di luce di sbieco su un vetro si' e uno no, in alto, dove c'e' solo cielo.
+  g.fillStyle = 'rgba(190,205,255,0.09)';
+  (info.vetri || []).forEach((v, i) => {
+    if (i % 2) return;
+    const cx = v / U - X;
+    const y = Math.min(i % 4 ? 4.6 : 4.1, cima - 0.2);
+    for (const [dx, lw] of [[0, 0.2], [0.3, 0.07]]) {
+      g.beginPath();
+      g.moveTo(cx - 0.25 + dx, y);
+      g.lineTo(cx - 0.25 + dx + lw, y);
+      g.lineTo(cx - 0.62 + dx + lw, y - 0.62);
+      g.lineTo(cx - 0.62 + dx, y - 0.62);
+      g.fill();
+    }
+  });
+  g.restore();
+
+  // La grana della carta, come nella stanza di legno: in pixel di tela, non di stanza.
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const { width: pw, height: ph } = g.canvas;
+  for (let i = 0, n = (pw * ph) / 1600; i < n; i++) {
+    g.fillStyle = i % 2 ? 'rgba(160,175,255,0.06)' : 'rgba(4,6,30,0.1)';
+    g.fillRect(rnd('gx', i) * pw, rnd('gy', i) * ph, 2 + rnd('gw', i) * 3, 2);
   }
   g.restore();
-  // Ogni secondo qualcuna si spegne e qualcuna si accende, e le spie delle antenne
-  // lampeggiano: una citta' ferma e' un fondale.
-  return (giro) => {
-    for (let i = 0; i < finestre.length; i++) {
-      const f = finestre[i];
-      if (f.spia) f.on = giro % 2 === 0;
-      else if (rnd(lato, 'giro', giro, i) < 0.012) f.on = !f.on;
-      else continue;
-      accendi(f);
-    }
-    return true;
-  };
 }
 
-/** Attorno alla stanza: il buio, con un filo d'aria blu perche' non galleggi nel nero. */
+/* Una striscia di cielo con la sua nuvola: quella della stanza di legno, ma bassa,
+   lunga e color della notte — il corpo chiaro e' quello che prende la luna. Una
+   sola per striscia, che di notte il cielo e' delle stelle, e nella meta' alta:
+   cosi' la corsia piu' bassa passa sopra i tetti e non davanti. Il motore la ripete
+   di fianco e la fa scorrere. */
+const NUVOLA = ['#4a52a6', '#2c3380'];
+function nuvole(g, w, h, i) {
+  g.save();
+  g.scale(w / 512, h / 128);
+  const una = (cx, cy, s) => {
+    for (const [c, dy] of [[NUVOLA[1], 5 * s], [NUVOLA[0], 0]]) {
+      g.save();
+      g.beginPath();
+      g.rect(0, 0, 512, cy + dy + 5 * s);
+      g.clip();
+      g.fillStyle = c;
+      g.beginPath();
+      g.roundRect(cx - 58 * s, cy + dy - 6 * s, 114 * s, 11 * s, 5 * s);
+      for (const [x, y, r] of [[-38, 0, 10], [-14, -6, 14], [14, -3, 12], [38, 1, 9]]) {
+        g.moveTo(cx + x * s + r * s, cy + y * s + dy);
+        g.arc(cx + x * s, cy + y * s + dy, r * s, 0, TAU);
+      }
+      g.fill();
+      g.restore();
+    }
+  };
+  g.globalAlpha = 0.9;
+  una(130 + rnd('nu', i, 0) * 250, 28 + rnd('nu', i, 1) * 16, 0.8 + rnd('nu', i, 2) * 0.4);
+  g.restore();
+}
+
+/** Dietro la stanza: non si vede mai, se non nel fotogramma in cui la scheda cambia misura. Il colore dei muri, cosi' non lampeggia. */
 function sfondo(g, w, h) {
-  g.fillStyle = '#06070e';
-  g.fillRect(0, 0, w, h);
-  const gr = g.createRadialGradient(w / 2, h * 0.56, 0, w / 2, h * 0.56, Math.max(w, h) * 0.62);
-  gr.addColorStop(0, 'rgba(40,48,104,0.38)');
-  gr.addColorStop(1, 'rgba(40,48,104,0)');
-  g.fillStyle = gr;
+  g.fillStyle = C.wallLo;
   g.fillRect(0, 0, w, h);
 }
 
 /* Quello che ha solo la notte: la pozza di luce sotto ogni scrivania (la `.of-luce`
-   della stanza piatta), e il filo che respira. */
+   della stanza piatta). A tinte piatte anche lei — due ovali uno nell'altro, non
+   una sfumatura — e tutte in una trama sola stesa sotto il blocco dei banchi: una
+   chiamata al disegno, quante che siano le scrivanie. */
 function extra(K) {
-  const { g, tex } = K.tela(128, 128);
-  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  gr.addColorStop(0, 'rgba(94,241,255,1)');
-  gr.addColorStop(0.6, 'rgba(94,241,255,0.4)');
-  gr.addColorStop(1, 'rgba(94,241,255,0)');
-  g.fillStyle = gr;
-  g.fillRect(0, 0, 128, 128);
+  const D = K.R.DESKS;
+  if (!D.length) return;
+  const x0 = Math.min(...D.map((b) => b.x)) - 30;
+  const y0 = Math.min(...D.map((b) => b.b)) - 50;
+  const w = Math.max(...D.map((b) => b.x)) + 78 - x0;
+  const d = Math.max(...D.map((b) => b.b)) + 20 - y0;
+  const PPU = Math.min(2, 2048 / w);
+  const { g, tex } = K.tela(w * PPU, d * PPU);
+  g.scale(PPU, PPU);
+  g.fillStyle = 'rgba(94,241,255,0.05)';
+  for (const b of D) {
+    for (const [rx, ry] of [[36, 20], [24, 13]]) {
+      g.beginPath();
+      g.ellipse(b.x + 24 - x0, b.b - 14 - y0, rx, ry, 0, 0, TAU);
+      g.fill();
+    }
+  }
   tex.needsUpdate = true;
-  for (const d of K.R.DESKS) K.decalco(tex, d.x - 20, d.b - 24, 88, 52, 0.08, { somma: true, forza: 0.1 });
-  // Due respiri ogni otto secondi: e' la sola cosa della stanza che si muove da sola
-  // anche quando non c'e' nessuno, insieme all'acqua.
-  K.anima((t) => K.mat.neon.color.setScalar(0.62 + 0.38 * (0.5 + 0.5 * Math.sin((TAU * t) / 4))));
+  K.decalco(tex, x0, y0, w, d, 0.08, { somma: true });
 }
 
 export default {
@@ -301,19 +415,30 @@ export default {
   schermi: {
     on: ['#3fd8f2', '#b8fbff', '#1d86b0'],
     working: ['#ff6ad5', '#ffd0f2', '#b03a92'],
-    luce: 46,
+    luce: 36,
   },
   filo: '#5ef1ff',
-  aloni: 1,
-  portaAccesa: true,
-  montanti: 32,
+  // Niente aloni: a tinte piatte un bagliore sfumato e' l'unica cosa non piatta
+  // della stanza, e quelli grandi sono gia' stati bocciati. Che uno schermo e'
+  // acceso lo dice la luce che fa sul suo piano (`schermi.luce`).
+  aloni: 0,
+  // Lo stipite non e' una luce ma un legno come gli altri, dipinto del verde della
+  // porta della stanza piatta: cosi' ha gli angoli tondi e il contorno, come tutto.
+  portaAccesa: false,
+  montanti: 45,
+  // Due luci, a tinte piatte, come nella stanza di legno. L'ambiente e' il colore
+  // di ogni ombra, ed e' lui a fare la notte: un blu che pero' lascia leggere una
+  // faccia. La chiave viene dalla parte della luna e ci aggiunge quello che manca
+  // per arrivare a un bianco appena freddo: la gente porta i suoi colori, e non
+  // deve uscirne ne' nera ne' bruciata.
   luci: {
-    ambiente: ['#aab4ff', 0.5],
-    chiave: ['#dfe6ff', 0.72, [-250, 70, 330]],
-    riempi: ['#c8d0ff', 0.3],
+    ambiente: ['#8a90d8', 1],
+    chiave: ['#d3d2a6', 1, [0.6, 0.3, 0.75]],
+    riempi: ['#ffffff', 0],
   },
   sfondo,
   pavimento,
   vetrata,
+  nuvole,
   extra,
 };
