@@ -42,23 +42,24 @@ const NERO = '#241b14';
 const CUFFIE = '#3c4633';
 const CREMA = '#f2ede2';
 
-const rgb = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
-/** Quanto distano due tinte, da 0 a 441. */
-const distano = (a, b) => Math.hypot(...rgb(a).map((v, i) => v - rgb(b)[i]));
+const BIANCO = new THREE.Color('#ffffff');
+/** Una tinta color carne: calda (rosso, poi verde, poi blu) e chiara. Pesca, albicocca, avorio, sabbia. */
+const carne = (c) => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  return r > g && g > b && r - b > 25 && g > 150;
+};
+const schiarita = (c, k) => '#' + new THREE.Color(c).lerp(BIANCO, k).getHexString();
 
 /** I tratti di npc.js, coi nomi che servono qui. */
 function aspetto(seme) {
   const t = window.NPC.traits(seme);
   let [topHi, top, topLo] = t.tessuto.toni;
-  /* Una camicia color pesca, avorio o sabbia addosso a una pelle chiara e' — a tinte
-     piatte, a questa distanza — un torso nudo: nello sprite piatto le separava il
-     contorno, qui si fondono. Quando le due tinte si confondono la camicia scende di
-     un tono: la sua ombra fa da corpo, e il corpo da luce. Resta la stessa camicia.
-     (Il bianco no: e' piu' chiaro di qualunque pelle, e si legge.) */
-  if (Math.min(...rgb(top)) < 230 && distano(top, t.pelle.toni[1]) < 52) {
-    [topHi, top] = [top, topLo];
-    topLo = '#' + new THREE.Color(top).multiplyScalar(0.62).getHexString();
-  }
+  /* Una camicia color pesca, albicocca, avorio o sabbia e' — a tinte piatte, vista di
+     schiena e da lontano — un torso nudo, di qualunque pelle sia chi la porta: nello
+     sprite piatto la separava il disegno, qui e' un volume del colore della carne. Si
+     schiarisce verso il bianco finche' si legge come una camicia chiara: resta la sua
+     tinta, slavata. (Il bianco e il salvia non sono color carne, e restano com'erano.) */
+  if (carne(top)) [topHi, top, topLo] = [schiarita(topHi, 0.75), schiarita(top, 0.62), schiarita(topLo, 0.3)];
   return {
     skin: t.pelle.toni[1],
     skinHi: t.pelle.toni[0],
