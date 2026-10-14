@@ -1562,6 +1562,90 @@ t(await page.evaluate(() => document.querySelector('.of-sheet .of-finiti').open)
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 
+// ---- e chi legge la bacheca non torna da capo ----
+//
+// Il foglio si ridipinge a ogni giro dei consumi e a ogni quadro delle task, e chi lo
+// sta leggendo non se ne deve accorgere. Tornava in cima quando Claude andava avanti
+// di un passo — la lista correva dietro alla riga accesa, come nella colonna stretta
+// del contesto — e «chi lavora per chi» si rifaceva da zero a ogni giro: sotto il
+// mouse spariva il fumetto del compito e la selezione si perdeva. E la riga che si
+// legge resta dov'era anche quando sopra una sezione se ne va (una conversazione che
+// finisce il piano) o torna, anche a foglio non scorso, dove Chromium da solo non la
+// tiene ferma.
+//
+// Il quadro si rimanda sempre con gli stessi aiutanti: `squadra()` rifa' i tempi a
+// ogni chiamata, e una squadra con i tempi nuovi e' una squadra cambiata.
+const agentiA = squadra([A('v2', 'Nuovo arrivato', 'in_progress', { since: Date.now() })]).agents;
+const pianoDi = (n, fatti) =>
+  Array.from({ length: n }, (_, i) => T('l' + i, 'Passo ' + (i + 1), i < fatti ? 'completed' : i === fatti ? 'in_progress' : 'pending'));
+const quadroLungo = (fatti, conPiano = true) => ({
+  'posta-a': { items: conPiano ? pianoDi(12, fatti) : [], agents: agentiA, done: fatti, total: 12, active: conPiano ? fatti : -1, busy: false },
+  'lungo-b': { items: pianoDi(40, 3), done: 3, total: 40, active: 3, busy: false },
+});
+const consumiLunghi = data([
+  card({ id: 'posta-a', name: 'Chi da il lavoro', busy: false, done: true }),
+  card({ id: 'lungo-b', name: 'Un piano lungo' }),
+]);
+await ctx(consumiLunghi);
+await tasks(quadroLungo(4));
+await page.waitForTimeout(400);
+// Puo' essere ancora aperta dalla prova di sopra: il suo Esc arriva quando la scheda
+// che aveva il fuoco e' gia' stata rifatta (e' arrivato un aiutante), e non chiude.
+if (await page.evaluate(() => document.querySelector('.of-sheet').hidden)) await page.locator('.of-kanban').click();
+await page.waitForTimeout(300);
+// Scorso a meta': in cima al foglio, il quarto passo del piano lungo.
+const primaDi = await page.evaluate(() => {
+  const b = document.querySelector('.of-sheet-body');
+  const lungo = [...b.querySelectorAll('.of-sheet-who')].find((s) => s.firstChild.textContent === 'Un piano lungo');
+  window.__letta = lungo.querySelectorAll('.tk-row')[3];
+  b.scrollTop += window.__letta.getBoundingClientRect().top - b.getBoundingClientRect().top - 20;
+  window.__albero = [...b.querySelectorAll('.of-tree *')];
+  return { scorso: b.scrollTop, nodi: window.__albero.length };
+});
+t(primaDi.scorso > 100 && primaDi.nodi > 20, 'il foglio della prova non scorre, o non ha l’albero: ' + JSON.stringify(primaDi));
+// Claude va avanti di un passo, poi i consumi e lo stesso quadro, come arrivano davvero.
+await tasks(quadroLungo(5));
+await page.waitForTimeout(200);
+await ctx(consumiLunghi);
+await page.waitForTimeout(200);
+await tasks(quadroLungo(5));
+await page.waitForTimeout(300);
+const dopoDi = await page.evaluate(() => {
+  const b = document.querySelector('.of-sheet-body');
+  const ora = [...b.querySelectorAll('.of-tree *')];
+  return { scorso: b.scrollTop, stessi: ora.length === window.__albero.length && ora.every((n, i) => n === window.__albero[i]) };
+});
+t(Math.abs(dopoDi.scorso - primaDi.scorso) <= 1, 'la bacheca scorsa torna su quando Claude va avanti di un passo: ' + primaDi.scorso + ' → ' + dopoDi.scorso);
+t(dopoDi.stessi, '«chi lavora per chi» si rifa’ da zero a ogni giro anche se non e’ cambiato niente');
+/** Dove sta la riga che si legge, sotto la cima del foglio. */
+const letta = () =>
+  page.evaluate(() => window.__letta.getBoundingClientRect().top - document.querySelector('.of-sheet-body').getBoundingClientRect().top);
+for (const [conPiano, cosa] of [[false, 'se ne va'], [true, 'torna']]) {
+  const y0 = await letta();
+  await tasks(quadroLungo(5, conPiano));
+  await page.waitForTimeout(300);
+  const y1 = await letta();
+  t(Math.abs(y1 - y0) <= 1, `quando sopra una sezione ${cosa}, la riga che si legge si sposta: ${y0} → ${y1}`);
+}
+// A foglio non scorso: in cima c'e' il piano lungo, e sopra gli torna l'altro.
+await tasks(quadroLungo(5, false));
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const b = document.querySelector('.of-sheet-body');
+  b.scrollTop = 0;
+  window.__letta = b.firstChild;
+});
+const inCima = await letta();
+await tasks(quadroLungo(5));
+await page.waitForTimeout(300);
+const spinta = await letta();
+t(Math.abs(spinta - inCima) <= 1, 'a foglio non scorso, la sezione che compare in cima spinge giu’ quella che si legge: ' + inCima + ' → ' + spinta);
+await page.locator('.of-sheet-x').click();
+await page.waitForTimeout(200);
+// Com'era prima, per chi viene dopo.
+await ctx(data([card({ id: 'posta-a', name: 'Chi da il lavoro', busy: false, done: true })]));
+await tasks({ 'posta-a': turnoA(agentiA) });
+
 // ---- e con le animazioni ridotte le buste non restano appese ----
 await page.emulateMedia({ reducedMotion: 'reduce' });
 await page.evaluate(() => (window.__buste = []));

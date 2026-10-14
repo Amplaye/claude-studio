@@ -1688,19 +1688,33 @@ window.OFFICE = (() => {
     }
   }
 
+  /**
+   * I figli di `dove`, nell'ordine di `figli`, toccando solo quelli fuori posto. Un
+   * nodo staccato e riattaccato, anche se e' lo stesso, perde il mouse, la selezione
+   * e l'ancora dello scorrimento come uno rifatto: il foglio si ridipinge ogni due
+   * secondi, e chi lo stava leggendo se ne accorgeva.
+   */
+  function metti(dove, figli) {
+    for (const n of [...dove.children]) if (!figli.includes(n)) n.remove();
+    figli.forEach((f, i) => dove.children[i] !== f && dove.insertBefore(f, dove.children[i] || null));
+  }
+
   function dipingiBacheca() {
     if (!sheet || sheet.hidden || foglioSu !== 'bacheca') return;
+    // La riga che si sta leggendo — la prima che comincia dentro il foglio — resta
+    // dov'era sullo schermo anche quando sopra compare o sparisce una sezione.
+    // Chromium lo fa da solo solo a volte: non a scorrimento zero, e nemmeno quando la
+    // sezione nuova e' la prima. Se la riga viene rifatta (una scheda dell'albero
+    // cambiata) vale la sua sezione, che resta.
+    const y = (n) => n.getBoundingClientRect().top - sheetBody.getBoundingClientRect().top;
+    const letta = [...sheetBody.querySelectorAll('*')].find((n) => y(n) >= 0);
+    const ancore = [letta, letta && letta.closest('.of-sheet-who')].filter(Boolean).map((n) => [n, y(n)]);
     sheetTitle.textContent = t('office.boardTitle');
     // Solo le conversazioni che in ufficio ci sono davvero, e solo quelle che un
     // piano ce l'hanno: un elenco rimasto nel quadro di una scheda chiusa e' una
     // lista di lavoro di nessuno.
     const vivi = [...people.keys()].filter((id) => ((board[id] || {}).items || []).length);
-    for (const [id, e] of elenchi) {
-      if (!vivi.includes(id)) {
-        e.sez.remove();
-        elenchi.delete(id);
-      }
-    }
+    for (const id of [...elenchi.keys()]) if (!vivi.includes(id)) elenchi.delete(id);
     let quante = 0;
     let fatte = 0;
     for (const id of vivi) {
@@ -1712,23 +1726,29 @@ window.OFFICE = (() => {
         sez.append(nome, dove);
         // Come nella colonna del contesto: la lista e' `TaskPanel`, e se il foglio
         // non e' stato caricato resta il nome, che e' meglio di una pagina rotta.
-        // Senza aiutanti: quelli hanno la sezione loro qui sotto, ad albero.
-        e = { sez, nome, pannello: window.TaskPanel ? window.TaskPanel(dove, { agents: false }) : null };
+        // Senza aiutanti: quelli hanno la sezione loro qui sotto, ad albero. E senza
+        // correre dietro al passo in corso: qui scorre il foglio intero.
+        e = { sez, nome, pannello: window.TaskPanel ? window.TaskPanel(dove, { agents: false, follow: false }) : null };
         elenchi.set(id, e);
       }
-      // Riappendere una sezione che c'e' gia' la sposta invece di duplicarla: e'
-      // quello che tiene l'ordine del foglio uguale all'ordine delle scrivanie.
-      sheetBody.append(e.sez);
-      e.nome.textContent = people.get(id).pname.textContent;
+      const nome = people.get(id).pname.textContent;
+      if (e.nome.textContent !== nome) e.nome.textContent = nome;
       if (e.pannello) e.pannello.render(board[id]);
       quante += (board[id].items || []).length;
       fatte += board[id].done || 0;
     }
     const gente = dipingiAlbero();
+    // L'ordine del foglio e' quello delle scrivanie, e l'albero sta in fondo. Quello
+    // che non c'entra se ne va: una sezione andata, le domande lasciate dal foglio di
+    // prima.
+    metti(sheetBody, vivi.map((id) => elenchi.get(id).sez).concat(gente ? [albero] : []));
     sheetCount.textContent = quante ? t('tasks.count', { done: fatte, total: quante }) : '';
     sheetCount.hidden = !quante;
     sheetEmpty.textContent = t('office.boardEmpty');
     sheetEmpty.hidden = quante > 0 || gente > 0;
+    const [ancora, era] = ancore.find(([n]) => n.isConnected) || [];
+    const spostata = ancora ? y(ancora) - era : 0;
+    if (spostata) sheetBody.scrollTop += spostata;
   }
 
   /* ---- chi lavora per chi ----
@@ -1745,11 +1765,16 @@ window.OFFICE = (() => {
    * un gomito che lo dice. Chi ha finito sta raccolto in fondo, chiuso: e' storia, e
    * si apre se serve. La scheda ricorda se l'hai aperta.
    *
-   * Si rifa' a ogni giro invece di ridipingerla: sono poche righe, e quello che deve
-   * sopravvivere (aperto o chiuso) sta in `finitiAperti`. */
+   * Una scheda si rifa' intera invece di ridipingerla, ma solo quando cambia quello
+   * che c'e' scritto sopra: rifatta a ogni giro dei consumi, sotto il mouse spariva il
+   * fumetto del compito, la riga evidenziata lampeggiava e la selezione si perdeva. I
+   * tempi che passano scorrono sul posto, e quello che deve sopravvivere a una scheda
+   * rifatta (aperto o chiuso) sta in `finitiAperti`. */
   let albero;
   /** id conversazione -> la sezione «hanno finito» e' aperta. Chi non c'e' e' come la vuole la scheda. */
   const finitiAperti = new Map();
+  /** id conversazione -> la sua scheda, e la firma di quello che c'e' scritto sopra. */
+  const schedeFatte = new Map();
 
   /** Una faccina della stanza, per la scheda: stessa striscia, stesso seme. */
   function faccina(seme) {
@@ -1776,13 +1801,10 @@ window.OFFICE = (() => {
     const con = [...people.keys()]
       .filter((id) => aiutanti(id).length)
       .sort((p, q) => alLavoro(q).length - alLavoro(p).length);
-    if (!con.length) {
-      albero.remove();
-      return 0;
-    }
-    albero.children[0].textContent = t('office.tree');
-    albero.children[1].textContent = t('office.treeIntro');
-    const corpo = albero.children[2];
+    if (!con.length) return 0;
+    const [titolo, intro, corpo] = albero.children;
+    if (titolo.textContent !== t('office.tree')) titolo.textContent = t('office.tree');
+    if (intro.textContent !== t('office.treeIntro')) intro.textContent = t('office.treeIntro');
     // Quello che e' aperto adesso resta aperto: lo si legge dalle schede che stanno per
     // essere rifatte, e non dall'evento `toggle`, che arriva dopo — un aggiornamento
     // che cade fra il clic e l'evento richiudeva la sezione appena aperta.
@@ -1795,11 +1817,19 @@ window.OFFICE = (() => {
     for (const id of con) {
       const capo = people.get(id);
       const tutti = aiutanti(id);
+      n += tutti.length;
+      // La firma come quella delle domande: i dati e non i tempi, che da soli
+      // rifarebbero la scheda a ogni giro. La lingua c'e' perche' le parole sono nostre.
+      const firma = JSON.stringify([window.I18N.lang, capo.pname.textContent, tutti, coppieScritte(id)]);
+      const fatta = schedeFatte.get(id);
+      if (fatta && fatta.firma === firma) {
+        schede.push(fatta.sq);
+        continue;
+      }
       const vivi = tutti.filter((a) => a.status === 'in_progress');
       const finiti = tutti.filter((a) => a.status === 'completed' || a.status === 'failed');
       const ok = finiti.filter((a) => a.status === 'completed').length;
       const ko = finiti.length - ok;
-      n += tutti.length;
 
       const sq = el('article', 'of-squadra');
       sq.dataset.id = id;
@@ -1862,7 +1892,11 @@ window.OFFICE = (() => {
           const sotto = [a.type, a.doing].filter(Boolean).join(' · ');
           if (sotto) testo.append(el('span', 'of-nodo-sotto', sotto));
           r.append(faccina(capo.seme + '/' + a.id), testo);
-          if (a.since) r.append(el('span', 'of-nodo-tempo', durata(Date.now() - a.since)));
+          if (a.since) {
+            const tempo = el('span', 'of-nodo-tempo', durata(Date.now() - a.since));
+            tempo.dataset.da = a.since;
+            r.append(tempo);
+          }
           r.title = [a.title, a.brief ? t('office.brief', { text: a.brief }) : ''].filter(Boolean).join('\n');
           lista.append(r);
         });
@@ -1899,12 +1933,15 @@ window.OFFICE = (() => {
       for (const { a, b, n: quante } of coppieScritte(id)) {
         sq.append(el('p', 'of-tree-rimpallo', t('office.pingPongTree', { a: nome(a), b: nome(b), n: quante })));
       }
+      schedeFatte.set(id, { firma, sq });
       schede.push(sq);
     }
-    // Chi non c'e' piu' non tiene aperta niente.
+    // Chi non c'e' piu' non tiene aperta niente, e chi non ha piu' aiutanti non ha scheda.
     for (const id of [...finitiAperti.keys()]) if (!people.has(id)) finitiAperti.delete(id);
-    corpo.replaceChildren(...schede);
-    sheetBody.append(albero);
+    for (const id of [...schedeFatte.keys()]) if (!con.includes(id)) schedeFatte.delete(id);
+    metti(corpo, schede);
+    // E i tempi che passano, sul posto: cambia il testo, non il nodo.
+    for (const s of corpo.querySelectorAll('[data-da]')) s.firstChild.nodeValue = durata(Date.now() - s.dataset.da);
     return n;
   }
 

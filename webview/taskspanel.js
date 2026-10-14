@@ -18,6 +18,15 @@
     return n;
   }
 
+  /**
+   * Un testo si riscrive solo se e' cambiato. Riscritto uguale e' comunque un nodo
+   * nuovo, e il pannello si ridipinge a ogni giro dei consumi: chi lo stava
+   * selezionando perdeva la selezione ogni due secondi.
+   */
+  function scrivi(n, testo) {
+    if (n.textContent !== testo) n.textContent = testo;
+  }
+
   function icon(name, cls) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'ico' + (cls ? ' ' + cls : ''));
@@ -38,9 +47,14 @@
    * `opts.agents === false` lascia fuori gli aiutanti: il foglio della bacheca li
    * disegna in una sezione sua, ad albero, e due volte la stessa gente sarebbe una
    * lista da confrontare invece che da leggere.
+   *
+   * `opts.follow === false` non corre dietro al passo in corso: nel foglio la lista e'
+   * una delle tante di una pagina che scorre tutta insieme, e portare in vista la sua
+   * riga accesa riportava in cima chi stava leggendo piu' giu'.
    */
   window.TaskPanel = function mount(root, opts) {
     const conAiutanti = !(opts && opts.agents === false);
+    const segue = !(opts && opts.follow === false);
     root.classList.add('taskroot');
 
     const head = el('div', 'tk-head');
@@ -78,7 +92,7 @@
       const all = conAiutanti && d && Array.isArray(d.agents) ? d.agents : [];
       crew.hidden = !all.length;
       const vivi = all.filter((a) => a.status === 'in_progress').length;
-      crewHead.textContent = vivi ? t('tasks.crewBusy', { n: vivi }) : t('tasks.crew');
+      scrivi(crewHead, vivi ? t('tasks.crewBusy', { n: vivi }) : t('tasks.crew'));
       const seen = new Set();
       let prima = null;
       for (const a of all) {
@@ -106,8 +120,8 @@
           r.row.classList.add(status);
           r.ic.replaceChildren(icon(ICON[status] || 'time'));
         }
-        r.txt.textContent = a.title || a.type || '';
-        r.kind.textContent = a.type || '';
+        scrivi(r.txt, a.title || a.type || '');
+        scrivi(r.kind, a.type || '');
         r.kind.hidden = !a.type;
         r.row.title = [a.title, a.doing || a.summary || ''].filter(Boolean).join(' — ');
       }
@@ -123,6 +137,8 @@
     let rows = [];
     /** Which step was in progress last time, so the panel only scrolls when it moves. */
     let lastActive = -1;
+    /** La scia gia' disegnata, per non rifarla quando non e' cambiata. */
+    let scia = '';
 
     function render(d) {
       const items = (d && d.items) || [];
@@ -139,8 +155,12 @@
       // atteggia a tale: non ha totale, quindi non ha percentuale.
       const trail = (!total && d && d.trail) || [];
       const doing = (d && d.busy && d.doing) || '';
-      trailBox.replaceChildren();
-      if (trail.length) {
+      // Rifatta solo se e' cambiata: rifatta a ogni giro dei consumi, il pallino
+      // dell'ultimo passo ripartiva da capo e la selezione di un comando se ne andava.
+      const firma = JSON.stringify([trail, !!(d && d.busy)]);
+      if (firma !== scia) {
+        scia = firma;
+        trailBox.replaceChildren();
         trail.forEach((step, i) => {
           const last = i === trail.length - 1;
           const row = el('div', 'tk-step' + (last && d.busy ? ' live' : ''));
@@ -150,7 +170,7 @@
       }
       trailBox.hidden = !trail.length;
       // La riga sola resta per il momento in cui non c'e' ancora nemmeno un passo.
-      empty.textContent = doing || (d && d.busy ? t('tasks.thinking') : t('tasks.none'));
+      scrivi(empty, doing || (d && d.busy ? t('tasks.thinking') : t('tasks.none')));
       empty.classList.toggle('live', !!doing);
       // Con degli aiutanti a schermo "niente in lista" sarebbe falso: la lista dei
       // passi e' vuota, ma qualcuno sta lavorando — e lo dice la loro testata.
@@ -159,12 +179,11 @@
       head.hidden = barWrap.hidden = total === 0;
 
       if (total) {
-        count.textContent = t('tasks.count', { done, total });
+        scrivi(count, t('tasks.count', { done, total }));
         const remaining = Math.max(0, total - done);
-        left.textContent = remaining ? t('tasks.left', { n: remaining }) : '';
+        scrivi(left, remaining ? t('tasks.left', { n: remaining }) : '');
         left.hidden = remaining === 0;
-        state.textContent =
-          done >= total ? t('tasks.finished') : d.busy ? t('tasks.working') : t('tasks.paused');
+        scrivi(state, done >= total ? t('tasks.finished') : d.busy ? t('tasks.working') : t('tasks.paused'));
         state.className = 'tk-state' + (done >= total ? ' ok' : d.busy ? ' live' : '');
         fill.style.width = total ? Math.round((done / total) * 100) + '%' : '0%';
       }
@@ -233,7 +252,7 @@
       // off — and the whole point of this panel is seeing it without hunting for it.
       // Only on a change: scrolling on every repaint would fight the mouse wheel.
       const active = acceso;
-      if (active >= 0 && active !== lastActive && rows[active]) {
+      if (segue && active >= 0 && active !== lastActive && rows[active]) {
         // `nearest` moves the list only when the row is actually out of sight, and
         // never drags the surrounding page around with it.
         rows[active].row.scrollIntoView({ block: 'nearest' });
@@ -272,7 +291,7 @@
         rows[i].row.classList.toggle('running', on);
         if (!on) continue;
         rows[i].bar.style.width = Math.round(p * 100) + '%';
-        rows[i].pct.textContent = t('tasks.about', { n: String(Math.round(p * 100)) });
+        scrivi(rows[i].pct, t('tasks.about', { n: String(Math.round(p * 100)) }));
         rows[i].pct.title = t('tasks.aboutHint');
       }
       clearInterval(ticker);
