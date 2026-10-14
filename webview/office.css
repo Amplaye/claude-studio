@@ -1516,3 +1516,15 @@ body.inoffice.linguette .top #btnNew {
     --tre-filo: #3a2030;
   }
 }
+
+/* La nuvoletta, in 3D: il posto glielo da' lo specchio, una volta sola, e da li' non
+   si muove piu' (webview3d/mirror.js, `nuvolette`). Con le animazioni ridotte compare
+   e sparisce, e basta: motion.css accorcerebbe of-fiato a niente, e finita la
+   nuvoletta resta trasparente — non la si vedrebbe mai. E niente transizioni sulla
+   misura e sul posto che le scrive lo specchio. */
+@media (prefers-reduced-motion: reduce) {
+  .office.tre .of-say {
+    animation: none;
+    transition: none;
+  }
+}

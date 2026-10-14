@@ -285,10 +285,11 @@ export function specchio(M) {
   }
 
   /**
-   * Quello che il bottone si porta addosso — la nuvoletta, i puntini, l'alone — cresce
-   * con lui, e il bottone adesso e' alto quanto una figura quasi doppia di prima: lo
-   * si riporta alla misura che aveva, appeso al suo angolo. L'annaffiatoio piatto si
-   * nasconde: qui ce n'e' uno vero in mano.
+   * Quello che il bottone si porta addosso — i puntini, l'alone — cresce con lui, e il
+   * bottone adesso e' alto quanto una figura quasi doppia di prima: lo si riporta alla
+   * misura che aveva, appeso al suo angolo. (La nuvoletta no: lei non segue nemmeno
+   * il bottone, vedi `nuvolette`.) L'annaffiatoio piatto si nasconde: qui ce n'e' uno
+   * vero in mano.
    */
   const figli = new WeakMap();
   function ritocca(n, k, origine) {
@@ -367,10 +368,8 @@ export function specchio(M) {
       for (const c of el.children) {
         const k = c.className;
         if (typeof k !== 'string') continue;
-        if (k.includes('of-say')) {
-          I.parla = true;
-          ritocca(c, P.rimpicciolisce || 1, (k.includes(' sx') ? '100% ' : '0 ') + (k.includes('sotto') ? '0' : '100%'));
-        } else if (k.includes('of-tazza')) {
+        if (k.includes('of-say')) I.parla = true;
+        else if (k.includes('of-tazza')) {
           I.tazza = true;
           // Chi le ha appena lavate ne riporta piu' d'una (`data-n`).
           I.tazze = Number(c.dataset.n) || 1;
@@ -677,41 +676,134 @@ export function specchio(M) {
         cartoncino(el);
       }
     }
-    scansa();
+    nuvolette();
   }
 
   /**
-   * Una nuvoletta non copre un nome. Nella stanza piatta le targhette stanno sulle
-   * scrivanie e le nuvolette sopra le teste, e non si incontrano; qui la targhetta
-   * della fila dietro sta sopra lo schermo, cioe' accanto alla testa di chi ci siede,
-   * e quando lui parla le due finiscono una sull'altra. La nuvoletta che ci cade si
-   * alza (o si abbassa) di quanto basta. Si misura sullo schermo, a cose gia' messe
-   * al loro posto, e solo finche' qualcuno sta parlando.
+   * Le nuvolette. Nella stanza piatta la nuvoletta e' figlia del bottone di chi parla
+   * e gli sta sopra la testa; qui quel bottone lo specchio lo sposta e lo scala a ogni
+   * fotogramma — il respiro, i tasti, la sedia che gira — e una nuvoletta che gli va
+   * dietro trema. Allora il suo posto si decide una volta sola: sopra la testa, e se
+   * li' c'e' una targhetta (quella della fila dietro sta sopra lo schermo, cioe'
+   * accanto alla testa di chi ci siede) sopra la targhetta, o sotto se sopra non c'e'
+   * posto. Da li' non si muove piu': a ogni giro le si toglie di dosso quanto il
+   * bottone si e' mosso e ingrandito.
+   *
+   * Il posto e' sopra una testa ferma. Chi arriva parla appena arrivato di la', e la
+   * sua figura arriva un attimo dopo: la nuvoletta l'aspetta nascosta, ed entra quando
+   * lei si e' fermata, in tempo per uscire quando la toglie la stanza piatta. Chi se ne
+   * va non se la porta dietro: lei resta dov'e' e sfuma prima del tempo. La stanza
+   * rimontata (la scheda tirata, un'altra pelle) e' un posto nuovo: la si rimette, una
+   * volta.
    */
-  const scansate = new WeakMap();
-  function scansa() {
-    const voci = stage.querySelectorAll('.of-guy > .of-say');
-    if (!voci.length) return;
-    const targhe = [];
-    for (const n of stage.querySelectorAll('.of-plate')) if (!n.hidden) targhe.push(n.getBoundingClientRect());
-    const tetto = M.wrap.getBoundingClientRect().top;
-    for (const n of voci) {
+  const nate = new WeakMap();
+  function nuvolette() {
+    let tetto = null;
+    let targhe = null;
+    for (const n of stage.querySelectorAll('.of-guy > .of-say')) {
       const P = vivi.get(n.parentElement);
       if (!P || !P.px) continue;
-      const era = scansate.get(n) || 0;
-      const r = n.getBoundingClientRect();
-      const su = r.top - era;
-      const giu = r.bottom - era;
-      let dy = 0;
-      for (const b of targhe) {
-        if (r.right < b.left + 1 || r.left > b.right - 1 || giu + dy < b.top - 2 || su + dy > b.bottom + 2) continue;
-        // Dalla parte dove sta gia', se sopra c'e' posto; se no di sotto.
-        dy = su + giu <= b.top + b.bottom && b.top - 3 - (giu - su) > tetto + 2 ? b.top - 3 - giu : b.bottom + 3 - su;
+      const k = P.px / 24;
+      // Come entra e come se ne va (of-fiato, room.css). Con le animazioni ridotte non c'e' (office.css).
+      const a = n.getAnimations()[0];
+      const dura = a ? a.effect.getComputedTiming().duration : 0;
+      let N = nate.get(n);
+      if (!N) nate.set(n, (N = {}));
+      // (Quella di chi se n'e' andato non si rimette: sta sfumando dov'era.)
+      if (!N.via && (N.B !== M.B || N.misura !== M.largo + 'x' + M.alto)) {
+        // La prima volta aspetta che chi parla sia arrivato: la gemella piatta ferma, e
+        // la figura seduta, se va a sedersi, o ferma in piedi. Se e' passata mezza frase,
+        // era una frase detta passando: non entra piu'.
+        const arrivato = P.I.fermo && (P.I.posto ? P.sit >= 1 : !(P.amp > 0.2));
+        if (!N.B && (!arrivato || (a && a.currentTime > dura / 2))) {
+          n.style.visibility = 'hidden';
+          N.attesa = true;
+          continue;
+        }
+        if (tetto == null) {
+          tetto = M.wrap.getBoundingClientRect().top;
+          targhe = [...stage.querySelectorAll('.of-plate')].filter((b) => !b.hidden).map((b) => b.getBoundingClientRect());
+          // Dal basso in su: chi sale sopra una targhetta trova dopo quelle che le stanno sopra.
+          targhe.sort((b, c) => c.bottom - b.bottom);
+        }
+        // Appesa all'angolo verso la testa di chi parla (verso i piedi, se sta `sotto`):
+        // e' da li' che si rimpicciolisce, ed e' quello che resta fermo.
+        const ox = n.classList.contains('sx') ? 1 : 0;
+        const oy = n.classList.contains('sotto') ? 0 : 1;
+        n.style.transformOrigin = ox * 100 + '% ' + oy * 100 + '%';
+        n.style.scale = P.rimpicciolisce.toFixed(4);
+        // Misurata dov'e' di suo: senza lo spostamento di prima, e senza il saltello di of-fiato.
+        n.style.setProperty('translate', '0px 0px', 'important');
+        const r = n.getBoundingClientRect();
+        const S = k * P.rimpicciolisce;
+        // Fra lei e una targhetta resta almeno la codina (due pixel suoi), e un filo d'aria.
+        const codina = 2 * S;
+        let dy = 0;
+        for (const b of targhe) {
+          if (r.right < b.left + 1 || r.left > b.right - 1 || r.bottom + dy + codina < b.top || r.top + dy - codina > b.bottom) continue;
+          dy = b.top - codina - 3 - r.bottom + r.top > tetto + 2 ? b.top - codina - 3 - r.bottom : b.bottom + codina + 3 - r.top;
+        }
+        // Quell'angolo rispetto ai piedi del bottone, in pixel di bottone; e dove deve stare sulla scheda.
+        N.ax = n.offsetLeft + ox * n.offsetWidth - 8;
+        N.ay = n.offsetTop + oy * n.offsetHeight - 24;
+        N.x = P.sx + k * N.ax;
+        N.y = P.sy + k * N.ay + dy;
+        N.S = S;
+        N.B = M.B;
+        N.misura = M.largo + 'x' + M.alto;
+        N.dove = [P.I.tx, P.I.ty];
+        N.tr = N.sc = '';
+        if (N.attesa) {
+          // E' rimasta nascosta: entra adesso, e fa in tempo a uscire prima che la stanza piatta la tolga.
+          N.attesa = false;
+          n.style.visibility = '';
+          if (a) {
+            a.playbackRate = dura / (dura - a.currentTime);
+            a.currentTime = 0;
+          }
+        }
       }
-      if (Math.abs(dy - era) < 0.5) continue;
-      scansate.set(n, dy);
-      // Il bottone e' ingrandito quanto la figura: uno spostamento suo vale tanti pixel di scheda quanto lei e' alta su ventiquattro.
-      n.style.translate = dy ? '0 ' + (dy / (P.px / 24)).toFixed(1) + 'px' : '';
+      ferma(n, N, P, P.sx, P.sy);
+      // Chi parla se ne va (la stanza piatta l'ha gia' mandato altrove): lei sfuma da
+      // adesso, dall'85% dove comincia a sfumare da sola.
+      if (!N.via && Math.hypot(P.I.tx - N.dove[0], P.I.ty - N.dove[1]) > 1.5) {
+        N.via = true;
+        if (a) a.currentTime = Math.max(a.currentTime, dura * 0.85);
+        else n.style.visibility = 'hidden';
+        tiene = tiene || requestAnimationFrame(tieni);
+      }
+    }
+  }
+  /**
+   * La nuvoletta al suo posto, col bottone che ha i piedi in (fx, fy) sulla scheda: alto
+   * quanto la figura, un pixel suo vale `k` pixel di scheda. Lo spostamento e' scritto
+   * `important` perche' of-fiato (room.css) anima anche lui, col saltello d'ingresso, e
+   * un'animazione vince su uno stile qualunque ma non su questo: cosi' in 3D sfuma
+   * soltanto, ed e' la stessa animazione della stanza piatta — passando dall'una
+   * all'altra non riparte da capo, e finisce quando la stanza piatta la toglie.
+   */
+  function ferma(n, N, P, fx, fy) {
+    const k = P.px / 24;
+    const tr = ((N.x - fx) / k - N.ax).toFixed(2) + 'px ' + ((N.y - fy) / k - N.ay).toFixed(2) + 'px';
+    const sc = (N.S / k).toFixed(4);
+    if (tr === N.tr && sc === N.sc) return;
+    n.style.setProperty('translate', (N.tr = tr), 'important');
+    n.style.scale = N.sc = sc;
+  }
+  /* Lo specchio gira trenta volte al secondo, ma il bottone di chi se ne va lo porta
+     avanti a ogni fotogramma la transizione della stanza piatta: la sua nuvoletta, mentre
+     sfuma, andrebbe avanti e indietro di un paio di pixel. Finche' ce n'e' una cosi', la
+     si tiene ferma anche fra un giro e l'altro. */
+  let tiene = 0;
+  function tieni() {
+    tiene = 0;
+    for (const n of stage.querySelectorAll('.of-guy > .of-say')) {
+      const N = nate.get(n);
+      const P = vivi.get(n.parentElement);
+      if (!N || !N.via || !P || !P.px) continue;
+      const cs = getComputedStyle(n.parentElement);
+      ferma(n, N, P, P.sx + (parseFloat(cs.left) - P.l) * geo.k, P.sy + (parseFloat(cs.top) - P.tp) * geo.k);
+      tiene = tiene || requestAnimationFrame(tieni);
     }
   }
 
@@ -756,6 +848,7 @@ export function specchio(M) {
       nodi();
     },
     smonta() {
+      cancelAnimationFrame(tiene);
       for (const [el, P] of [...vivi]) muore(el, P);
       // Quello che il bottone si porta addosso torna alla misura e al posto che gli da' il foglio di stile.
       for (const n of stage.querySelectorAll('.of-guy > *')) n.style.scale = n.style.translate = n.style.transformOrigin = n.style.visibility = '';

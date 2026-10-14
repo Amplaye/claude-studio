@@ -20,7 +20,10 @@
 //  - chi si fa il caffe' lo fa davvero: la macchina versa mentre lui e' li', il
 //    rubinetto scorre mentre qualcuno lava, e si fermano quando ha finito;
 //  - il gatto e il cane ci sono, e stanno dentro i muri;
-//  - con le animazioni ridotte le bestie dormono;
+//  - la nuvoletta di chi siede nella fila dietro, con la targhetta accanto alla testa,
+//    nasce gia' piccola e al suo posto, e da li' non si muove: mai sopra un nome, e lo
+//    spostamento che le scrive lo specchio e' quello che si vede;
+//  - con le animazioni ridotte le bestie dormono, e la nuvoletta si vede, ferma;
 //  - e un fotogramma non costa piu' di quanto regge una scheda grafica integrata:
 //    i triangoli e le chiamate al disegno hanno un tetto, che si sfonda senza
 //    accorgersene aggiungendo un mobile tondo.
@@ -284,6 +287,64 @@ for (const pelle of PELLI) {
   t(s.disegni <= TETTO.disegni, qui(`un fotogramma sono ${s.disegni} chiamate al disegno (il tetto e’ ${TETTO.disegni})`));
 }
 
+/**
+ * Una frase detta a chi siede nella fila dietro, dove la targhetta sta sopra lo
+ * schermo, accanto alla sua testa. Torna la nuvoletta com'e' appena nata — passato il
+ * MutationObserver dello specchio, prima di un fotogramma — e poi a ogni fotogramma
+ * della tela (a software sono pochi al secondo, e si contano quelli).
+ */
+const nuvoletta = () =>
+  page.evaluate(async () => {
+    const chi = window.OFFICE3D.stato().gente.filter((g) => g.seduto && g.visibile).sort((a, b) => a.y - b.y)[0];
+    const el = chi && [...document.querySelectorAll('.of-stage .of-guy')].find((n) => n.getAttribute('aria-label') === chi.nome);
+    if (!el) return null;
+    // Le altre via: una nuvoletta vicina, o quattro in aria, e la stanza piatta non lo farebbe parlare.
+    for (const n of document.querySelectorAll('.of-stage .of-say')) n.remove();
+    const ms = window.ROOM.parla({ el }, 'Questa la sistemo dopo pranzo, promesso');
+    await null;
+    const n = el.querySelector('.of-say');
+    if (!n) return { chi: chi.nome, ms };
+    const xy = (s) => (s === 'none' ? '' : s).split(' ').filter(Boolean).map(parseFloat).concat(0, 0).slice(0, 2);
+    const foto = () => {
+      const r = n.getBoundingClientRect();
+      const [a, b] = xy(n.style.translate);
+      const [c, d] = xy(getComputedStyle(n).translate);
+      const nomi = [...document.querySelectorAll('.of-stage .of-plate')].filter((p) => !p.hidden).map((p) => p.getBoundingClientRect());
+      return {
+        t: r.top,
+        b: r.bottom,
+        l: r.left,
+        // Chi siede e' gia' arrivato: la sua nuvoletta non aspetta nascosta.
+        o: getComputedStyle(n).visibility === 'visible' ? +getComputedStyle(n).opacity : -1,
+        diverso: Math.abs(a - c) > 0.01 || Math.abs(b - d) > 0.01,
+        nome: nomi.some((q) => r.right > q.left + 1 && r.left < q.right - 1 && r.bottom > q.top + 1 && r.top < q.bottom - 1),
+      };
+    };
+    const C = [foto()];
+    let q = window.OFFICE3D.stato().quadri;
+    while (n.isConnected && C.length < 10) {
+      await new Promise((ok) => requestAnimationFrame(ok));
+      const s = window.OFFICE3D.stato().quadri;
+      if (s === q) continue;
+      q = s;
+      C.push(foto());
+    }
+    return { chi: chi.nome.split(' — ')[0], ms, C };
+  });
+/** La nuvoletta resta dove nasce, gia' della sua misura: un pixel al massimo fra due fotogrammi, e mai sopra un nome. */
+function ferma(N, quando = '') {
+  if (!N || !N.C || N.C.length < 4) return t(false, `${quando}la nuvoletta di chi siede nella fila dietro non c’e’, o la tela non va avanti: ` + JSON.stringify(N));
+  const C = N.C;
+  const salto = Math.max(...C.slice(1).map((c, i) => Math.max(Math.abs(c.t - C[i].t), Math.abs(c.b - C[i].b), Math.abs(c.l - C[i].l))));
+  t(!C.some((c) => c.o < 0), `${quando}la nuvoletta di ${N.chi}, che e’ seduto, resta nascosta`);
+  t(salto <= 1, `${quando}la nuvoletta di ${N.chi} si muove di ${salto.toFixed(1)} px fra due fotogrammi (o nasce grande, e poi si rimpicciolisce)`);
+  t(!C.some((c) => c.nome), `${quando}la nuvoletta di ${N.chi} copre un nome`);
+  t(!C.some((c) => c.diverso), `${quando}alla nuvoletta di ${N.chi} si vede uno spostamento diverso da quello che le scrive lo specchio`);
+}
+
+// --- la nuvoletta di chi siede nella fila dietro: nasce al suo posto, e non si muove piu'.
+ferma(await nuvoletta());
+
 // --- le animazioni ridotte: le bestie dormono, e le mani di chi batte stanno ferme sui
 //     tasti (e' il momento buono per misurarle: da vivi vagano, e ogni tanto si fermano
 //     a pensare con una mano al mento).
@@ -298,6 +359,10 @@ for (const p of calmo.v.mani) {
   const ok = p.mani.every(([d, h]) => d < 0.15 && h > 0.03 && h < 0.1);
   t(ok, `le mani di chi siede al posto ${p.posto} (${p.tipo}) non stanno sulla tastiera: ` + JSON.stringify(p.mani));
 }
+// E la nuvoletta compare e sparisce senza sfumare: si vede tutta, e sta ferma lo stesso.
+const calma = await nuvoletta();
+ferma(calma, 'con le animazioni ridotte ');
+if (calma && calma.C) t(calma.C.every((c) => c.o === 1), 'con le animazioni ridotte la nuvoletta non si vede: opacita’ ' + calma.C.map((c) => c.o).join(' '));
 await page.emulateMedia({ reducedMotion: 'no-preference' });
 
 // --- e si spegne senza lasciare niente appeso
@@ -317,4 +382,4 @@ if (fails.length) {
   console.error('office3d-check FAIL\n - ' + fails.join('\n - '));
   process.exit(1);
 }
-console.log('office3d-check ok — in tre pelli: la stanza che riempie la scheda, chi siede davanti al suo schermo, le tazze contate, il caffe’ e il rubinetto, il gatto e il cane, il costo; e le mani sui tasti');
+console.log('office3d-check ok — in tre pelli: la stanza che riempie la scheda, chi siede davanti al suo schermo, le tazze contate, il caffe’ e il rubinetto, il gatto e il cane, il costo; la nuvoletta ferma accanto alla targhetta; e le mani sui tasti');
