@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.39.1
+
+- **Si cammina come in un cartone animato.** La gamba e' un pezzo solo, senza
+  ginocchio: un tubo morbido dall'anca alla scarpa, che si piega quando il piede
+  passa avanti e torna dritto quando appoggia. Il bacino non resta piu' basso, la
+  scarpa rotola dal tallone alla punta, le braccia vanno a tempo coi passi, e il
+  passo e' piu' lungo e piu' calmo. Si parte in due passi, ci si ferma coi piedi
+  accanto, si gira ad arco, e due che si incrociano nel corridoio si scansano
+  invece di passarsi attraverso. Seduti, le gambe scendono morbide sotto la
+  scrivania.
+
+- **Le nuvolette stanno ferme.** Quelle di chi siede nella fila dietro tremavano e
+  finivano sopra i nomi: adesso una nuvoletta nasce gia' al suo posto, mai sopra un
+  nome, e da li' non si muove finche' non sparisce. Chi se ne va mentre parla non se
+  la porta dietro: resta dov'e' e sfuma.
+
+- **Le tazze sono quattro, e si lavano.** Nessuno entra piu' con una tazza sua in
+  mano. Chi vuole un caffe' e trova la rastrelliera vuota lava tutte quelle del
+  lavandino, le rimette a posto e poi si fa il caffe'.
+
+- **La bacheca non torna in cima.** Mentre Claude va avanti di un passo, il foglio
+  resta dove lo stavi leggendo, e «chi lavora per chi» non si rifa' a ogni
+  aggiornamento: il fumetto sotto il mouse e la selezione restano.
+
 ## 0.39.0
 
 - **L'ufficio in 3D, ridisegnato.** Quello a scatole sembrava un videogioco a cubetti:
