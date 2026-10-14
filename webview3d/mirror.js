@@ -27,7 +27,7 @@
  * quello che verra' aggiunto alla stanza si vede anche di qua.
  */
 import { THREE, U, clamp, ease, lerp, giro as corto } from './kit.js';
-import { persona, ALTA } from './people.js';
+import { persona, ALTA, SCARPA, CAVIGLIA } from './people.js';
 import { nuovo, ingressi, sposta, atteggia, siediSubito, SBRACCIO, AL_BANCONE, ACCANTO, DI_FIANCO, LIBRO_DOPO, PRESA_DOPO, CAFFE } from './gesti.js';
 
 /** I nodi del palco che hanno un gemello a volumi, o che sono solo contenitori. */
@@ -407,8 +407,13 @@ export function specchio(M) {
     }
 
     // --- secondo giro: ognuno bada a qualcosa, si sposta, si mette in posa, e si porta dietro il suo bottone
+    // (chi cammina sa dove sono gli altri, per non urtarli, e le scrivanie, per non tagliarne gli spigoli)
+    const gente = [...vivi.values()];
+    const banchi = M.B.banchi.map((b) => b.top);
     for (const [el, P] of vivi) {
       const I = P.I;
+      I.gente = gente;
+      I.banchi = banchi;
       // Uscito dalla porta: il bottone non c'e' piu', ma lui finisce di entrare in cabina.
       if (!visti.has(el)) {
         if (!I.soglia || !P.visibile || (P.addio = P.addio || t) < t - 2.5) {
@@ -464,9 +469,18 @@ export function specchio(M) {
 
       // La stanza rimontata ha sedie nuove al posto delle vecchie: la sua e' quella allo stesso posto.
       if (P.posto && !M.B.posti.includes(P.posto)) P.posto = M.B.posti[P.postoN] || null;
-      for (let i = 0; i < volte; i++) sposta(P, I, vero / volte, vero);
+      if (controllo) {
+        // Per i controlli la posa si rifa' a ogni sotto-passo, e a ogni sotto-passo si misura.
+        for (let i = 0; i < volte; i++) {
+          sposta(P, I, vero / volte, vero);
+          atteggia(P, I, t - vero + ((i + 1) * vero) / volte, vero / volte);
+          misuraPasso(P, i);
+        }
+      } else {
+        for (let i = 0; i < volte; i++) sposta(P, I, vero / volte, vero);
+        atteggia(P, I, t, vero);
+      }
       P.postoN = P.posto ? M.B.posti.indexOf(P.posto) : -1;
-      atteggia(P, I, t, vero);
       // Ferma da un pezzo: sbiadita, come la sua gemella piatta.
       const tinta = verso(P.tinta, I.ferma ? 0.5 : 1, vero * 2);
       if (tinta !== P.tinta || !P.alta) P.fig.tinta((P.tinta = tinta));
@@ -489,6 +503,8 @@ export function specchio(M) {
       P.rimpicciolisce = clamp((0.88 * piedi.s * 24) / P.px, 0.3, 1);
     }
 
+    if (controllo) misuraIncroci(volte);
+
     // Le sedie girano verso chi arriva e con chi ci sta seduto, e tornano dritte quando si alza.
     for (const q of M.B.posti) {
       if (!q.sedia) continue;
@@ -501,6 +517,109 @@ export function specchio(M) {
       }
       q.sedia.rotation.y += corto(q.sedia.rotation.y, a) * Math.min(1, vero * k);
     }
+  }
+
+  // ---------------------------------------------------------------------
+  //  i controlli della camminata (office3d-check), misurati dentro il 3D a ogni
+  //  sotto-passo: cosi' reggono anche dove un fotogramma dura decimi di secondo
+  // ---------------------------------------------------------------------
+  /** Acceso dai controlli (`passi`): i peggiori numeri visti finora. */
+  let controllo = null;
+  /** La scarpa nello spazio del suo osso, che sta alla caviglia (SCARPA in people.js). */
+  const SC = [SCARPA.centro[0], SCARPA.centro[1] + CAVIGLIA, SCARPA.centro[2]];
+  const SR = SCARPA.raggi;
+  const LT = [0, 0, 0];
+  /** Il punto piu' basso della scarpa: lo scrive in `L` (spazio dell'osso) e torna dov'e' nella stanza. */
+  function suola(o, L) {
+    const e = o.matrixWorld.elements;
+    const r = [e[1] * SR[0], e[5] * SR[1], e[9] * SR[2]];
+    const n = Math.hypot(r[0], r[1], r[2]);
+    for (let i = 0; i < 3; i++) L[i] = SC[i] - (SR[i] * r[i]) / n;
+    return v3.set(L[0], L[1], L[2]).applyMatrix4(o.matrixWorld);
+  }
+  /** Le parti di una scrivania dove non devono entrare le gambe di chi siede: in metri, viste dalla sua sedia (x a destra, z verso di lui), come le disegna props.js. */
+  const BANCO = [
+    ['piano', [-0.6, 0.49, -0.31], [0.6, 0.54, 0.31]],
+    ['fianco', [-0.53, 0, -0.25], [-0.47, 0.49, 0.25]],
+    ['fianco', [0.47, 0, -0.25], [0.53, 0.49, 0.25]],
+    ['pannello', [-0.47, 0.22, -0.245], [0.47, 0.46, -0.215]],
+    ['cassettiera', [-0.47, 0.1, -0.25], [-0.19, 0.48, 0.21]],
+  ];
+  const scatola = (p, lo, hi) => {
+    const q = [0, 1, 2].map((i) => Math.max(lo[i] - p[i], p[i] - hi[i]));
+    return Math.hypot(...q.map((x) => Math.max(x, 0))) + Math.min(Math.max(...q), 0);
+  };
+  function misuraPasso(P, i) {
+    const C = controllo;
+    const fig = P.fig;
+    fig.g.position.set(P.x, 0, P.y);
+    fig.g.rotation.y = P.a;
+    fig.g.updateMatrixWorld(true);
+    const S = P.verifica || (P.verifica = { L: [[0, 0, 0], [0, 0, 0]], w: [null, null], sci: [0, 0], pos: [] });
+    S.pos[i] = P.visibile && P.sit <= 0 ? [P.x, P.y, P.vel] : null;
+    if (!P.visibile) return;
+    for (let k = 0; k < 2; k++) {
+      const f = P.piedi[k];
+      const o = fig.ossa.gambe[k].scarpa;
+      const y = suola(o, LT).y / U;
+      if (P.sit > 0) {
+        S.w[k] = null;
+        continue;
+      }
+      C.suola = Math.min(C.suola, y);
+      if (f.su) {
+        // Finito un appoggio: quanto ha strisciato in tutto il punto che toccava terra.
+        if (S.w[k]) {
+          C.appoggi++;
+          if (S.sci[k] > C.scivola) (C.scivola = S.sci[k]), (C.chi = P.el ? (P.el.getAttribute('aria-label') || '').slice(0, 24) : '');        }
+        S.w[k] = null;
+        S.sci[k] = 0;
+        const u = f.aTempo ? f.s : f.u;
+        if (P.andava && u > 0.3 && u < 0.7) (C.aria = Math.min(C.aria, y)), C.inAria++;
+        continue;
+      }
+      // A terra: lo stesso punto della scarpa che toccava al sotto-passo prima, dov'e' adesso.
+      if (S.w[k]) {
+        v3.set(S.L[k][0], S.L[k][1], S.L[k][2]).applyMatrix4(o.matrixWorld);
+        S.sci[k] += Math.hypot(v3.x - S.w[k][0], v3.z - S.w[k][1]) / U;
+      }
+      const p = suola(o, S.L[k]);
+      S.w[k] = [p.x, p.z];
+    }
+    // Chi siede a una scrivania: le gambe (lungo le ossa del tubo) e le scarpe stanno fuori dal banco.
+    const q = P.posto;
+    if (i || !q || q.tipo !== 'banco' || P.sit < 1 || P.gira < 1) return;
+    const t = q.top;
+    const f = [Math.sin(t.a), Math.cos(t.a)];
+    const r = [-Math.cos(t.a), Math.sin(t.a)];
+    const sgn = Math.sign((q.x - t.x) * r[0] + (q.y - t.y) * r[1]) || 1;
+    const prova = (w, raggio) => {
+      const dx = w.x - t.x;
+      const dy = w.z - t.y;
+      const p = [(sgn * (dx * r[0] + dy * r[1])) / U, w.y / U, -(dx * f[0] + dy * f[1]) / U];
+      for (const [nome, lo, hi] of BANCO) {
+        const d = scatola(p, lo, hi) - raggio;
+        if (d < C.banco) (C.banco = d), (C.dove = nome);
+      }
+    };
+    for (const g of fig.ossa.gambe) {
+      for (const o of g.ossa) for (let y = 0; y < 0.155; y += 0.03) prova(o.localToWorld(v3.set(0, -y, 0)), 0.072);
+      for (let a = 0; a < 12; a++) for (const b of [0.6, 1.57, 2.5]) prova(g.scarpa.localToWorld(v3.set(SC[0] + SR[0] * Math.sin(b) * Math.cos(a * 0.52), SC[1] + SR[1] * Math.cos(b), SC[2] + SR[2] * Math.sin(b) * Math.sin(a * 0.52))), 0);
+    }
+    C.seduti++;
+  }
+  /** Due in piedi di cui almeno uno cammina: quanto si sono avvicinati, a ogni sotto-passo. */
+  function misuraIncroci(volte) {
+    const gente = [...vivi.values()].filter((P) => P.verifica);
+    for (let i = 0; i < volte; i++)
+      for (let a = 0; a < gente.length; a++)
+        for (let b = a + 1; b < gente.length; b++) {
+          const p = gente[a].verifica.pos[i];
+          const q = gente[b].verifica.pos[i];
+          if (!p || !q || (p[2] < 3 && q[2] < 3)) continue;
+          const d = Math.hypot(p[0] - q[0], p[1] - q[1]) / U;
+          if (d < controllo.incrocio) (controllo.incrocio = d), (controllo.chi2 = [gente[a], gente[b]].map((P) => (P.el ? (P.el.getAttribute('aria-label') || '').slice(0, 16) : '') + (P.sit > 0 ? ' (sedendosi)' : '')).join(' / '));
+        }
   }
 
   /** Da che parte sta girato chi e' fermo in piedi senza niente da fare: verso chi ha seduto accanto, o un po' verso chi gli sta vicino — ma sempre con la faccia a chi guarda. */
@@ -841,6 +960,21 @@ export function specchio(M) {
         sotto: !!b.macchina && b.macchina.tazza.visible,
         acqua: !!b.lavandino && b.lavandino.acqua.visible,
       };
+    },
+    /**
+     * I controlli della camminata: `true` comincia a misurare, `false` smette; torna
+     * i peggiori numeri visti (metri): quanto ha strisciato al massimo un piede in un
+     * appoggio, la suola piu' bassa, il piede in aria piu' basso a meta' passo, i due
+     * piu' vicini quando uno cammina, e le gambe di chi siede contro la scrivania.
+     */
+    passi(acceso) {
+      if (acceso === true) controllo = { scivola: 0, chi: '', appoggi: 0, suola: Infinity, aria: Infinity, inAria: 0, incrocio: Infinity, chi2: '', banco: Infinity, dove: '', seduti: 0 };
+      const r = controllo && { ...controllo };
+      if (acceso === false) {
+        controllo = null;
+        for (const P of vivi.values()) delete P.verifica;
+      }
+      return r;
     },
     /** Fuori dal giro: un nodo appena nato va messo a posto prima che lo si veda. */
     sistema() {

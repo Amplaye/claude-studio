@@ -9,23 +9,31 @@
  *
  * Costruita in METRI che guarda verso +z (a sud, verso la camera), dentro un gruppo
  * scalato di U: fuori di qui e' alta una cinquantina di unita' di stanza. Una figura
- * sola fa tutto: pende da quattro perni per parte — spalla e gomito, anca e
- * ginocchio — e non la si mette in posa per angoli ma per PUNTI: dove stanno le
- * mani, dove poggiano i piedi. Gli angoli li trova lei (due ossa e un triangolo).
- * E' quello che tiene i piedi per terra mentre il bacino scende sulla sedia, e le
- * mani sulla tastiera mentre la schiena si appoggia.
+ * sola fa tutto. Le braccia pendono da due perni, spalla e gomito, e si mettono in
+ * posa per PUNTI: dove stanno le mani. Gli angoli li trova lei (due ossa e un
+ * triangolo), ed e' quello che tiene le mani sulla tastiera mentre la schiena si
+ * appoggia. Le gambe no: sono un tubo solo, dall'anca alla scarpa, senza ginocchio,
+ * che gira all'anca e si incurva tutto quando la caviglia le si avvicina; come, lo
+ * decide chi la muove (gesti.js), che sa dove la scarpa tocca terra.
  *
  * Qui c'e' il corpo. Cosa fa lo decide gesti.js, e dove sta lo specchio (mirror.js),
  * che lo legge dalla stanza piatta.
  */
-import { THREE, Tratto, penna, G, toon, tazza, TAZZA, U, SEDILE_M, TAU, rnd, clamp } from './kit.js';
+import { THREE, Tratto, penna, senzaFilo, G, toon, tazza, TAZZA, U, SEDILE_M, TAU, rnd, clamp } from './kit.js';
 
-/** Le misure del corpo, in metri. L'anca in piedi sta un dito sotto la gamba tesa: un ginocchio mai dritto del tutto non scatta. */
+/** Le misure del corpo, in metri. In piedi, con la gamba dritta sotto, l'anca sta alta quanto la gamba: dall'anca alla suola. */
 export const ANCA = 0.69;
-export const COSCIA = 0.3;
-export const STINCO = 0.33;
-/** Dalla caviglia alla suola. */
-export const SUOLA = 0.07;
+/** Dall'anca alla caviglia, lungo la gamba; e di quanto stanno le due anche a destra e a sinistra del centro del bacino. */
+export const CAVIGLIA = 0.62;
+export const ANCHE = 0.082;
+/**
+ * La scarpa: un uovo appeso sotto la caviglia, il tacco poco dietro e la punta molto
+ * avanti. `centro` nello spazio della gamba (l'anca e' l'origine, la gamba pende lungo
+ * -y, la punta guarda +z) e i tre `raggi`. Di profilo la suola e' un'ellisse, e una
+ * gamba senza ginocchio cammina rotolandoci sopra: chi la muove calcola da qui dove
+ * tocca terra; chi misura, dove stanno tallone, punta e il punto piu' basso.
+ */
+export const SCARPA = { centro: [0, 0.055 - ANCA, 0.045], raggi: [0.075, 0.055, 0.125] };
 export const OMERO = 0.18;
 export const AVAMBRACCIO = 0.2;
 export const SPALLA = [0.178, 0.345];
@@ -79,7 +87,6 @@ function aspetto(seme) {
     occhiali: t.occhiali,
     cuffie: t.accessorio === 'cuffie',
     badge: t.accessorio === 'badge',
-    tazza: t.accessorio === 'tazza',
     vestito: t.vestito,
     cravatta: t.cravatta,
     robusta: t.corporatura === 'robusta',
@@ -249,11 +256,6 @@ const COSE = {
       for (const z of [-0.06, -0.03, 0, 0.03, 0.06]) p.cube(0.09, 0.002, 0.008, k * 0.069, 0.0265, z, '#b8a890', { rz: k * 0.2, filo: 0 });
     }
   },
-  /** La tazza che uno si e' portato da casa: e' sua, con la fascia del suo accento, e vive sulla sua scrivania. */
-  sua(p, o) {
-    COSE.tazza(p);
-    p.cyl(0.0465, 0.0465, 0.022, 0, 0.04, 0, o.acc, { filo: 0, n: 10 });
-  },
   /** Lo schermo in su, il lato lungo lungo z. */
   telefono(p) {
     p.box(0.065, 0.012, 0.125, 0, 0, 0, '#2e2430', { r: 0.005, filo: 0.006 });
@@ -274,7 +276,36 @@ const COSE = {
 };
 
 /** Le tazze sono un filo piu' grandi del vero, come quelle della stanza. */
-const GRANDE = { tazza: TAZZA, tazza2: TAZZA, tazza3: TAZZA, tazza4: TAZZA, sua: TAZZA };
+const GRANDE = { tazza: TAZZA, tazza2: TAZZA, tazza3: TAZZA, tazza4: TAZZA };
+
+/* La gamba di profilo, dalla caviglia all'anca: un tubo che si stringe verso il basso, con
+   un anello a ogni giuntura delle sue ossa (TRATTI pezzi lunghi PEZZO). Sopra finisce
+   dentro il bacino, sotto dentro la scarpa: li' e' aperto, tanto non si vede. */
+const TRATTI = 4;
+const PEZZO = CAVIGLIA / TRATTI;
+const GAMBA = [[0.052, -0.615], [0.06, -3 * PEZZO], [0.067, -2 * PEZZO], [0.072, -PEZZO], [0.066, 0.02], [0, 0.05]];
+
+/**
+ * Quanto si incurva il tubo perche' dall'anca alla caviglia ci siano `d` metri: e' un arco,
+ * TRATTI pezzi dritti girati ognuno di un tratto dell'angolo `φ` (0 dritto), e la corda di
+ * quell'arco (`corda`) e' PEZZO·Σ cos. Si cerca φ a meta' (la corda cala sempre, fino a φ = π).
+ */
+export function corda(f) {
+  let s = 0;
+  for (let i = 0; i < TRATTI; i++) s += Math.cos(f / 2 - ((i + 0.5) * f) / TRATTI);
+  return s * PEZZO;
+}
+function piega(d) {
+  if (d >= CAVIGLIA - 1e-6) return 0;
+  let a = 0;
+  let b = Math.PI;
+  for (let i = 0; i < 22; i++) {
+    const m = (a + b) / 2;
+    if (corda(m) > d) a = m;
+    else b = m;
+  }
+  return (a + b) / 2;
+}
 
 const GIU = new THREE.Vector3(0, -1, 0);
 const _n = new THREE.Vector3();
@@ -284,16 +315,15 @@ const _gi = new THREE.Vector3();
 const _t = new THREE.Vector3();
 const _g = new THREE.Vector3();
 const _q = new THREE.Quaternion();
-const _mh = new THREE.Matrix4();
+const _e = new THREE.Euler();
 const _mt = new THREE.Matrix4();
-const _ih = new THREE.Matrix4();
 const _it = new THREE.Matrix4();
 
 /**
- * Due ossa verso un punto. `T` e' il bersaglio visto dal perno di sopra, nello spazio
- * del genitore; `palo` da che parte si piega la giuntura (il gomito all'indietro, il
- * ginocchio in avanti). Le ossa pendono lungo -y. Quello che e' troppo lontano si
- * raggiunge a braccio teso; `fine`, se c'e', riceve dove arriva davvero la punta.
+ * Due ossa verso un punto: il braccio. `T` e' il bersaglio visto dalla spalla, nello
+ * spazio del genitore; `palo` da che parte si piega il gomito. Le ossa pendono lungo
+ * -y. Quello che e' troppo lontano si raggiunge a braccio teso; `fine`, se c'e',
+ * riceve dove arriva davvero la punta.
  */
 function dueOssa(sup, inf, a, b, T, palo, fine) {
   const d0 = T.length() || 1e-6;
@@ -376,16 +406,58 @@ export function persona(seme, mat) {
     });
     return { spalla, gomito };
   });
-  const gambe = [-1, 1].map((k) => {
-    const anca = nodo(hips, k * 0.082, 0, 0);
-    pezzo(anca, (p) => p.cap(0.072 * kr, COSCIA, 0, -COSCIA / 2, 0, o.pants));
-    const ginocchio = nodo(anca, 0, -COSCIA, 0);
-    pezzo(ginocchio, (p) => {
-      p.cap(0.06 * kr, 0.28, 0, -0.14, 0, o.pants);
-      p.sph(1, 0, -0.345, 0.045, o.shoes, { s: [0.075, 0.055, 0.125], n: 10 });
-    });
-    return { anca, ginocchio };
+  // Le gambe: tubi senza ginocchio che si piegano tutti d'un pezzo. Una mesh sola per le
+  // due, sul bacino, con le ossa appese alle anche: TRATTI pezzi di tubo e la scarpa. Ogni
+  // anello del tubo sta a una giuntura e va a meta' coi due pezzi che lega, cosi' il tubo
+  // (e il suo filo d'inchiostro, che ha gli stessi pesi) si incurva senza spigoli.
+  const Lg = new Tratto();
+  const pg = penna(Lg);
+  const scheletro = [];
+  const pesi = [];
+  const gambe = [-1, 1].map((k, j) => {
+    const anca = nodo(hips, k * ANCHE, 0, 0);
+    const ossa = [];
+    let su = anca;
+    for (let i = 0; i <= TRATTI; i++) {
+      const b = new THREE.Bone();
+      b.position.y = i ? -PEZZO : 0;
+      su.add(b);
+      ossa.push(b);
+      su = b;
+    }
+    scheletro.push(...ossa);
+    const n0 = Lg.p.length / 3;
+    pg.lathe(GAMBA, k * ANCHE, 0, 0, o.pants, { s: [kr, 1, kr], n: 10 });
+    const n1 = Lg.p.length / 3;
+    pg.sph(1, k * ANCHE + SCARPA.centro[0], SCARPA.centro[1], SCARPA.centro[2], o.shoes, { s: SCARPA.raggi, n: 10 });
+    const o0 = j * (TRATTI + 1);
+    for (let v = n0; v < n1; v++) {
+      // Fra il centro di un pezzo e quello dopo il peso passa dall'uno all'altro; l'anello in fondo va a meta' con la scarpa.
+      const c = clamp(-Lg.p[3 * v + 1] / PEZZO - 0.5, 0, TRATTI - 0.5);
+      const i = Math.min(Math.floor(c), TRATTI - 1);
+      pesi[v] = [o0 + i, o0 + i + 1, c - i];
+    }
+    for (let v = n1; v < Lg.p.length / 3; v++) pesi[v] = [o0 + TRATTI, o0, 0];
+    return { anca, ossa: ossa.slice(0, TRATTI), scarpa: ossa[TRATTI], piega: 0 };
   });
+  {
+    const geo = Lg.geometry();
+    const n = pesi.length;
+    const si = new Uint16Array(4 * n);
+    const sw = new Float32Array(4 * n);
+    for (let v = 0; v < n; v++) {
+      si[4 * v] = pesi[v][0];
+      si[4 * v + 1] = pesi[v][1];
+      sw[4 * v] = 1 - pesi[v][2];
+      sw[4 * v + 1] = pesi[v][2];
+    }
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+    geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+    const m = senzaFilo(new THREE.SkinnedMesh(geo, suo));
+    hips.add(m);
+    g.updateMatrixWorld(true);
+    m.bind(new THREE.Skeleton(scheletro));
+  }
 
   // Le cose nascono solo quando servono la prima volta: quasi nessuno annaffia.
   const cose = {};
@@ -405,10 +477,10 @@ export function persona(seme, mat) {
   return {
     g,
     seme,
-    /** I tratti che servono a chi la muove: se ha una tazza sua, se e' di stazza. */
+    /** I tratti che servono a chi la muove: se e' di stazza. */
     tratti: o,
     mani,
-    /** I perni, per chi deve misurare dove sono finiti davvero (i controlli). */
+    /** I perni, per chi deve misurare dove sono finiti davvero (i controlli): di ogni gamba l'anca, le ossa del tubo, la scarpa (che sta dove dice SCARPA, spostata alla caviglia) e quanto e' piegata. */
     ossa: { hips, torso, head, braccia, gambe },
     /**
      * Mette la figura in posa. Tutto in metri, nello spazio della figura (x di
@@ -416,7 +488,10 @@ export function persona(seme, mat) {
      *   anca [x, y, z] dove sta il bacino · bacino, busto, capo [rx, ry, rz] come girano
      *   (il busto rispetto al bacino, il capo rispetto al busto)
      *   mani [[x, y, z], [x, y, z]] e gomiti: dove vanno le mani, e da che parte piega il gomito
-     *   piedi [[x, y, z], …] dove poggiano le suole
+     *   gambe [[rx, ry, rz, d, s], …] come gira ogni gamba all'anca, nello spazio della figura
+     *     (ordine YXZ: ry di dove punta la scarpa, rx in avanti negativo, rz di fianco): e' la
+     *     corda dall'anca alla caviglia, lunga `d` metri (CAVIGLIA, o niente, e' dritta; piu'
+     *     corta si incurva in avanti); `s` di quanto la scarpa si alza di punta rispetto alla corda
      *   fiato il respiro · chiusi, sx, sy gli occhi · ciglia quanto si alzano
      *   umore -1 broncio … 1 sorriso · voce 0..1 la bocca che parla
      */
@@ -429,16 +504,19 @@ export function persona(seme, mat) {
       tronco.scale.set(1 + 0.012 * f, 1 + 0.02 * f, 1 + 0.035 * f);
       hips.updateMatrix();
       torso.updateMatrix();
-      _mh.copy(hips.matrix);
       _mt.multiplyMatrices(hips.matrix, torso.matrix);
-      _ih.copy(_mh).invert();
       _it.copy(_mt).invert();
       for (let k = 0; k < 2; k++) {
-        const l = gambe[k];
-        const s = p.piedi[k];
-        _t.set(s[0], s[1] + SUOLA, s[2]).applyMatrix4(_ih).sub(l.anca.position);
-        _g.set(k ? 0.1 : -0.1, 0, 1);
-        dueOssa(l.anca, l.ginocchio, COSCIA, STINCO, _t, _g);
+        // La gamba gira come vuole chi la muove, a prescindere da come e' girato il bacino.
+        const r = p.gambe[k];
+        const G = gambe[k];
+        G.anca.quaternion.copy(hips.quaternion).invert().multiply(_q.setFromEuler(_e.set(r[0], r[1], r[2], 'YXZ')));
+        // Il tubo: un arco dall'anca alla caviglia lungo quanto la corda chiesta, che pancia in
+        // avanti; la scarpa gira di quanto chiesto rispetto alla corda (0: come lei).
+        const fi = (G.piega = piega(r[3] ?? CAVIGLIA));
+        G.ossa[0].rotation.x = -fi / 2 + fi / (2 * TRATTI);
+        for (let i = 1; i < TRATTI; i++) G.ossa[i].rotation.x = fi / TRATTI;
+        G.scarpa.rotation.x = -fi / 2 + fi / (2 * TRATTI) - (r[4] || 0);
         const b = braccia[k];
         const m = p.mani[k];
         const e = p.gomiti[k];

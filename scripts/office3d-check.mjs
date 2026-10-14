@@ -23,7 +23,13 @@
 //  - la nuvoletta di chi siede nella fila dietro, con la targhetta accanto alla testa,
 //    nasce gia' piccola e al suo posto, e da li' non si muove: mai sopra un nome, e lo
 //    spostamento che le scrive lo specchio e' quello che si vede;
-//  - con le animazioni ridotte le bestie dormono, e la nuvoletta si vede, ferma;
+//  - la camminata, misurata dentro il 3D a ogni sotto-passo (cosi' regge anche qui, dove
+//    i fotogrammi sono pochi): due si scambiano il posto e si incrociano; i piedi a terra
+//    non strisciano, la suola non va sotto il pavimento, il piede in aria ci passa sopra,
+//    chi si incrocia si tiene a quaranta centimetri, e le gambe di chi siede non entrano
+//    nella scrivania;
+//  - con le animazioni ridotte le bestie dormono, la nuvoletta si vede, ferma, e
+//    camminare e sedersi restano;
 //  - e un fotogramma non costa piu' di quanto regge una scheda grafica integrata:
 //    i triangoli e le chiamate al disegno hanno un tetto, che si sfonda senza
 //    accorgersene aggiungendo un mobile tondo.
@@ -288,6 +294,66 @@ for (const pelle of PELLI) {
 }
 
 /**
+ * Due che siedono nella stessa fila si scambiano il posto: si alzano, si vengono
+ * incontro nel corridoio, si incrociano e si siedono ognuno alla scrivania dell'altro.
+ * Torna i nomi, o null se nella stessa fila non c'e' nessuno da scambiare.
+ */
+async function scambio() {
+  return page.evaluate(() => {
+    const R = window.ROOM;
+    const seduti = new Set(window.OFFICE3D.stato().gente.filter((g) => g.seduto).map((g) => g.nome));
+    // Chi siede a ogni scrivania, per la stanza piatta (il posto e' l'angolo del suo bottone) e anche di qua.
+    const chi = [];
+    for (let i = 0; i < 8; i++) {
+      const r = R.posto(i);
+      const el = [...document.querySelectorAll('.of-stage .of-guy')].find((n) => Math.abs(parseFloat(n.style.left) - r.x) < 3 && Math.abs(parseFloat(n.style.top) - r.y) < 3);
+      if (el && seduti.has(el.getAttribute('aria-label'))) chi.push({ el, r });
+    }
+    // I due piu' lontani della stessa fila: si incrociano nel corridoio dietro le scrivanie.
+    let coppia = null;
+    for (const a of chi) for (const b of chi) if (a !== b && a.r.y === b.r.y && (!coppia || Math.abs(a.r.x - b.r.x) > Math.abs(coppia[0].r.x - coppia[1].r.x))) coppia = [a, b];
+    if (!coppia) return null;
+    // (i piedi stanno otto pixel a destra e ventiquattro sotto l'angolo del bottone)
+    const [A, B] = coppia;
+    R.viaggio(A.el, B.r.x + 8, B.r.y + 24);
+    R.viaggio(B.el, A.r.x + 8, A.r.y + 24);
+    return [A.el.getAttribute('aria-label'), B.el.getAttribute('aria-label')];
+  });
+}
+/** Tutti e due di nuovo seduti (dopo essersi alzati). */
+const risiedono = async (nomi) => {
+  const seduti = async () => (await stato()).gente.filter((g) => nomi.includes(g.nome) && g.seduto).length;
+  let alzati = false;
+  for (let i = 0; i < 900; i++) {
+    const n = await seduti();
+    if (n < 2) alzati = true;
+    if (alzati && n === 2) return true;
+    await page.waitForTimeout(100);
+  }
+  console.error('scambio non finito:', alzati ? 'si sono alzati' : 'non si sono alzati', JSON.stringify((await stato()).gente.filter((g) => nomi.includes(g.nome))));
+  return false;
+};
+
+// --- la camminata, misurata dentro il 3D a ogni sotto-passo: due si scambiano il posto
+//     e si incrociano nel corridoio. I piedi a terra non strisciano (un centimetro al piu'
+//     per appoggio), la suola non va mai sotto il pavimento, il piede in aria ci passa
+//     sopra, chi si incrocia si tiene a quaranta centimetri, e le gambe di chi siede non
+//     entrano nella scrivania.
+await page.evaluate(() => window.OFFICE3D.passi(true));
+const coppia = await scambio();
+t(!!coppia, 'nella stessa fila non siedono due persone da far incrociare');
+if (coppia) t(await risiedono(coppia), 'scambiandosi il posto, ' + coppia.join(' e ') + ' non si risiedono');
+await fotogrammi(4);
+const P = await page.evaluate(() => window.OFFICE3D.passi(false));
+const cm = (x) => (x * 100).toFixed(1) + ' cm';
+t(P.appoggi >= 6 && P.scivola <= 0.01, `un piede a terra striscia di ${cm(P.scivola)} in un appoggio (su ${P.appoggi})`);
+t(P.suola >= -0.002, `una suola scende ${cm(-P.suola)} sotto il pavimento`);
+t(P.inAria > 0 && P.aria > 0.005, `a meta' passo il piede in aria passa a ${cm(P.aria)} dal pavimento`);
+t(P.incrocio >= 0.4, `due che si incrociano passano a ${cm(P.incrocio)} l'uno dall'altro`);
+t(P.seduti > 0 && P.banco >= 0, `le gambe di chi siede entrano nella scrivania (${P.dove}, ${cm(-P.banco)})`);
+console.log('camminata: strisciata massima', cm(P.scivola), '· suola piu bassa', cm(P.suola), '· piede in aria', cm(P.aria), '· incrocio', cm(P.incrocio), P.chi2 ? `(${P.chi2})` : '', '· gambe dalla scrivania', cm(P.banco), `(${P.appoggi} appoggi, ${P.seduti} sedute)`);
+
+/**
  * Una frase detta a chi siede nella fila dietro, dove la targhetta sta sopra lo
  * schermo, accanto alla sua testa. Torna la nuvoletta com'e' appena nata — passato il
  * MutationObserver dello specchio, prima di un fotogramma — e poi a ogni fotogramma
@@ -363,6 +429,9 @@ for (const p of calmo.v.mani) {
 const calma = await nuvoletta();
 ferma(calma, 'con le animazioni ridotte ');
 if (calma && calma.C) t(calma.C.every((c) => c.o === 1), 'con le animazioni ridotte la nuvoletta non si vede: opacita’ ' + calma.C.map((c) => c.o).join(' '));
+// Camminare e sedersi invece restano: e' quello che succede davvero.
+const calmi = await scambio();
+t(!!calmi && (await risiedono(calmi)), 'con le animazioni ridotte chi si scambia il posto non cammina o non si siede');
 await page.emulateMedia({ reducedMotion: 'no-preference' });
 
 // --- e si spegne senza lasciare niente appeso
@@ -382,4 +451,4 @@ if (fails.length) {
   console.error('office3d-check FAIL\n - ' + fails.join('\n - '));
   process.exit(1);
 }
-console.log('office3d-check ok — in tre pelli: la stanza che riempie la scheda, chi siede davanti al suo schermo, le tazze contate, il caffe’ e il rubinetto, il gatto e il cane, il costo; la nuvoletta ferma accanto alla targhetta; e le mani sui tasti');
+console.log('office3d-check ok — in tre pelli: la stanza che riempie la scheda, chi siede davanti al suo schermo, le tazze contate, il caffe’ e il rubinetto, il gatto e il cane, il costo; la camminata (piedi, suole, incroci, gambe sotto la scrivania); la nuvoletta ferma accanto alla targhetta; e le mani sui tasti');

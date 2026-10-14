@@ -482,6 +482,8 @@ window.OFFICE3D = {
   accendi,
   spegni,
   sveglia,
+  /** I controlli della camminata, misurati dentro il 3D a ogni sotto-passo: `passi(true)` comincia, `passi()` legge, `passi(false)` smette (vedi mirror.js). */
+  passi: (acceso) => (M ? M.specchio.passi(acceso) : null),
   get acceso() {
     return !!M;
   },
@@ -526,6 +528,8 @@ window.OFFICE3D = {
       seduti: [...M.specchio.vivi.values()]
         .filter((P) => P.posto && P.posto.tipo === 'banco' && P.sit >= 1 && P.gira >= 1 && P.cam === 0)
         .map((P) => ({ i: P.posto.i, punto: punto(P.a, M.B.banchi[P.posto.i].normale) })),
+      // Tutti i posti dove ci si siede (scrivanie e sgabelli): `p2` e' dove ci si mette i piedi nella stanza piatta.
+      posti: M.B.posti.map((q) => ({ tipo: q.tipo, p2: q.p2 })),
     };
   },
   /**
