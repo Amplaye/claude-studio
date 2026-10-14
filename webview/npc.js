@@ -127,7 +127,7 @@
        . niente     S s d pelle    H h g capelli   C c v tessuto
        I i j sotto  T t y accento  P p n pantaloni O o scarpe
        k scuro      e occhio       m bocca         z stoppia
-       f montatura  u U tazza      b B tesserino   x X cuffie
+       f montatura  b B tesserino  x X cuffie
 
      Vista tre quarti dall'alto: la testa e' grossa apposta (10 righe su 24),
      e' l'unico modo perche' a 16 pixel di larghezza una faccia si legga. */
@@ -350,9 +350,6 @@
   ];
 
   const ACCESSORI = {
-    tazza:  { y: 15, righe: ['.............UUU',
-                             '.............uuk',
-                             '.............uu.'] },
     badge:  { y: 12, righe: ['.....t....t.....',
                              '......t..t......',
                              '......t..t......',
@@ -394,7 +391,11 @@
   // Ripetuto = piu' probabile: la meta' dell'ufficio e' sbarbata, e le
   // sopracciglia non bastano a fare varieta' se tutti hanno la barba.
   const BARBE_PESATE = ['no', 'no', 'no', 'no', 'baffi', 'pizzetto', 'corta', 'corta', 'piena', 'piena'];
-  const ACCESSORI_PESATI = ['nessuno', 'nessuno', 'nessuno', 'tazza', 'tazza', 'badge', 'cuffie'];
+  // La tazza non e' piu' un accessorio: le tazze sono le quattro del bar, e una
+  // portata da casa era una tazza fuori dal conto. Al suo posto 'nessuno', e la
+  // lista resta di sette: il dado cade dove cadeva, e badge e cuffie restano a
+  // chi li aveva.
+  const ACCESSORI_PESATI = ['nessuno', 'nessuno', 'nessuno', 'nessuno', 'nessuno', 'badge', 'cuffie'];
 
   const memoT = new Map(), memoP = new Map(), memoV = new Map(), memoS = new Map();
 
@@ -550,7 +551,7 @@
       P: t.pantaloni.toni[0], p: t.pantaloni.toni[1], n: t.pantaloni.toni[2],
       O: t.scarpe.toni[0], o: t.scarpe.toni[1],
       K: 'rgba(30,23,15,.62)', k: '#2A2119', e: '#241B14', m: t.bocca, z: t.stoppia, f: '#3A2E20', l: t.riflesso,
-      u: '#F7EEE0', U: '#FFFDF8', b: '#F4E4CD', B: '#FFFDF8',
+      b: '#F4E4CD', B: '#FFFDF8',
       x: '#3C4633', X: '#768A61',
     };
   }
@@ -697,10 +698,6 @@
       o.push('<path d="M6.2 10.9 7.6 14.4M9.8 10.9 8.4 14.4" stroke="' + acc[1] + '" stroke-width=".35" fill="none"/>',
              '<rect x="6.6" y="14.3" width="2.8" height="2" rx=".3" fill="#FCF6ED" stroke="' + acc[2] + '" stroke-width=".25"/>',
              '<path d="M7.1 15.3h1.8M7.1 15.9h1.2" stroke="#8a8272" stroke-width=".3"/>');
-    if (t.accessorio === 'tazza')
-      o.push('<rect x="12.7" y="15.4" width="2.8" height="2.6" rx=".5" fill="#FFFDF8"/>',
-             '<rect x="12.7" y="15.4" width="2.8" height=".7" rx=".3" fill="' + acc[1] + '"/>',
-             '<circle cx="12.4" cy="16.8" r=".75" fill="none" stroke="#FFFDF8" stroke-width=".45"/>');
 
     // la capigliatura dietro, poi la testa sopra: la corona che avanza e' il taglio
     if (c.rx) o.push('<ellipse cx="8" cy="' + c.cy + '" rx="' + c.rx + '" ry="' + c.ry + '" fill="' + g('h') + '"/>');

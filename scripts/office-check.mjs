@@ -1670,22 +1670,98 @@ await page.emulateMedia({ reducedMotion: null });
 // la scrivania di chi se l'e' riportata indietro e il lavandino dove restano
 // sporche, ma sono sempre quattro. E' l'unica cosa che rende il bar un posto
 // invece che un'animazione — quando finiscono, la rastrelliera e' vuota davvero,
-// e chi arriva lava quelle del lavandino o torna a mani vuote. In mano se ne
-// possono avere piu' d'una (chi le ha appena lavate): quante, lo dice `data-n`.
+// e chi vuole un caffe' lava quelle del lavandino o torna a mani vuote. In mano se
+// ne possono avere piu' d'una (chi le sta lavando): quante, lo dice `data-n`. E
+// chi sta allungando la mano alla rastrelliera (`data-gesto="prende"`) ne ha una
+// in viaggio: dallo scaffale e' gia' sparita, in mano non ce l'ha ancora.
 //
 // Il conto e' anche l'unico modo in cui questa scena si rompe in silenzio: una
 // tazza persa non si vede finche' non sono finite tutte, e a quel punto e'
 // finito il caffe' in un ufficio dove nessuno ha bevuto niente. Qui si guarda
 // alla fine di tutto, quando la stanza ha gia' avuto un minuto per girare.
-const tazze = await page.evaluate(() => ({
-  scaffale: document.querySelectorAll('.of-tazze:not(.of-sporche) .of-tazza').length,
-  lavandino: document.querySelectorAll('.of-sporche .of-tazza').length,
-  mano: [...document.querySelectorAll('.of-tazza.addosso')].reduce((n, e) => n + (Number(e.dataset.n) || 1), 0),
-  scrivania: document.querySelectorAll('.of-tazza.piena').length,
-}));
+const contaTazze = (p) =>
+  p.evaluate(() => ({
+    scaffale: document.querySelectorAll('.of-tazze:not(.of-sporche) .of-tazza').length,
+    lavandino: document.querySelectorAll('.of-sporche .of-tazza').length,
+    mano: [...document.querySelectorAll('.of-tazza.addosso')].reduce((n, e) => n + (Number(e.dataset.n) || 1), 0),
+    scrivania: document.querySelectorAll('.of-tazza.piena').length,
+    viaggio: document.querySelectorAll('.of-guy[data-gesto="prende"]').length,
+  }));
+const somma = (c) => c.scaffale + c.lavandino + c.mano + c.scrivania + c.viaggio;
+const tazze = await contaTazze(page);
+t(somma(tazze) === 4, 'le tazze non sono piu\' quattro: ' + JSON.stringify(tazze));
+
+// Nessuno ha una tazza sua. Era un accessorio, disegnato in mano a chi entrava, e
+// nel 3D diventava una tazza vera da posare sulla scrivania: una tazza fuori dal
+// conto, che non finiva mai nel lavandino.
+const sue = await page.evaluate(() =>
+  Array.from({ length: 300 }, (_, i) => 'seme ' + i + '#' + (i % 8)).filter((s) => window.NPC.traits(s).accessorio === 'tazza')
+);
+t(!sue.length, 'c’e’ ancora chi ha una tazza sua: ' + sue.slice(0, 3).join(', '));
+
+// E un'ora d'ufficio, a orologio finto su una pagina sua. A ogni campione le tazze
+// sono quattro; nessuno lava finche' sulla rastrelliera ce n'e' una pulita, nessuno
+// fa il broncio finche' nel lavandino ce n'e' una da lavare, e chi le ha lavate
+// dopo si fa il caffe'. Se in un'ora il caso non capita da solo lo si prepara:
+// Math.random fermo a 0.65 vuol dire che chi arriva con la sua la lascia nel
+// lavandino (>= 0.6) e ne vuole un'altra (< 0.75), e in pochi giri la
+// rastrelliera e' vuota.
+const ora = await browser.newPage({ viewport: { width: 1500, height: 940 } });
+const erroriOra = [];
+ora.on('pageerror', (e) => erroriOra.push(String(e)));
+await ora.clock.install({ time: new Date('2026-10-14T09:00:00') });
+// Fermo: senza, l'orologio finto corre anche col tempo vero.
+await ora.clock.pauseAt(new Date('2026-10-14T09:00:01'));
+await ora.addInitScript(() => {
+  window.__bar = [];
+  addEventListener('DOMContentLoaded', () =>
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        const g = m.target.dataset.gesto;
+        if (!g || g === m.oldValue || !m.target.classList.contains('of-guy')) continue;
+        window.__bar.push({
+          g,
+          chi: m.target.querySelector('.of-body')?.dataset.seme,
+          r: document.querySelectorAll('.of-tazze:not(.of-sporche) .of-tazza').length,
+          s: document.querySelectorAll('.of-sporche .of-tazza').length,
+        });
+      }
+    }).observe(document.documentElement, { subtree: true, attributes: true, attributeOldValue: true, attributeFilter: ['data-gesto'] })
+  );
+});
+await ora.goto(url + '?office');
+await ora.clock.runFor(3000);
+const fuoriConto = [];
+const gira = async (secondi) => {
+  for (let i = 0; i < secondi / 2; i++) {
+    await ora.clock.runFor(2000);
+    const c = await contaTazze(ora);
+    if (somma(c) !== 4 && fuoriConto.length < 3) fuoriConto.push(c);
+  }
+};
+await gira(3600);
+const preparato = !(await ora.evaluate(() => window.__bar.some((e) => e.g === 'lava')));
+if (preparato) {
+  await ora.evaluate(() => (Math.random = () => 0.65));
+  await gira(900);
+}
+const bar = await ora.evaluate(() => window.__bar);
+await ora.close();
+t(!fuoriConto.length, 'in un’ora d’ufficio le tazze non sono sempre quattro: ' + JSON.stringify(fuoriConto));
+t(!erroriOra.length, 'nell’ora d’ufficio la pagina ha protestato: ' + erroriOra.join(' | '));
+const lavate = bar.filter((e) => e.g === 'lava');
+t(lavate.length, 'nessuno ha lavato le tazze, nemmeno col caso preparato');
+t(!lavate.some((e) => e.r > 0), 'qualcuno lava una tazza mentre sulla rastrelliera ce n’e’ una pulita');
+t(!bar.some((e) => e.g === 'broncio' && e.s > 0), 'qualcuno fa il broncio con le tazze sporche nel lavandino');
+// Chi ha lavato si fa il caffe': le posa sulla rastrelliera, ne prende una e la
+// mette sotto la macchina. I gesti di ognuno in fila, coi lavaggi di fila contati
+// una volta; quello rimasto a meta' quando l'ora e' finita vale. (In due al
+// lavandino l'ultima la prende uno solo, e l'altro torna senza: per questo si
+// guarda chi le ha posate, non chi ha strofinato.)
+const file = [...new Set(lavate.map((e) => e.chi))].map((chi) => bar.filter((e) => e.chi === chi).map((e) => e.g).join(' ').replace(/lava( lava)*/g, 'lava') + ' fine');
 t(
-  tazze.scaffale + tazze.lavandino + tazze.mano + tazze.scrivania === 4,
-  'le tazze non sono piu\' quattro: ' + JSON.stringify(tazze)
+  file.some((f) => f.includes('lava posa prende caffe')) && !file.some((f) => /lava posa (?!prende caffe|(prende )?fine)/.test(f)),
+  'chi ha lavato le tazze non si e’ fatto il caffe’' + (preparato ? ' (caso preparato)' : '') + ': ' + file.join(' | ').slice(0, 300)
 );
 
 // ---- la scheda dentro lo schermo ----
